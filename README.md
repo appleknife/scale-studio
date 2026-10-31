@@ -11,7 +11,8 @@ begin — there is no count-in and no timer — then follows the scale note by n
 and shows a percentage with specific, encouraging feedback: which notes sat
 high or low, whether the pulse wandered, and where you stopped.
 
-Everything happens in the browser. No audio is recorded, stored or uploaded.
+Everything happens in the browser. Nothing is uploaded, there is no account, and
+a recording you make stays in the tab and is gone when you close it.
 
 ---
 
@@ -323,6 +324,61 @@ believing it. Cropping the printed glyph and the render, scaling both to the sam
 height and putting them side by side settled every argument about these shapes;
 judging them from two separate screenshots did not.
 
+## Practice log
+
+A fourth screen, reached from the home page, keeps a practice record on that device: a
+streak, a five-week grid, one-tap tags for what you did, one-tap tags for what was
+hard, a checklist of scales that are audition-ready, a recording you can hear back
+in a hall, and a week summary you can copy into a lesson note.
+
+The shape of it is not arbitrary. It follows what the research on music practice and
+habit says keeps students playing:
+
+* **The streak counts anything.** One tap is a day. Demanding a full session is what
+  stops the habit forming. Duolingo found that separating the streak from the daily
+  goal, so one small lesson kept it alive, raised 7-day streaks by more than 40%.
+* **Two rest days a week, planned in advance.** A goal with emergency skips survives
+  a missed day; a perfect record does not. A rest day neither adds to the streak nor
+  breaks it, and a third in one week is refused rather than negotiated.
+* **Nothing is ever marked as a miss.** A day with no practice is a blank square,
+  never a red one: reminders that highlight failure are the ones that backfire.
+* **"What was hard today?"** is one tap, because reflection is the step that turns
+  playing into practicing, and it hands the teacher a starting point for the lesson.
+* **A plan, not a reminder.** Reminders on their own do not build habits; an if-then
+  plan ("I practice after dinner") does. That is what the little menu is for.
+* **Ready means ready.** A scale counts once it has been played at 90% or better on
+  two different days, which answers "am I ready?" far better than one good take.
+* No leaderboards, no badges, no notifications, and the streak shows yesterday's run
+  until today is logged, so a good habit does not look lost before breakfast.
+
+Takes log themselves: finishing a scale in the trainer, or a sight-reading attempt,
+adds a take to today without anything to type. A day with only "what was hard"
+tapped does not count as practice, so a stray tap cannot keep a streak alive.
+
+### Hearing yourself back
+
+The record button keeps the take in memory as a blob and plays it back through a
+synthesised hall: exponentially decaying, decorrelated stereo noise as an impulse
+response, 2.6 seconds with 20 ms of pre-delay, generated in a few milliseconds
+instead of the megabyte a sampled hall would cost. Hearing yourself in a concert
+hall is one of the most motivating things a practice room can offer, and
+self-recording is the technique conservatoire teachers rate highest of all.
+
+Three honest limits, all of them said on the screen:
+
+* The recording **never leaves the tab** and is not written to disk. Reloading or
+  closing the page ends it. That is why it can live inside an app that promises not
+  to upload anything.
+* The hall is **playback only**. It is added on the way to your headphones and never
+  touches the detector, so it cannot flatter a take into a better score.
+* Eight takes are kept and older ones are let go, so a long session cannot quietly
+  fill a phone's memory. Recording needs iOS 14.1 or later; the button says so
+  instead of failing silently.
+
+The log is held in `localStorage` under `scale-studio.journal.v1`, and *Start over*
+clears it. It is per device and per browser, so a student's log on the school iPad
+and the one at home are two different logs.
+
 ## Languages
 
 The app is in English and Simplified Chinese. The switch is the pill in the top
@@ -354,6 +410,8 @@ src/staff.js          treble-staff renderer (SVG)
 src/score.js          eight bars of notation: beams, rests, dots, marks
 src/sightreading.js   level table and seeded passage generator
 src/onsets.js         bow-change detection (built, not wired in yet)
+src/journal.js        practice-log rules: streak, rest days, ready scales, week sheet
+src/recorder.js       in-memory recording and the synthesised hall
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
 tests/sightreading.test.html  720 generated passages against the level rules
@@ -365,6 +423,8 @@ tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correc
 tests/notation.test.html  renders 360 passages and measures the ink: no rest and
                       no slur may come within two units of another glyph
 tests/i18n.test.html  translation coverage: no visible English left on any screen
+tests/journal.test.html   the log's arithmetic: streaks, two rests a week, ready scales
+tests/recorder.test.html  measures the synthesised hall: it decays, and it is stereo
 tests/lab-server.ps1  test server that collects results from a headless browser
 server.ps1            the local server used by Start Scale Studio.cmd
 ```
@@ -383,6 +443,17 @@ instead of trusting the generator: it pairs every stem with a note head and chec
 the stem is on the side its direction demands, and that no beam begins or ends in
 mid-air. That is the bug that kept appearing as "mutated" note pairs, so it is now
 checked mechanically rather than by eye.
+
+`tests/journal.test.html` pins today to a fixed date and walks a realistic week: a
+day with only "what was hard" does not count as practice, a rest day holds the streak
+together but a third one in a week is refused, today is not a broken streak before it
+is over, and a scale becomes ready on its second clean day rather than its first.
+
+`tests/recorder.test.html` cannot open a microphone headlessly, so it judges the room
+by the impulse response itself: the tail decays from 0.28 to nothing, the level at
+0.45 s is still audible and gone by 2.3 s, and the two channels correlate at r ≈ 0
+(a normalised correlation, because a raw dot product of pure noise fails at random).
+The live record path has to be tried by hand.
 
 `tests/dsp.test.html` synthesises a violin-like scale in the browser, runs it
 through the real detector and scorer, and reports pass/fail for a clean take,

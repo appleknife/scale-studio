@@ -452,6 +452,50 @@ export const S = {
   'aria.notation': ['Scale notation', '音阶乐谱'],
   'aria.dial': ['Tuning dial', '调音表盘'],
   'aria.score': ['Sight-reading passage', '视奏乐谱'],
+
+  /* Practice log, as the screen says it */
+  'log.banner.streak': ['{n} days in a row · {days} this week', '{n} 天连续 · 本周 {days} 天'],
+  'log.banner.empty': ['Start the log — one tap is enough.', '开始记录吧——点一下就算。'],
+  'log.planLine': ['You practice {when}.', '你的计划：{when}。'],
+  'log.planEmpty': ['Pick a time and it will show here.', '选一个时间，会显示在这里。'],
+  'log.rest': ['Mark today as rest', '把今天标为休息'],
+  'log.resting': ['Resting today · tap to undo', '今天休息 · 点一下取消'],
+  'log.restLimit': ['Two rest days a week is the limit', '一周只有两天休息'],
+  'log.thisWeek': ['{n} of 7 days', '7 天里有 {n} 天'],
+  'log.tag.scales': ['Scales', '音阶'],
+  'log.tag.sight': ['Sight reading', '视奏'],
+  'log.tag.tuner': ['Tuning', '调音'],
+  'log.tag.piece': ['A piece', '曲子'],
+  'log.tag.recording': ['Recording', '录音'],
+  'log.tag.other': ['Something else', '其他'],
+  'log.hard.intonation': ['Intonation', '音准'],
+  'log.hard.rhythm': ['Rhythm', '节奏'],
+  'log.hard.shifts': ['Shifts', '换把'],
+  'log.hard.reading': ['Reading', '读谱'],
+  'log.hard.tone': ['Tone and bow', '音色与运弓'],
+  'log.ready': ['Ready', '已就绪'],
+  'log.readyOf': ['{n} of {total} days', '{n}/{total} 天'],
+  'log.record': ['Record', '录音'],
+  'log.stop': ['Stop', '停止'],
+  'log.recording': [
+    'Recording — play something you are working on.',
+    '正在录音——拉一段你正在练的。',
+  ],
+  'log.recFailed': ['That recording did not save. Try again.', '这次录音没有成功，再试一次。'],
+  'log.noRecorder': ['This browser cannot record audio.', '这个浏览器不能录音。'],
+  'log.playing': ['Playing back…', '正在播放…'],
+  'log.playFailed': ['Could not play that back.', '这段放不出来。'],
+  'log.take': ['Take {n}', '第 {n} 段'],
+  'log.sheet.week': ['Week of {date}', '本周（{date} 起）'],
+  'log.sheet.days': ['Practiced {n} days, rested {rests}', '练了 {n} 天，休息 {rests} 天'],
+  'log.sheet.takes': ['{n} takes heard and scored', '听完并打分的次数：{n}'],
+  'log.sheet.did': ['Did: {list}', '练了：{list}'],
+  'log.sheet.hard': ['Hard this week: {list}', '这周觉得难的地方：{list}'],
+  'log.sheet.ready': ['Scales ready: {n} of {total}', '就绪的音阶：{n}/{total}'],
+  'log.copy': ['Copy the week', '复制这一周'],
+  'log.copied': ['Copied', '已复制'],
+  'log.copyFailed': ['Could not copy', '复制不了'],
+  'log.confirmClear': ['Clear the whole log? This cannot be undone.', '清空整份记录？不能恢复。'],
 };
 
 /* ── Static text that lives in index.html ─────────────────────────────── */
@@ -464,8 +508,8 @@ export const STATIC = {
   '中文': '中文',
   'NYSSMA Levels I–VI · violin': 'NYSSMA 一至六级 · 小提琴',
   'Tuned to A = 440 Hz': '以 A = 440 Hz 为准',
-  'Nothing is recorded or uploaded — audio is analysed in your browser.':
-    '不录音、不上传——声音只在这个浏览器里分析。',
+  'Audio is analysed in your browser. Nothing is uploaded, and a recording lives only in this tab.':
+    '声音只在这个浏览器里分析。不会上传；录音也只留在这个标签页里。',
 
   /* chooser */
   'Which scale today?': '今天练哪条音阶？',
@@ -591,6 +635,40 @@ export const STATIC = {
     '<li><strong>速度</strong>——不打分。比标记慢一点没关系。</li>' +
     '<li><strong>力度、弓法、音色</strong>——听不出来。一支麦克风分不清渐强和加弓压，也分不清断弓和连弓。</li>' +
     '<li><strong>重复音</strong>——同一个音连着拉，可能会合成一个音；换弓的位置它只能大致听出来。</li>',
+
+  /* Practice log — what the sheet markup and the date menu say */
+  'log.plan.none': '随时都可以',
+  'log.plan.afterSchool': '放学以后',
+  'log.plan.afterDinner': '晚饭以后',
+  'log.plan.beforeBed': '睡觉之前',
+  'What you played, what was hard, and how close the scales are to ready.':
+    '练了什么、哪里难、音阶离就绪还有多远。',
+  'Open the log': '打开记录',
+  'Everything here lives on this device. Nothing is uploaded, and a recording lasts only as long as this tab is open.':
+    '这些只存在这台设备上。不会上传；录音也只在这个标签页开着的时候存在。',
+  'days in a row': '天连续',
+  'Two rest days a week are yours to take. A day off you planned is not a broken streak.':
+    '每周有两天可以安排休息。计划好的休息，不算中断。',
+  'I practice': '我练习的时间',
+  'Last five weeks': '最近五周',
+  'Today': '今天',
+  'One tap is enough — a minute counts.': '点一下就够了——一分钟也算。',
+  'What was hard today?': '今天哪里觉得难？',
+  'Scales ready for the audition': '可以上场的音阶',
+  'A scale counts as ready once you have played it cleanly on two different days.':
+    '一条音阶在两个不同的日子都拉得干净，就算就绪。',
+  'Practice log': '练习记录',
+  'Copy the week': '复制这一周',
+  'Listen back': '听回放',
+  'Add a hall': '加一点厅堂混响',
+  'The reverb is only in your headphones — it does not touch the scoring, and the recording disappears when you close the tab.':
+    '混响只在你耳机里——它不参与打分；录音在关闭这个标签页后就没了。',
+  'Take this to your lesson': '带去上课用',
+  'Start over': '重新开始',
+  'whenever it happens': '随时都可以',
+  'after school': '放学以后',
+  'after dinner': '晚饭以后',
+  'before bed': '睡觉之前',
 
   /* the rest of the static sheet */
   'eyebrow.test': '模拟考试 · 三条音阶',

@@ -2209,3 +2209,303 @@ dialog .primary-btn {
   color: var(--ink-soft);
   font-weight: 600;
 }
+
+/* ── Practice log ──────────────────────────────────────────────────────── */
+
+.track-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 14px;  /* the week cells are sized by this column, so it also sets the row height */
+  margin-top: 18px;
+}
+
+@media (max-width: 720px) {
+  .track-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.track-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  padding: 20px 22px;
+}
+
+/* The week grid sets the height of the row. The streak card is a column with a
+   footer line, so the space reads as margin rather than as a dead patch under
+   the rest button. */
+.streak-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.streak-foot {
+  margin-top: auto;
+  padding-top: 18px;
+}
+
+.streak-note {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 34ch;
+}
+
+.streak-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.streak-num {
+  font-family: var(--serif);
+  font-size: 46px;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.streak-unit {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.streak-plan {
+  margin: 10px 0 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  min-height: 1.2em;
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.plan-row select {
+  font: inherit;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 4px 8px;
+}
+
+.week-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.week-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 7px;
+}
+
+/* A day is a dot. Practised is ink, a rest day is a ring, a missed day is an
+   empty square — never red, never marked as a failure. */
+.week-grid .day {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: #f2ece1;
+  border: 1px solid transparent;
+}
+
+.week-grid .day.on {
+  background: var(--accent);
+  opacity: 0.82;
+}
+
+.week-grid .day.rest {
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+}
+
+.week-grid .day.future {
+  background: transparent;
+}
+
+.week-grid .day.today {
+  box-shadow: 0 0 0 2px var(--accent-wash);
+  border-color: var(--accent-2);
+}
+
+.week-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 7px;
+  margin-top: 7px;
+  font-size: 10.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 18px;
+}
+
+.chip {
+  font: inherit;
+  font-size: 13.5px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.chip:hover {
+  border-color: var(--line-strong);
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--accent-wash);
+  border-color: #bcd3c6;
+  color: var(--accent);
+}
+
+.ready-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 10px 0 18px;
+}
+
+.ready-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 9px 11px;
+  background: var(--surface);
+}
+
+.ready-item.is-ready {
+  border-color: #bcd3c6;
+  background: var(--accent-wash);
+}
+
+.ready-key {
+  display: block;
+  font-family: var(--serif);
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.ready-item.is-ready .ready-key {
+  color: var(--accent);
+}
+
+.ready-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.rec-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  padding: 18px 22px;
+}
+
+.rec-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.rec-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.rec-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.rec-note {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.rec-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rec-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.rec-len {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+#recBtn.is-recording {
+  background: var(--rose);
+}
+
+.sheet {
+  margin: 10px 0 14px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+}
+
+.section-title {
+  margin-top: 26px;
+}
+
+.subtle.small {
+  font-size: 12.5px;
+  margin-top: -4px;
+}

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>The hall</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      pre {
+        background: #fffdfa;
+        border: 1px solid #e8dfd1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // The reverb is synthesised, so it can be measured without a microphone and
+      // without waiting for real time: an OfflineAudioContext renders faster than
+      // it plays. A microphone cannot be driven headlessly, so this is what can
+      // be checked — that the room is a room.
+      import { makeHallIR, canRecord } from '../src/recorder.js';
+
+      const problems = [];
+      const log = [];
+      const eq = (name, got, want, tol = 0) => {
+        if (Math.abs(got - want) > tol) problems.push(`${name}: ${got}, wanted ${want}±${tol}`);
+      };
+
+      const rate = 44100;
+
+      /* ── the impulse response ──────────────────────────────────────── */
+      {
+        const offline = new OfflineAudioContext(2, 1024, rate);
+        const ir = makeHallIR(offline, 2.6, 3.2);
+        eq('stereo', ir.numberOfChannels, 2);
+        eq('length', ir.duration, 2.6, 0.01);
+
+        const data = ir.getChannelData(0);
+        const preDelay = Math.floor(rate * 0.02);
+        let leading = 0;
+        for (let i = 0; i < preDelay - 1; i++) leading = Math.max(leading, Math.abs(data[i]));
+        eq('silent before the first reflection', leading, 0, 0.0001);
+
+        const rms = (from, to) => {
+          let sum = 0;
+          for (let i = from; i < to; i++) sum += data[i] * data[i];
+          return Math.sqrt(sum / Math.max(1, to - from));
+        };
+        const early = rms(preDelay, preDelay + rate * 0.2);
+        const late = rms(data.length - rate * 0.2, data.length);
+        if (!(early > late)) problems.push(`the tail does not decay: early ${early.toFixed(3)}, late ${late.toFixed(3)}`);
+        log.push(`tail: early ${early.toFixed(3)} → late ${late.toFixed(3)}`);
+
+        // The two ears must not be the same noise, or it reads as mono. Stated as
+        // a normalised correlation, because a raw dot product grows with the
+        // number of samples and would fail at random on a run of pure noise.
+        const left = ir.getChannelData(0);
+        const right = ir.getChannelData(1);
+        let dot = 0;
+        let power = 0;
+        for (let i = preDelay; i < left.length; i++) {
+          dot += left[i] * right[i];
+          power += left[i] * left[i];
+        }
+        const corr = dot / (power || 1);
+        if (Math.abs(corr) > 0.1) problems.push(`the two channels are the same signal (r ${corr.toFixed(2)})`);
+        log.push(`stereo independence: r ${corr.toFixed(3)}`);
+      }
+
+      /* ── what a click would do in it ──────────────────────────────── */
+      // Convolving an impulse with the IR gives back the IR, so the room can be
+      // judged from the IR alone — and without waiting on an audio thread, which
+      // a headless run cannot do. A note is still audible about half a second
+      // after it is played, and well gone by two.
+      {
+        const offline = new OfflineAudioContext(2, 1024, rate);
+        const ir = makeHallIR(offline, 2.6, 3.2);
+        const data = ir.getChannelData(0);
+        const rms = (at, width = 0.1) => {
+          const from = Math.floor(rate * at);
+          const to = Math.min(data.length, from + Math.floor(rate * width));
+          let sum = 0;
+          for (let i = from; i < to; i++) sum += data[i] * data[i];
+          return Math.sqrt(sum / Math.max(1, to - from));
+        };
+        const half = rms(0.45);
+        const late = rms(2.3);
+        log.push(`level at 0.45s ${half.toFixed(4)}, at 2.3s ${late.toFixed(4)}`);
+        if (!(half > 0.02)) problems.push(`a note has died by half a second (${half.toFixed(4)})`);
+        if (!(late < half * 0.25)) problems.push('the room never goes quiet');
+      }
+
+      // A microphone cannot be opened in a headless run, so the live path can only
+      // be confirmed as available, not exercised.
+      log.push(`MediaRecorder + getUserMedia: ${canRecord() ? 'available' : 'missing'}`);
+
+      document.getElementById('report').textContent = problems.length
+        ? `HALL FAILED\n${problems.join('\n')}\n\n${log.join('\n')}`
+        : `HALL OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'HALL FAILED' : 'HALL OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'recorder', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

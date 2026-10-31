@@ -1,12 +1,14 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311630';
-import { renderStaff } from './staff.js?v=202610311630';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610311630';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311630';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311630';
-import { generatePassage } from './sightreading.js?v=202610311630';
-import { renderScore } from './score.js?v=202610311630';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311732';
+import { renderStaff } from './staff.js?v=202610311732';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610311732';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311732';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311732';
+import { generatePassage } from './sightreading.js?v=202610311732';
+import { renderScore } from './score.js?v=202610311732';
+import * as Journal from './journal.js?v=202610311732';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202610311732';
 import {
   STRINGS,
   FIFTHS,
@@ -14,7 +16,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610311630';
+} from './tuner.js?v=202610311732';
 
 const LANG = initLang();
 
@@ -27,6 +29,7 @@ const el = {
     result: $('view-result'),
     tune: $('view-tune'),
     sight: $('view-sight'),
+    track: $('view-track'),
     'test-draw': $('view-test-draw'),
     'test-pick': $('view-test-pick'),
     'test-result': $('view-test-result'),
@@ -49,6 +52,26 @@ const el = {
   sightTips: $('sightTips'),
   sightAgain: $('sightAgain'),
   sightNext: $('sightNext'),
+  openLogBtn: $('openLogBtn'),
+  logBannerText: $('logBannerText'),
+  trackBack: $('trackBack'),
+  streakNum: $('streakNum'),
+  streakPlan: $('streakPlan'),
+  planSelect: $('planSelect'),
+  restBtn: $('restBtn'),
+  weekGrid: $('weekGrid'),
+  weekDays: $('weekDays'),
+  weekCount: $('weekCount'),
+  todayChips: $('todayChips'),
+  hardChips: $('hardChips'),
+  readyList: $('readyList'),
+  recBtn: $('recBtn'),
+  recStatus: $('recStatus'),
+  recList: $('recList'),
+  reverbToggle: $('reverbToggle'),
+  lessonSheet: $('lessonSheet'),
+  copySheet: $('copySheet'),
+  clearLog: $('clearLog'),
   sightLive: $('sightLive'),
   sightLiveNote: $('sightLiveNote'),
   sightLiveCents: $('sightLiveCents'),
@@ -455,7 +478,13 @@ function spinReels(animate = true) {
     const row = track.firstElementChild?.getBoundingClientRect().height || REEL_ROW_FALLBACK;
     const distance = (names.length - 1) * row;
 
+    // Which spin owns this reel. A stale one (its timer still pending when the
+    // student spins again) must not write its name into the new one.
+    const token = String(Number(reel.dataset.spin || 0) + 1);
+    reel.dataset.spin = token;
+
     const land = () => {
+      if (reel.dataset.spin !== token) return;
       track.style.transform = `translateY(-${distance}px)`;
       reel.classList.add('is-landed');
       sig.textContent = `${keyGlyphs(target)} · ${t('oct.short', { n: target.octaves })}`;
@@ -470,11 +499,16 @@ function spinReels(animate = true) {
       return;
     }
 
+    const duration = 900 + i * 380;
     const animation = track.animate(
       [{ transform: 'translateY(0px)' }, { transform: `translateY(-${distance}px)` }],
-      { duration: 900 + i * 380, easing: 'cubic-bezier(.12,.7,.16,1)', fill: 'forwards' },
+      { duration, easing: 'cubic-bezier(.12,.7,.16,1)', fill: 'forwards' },
     );
     animation.onfinish = land;
+    // A timer as well as the callback: a composited animation in a background
+    // tab, or a browser that never fires `finish`, must not leave the student
+    // looking at a stopped slot machine with Begin greyed out.
+    setTimeout(land, duration + 120);
   });
 }
 
@@ -1019,6 +1053,7 @@ function stopSightTake(analyse = true) {
   resetSightLive();
   if (analyse && take && take.started) {
     renderSightResult(analyzeSightTake(take.frames, sight.passage));
+    noteTake('sight');
   } else {
     el.sightStatus.textContent = '';
   }
@@ -1176,6 +1211,296 @@ el.sightLevels.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-sight-level]');
   if (!btn) return;
   newPassage(Number(btn.dataset.sightLevel));
+});
+
+/* ── Practice log ─────────────────────────────────────────────────────── */
+
+const journal = Journal.load();
+const recorder = { live: null, takes: [], playing: null };
+
+function todayKey() {
+  return Journal.dayKey();
+}
+
+function keyName(id) {
+  const card = MAJOR_KEYS.find((k) => k.id === id);
+  return card ? card.variants[0].name : id;
+}
+
+function saveJournal() {
+  Journal.save(journal);
+  renderLogBanner();
+}
+
+/** The one-line summary on the home card. */
+function renderLogBanner() {
+  if (!el.logBannerText) return;
+  const today = todayKey();
+  const days = Journal.streak(journal, today);
+  const sheet = Journal.weekSheet(journal, today, []);
+  el.logBannerText.textContent = days
+    ? t('log.banner.streak', { n: days, days: sheet.days })
+    : t('log.banner.empty');
+}
+
+function chips(container, items, dataKey, isOn, label) {
+  container.innerHTML = items
+    .map(
+      (item) =>
+        `<button class="chip" type="button" data-${dataKey}="${item}" aria-pressed="${isOn(
+          item,
+        )}">${label(item)}</button>`,
+    )
+    .join('');
+}
+
+function sheetText() {
+  const today = todayKey();
+  const ids = MAJOR_KEYS.map((k) => k.id);
+  const s = Journal.weekSheet(journal, today, ids);
+  const date = new Date(...s.start.split('-').map((v, i) => (i === 1 ? Number(v) - 1 : Number(v))));
+  const when = date.toLocaleDateString(getLang() === 'zh' ? 'zh-CN' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+  const lines = [t('log.sheet.week', { date: when })];
+  lines.push(t('log.sheet.days', { n: s.days, rests: s.rests }));
+  if (s.takes) lines.push(t('log.sheet.takes', { n: s.takes }));
+  const tags = Object.entries(s.tags)
+    .map(([tag, n]) => `${t(`log.tag.${tag}`)} ×${n}`)
+    .join(', ');
+  if (tags) lines.push(t('log.sheet.did', { list: tags }));
+  if (s.hard.length) {
+    const list = s.hard.map((h) => `${t(`log.hard.${h.key}`)} ×${h.n}`).join(', ');
+    lines.push(t('log.sheet.hard', { list }));
+  }
+  lines.push(t('log.sheet.ready', { n: s.ready.length, total: s.total }));
+  if (s.ready.length) lines.push(`  ${s.ready.map(keyName).join(', ')}`);
+  return lines.join('\n');
+}
+
+function renderRecList() {
+  el.recList.innerHTML = recorder.takes
+    .map(
+      (take, i) => `<li class="rec-item">
+        <button class="quiet-btn small" type="button" data-play="${i}">▶</button>
+        <span class="rec-name">${t('log.take', { n: recorder.takes.length - i })}</span>
+        <span class="rec-len">${take.seconds ? `${take.seconds.toFixed(0)}″` : ''}</span>
+      </li>`,
+    )
+    .join('');
+}
+
+function renderLog() {
+  const today = todayKey();
+  const days = Journal.streak(journal, today);
+  el.streakNum.textContent = String(days);
+
+  // The plan line repeats whatever the menu says, in the reader's language,
+  // rather than keeping a second copy of the four phrases to drift out of step.
+  el.planSelect.value = journal.plan || '';
+  const option = el.planSelect.options[el.planSelect.selectedIndex];
+  el.streakPlan.textContent = journal.plan
+    ? t('log.planLine', { when: option ? option.textContent : '' })
+    : t('log.planEmpty');
+
+  const resting = Journal.isRest(journal, today);
+  el.restBtn.textContent = resting ? t('log.resting') : t('log.rest');
+  el.restBtn.setAttribute('aria-pressed', String(resting));
+
+  el.weekGrid.innerHTML = Journal.weeks(journal, today, 5)
+    .flat()
+    .map((day) => {
+      const cls = day.future ? 'day future' : day.practised ? 'day on' : day.rest ? 'day rest' : 'day';
+      return `<span class="${cls}${day.today ? ' today' : ''}" title="${day.key}"></span>`;
+    })
+    .join('');
+  const sheet = Journal.weekSheet(journal, today, []);
+  el.weekCount.textContent = t('log.thisWeek', { n: sheet.days });
+
+  // The weekday letters come from the reader's own calendar, so a Chinese
+  // student sees 一 to 日 instead of an English row they have to translate.
+  const locale = getLang() === 'zh' ? 'zh-CN' : 'en-US';
+  el.weekDays.innerHTML = Array.from({ length: 7 }, (_, i) => {
+    const monday = new Date(2026, 2, 2 + i); // a Monday, so the week reads M to S
+    return `<span>${monday.toLocaleDateString(locale, { weekday: 'narrow' })}</span>`;
+  }).join('');
+
+  chips(
+    el.todayChips,
+    Journal.TAGS,
+    'tag',
+    (tag) => Boolean(journal.days[today] && journal.days[today].tags.includes(tag)),
+    (tag) => t(`log.tag.${tag}`),
+  );
+  chips(
+    el.hardChips,
+    Journal.HARD,
+    'hard',
+    (what) => Journal.hardThatDay(journal, today).includes(what),
+    (what) => t(`log.hard.${what}`),
+  );
+
+  const ids = MAJOR_KEYS.map((k) => k.id);
+  el.readyList.innerHTML = Journal.scalesReady(journal, ids)
+    .map(
+      (s) => `<div class="ready-item${s.ready ? ' is-ready' : ''}">
+        <span class="ready-key">${keyName(s.id)}</span>
+        <span class="ready-sub">${s.ready ? t('log.ready') : t('log.readyOf', { n: s.days, total: Journal.READY_DAYS })}</span>
+      </div>`,
+    )
+    .join('');
+
+  el.lessonSheet.textContent = sheetText();
+  el.copySheet.textContent = t('log.copy');
+  if (!recorder.live) el.recBtn.textContent = t('log.record');
+  renderRecList();
+}
+
+function openTrack() {
+  cancelListening();
+  showView('track');
+  renderLog();
+}
+
+/** A finished take logs itself: nothing to type, and nothing to forget. */
+function noteTake(tag, cardId = null, score = 0) {
+  const today = todayKey();
+  Journal.logTake(journal, today, tag);
+  if (cardId) Journal.noteScale(journal, cardId, today, score);
+  saveJournal();
+  if (!el.views.track.hidden) renderLog();
+}
+
+el.openLogBtn.addEventListener('click', openTrack);
+el.trackBack.addEventListener('click', goHome);
+
+el.todayChips.addEventListener('click', (event) => {
+  const chip = event.target.closest('button[data-tag]');
+  if (!chip) return;
+  const today = todayKey();
+  const day = journal.days[today];
+  const tag = chip.dataset.tag;
+  if (day && day.tags.includes(tag)) day.tags = day.tags.filter((k) => k !== tag);
+  else Journal.log(journal, today, tag);
+  saveJournal();
+  renderLog();
+});
+
+el.hardChips.addEventListener('click', (event) => {
+  const chip = event.target.closest('button[data-hard]');
+  if (!chip) return;
+  Journal.toggleHard(journal, todayKey(), chip.dataset.hard);
+  saveJournal();
+  renderLog();
+});
+
+el.restBtn.addEventListener('click', () => {
+  const result = Journal.markRest(journal, todayKey());
+  if (result === 'limit') el.restBtn.textContent = t('log.restLimit');
+  saveJournal();
+  renderLog();
+});
+
+el.planSelect.addEventListener('change', () => {
+  journal.plan = el.planSelect.value;
+  saveJournal();
+  renderLog();
+});
+
+el.copySheet.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(el.lessonSheet.textContent);
+    el.copySheet.textContent = t('log.copied');
+    setTimeout(() => {
+      el.copySheet.textContent = t('log.copy');
+    }, 1500);
+  } catch {
+    el.copySheet.textContent = t('log.copyFailed');
+  }
+});
+
+el.clearLog.addEventListener('click', () => {
+  if (!window.confirm(t('log.confirmClear'))) return;
+  Journal.clear();
+  Object.assign(journal, Journal.emptyState());
+  renderLog();
+  renderLogBanner();
+});
+
+/* ── Recording, with a hall on playback ───────────────────────────────── */
+
+async function toggleRecording() {
+  if (recorder.live) {
+    el.recBtn.disabled = true;
+    const started = Date.now();
+    try {
+      const blob = await recorder.live.stop();
+      recorder.live = null;
+      if (blob && blob.size) {
+        recorder.takes.unshift({
+          blob,
+          url: URL.createObjectURL(blob),
+          seconds: (Date.now() - started) / 1000,
+        });
+        // Keep the last eight in memory and let the older blobs go: a long
+        // session must not quietly eat a phone's RAM.
+        while (recorder.takes.length > 8) {
+          URL.revokeObjectURL(recorder.takes.pop().url);
+        }
+        noteTake('recording');
+      }
+      el.recStatus.textContent = '';
+    } catch {
+      el.recStatus.textContent = t('log.recFailed');
+    }
+    el.recBtn.disabled = false;
+    el.recBtn.textContent = t('log.record');
+    el.recBtn.classList.remove('is-recording');
+    renderRecList();
+    return;
+  }
+
+  if (!canRecord()) {
+    el.recStatus.textContent = t('log.noRecorder');
+    return;
+  }
+  try {
+    recorder.live = await startRecording();
+    el.recBtn.textContent = t('log.stop');
+    el.recBtn.classList.add('is-recording');
+    el.recStatus.textContent = t('log.recording');
+  } catch (err) {
+    el.recStatus.textContent = micErrorMessage(err);
+  }
+}
+
+async function playTake(index) {
+  if (recorder.playing) {
+    recorder.playing.stop();
+    recorder.playing = null;
+  }
+  const take = recorder.takes[index];
+  if (!take) return;
+  try {
+    const handle = await playRecording(take.blob, { wet: el.reverbToggle.checked ? 0.34 : 0 });
+    recorder.playing = handle;
+    el.recStatus.textContent = t('log.playing');
+    await handle.ended;
+    if (recorder.playing === handle) {
+      recorder.playing = null;
+      el.recStatus.textContent = '';
+    }
+  } catch {
+    el.recStatus.textContent = t('log.playFailed');
+  }
+}
+
+el.recBtn.addEventListener('click', toggleRecording);
+el.recList.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-play]');
+  if (!btn) return;
+  playTake(Number(btn.dataset.play));
 });
 
 /* ── Practice screen ──────────────────────────────────────────────────── */
@@ -1522,6 +1847,7 @@ function finishTake() {
   el.levelBar.hidden = true;
 
   const result = analyzeTake(take.frames, state.scale);
+  noteTake('scales', state.cardId, result.score);
 
   // In a mock audition the microphone stays open, the score stays hidden, and
   // the next scale arrives after a short pause.
@@ -1924,8 +2250,11 @@ if (params.has('autostart')) {
 }
 window.__scaleStudioReady = true;
 
+renderLogBanner();
+
 if (params.has('help')) el.helpDialog.showModal();
 if (params.has('draw')) drawThree();
+if (params.has('log')) openTrack();
 if (params.has('sightdemo')) {
   openSight(Number(params.get('sightdemo')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
   renderSightResult(analyzeSightTake(sightDemoFrames(sight.passage), sight.passage));

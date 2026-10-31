@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Practice log rules</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      pre {
+        background: #fffdfa;
+        border: 1px solid #e8dfd1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // The rules behind the log are the whole motivational design: a streak that
+      // survives a planned day off, never more than two of those a week, and a
+      // scale that only counts as ready after two separate days. All of it is
+      // arithmetic on dates, so it is tested as arithmetic.
+      import * as J from '../src/journal.js';
+
+      const problems = [];
+      const log = [];
+      const eq = (name, got, want) => {
+        const a = JSON.stringify(got);
+        const b = JSON.stringify(want);
+        if (a !== b) problems.push(`${name}: got ${a}, wanted ${b}`);
+      };
+
+      // A fixed Wednesday, so the test does not depend on when it is run.
+      const TODAY = '2026-03-11';
+
+      /* ── dates ─────────────────────────────────────────────────────── */
+      eq('weekStart is a Monday', J.weekStart(TODAY), '2026-03-09');
+      eq('addDays crosses a month', J.addDays('2026-02-27', 3), '2026-03-02');
+      eq('addDays goes back a year', J.addDays('2026-01-01', -1), '2025-12-31');
+      eq('dayKey is local and zero-padded', J.dayKey(new Date(2026, 2, 5)), '2026-03-05');
+
+      /* ── the streak ────────────────────────────────────────────────── */
+      {
+        const s = J.emptyState();
+        J.log(s, TODAY, 'scales');
+        eq('one day', J.streak(s, TODAY), 1);
+
+        J.log(s, J.addDays(TODAY, -1), 'piece');
+        J.log(s, J.addDays(TODAY, -2), 'sight');
+        eq('three in a row', J.streak(s, TODAY), 3);
+
+        // A gap two days back stops it there.
+        J.log(s, J.addDays(TODAY, -4), 'scales');
+        eq('a gap ends the run', J.streak(s, TODAY), 3);
+      }
+
+      {
+        // Not practising yet today shows yesterday's run rather than zero: a good
+        // habit should not look lost before breakfast.
+        const s = J.emptyState();
+        J.log(s, J.addDays(TODAY, -1), 'scales');
+        J.log(s, J.addDays(TODAY, -2), 'scales');
+        eq('today not done yet', J.streak(s, TODAY), 2);
+      }
+
+      {
+        // A planned rest day keeps the run alive without adding to it.
+        const s = J.emptyState();
+        J.log(s, TODAY, 'scales');
+        J.markRest(s, J.addDays(TODAY, -1));
+        J.log(s, J.addDays(TODAY, -2), 'scales');
+        eq('rest day bridges', J.streak(s, TODAY), 2);
+      }
+
+      {
+        // Two a week, and no more.
+        const s = J.emptyState();
+        eq('first rest', J.markRest(s, '2026-03-09'), 'marked');
+        eq('second rest', J.markRest(s, '2026-03-10'), 'marked');
+        eq('third rest', J.markRest(s, '2026-03-11'), 'limit');
+        eq('rest count', s.rests.length, 2);
+        eq('same day again clears', J.markRest(s, '2026-03-09'), 'cleared');
+        eq('and frees the slot', J.markRest(s, '2026-03-11'), 'marked');
+        // Next week starts with two fresh ones.
+        eq('next week is a new week', J.markRest(s, '2026-03-16'), 'marked');
+      }
+
+      /* ── the five-week grid ────────────────────────────────────────── */
+      {
+        const s = J.emptyState();
+        J.log(s, TODAY, 'scales');
+        const weeks = J.weeks(s, TODAY, 5);
+        eq('five rows', weeks.length, 5);
+        eq('seven columns', weeks[0].length, 7);
+        eq('this week starts Monday', weeks[4][0].key, '2026-03-09');
+        eq('the last cell is Sunday', weeks[4][6].key, '2026-03-15');
+        eq('today is marked', weeks[4][2].today, true);
+        eq('the future is future', weeks[4][3].future, true);
+        eq('the past is not', weeks[0][0].future, false);
+        eq('today is filled', weeks[4][2].practised, true);
+      }
+
+      /* ── scales ready ──────────────────────────────────────────────── */
+      {
+        const s = J.emptyState();
+        const ids = ['G', 'D', 'A'];
+        J.noteScale(s, 'G', '2026-03-09', 94);
+        eq('one clean day is not ready', J.scalesReady(s, ids)[0].ready, false);
+        J.noteScale(s, 'G', '2026-03-10', 91);
+        eq('two clean days are ready', J.scalesReady(s, ids)[0].ready, true);
+
+        // The same day twice does not count twice.
+        J.noteScale(s, 'D', '2026-03-09', 99);
+        J.noteScale(s, 'D', '2026-03-09', 98);
+        eq('same day twice', J.scalesReady(s, ids)[1].ready, false);
+
+        // A scruffy take is remembered but does not count as a day.
+        J.noteScale(s, 'A', '2026-03-09', 70);
+        J.noteScale(s, 'A', '2026-03-10', 72);
+        eq('low scores are not days', J.scalesReady(s, ids)[2].days, 0);
+        eq('but the best is kept', J.scalesReady(s, ids)[2].best, 72);
+      }
+
+      /* ── the lesson sheet ──────────────────────────────────────────── */
+      {
+        const s = J.emptyState();
+        const ids = ['G', 'D', 'A'];
+        J.logTake(s, '2026-03-09', 'scales');
+        J.logTake(s, '2026-03-09', 'scales');
+        J.log(s, '2026-03-10', 'sight');
+        J.toggleHard(s, '2026-03-10', 'shifts');
+        J.toggleHard(s, '2026-03-11', 'shifts');
+        J.toggleHard(s, '2026-03-11', 'intonation');
+        J.noteScale(s, 'G', '2026-03-09', 95);
+        J.noteScale(s, 'G', '2026-03-10', 95);
+        const sheet = J.weekSheet(s, '2026-03-11', ids);
+        eq('week start', sheet.start, '2026-03-09');
+        // Marking what was hard is not itself practice — the day needs a tag or a
+        // take, or a stray tap would keep the streak alive on its own.
+        eq('days practised', sheet.days, 2);
+        eq('takes', sheet.takes, 2);
+        eq('scales tagged', sheet.tags.scales, 1);
+        eq('sight tagged', sheet.tags.sight, 1);
+        eq('hard, most often first', sheet.hard[0], { key: 'shifts', n: 2 });
+        eq('hard, second', sheet.hard[1], { key: 'intonation', n: 1 });
+        eq('ready list', sheet.ready, ['G']);
+        eq('total offered', sheet.total, 3);
+      }
+
+      /* ── toggling ──────────────────────────────────────────────────── */
+      {
+        const s = J.emptyState();
+        eq('tag off again', (J.toggleHard(s, TODAY, 'tone'), J.hardThatDay(s, TODAY)), ['tone']);
+        J.toggleHard(s, TODAY, 'tone');
+        eq('empty after two taps', J.hardThatDay(s, TODAY), []);
+        eq('a day with no tags is not practice', J.practised(s, TODAY), false);
+        J.log(s, TODAY, 'tuner');
+        eq('logging a tag makes it practice', J.practised(s, TODAY), true);
+      }
+
+      /* ── storage round trip ────────────────────────────────────────── */
+      {
+        const store = new Map();
+        const fake = {
+          getItem: (k) => (store.has(k) ? store.get(k) : null),
+          setItem: (k, v) => store.set(k, String(v)),
+          removeItem: (k) => store.delete(k),
+        };
+        const s = J.load(fake);
+        eq('empty store gives an empty log', s.days, {});
+        J.log(s, TODAY, 'scales');
+        J.save(s, fake);
+        eq('it survives the round trip', J.practised(J.load(fake), TODAY), true);
+        J.clear(fake);
+        eq('and clears', J.load(fake).days, {});
+        // A store that throws must not take the app down with it.
+        const blocked = () => {
+          throw new Error('blocked');
+        };
+        const broken = { getItem: blocked, setItem: blocked, removeItem: blocked };
+        eq('a blocked store is survivable', J.load(broken).days, {});
+      }
+
+      document.getElementById('report').textContent = problems.length
+        ? `LOG FAILED\n${problems.join('\n')}`
+        : 'LOG OK';
+      document.title = problems.length ? 'LOG FAILED' : 'LOG OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'journal', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

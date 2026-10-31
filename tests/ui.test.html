@@ -12,7 +12,9 @@
     </style>
   </head>
   <body>
-    <iframe id="f" src="/index.html"></iframe>
+    <!-- The language is pinned: this test looks for English labels, and a
+         previous run on the same origin may have left Chinese in localStorage. -->
+    <iframe id="f" src="/index.html?lang=en"></iframe>
     <script>
       const problems = [];
       const log = [];

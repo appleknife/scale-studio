@@ -18,7 +18,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610311630" />
+    <link rel="stylesheet" href="app.css?v=202610311732" />
   </head>
   <body>
     <div class="shell">
@@ -86,6 +86,16 @@
               </p>
             </div>
             <button class="primary-btn" id="openSightBtn" type="button">Open sight reading</button>
+          </div>
+
+          <div class="test-banner log-banner">
+            <div class="test-banner-copy">
+              <h3>Practice log</h3>
+              <p id="logBannerText">
+                What you played, what was hard, and how close the scales are to ready.
+              </p>
+            </div>
+            <button class="primary-btn" id="openLogBtn" type="button">Open the log</button>
           </div>
 
           <div class="mode-row">
@@ -410,6 +420,92 @@
           </div>
         </section>
 
+        <!-- ── Practice log ────────────────────────────────────────────── -->
+        <section class="view" id="view-track" hidden>
+          <button class="back-btn" id="trackBack" type="button">
+            <span aria-hidden="true">←</span> All scales
+          </button>
+
+          <div class="head-row">
+            <div>
+              <h2>Practice log</h2>
+              <p class="subtle" id="trackSub">
+                Everything here lives on this device. Nothing is uploaded, and a
+                recording lasts only as long as this tab is open.
+              </p>
+            </div>
+          </div>
+
+          <div class="track-grid">
+            <div class="track-card streak-card">
+              <div class="streak-line">
+                <span class="streak-num" id="streakNum">0</span>
+                <span class="streak-unit">days in a row</span>
+              </div>
+              <p class="streak-plan" id="streakPlan"></p>
+              <label class="plan-row">
+                <span class="plan-label">I practice</span>
+                <select id="planSelect">
+                  <option value="" data-i18n="log.plan.none">whenever it happens</option>
+                  <option value="afterSchool" data-i18n="log.plan.afterSchool">after school</option>
+                  <option value="afterDinner" data-i18n="log.plan.afterDinner">after dinner</option>
+                  <option value="beforeBed" data-i18n="log.plan.beforeBed">before bed</option>
+                </select>
+              </label>
+              <div class="streak-foot">
+                <button class="quiet-btn small" id="restBtn" type="button">Resting today</button>
+                <p class="streak-note">Two rest days a week are yours to take. A day off you planned is not a broken streak.</p>
+              </div>
+            </div>
+
+            <div class="track-card week-card">
+              <div class="week-head">
+                <span>Last five weeks</span>
+                <span class="week-count" id="weekCount"></span>
+              </div>
+              <div class="week-grid" id="weekGrid"></div>
+              <div class="week-days" id="weekDays" aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <h3 class="section-title">Today</h3>
+          <p class="subtle small" id="todayHint">One tap is enough — a minute counts.</p>
+          <div class="chip-row" id="todayChips"></div>
+
+          <h3 class="section-title">What was hard today?</h3>
+          <div class="chip-row" id="hardChips"></div>
+
+          <h3 class="section-title">Scales ready for the audition</h3>
+          <p class="subtle small" id="readyHint">
+            A scale counts as ready once you have played it cleanly on two different days.
+          </p>
+          <div class="ready-grid" id="readyList"></div>
+
+          <h3 class="section-title">Listen back</h3>
+          <div class="rec-card">
+            <div class="rec-row">
+              <button class="primary-btn" id="recBtn" type="button">Record</button>
+              <label class="rec-toggle">
+                <input type="checkbox" id="reverbToggle" checked />
+                <span>Add a hall</span>
+              </label>
+              <p class="rec-status" id="recStatus" role="status" aria-live="polite"></p>
+            </div>
+            <p class="rec-note" id="recNote">
+              The reverb is only in your headphones — it does not touch the scoring,
+              and the recording disappears when you close the tab.
+            </p>
+            <ul class="rec-list" id="recList"></ul>
+          </div>
+
+          <h3 class="section-title">Take this to your lesson</h3>
+          <pre class="sheet" id="lessonSheet"></pre>
+          <div class="actions">
+            <button class="quiet-btn" id="copySheet" type="button">Copy the week</button>
+            <button class="quiet-btn" id="clearLog" type="button">Start over</button>
+          </div>
+        </section>
+
         <!-- ── Practice ────────────────────────────────────────────────── -->
         <section class="view" id="view-practice" hidden>
           <button class="back-btn" id="backBtn" type="button">
@@ -603,7 +699,7 @@
       <footer class="footer">
         <span>Tuned to A = 440 Hz</span>
         <span class="dot-sep">·</span>
-        <span>Nothing is recorded or uploaded — audio is analysed in your browser.</span>
+        <span>Audio is analysed in your browser. Nothing is uploaded, and a recording lives only in this tab.</span>
         <span class="dot-sep">·</span>
         <a
           class="donate-link"
@@ -667,7 +763,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610311630"></script>
+    <script type="module" src="src/app.js?v=202610311732"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.
