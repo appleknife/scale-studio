@@ -18,24 +18,16 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610311309" />
+    <link rel="stylesheet" href="app.css?v=202610311326" />
   </head>
   <body>
     <div class="shell">
       <header class="topbar">
         <button class="brand" id="brandHome" type="button" aria-label="Back to scale list" data-i18n-aria="aria.back">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32">
-              <circle cx="12" cy="22.5" r="4.1" fill="currentColor" />
-              <rect x="14.6" y="7" width="1.9" height="15.5" rx="0.9" fill="currentColor" />
-              <path
-                d="M16.5 7.2c3.6.5 5.6 2.3 5.6 5.4"
-                stroke="currentColor"
-                stroke-width="1.9"
-                fill="none"
-                stroke-linecap="round"
-              />
-            </svg>
+            <!-- the eighth note the score is matched against, drawn once at 160px
+                 and shown here at 26: the same engraving as the app icons -->
+            <img class="brand-note" src="icons/mark.png" alt="" width="14" height="26" />
           </span>
           <span class="brand-text">
             <strong>Scale Studio</strong>
@@ -553,7 +545,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610311309"></script>
+    <script type="module" src="src/app.js?v=202610311326"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

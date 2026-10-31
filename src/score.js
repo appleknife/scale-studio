@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311309';
-import { CLEF_PATH } from './clef.js?v=202610311309';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311326';
+import { CLEF_PATH } from './clef.js?v=202610311326';
 
-import { beatLength } from './sightreading.js?v=202610311309';
+import { beatLength } from './sightreading.js?v=202610311326';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -25,8 +25,12 @@ const BARS_PER_SYSTEM = 4;
 // Proportions follow engraving convention in staff spaces (one space = LINE_GAP):
 // a stem is 3.5 spaces, a beam half a space thick, a note head a little over a
 // space wide. Anything smaller reads as a sketch rather than a score.
-const HEAD_RX = 6.1;
-const HEAD_RY = 4.6;
+// Head proportions from a display-weight eighth note the app was matched
+// against: 1.56 wide to tall, leaning 24°. The engraved default is nearer 1.33
+// at 18°, which reads thinner at phone size than the rest of this design.
+const HEAD_RX = 7.1;
+const HEAD_RY = 4.55;
+const HEAD_ANGLE = -24;
 const STEM = 3.5 * LINE_GAP;
 const BEAM = 0.48 * LINE_GAP;
 const FLAG = 22;
@@ -54,9 +58,9 @@ function ledgerLines(letter, octave, x, bottom) {
  */
 function head(x, y, { hollow = false, colour = INK } = {}) {
   if (hollow) {
-    return `<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="none" stroke="${colour}" stroke-width="1.7" transform="rotate(-18 ${x} ${y})"/>`;
+    return `<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="none" stroke="${colour}" stroke-width="1.7" transform="rotate(${HEAD_ANGLE} ${x} ${y})"/>`;
   }
-  return `<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="${colour}" transform="rotate(-18 ${x} ${y})"/>`;
+  return `<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="${colour}" transform="rotate(${HEAD_ANGLE} ${x} ${y})"/>`;
 }
 
 /* ── Rests ─────────────────────────────────────────────────────────────── */
@@ -492,7 +496,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       // a stem is drawn for everything but a whole note and a beamed eighth
       if (!(event.dur >= 16)) {
         part.push(
-          `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemEnd}" stroke="${INK}" stroke-width="1.35" stroke-linecap="round"/>`,
+          `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemEnd}" stroke="${INK}" stroke-width="1.42" stroke-linecap="round"/>`,
         );
       }
       if (event.dur <= 2 && !beam) {
@@ -501,12 +505,20 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
         // centreline with a width — because a hairline curl turns into a detached
         // crescent as soon as the page is drawn at phone size.
         const toward = up ? 1 : -1; // which way the head lies from the stem tip
+        // The shape of the hook, as [across, down, half-width] from the stem tip.
+        // An engraved flag is fattest where it leaves the stem and tapers the
+        // whole way to a point — a comma, not a blade. The ribbon used to bulge
+        // in the middle (0.75 → 1.85 → 2.0 → 1.35), which made a symmetrical
+        // sliver that read as something caught on the stem rather than a flag.
+        // It now starts wide enough to sit inside the stem, so the join is
+        // solid, and closes on essentially nothing.
         const FLAG_SHAPE = [
-          [0.3, 0.0, 0.8],
-          [3.4, 3.2, 1.9],
-          [7.0, 7.8, 2.0],
-          [8.6, 12.6, 1.2],
-          [7.4, 17.0, 0.35],
+          [0.4, 0.0, 0.85],
+          [3.3, 3.1, 1.7],
+          [6.9, 7.7, 1.75],
+          [8.7, 12.5, 1.15],
+          [8.2, 15.8, 0.55],
+          [6.9, 17.6, 0.05],
         ];
         const flag = (shift) => {
           const pts = FLAG_SHAPE.map(([x, t, w]) => [stemX + x, stemEnd + toward * (t + shift), w]);

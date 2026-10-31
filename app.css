@@ -91,6 +91,13 @@ body {
   height: 26px;
 }
 
+/* the note glyph is tall and narrow: fix the height, let the width follow */
+.brand-note {
+  display: block;
+  height: 26px;
+  width: auto;
+}
+
 .brand-text {
   display: flex;
   flex-direction: column;
