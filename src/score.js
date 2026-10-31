@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311326';
-import { CLEF_PATH } from './clef.js?v=202610311326';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311331';
+import { CLEF_PATH } from './clef.js?v=202610311331';
 
-import { beatLength } from './sightreading.js?v=202610311326';
+import { beatLength } from './sightreading.js?v=202610311331';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -506,19 +506,20 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
         // crescent as soon as the page is drawn at phone size.
         const toward = up ? 1 : -1; // which way the head lies from the stem tip
         // The shape of the hook, as [across, down, half-width] from the stem tip.
-        // An engraved flag is fattest where it leaves the stem and tapers the
-        // whole way to a point — a comma, not a blade. The ribbon used to bulge
-        // in the middle (0.75 → 1.85 → 2.0 → 1.35), which made a symmetrical
-        // sliver that read as something caught on the stem rather than a flag.
-        // It now starts wide enough to sit inside the stem, so the join is
-        // solid, and closes on essentially nothing.
+        // The width has to fall from the first point to the last: the flag is a
+        // comma, heaviest where it joins the stem and thinning all the way to a
+        // point. Bulging in the middle (0.85 → 1.7 → 1.75 → 1.15 → 0.55) gave
+        // thin → thick → thin, which read as a bandage wrapped round the stem
+        // rather than a flag growing out of it. The base is also wider than the
+        // stem itself, so the join is a solid block of ink.
         const FLAG_SHAPE = [
-          [0.4, 0.0, 0.85],
-          [3.3, 3.1, 1.7],
-          [6.9, 7.7, 1.75],
-          [8.7, 12.5, 1.15],
-          [8.2, 15.8, 0.55],
-          [6.9, 17.6, 0.05],
+          [0.0, 0.0, 2.3],
+          [1.8, 2.8, 2.1],
+          [4.2, 6.4, 1.75],
+          [6.6, 10.6, 1.25],
+          [8.2, 14.2, 0.7],
+          [7.6, 17.0, 0.25],
+          [6.6, 18.0, 0.04],
         ];
         const flag = (shift) => {
           const pts = FLAG_SHAPE.map(([x, t, w]) => [stemX + x, stemEnd + toward * (t + shift), w]);
