@@ -263,9 +263,15 @@ sight-reading table for that level.
   resolves its leaps, has one climax and cadences on the tonic — the conventions a
   human writes sight reading by.
 
-**It does not listen yet.** It is a generator: read from the screen, study it, hear
-its tempo. Hearing the passage and marking it is the next piece of work, and the
-card on screen says so rather than pretending otherwise.
+* **Start listening** waits for your first note, then marks the passage: notes,
+  intonation, pulse and stops, in the same forgiving spirit as the scales. Tempo is
+  not scored and dynamics and articulation are out of reach — the card says so.
+* **The needle** under the buttons is the same readout the scale take shows: the
+  note you are sounding and how many cents off centre it sits. It is a rehearsal
+  aid, so it only appears while a take is running; a mock audition will arm the
+  take with `armSightTake({ live: false })` and hide it.
+* A take left open when the student walks away is closed with the microphone, so
+  nothing keeps counting on a screen nobody is watching.
 
 ### Drawing the notation
 

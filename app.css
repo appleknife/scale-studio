@@ -2018,6 +2018,17 @@ dialog .primary-btn {
   min-height: 1.2em;
 }
 
+/* The live intonation readout, on the same footing as the scale take's: a small
+   card of its own, centred under the buttons. */
+.sight-live {
+  margin: 20px auto 18px;
+  padding: 16px 20px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
 .sight-result {
   margin-top: 18px;
   background: var(--card);

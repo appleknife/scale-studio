@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sight-reading listening test</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      pre {
+        background: #fffdfa;
+        border: 1px solid #e8dfd1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+      iframe {
+        position: fixed;
+        left: -4000px;
+        top: 0;
+        width: 1100px;
+        height: 900px;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      // A synthetic take is played through `routeFrame` — the very function the
+      // microphone feeds — so the whole listening path is exercised headless.
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      const problems = [];
+      const log = [];
+
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      /** Opens the app on `url` and waits until it has booted. */
+      function load(url) {
+        return new Promise((resolve, reject) => {
+          const frame = document.createElement('iframe');
+          frame.src = url;
+          frame.addEventListener('load', () => resolve(frame));
+          frame.addEventListener('error', () => reject(new Error(`cannot load ${url}`)));
+          document.body.appendChild(frame);
+        });
+      }
+
+      /** Polls until `check` is true or the budget runs out. */
+      async function until(check, budget = 8000) {
+        const started = performance.now();
+        while (performance.now() - started < budget) {
+          if (check()) return true;
+          await wait(40);
+        }
+        return false;
+      }
+
+      const noteName = /^[A-G][♯♭]?\d$/;
+
+      /* ── 1. Mid-take: the needle is up and reading ──────────────────── */
+      {
+        // `hold` stops the feed 700 ms in, on a note deliberately 38 cents flat,
+        // so the readout is still on screen when we look at it.
+        const frame = await load('../index.html?sightplay=5&seed=7&detune&hold=700');
+        const d = frame.contentDocument;
+        const live = d.getElementById('sightLive');
+
+        const showed = await until(() => !live.hidden);
+        if (!showed) problems.push('the live readout never appeared during a take');
+
+        const note = d.getElementById('sightLiveNote').textContent.trim();
+        const cents = d.getElementById('sightLiveCents').textContent.trim();
+        const marker = d.getElementById('sightMarker').style.left;
+        log.push(`mid-take: note ${note} · ${cents} · needle ${marker}`);
+
+        if (!noteName.test(note)) problems.push(`live note name looks wrong: ${note}`);
+        if (!/^[+-]?\d+¢$/.test(cents)) problems.push(`live cents look wrong: ${cents}`);
+        if (Math.abs(Number(cents.replace('¢', ''))) < 20) {
+          problems.push(`the detuned note did not read as detuned: ${cents}`);
+        }
+        if (!marker || marker === '50%') problems.push(`needle did not move: ${marker}`);
+        if (!d.getElementById('sightResult').hidden) problems.push('result shown during a take');
+        if (d.getElementById('sightStop').hidden) {
+          problems.push('Finish button not offered during a take');
+        }
+        frame.remove();
+      }
+
+      /* ── 2. A whole take: it finishes itself and scores ─────────────── */
+      {
+        const frame = await load('../index.html?sightplay=5&seed=7');
+        const d = frame.contentDocument;
+
+        const finished = await until(() => !d.getElementById('sightResult').hidden, 15000);
+        if (!finished) problems.push('the take never finished and scored');
+
+        const pct = d.getElementById('sightPct').textContent.trim();
+        const rows = d.querySelectorAll('#sightParts li').length;
+        log.push(`finished: ${pct} · ${rows} parts · needle hidden ${d.getElementById('sightLive').hidden}`);
+
+        if (!/^\d+%$/.test(pct)) problems.push(`no score rendered: ${pct}`);
+        else if (Number(pct.replace('%', '')) < 90) problems.push(`a clean take scored only ${pct}`);
+        if (rows !== 4) problems.push(`expected four score parts, saw ${rows}`);
+        if (!d.getElementById('sightLive').hidden) problems.push('needle still up after the take');
+        frame.remove();
+      }
+
+      /* ── 3. The switch a mock audition will use ─────────────────────── */
+      {
+        const frame = await load('../index.html?sightplay=5&seed=7&live=0');
+        const d = frame.contentDocument;
+
+        const finished = await until(() => !d.getElementById('sightResult').hidden, 15000);
+        if (!finished) problems.push('a take with the needle off never scored');
+        if (!d.getElementById('sightLive').hidden) {
+          problems.push('the needle appeared even though a take asked for it to stay off');
+        }
+        log.push(`needle off: ${d.getElementById('sightPct').textContent.trim()}`);
+        frame.remove();
+      }
+
+      /* ── 4. Walking away mid-take stops the counting ───────────────── */
+      {
+        const frame = await load('../index.html?sightleak');
+        const d = frame.contentDocument;
+        await wait(400);
+        if (d.getElementById('sightLiveNote').textContent.trim() !== '—') {
+          problems.push('a reading survived the student leaving the take');
+        }
+        if (!d.getElementById('sightLive').hidden) {
+          problems.push('the needle came back after the view was left');
+        }
+        if (!d.getElementById('sightResult').hidden) {
+          problems.push('a take that was walked away from still scored');
+        }
+        log.push('left mid-take: nothing counted');
+        frame.remove();
+      }
+
+      document.getElementById('report').textContent = problems.length
+        ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
+        : `SIGHT LISTEN OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'SIGHT LISTEN FAILED' : 'SIGHT LISTEN OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'sight-listen', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

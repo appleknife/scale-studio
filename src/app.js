@@ -1,12 +1,12 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311457';
-import { renderStaff } from './staff.js?v=202610311457';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610311457';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311457';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311457';
-import { generatePassage } from './sightreading.js?v=202610311457';
-import { renderScore } from './score.js?v=202610311457';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311508';
+import { renderStaff } from './staff.js?v=202610311508';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610311508';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311508';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311508';
+import { generatePassage } from './sightreading.js?v=202610311508';
+import { renderScore } from './score.js?v=202610311508';
 import {
   STRINGS,
   FIFTHS,
@@ -14,7 +14,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610311457';
+} from './tuner.js?v=202610311508';
 
 const LANG = initLang();
 
@@ -49,6 +49,10 @@ const el = {
   sightTips: $('sightTips'),
   sightAgain: $('sightAgain'),
   sightNext: $('sightNext'),
+  sightLive: $('sightLive'),
+  sightLiveNote: $('sightLiveNote'),
+  sightLiveCents: $('sightLiveCents'),
+  sightMarker: $('sightMarker'),
   grid: $('scaleGrid'),
   gridNote: $('gridNote'),
   levelTabs: $('levelTabs'),
@@ -788,7 +792,7 @@ async function startTunerMic() {
   if (!state.tune) return;
   closeMic();
   try {
-    state.mic = await openMic(onTuneFrame);
+    state.mic = await openMic(routeFrame);
     state.micMode = 'tune';
     state.tune.listening = true;
     el.tuneMicBtn.hidden = true;
@@ -891,7 +895,7 @@ function openSight(level = sight.level, seed = null) {
 
 /* ── Sight reading: listening ──────────────────────────────────────── */
 
-async function startSightTake() {
+async function startSightTake(options = {}) {
   if (!sight.passage || sight.phase !== 'idle') return;
   el.sightStart.disabled = true;
   el.sightStatus.textContent = t('sight.waitingMic');
@@ -900,7 +904,7 @@ async function startSightTake() {
   if (state.mic && state.micMode !== 'take') closeMic();
   if (!state.mic) {
     try {
-      state.mic = await openMic(onFrame);
+      state.mic = await openMic(routeFrame);
       state.micMode = 'take';
     } catch (err) {
       el.sightStart.disabled = false;
@@ -909,12 +913,58 @@ async function startSightTake() {
     }
   }
 
+  armSightTake(options);
+}
+
+/**
+ * Get ready without touching the microphone — the take itself begins on the
+ * student's first note. A mock audition will arm with { live: false } so the
+ * needle gives nothing away while it is being judged.
+ */
+function armSightTake(options = {}) {
   sight.phase = 'armed';
-  sight.take = { frames: [], started: false, t0: 0, strong: 0, lastVoiced: 0, peak: 0 };
+  sight.take = {
+    frames: [],
+    started: false,
+    t0: 0,
+    strong: 0,
+    lastVoiced: 0,
+    peak: 0,
+    live: options.live !== false,
+    liveMidi: null,
+    liveCents: null,
+  };
+  el.sightLive.hidden = true;
+  resetSightLive();
   el.sightStart.disabled = false;
   el.sightStart.hidden = true;
   el.sightStop.hidden = false;
   el.sightStatus.textContent = t('sight.armed');
+}
+
+/** Puts the sight-reading needle back to nothing, ready for a fresh take. */
+function resetSightLive() {
+  el.sightLiveNote.textContent = '—';
+  el.sightLiveCents.textContent = '';
+  el.sightMarker.style.left = '50%';
+  el.sightMarker.style.background = '';
+  el.sightMarker.style.boxShadow = '';
+}
+
+/**
+ * The live reading during a sight-reading take. Sixteenths go past quickly, so
+ * the note name follows the nearest semitone at once while the cents are
+ * smoothed a little — the needle should read as a number, not a twitch. A new
+ * note resets the smoothing, so one note's offset never bleeds into the next.
+ */
+function updateSightLive(take, freq) {
+  const midiFloat = 69 + 12 * Math.log2(freq / 440);
+  const midi = Math.round(midiFloat);
+  const cents = (midiFloat - midi) * 100;
+  const fresh = take.liveMidi == null || Math.abs(midiFloat - take.liveMidi) > 0.7;
+  take.liveCents = fresh || take.liveCents == null ? cents : take.liveCents * 0.6 + cents * 0.4;
+  take.liveMidi = midiFloat;
+  paintLiveRead(el.sightLiveNote, el.sightLiveCents, el.sightMarker, midi, take.liveCents);
 }
 
 function ingestSightFrame(frame) {
@@ -930,13 +980,22 @@ function ingestSightFrame(frame) {
       sight.phase = 'taking';
       take.t0 = Math.max(0, frame.t - 0.1);
       el.sightStatus.textContent = t('sight.playing');
+      if (take.live) {
+        el.sightLive.hidden = false;
+        resetSightLive();
+      }
     }
     return;
   }
 
   const elapsed = Math.max(0, frame.t - take.t0);
   take.frames.push({ t: elapsed, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
-  if (frame.freq > 0 && frame.clarity > 0.5 && frame.rms > 0.004) take.lastVoiced = elapsed;
+
+  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > 0.004;
+  if (voiced) {
+    take.lastVoiced = elapsed;
+    if (take.live) updateSightLive(take, frame.freq);
+  }
 
   // Ends on its own after a real pause once something has been played, so nobody
   // has to reach for a button with a violin under their chin.
@@ -950,6 +1009,9 @@ function stopSightTake(analyse = true) {
   sight.take = null;
   el.sightStop.hidden = true;
   el.sightStart.hidden = false;
+  el.sightLive.hidden = true;
+  // Nothing stale left behind: a reading only exists while a take is running.
+  resetSightLive();
   if (analyse && take && take.started) {
     renderSightResult(analyzeSightTake(take.frames, sight.passage));
   } else {
@@ -1184,7 +1246,7 @@ function setStatus(live, text) {
 
 /* ── Microphone ───────────────────────────────────────────────────────── */
 
-async function openMic(onFrame) {
+async function openMic(emit) {
   if (!navigator.mediaDevices?.getUserMedia) {
     const err = new Error('no-media');
     err.name = 'InsecureContext';
@@ -1234,7 +1296,7 @@ async function openMic(onFrame) {
   const timer = setInterval(() => {
     analyser.getFloatTimeDomainData(buf);
     const { freq, clarity, rms } = detector.detect(buf);
-    onFrame({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms });
+    emit({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms });
   }, 30);
 
   return {
@@ -1264,6 +1326,18 @@ function micErrorMessage(err) {
   }
 }
 
+/**
+ * One microphone, several listeners. Every frame lands here and is handed to
+ * whatever is asking for it — a sight-reading take, a scale take, or the tuner.
+ * The stream is opened once and shared, which is also what keeps iOS happy
+ * between takes.
+ */
+function routeFrame(frame) {
+  if (sight.phase !== 'idle' && sight.take) return ingestSightFrame(frame);
+  if (state.take) return onFrame(frame);
+  if (state.tune?.listening) return onTuneFrame(frame);
+}
+
 /* ── Listening ────────────────────────────────────────────────────────── */
 
 async function startListening() {
@@ -1281,7 +1355,7 @@ async function startListening() {
   if (state.mic && state.micMode !== 'take') closeMic();
   if (!state.mic) {
     try {
-      state.mic = await openMic(onFrame);
+      state.mic = await openMic(routeFrame);
       state.micMode = 'take';
     } catch (err) {
       state.phase = 'idle';
@@ -1398,20 +1472,28 @@ function onFrame(frame) {
   if (silence > (nearEnd ? 1.3 : 3.0) || elapsed > 100) finishTake();
 }
 
-function updateTuner(midiFloat) {
-  const midi = Math.round(midiFloat);
-  const cents = (midiFloat - midi) * 100;
+/**
+ * One live reading: the note name, the cents beside it, and where the needle
+ * sits. Shared by the scale take and the sight-reading take so a student reads
+ * exactly the same thing in both places.
+ */
+function paintLiveRead(noteEl, centsEl, markerEl, midi, cents) {
   const name = NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
 
-  el.liveNote.textContent = name;
-  el.liveCents.textContent = `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢`;
+  noteEl.textContent = name;
+  centsEl.textContent = `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢`;
 
   const abs = Math.abs(cents);
   const colour = abs <= 15 ? '#2f5d4e' : abs <= 35 ? '#b0843f' : '#a4534a';
-  el.liveNote.style.color = colour;
-  el.tunerMarker.style.left = `${50 + Math.max(-1, Math.min(1, cents / 50)) * 47}%`;
-  el.tunerMarker.style.background = colour;
-  el.tunerMarker.style.boxShadow = `0 0 0 3px ${colour}22`;
+  noteEl.style.color = colour;
+  markerEl.style.left = `${50 + Math.max(-1, Math.min(1, cents / 50)) * 47}%`;
+  markerEl.style.background = colour;
+  markerEl.style.boxShadow = `0 0 0 3px ${colour}22`;
+}
+
+function updateTuner(midiFloat) {
+  const midi = Math.round(midiFloat);
+  paintLiveRead(el.liveNote, el.liveCents, el.tunerMarker, midi, (midiFloat - midi) * 100);
 }
 
 function finishTake() {
@@ -1752,6 +1834,9 @@ function cancelListening() {
   }
   state.phase = 'idle';
   state.take = null;
+  // A sight-reading take has to go with the microphone. Left armed it would
+  // keep swallowing frames — and scoring — on a screen nobody is looking at.
+  stopSightTake(false);
 }
 
 window.addEventListener('pagehide', cancelListening);
@@ -1833,6 +1918,41 @@ if (params.has('sightdemo')) {
 if (params.has('sight')) {
   // ?sight=5&seed=4471 reproduces one passage exactly — handy for a class
   openSight(Number(params.get('sight')) || 5, params.has('seed') ? Number(params.get('seed')) : null);
+}
+if (params.has('sightplay')) {
+  // Plays a synthetic take through routeFrame — the same wire the microphone
+  // uses — so the listening path can be checked without a microphone.
+  // ?sightplay=5&seed=7            one whole take, scored
+  // ?sightplay=5&hold=1400         stop early, needle left on screen
+  // ?sightplay=5&detune            every note 42 cents sharp
+  // ?sightplay=5&live=0            arm with the needle switched off
+  openSight(Number(params.get('sightplay')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
+  armSightTake({ live: params.get('live') !== '0' });
+  const offsets = params.has('detune')
+    ? Object.fromEntries([...Array(64).keys()].map((k) => [k, 42]))
+    : {};
+  const frames = sightDemoFrames(sight.passage, 0.32, offsets);
+  const holdAt = params.has('hold') ? Number(params.get('hold')) / 1000 : Infinity;
+  let i = 0;
+  const step = () => {
+    if (i >= frames.length) return finishSightTake();
+    const frame = frames[i++];
+    routeFrame(frame);
+    // Let the picture settle while the needle is still up, for a screenshot.
+    if (frame.t >= holdAt) return;
+    setTimeout(step, 0);
+  };
+  step();
+}
+if (params.has('sightleak')) {
+  // Walking away mid-take must stop the counting: arm, play a little, leave,
+  // then play a lot more. Nothing should appear on the sight-reading screen.
+  openSight(5, 7);
+  armSightTake();
+  const frames = sightDemoFrames(sight.passage);
+  frames.slice(0, 40).forEach(routeFrame);
+  goHome();
+  frames.slice(40).forEach(routeFrame);
 }
 if (params.has('pick')) {
   // Visual check of the picker with a full selection.

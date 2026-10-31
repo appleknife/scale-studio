@@ -1,9 +1,11 @@
 # Sight reading — what it would take
 
 > **Status.** Phase 0 (can a bow change be heard?) and Phase 1 (generator +
-> notation + tempo preview, no microphone) are built and in the app. Phases 2–5 —
-> listening, scoring, weakness memory, Chinese polish — are not. The screen says so
-> plainly rather than pretending to listen.
+> notation + tempo preview) are built, and so are listening and scoring: the take
+> starts on the first note, a needle shows the intonation as you play, and the
+> passage is marked for notes, intonation, pulse and stops. Phases 4–5 — weakness
+> memory and a mock audition that hides the needle — are not built. The screen says
+> what it cannot hear rather than pretending.
 
 A sight-reading trainer is not a "nice to have" for this app; it is the one NYSSMA
 component the app currently cannot help with at all, and it is the one students
