@@ -4,7 +4,7 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202610302253';
+import { median } from './pitch.js?v=202610302307';
 
 export const DEFAULTS = {
   minClarity: 0.5,

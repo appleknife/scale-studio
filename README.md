@@ -90,10 +90,17 @@ The **Tuner** button in the header opens a needle dial for the open strings. Bow
 string at a time and the app follows whichever string it hears. The green band shows
 where that string should sit — which is deliberately *not* dead centre:
 
-* **A, D and E** want a hair above centre. A bowed string settles slightly down once
-you play with real weight, so a couple of cents high is where it will actually sit.
-* **G** wants a hair below. Digging into the G lifts its pitch a lot, so tuning it a
-little low keeps it honest when you push.
+* **A, D and E** want a hair above the note, deliberately. Soloists tune slightly high
+  because the violin sounds a little brighter and carries further, and because strings
+  drift down as you play — so starting a touch high keeps you closer to pitch for
+  longer.
+* **G** wants a hair below. It is the string that lifts most under bow weight, and it
+  still has to sit a true fifth under the D.
+
+The screen also carries the mechanics students actually need: fine tuners first, pegs
+only for a big move, always arriving at a pitch from below (ease it flat, then come up),
+never overshooting, resetting a fine tuner that has bottomed out — and extra care on the
+E, which snaps first.
 
 Then the part that matters more than any number on the dial: **the fifths**. A violin
 is tuned in pure fifths while a tuner is equal-tempered, so the two disagree by a

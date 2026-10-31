@@ -515,6 +515,20 @@ h3 {
   font-weight: 600;
 }
 
+.guide-warning {
+  margin: 14px 0 2px;
+  padding: 10px 14px;
+  background: var(--gold-wash);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.guide-warning strong {
+  color: var(--ink);
+}
+
 .guide-intro {
   margin: 0 0 14px;
   font-size: 13.5px;
