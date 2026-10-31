@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610310112';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610310114';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -340,7 +340,12 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     }
   });
   if (home < 0) home = aboveIndex >= 0 ? aboveIndex : Math.floor(pool.length / 2);
-  const peak = Math.min(pool.length - 1, home + 6);
+
+  // Home to an octave above it, and never more than a third below home. Without
+  // the clamp the random walk drifts: a level III passage would climb to B5 and
+  // stay there, however well the arc was aimed.
+  const peak = Math.min(pool.length - 1, home + 7);
+  const lowest = Math.max(0, home - 3);
 
   let prev = home;
   let lastStep = 0;
@@ -366,8 +371,8 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     } else {
       const step = chooseStep(rng, [...spec.steps, -1, -2, -3, -4, -5, -6].filter((s) => spec.steps.includes(Math.abs(s))), directionBias, lastStep);
       let next = prev + step;
-      if (next < 0 || next >= pool.length) next = prev - Math.sign(step) * Math.abs(step);
-      prev = Math.max(0, Math.min(pool.length - 1, next));
+      if (next < lowest || next > peak) next = prev - step;
+      prev = Math.max(lowest, Math.min(peak, next));
       lastStep = step;
     }
 

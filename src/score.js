@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM } from './staff.js?v=202610310112';
-import { CLEF_PATH } from './clef.js?v=202610310112';
-import { accidentalGlyph } from './music.js?v=202610310112';
-import { beatLength } from './sightreading.js?v=202610310112';
+import { STAFF_GEOM } from './staff.js?v=202610310114';
+import { CLEF_PATH } from './clef.js?v=202610310114';
+import { accidentalGlyph } from './music.js?v=202610310114';
+import { beatLength } from './sightreading.js?v=202610310114';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 

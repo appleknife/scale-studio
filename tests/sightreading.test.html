@@ -114,6 +114,25 @@
 
       log.push(`passages generated: ${checked}`);
 
+      // Where does the music actually sit? A passage can obey every rule and still
+      // live on ledger lines, so this is reported per level rather than asserted.
+      for (const level of SIGHT_LEVELS) {
+        const firsts = [];
+        const tops = [];
+        const all = [];
+        for (let seed = 0; seed < 60; seed++) {
+          const p = generatePassage({ level, seed });
+          const notes = flatten(p).filter((e) => e.note).map((e) => e.midi);
+          firsts.push(notes[0]);
+          tops.push(Math.max(...notes));
+          all.push(...notes);
+        }
+        const med = (a) => a.slice().sort((x, y) => x - y)[a.length >> 1];
+        log.push(
+          `L${level}: opens ~${med(firsts)} · peak ~${med(tops)} · range ${Math.min(...all)}–${Math.max(...all)}`,
+        );
+      }
+
       // a spread of seeds per level, for the eye
       const gallery = document.getElementById('gallery');
       for (const level of SIGHT_LEVELS) {
