@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311518';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311528';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -62,9 +62,12 @@ const LEVELS = {
     maxSemis: 4,
     rhythms: {
       '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8]],
-      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8]],
-      '4/4': [[4, 4, 4, 4], [8, 4, 4], [4, 4, 8], [4, 2, 2, 4, 4]],
+      // The dotted half is level II's long note: it fills a 3/4 bar, or takes
+      // the first three beats of a 4/4 one.
+      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8], [12]],
+      '4/4': [[4, 4, 4, 4], [8, 4, 4], [4, 4, 8], [4, 2, 2, 4, 4], [12, 4]],
     },
+    slurs: 0.5,
     tempo: { '*': { unit: 'q', bpm: 72 } },
     dynamics: ['mf'],
     marks: [],
@@ -93,6 +96,7 @@ const LEVELS = {
         [2, 2, 2, 2, 4, 4],
       ],
     },
+    slurs: 0.75,
     tempo: { '*': { unit: 'q', bpm: 60 } },
     dynamics: ['f', 'ff'],
     marks: ['staccato'],
@@ -795,8 +799,13 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // ── slurs ─────────────────────────────────────────────────────────────
   // Two to four notes of one bar under a curve. Engraving puts the slur on the
   // opposite side of the stems; the renderer works that out from the notes.
-  if (level >= 4) {
-    const wanted = 1 + (chance(rng, 0.45) ? 1 : 0);
+  // Slurs begin at level II — the Manual's level II page has slurred pairs —
+  // and get commoner as the levels go up. `spec.slurs` is how often a passage
+  // gets any: half of them at II, most at III, all of them from IV on.
+  if (level >= 2) {
+    const wanted = chance(rng, spec.slurs ?? 1)
+      ? (chance(rng, level >= 4 ? 0.45 : 0.2) ? 2 : 1)
+      : 0;
     for (let s = 0; s < wanted; s++) {
       const barEvents = bars[Math.floor(rng() * (BAR_COUNT - 1))].filter((e) => !e.rest);
       if (barEvents.length < 2) continue;

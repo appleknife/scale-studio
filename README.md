@@ -278,6 +278,12 @@ sight-reading table for that level.
 a third — the page the Manual prints for level I. A whole note alone in a bar is
 centred in it, the way an engraver sets one.
 
+**Level II adds slurs and the dotted half.** Roughly two passages in five carry a
+slurred pair or three notes, and a dotted half turns up in about half of them —
+filling a 3/4 bar, or taking the first three beats of 4/4. Slurs start here and get
+commoner with the level: three quarters of level III passages have one, and every
+passage from level IV on.
+
 ### Drawing the notation
 
 Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave

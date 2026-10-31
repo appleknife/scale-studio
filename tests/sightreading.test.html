@@ -117,6 +117,22 @@
           if (!spec.keys.includes(p.key.id)) problems.push(`${id}: key ${p.key.id} not in the level`);
           if (!spec.meters.includes(p.meter)) problems.push(`${id}: meter ${p.meter} not in the level`);
 
+          // slurs pair up inside one bar: start, then end, never two at once
+          for (const barEvents of p.bars) {
+            let open = false;
+            for (const e of barEvents) {
+              if (e.slurStart) {
+                if (open) problems.push(`${id}: two slurs open at once`);
+                open = true;
+              }
+              if (e.slurEnd) {
+                if (!open) problems.push(`${id}: a slur ends without starting`);
+                open = false;
+              }
+            }
+            if (open) problems.push(`${id}: a slur never closes`);
+          }
+
           // Level I is D major, one octave, quarter notes and slower, no rests —
           // the Manual's page for level I has nothing else on it.
           if (level === 1) {
@@ -154,6 +170,21 @@
               .map(([d, n]) => `${DUR[d] || d} ${Math.round((n / total) * 100)}%`)
               .join(' · '),
         );
+      }
+
+      // Level II's page has slurred pairs and dotted halves. Both are easy to lose
+      // behind a level gate or a missing rhythm pattern, so count them for real.
+      {
+        let slurred = 0;
+        let dotted = 0;
+        for (let seed = 0; seed < 80; seed++) {
+          const evs = flatten(generatePassage({ level: 2, seed }));
+          if (evs.some((e) => e.slurStart)) slurred++;
+          if (evs.some((e) => e.dur === 12)) dotted++;
+        }
+        log.push(`L2: slurs in ${slurred}/80 passages · dotted halves in ${dotted}/80`);
+        if (slurred < 20) problems.push(`level 2 slurred only ${slurred} of 80 passages`);
+        if (dotted < 5) problems.push(`level 2 used a dotted half in only ${dotted} of 80 passages`);
       }
 
       // Where does the music actually sit? A passage can obey every rule and still
