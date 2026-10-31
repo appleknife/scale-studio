@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311354';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311410';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -162,6 +162,7 @@ const LEVELS = {
         // example uses in both beats — a whole beat of them
         [1, 1, 1, 1, 4, 4],
         [4, 1, 1, 1, 1, 4],
+        [4, 4, 1, 1, 1, 1],
       ],
       '4/4': [
         [4, 4, 4, 4],
@@ -173,6 +174,8 @@ const LEVELS = {
         [8, 2, 2, 4],
         [1, 1, 2, 4, 4, 4],
         [1, 1, 1, 1, 4, 4, 4],
+        [4, 1, 1, 1, 1, 4, 4],
+        [4, 4, 1, 1, 1, 1, 4],
         [2, 1, 1, 4, 4, 4],
         [4, 2, 1, 1, 4, 4],
         [4 / 3, 4 / 3, 4 / 3, 4, 4, 4],
@@ -313,13 +316,30 @@ export function generatePassage({ level = 5, seed = null } = {}) {
 
   // ── rhythm: one pattern per bar, the last bar landing on a longer note ──
   const patterns = spec.rhythms[meter];
+
+  // A beat of four sixteenths is the figure the Manual's own level VI example
+  // leans on, so patterns containing one go into the draw twice. Left unweighted
+  // it turned up in about half the passages; the students who need it most are
+  // the ones who never saw it.
+  const hasRunOfFour = (p) => {
+    let run = 0;
+    for (const d of p) {
+      run = d === 1 ? run + 1 : 0;
+      if (run >= 4) return true;
+    }
+    return false;
+  };
+
   const bars = [];
   let previous = null;
   for (let b = 0; b < BAR_COUNT; b++) {
     // Avoid the same bar twice in a row when there is a choice: eight identical
     // bars of half notes is not a sight-reading test, it is a warm-up.
     const fresh = patterns.filter((p) => p !== previous);
-    const pool_ = fresh.length ? fresh : patterns;
+    const base = fresh.length ? fresh : patterns;
+    // three copies of the run patterns, one of everything else
+    const runs = base.filter(hasRunOfFour);
+    const pool_ = base.concat(runs, runs);
 
     let pattern;
     if (b === BAR_COUNT - 1) {
@@ -481,6 +501,20 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     );
   };
 
+  /**
+   * No unison with a neighbour — and above all no *enharmonic* unison. The trap
+   * is G♯ followed by A♭: one pitch wearing two spellings, which reads as a
+   * repeated note nobody meant to write. A lucky pairing of key and accidental
+   * used to produce it (A♭ major was the usual culprit), and no adjudicator
+   * sets that on purpose.
+   */
+  const samePitch = (event, note) => {
+    const i = sounding.indexOf(event);
+    const before = sounding[i - 1];
+    const after = sounding[i + 1];
+    return Boolean((before && before.midi === note.midi) || (after && after.midi === note.midi));
+  };
+
   // ── the middle of the phrase may close on the dominant ─────────────────
   // Before the interval pass, so any leap it introduces gets repaired.
   const halfBar = bars[BAR_COUNT / 2 - 1];
@@ -521,6 +555,9 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       const spelled = makeNote(letter, next, event.note.octave);
       if (spelled.midi < spec.range[0] || spelled.midi > spec.range[1]) continue;
       if (!neighbourOk(event, spelled)) continue;
+      // A chromatic note that lands on the pitch next door reads as a mistake,
+      // however it is spelled — the G♯/A♭ trap.
+      if (samePitch(event, spelled)) continue;
       setNote(event, spelled);
       event.accidental = true;
     }
