@@ -192,6 +192,55 @@
         };
         const broken = { getItem: blocked, setItem: blocked, removeItem: blocked };
         eq('a blocked store is survivable', J.load(broken).days, {});
+        eq('and it says so rather than pretending', J.save(s, broken), false);
+        eq('a working store says it worked', J.save(s, fake), true);
+      }
+
+      /* ── copies ───────────────────────────────────────────────────── */
+      {
+        const a = J.emptyState();
+        J.logTake(a, '2026-03-09', 'scales');
+        J.logTake(a, '2026-03-09', 'scales');
+        J.toggleHard(a, '2026-03-09', 'shifts');
+        J.markRest(a, '2026-03-10');
+        J.noteScale(a, 'G', '2026-03-09', 94);
+        a.plan = 'afterDinner';
+
+        const text = J.serialise(a, new Date(2026, 2, 11));
+        eq('a copy names the app', JSON.parse(text).app, 'scale-studio');
+        eq('a copy is dated', JSON.parse(text).saved, '2026-03-11');
+        const back = J.parse(text);
+        // A rest day is not a practised day, so it lives in `rests` and not in `days`.
+        eq('a copy survives the round trip', J.totalDays(back), 1);
+        eq('with its takes', back.days['2026-03-09'].takes, 2);
+        eq('and its rest day', back.rests, ['2026-03-10']);
+
+        eq('junk is refused', J.parse('not json at all'), null);
+        eq('someone else\'s json is refused', J.parse('{"app":"other"}'), null);
+        eq('a broken log is refused', J.parse('{"app":"scale-studio","kind":"practice-log"}'), null);
+
+        // Loading a copy adds what is missing and leaves what is here. Loading it
+        // a second time must land in exactly the same place, or a student who
+        // clicks twice ends up with a week twice as busy as it was.
+        const into = J.emptyState();
+        J.logTake(into, '2026-03-11', 'piece');
+        const once = J.merge(into, back);
+        const twice = J.merge(once, back);
+        eq('merge keeps the day it already had', once.days['2026-03-11'].tags, ['piece']);
+        eq('merge adds the other days', J.totalDays(once), 2);
+        eq('merge keeps takes apart', once.days['2026-03-09'].takes, 2);
+        eq('merging twice is the same as once', J.serialise(twice, new Date(2026, 2, 11)),
+          J.serialise(once, new Date(2026, 2, 11)));
+        eq('takes are the larger, never the sum', twice.days['2026-03-09'].takes, 2);
+        eq('the plan comes across when there is none here', once.plan, 'afterDinner');
+        eq('and is not overwritten when there is one', J.merge({ ...into, plan: 'afterSchool' }, back).plan, 'afterSchool');
+        eq('scale days are joined', J.merge(once, back).scales.G.days.length, 1);
+        eq('a better score wins', J.merge(once, back).scales.G.best, 94);
+        eq('the whole state has a day count', J.totalDays(once), 2);
+
+        // A copy taken before the log existed merges into an empty log cleanly.
+        const fresh = J.merge(J.emptyState(), back);
+        eq('an empty target takes the whole copy', J.totalDays(fresh), 1);
       }
 
       document.getElementById('report').textContent = problems.length

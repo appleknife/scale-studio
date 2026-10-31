@@ -375,9 +375,35 @@ Three honest limits, all of them said on the screen:
   fill a phone's memory. Recording needs iOS 14.1 or later; the button says so
   instead of failing silently.
 
-The log is held in `localStorage` under `scale-studio.journal.v1`, and *Start over*
-clears it. It is per device and per browser, so a student's log on the school iPad
-and the one at home are two different logs.
+### Keeping it
+
+The log is held in `localStorage` under `scale-studio.journal.v1` and is per device
+and per browser, so a student's log on the school iPad and the one at home are two
+different logs. That also means four things can take it away:
+
+* **Clearing the browser's website data** — the normal "clear history and data" —
+  deletes it, and so does a private window.
+* **Safari on iOS** caps storage for sites it has not seen for seven days. Adding the
+  app to the home screen exempts it.
+* **A different browser is a different log**, even on the same laptop.
+* **Some browsers refuse to store anything at all** (a locked-down school Chromebook,
+  for instance). The screen says so in a quiet banner instead of letting a term of
+  practice disappear at the next reload.
+
+So the log can be **saved to a file and loaded back**:
+
+* *Save a copy* writes `scale-studio-practice-log-YYYY-MM-DD.json` — a small JSON file
+  with an envelope (`app`, `kind`, `saved`) around the state, so a wrong file is
+  recognised rather than half-imported.
+* *Load a copy* merges it in: days, rest days and scale days are a **union**, takes
+  are the **larger** of the two rather than the sum, and the plan is only taken when
+  there is not one already. That makes loading idempotent — loading the same file
+  twice, or an old copy after the log has moved on, cannot inflate a week.
+* The file is read before the picker is emptied again, so a slow read cannot come
+  back empty.
+
+That is the whole backup story: one file, no account, no server. It is also how a
+student carries a log between the practice room and the lesson.
 
 ## Languages
 
@@ -410,7 +436,8 @@ src/staff.js          treble-staff renderer (SVG)
 src/score.js          eight bars of notation: beams, rests, dots, marks
 src/sightreading.js   level table and seeded passage generator
 src/onsets.js         bow-change detection (built, not wired in yet)
-src/journal.js        practice-log rules: streak, rest days, ready scales, week sheet
+src/journal.js        practice-log rules: streak, rest days, ready scales, week sheet,
+                      and the save/load copy format
 src/recorder.js       in-memory recording and the synthesised hall
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
@@ -423,7 +450,8 @@ tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correc
 tests/notation.test.html  renders 360 passages and measures the ink: no rest and
                       no slur may come within two units of another glyph
 tests/i18n.test.html  translation coverage: no visible English left on any screen
-tests/journal.test.html   the log's arithmetic: streaks, two rests a week, ready scales
+tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
+                      scales — and its save/load copy format
 tests/recorder.test.html  measures the synthesised hall: it decays, and it is stereo
 tests/lab-server.ps1  test server that collects results from a headless browser
 server.ps1            the local server used by Start Scale Studio.cmd
@@ -448,6 +476,11 @@ checked mechanically rather than by eye.
 day with only "what was hard" does not count as practice, a rest day holds the streak
 together but a third one in a week is refused, today is not a broken streak before it
 is over, and a scale becomes ready on its second clean day rather than its first.
+
+The same file covers the copy format: a saved log reads back with its takes, rest days
+and scores intact; junk, someone else's JSON and an envelope with no log inside are
+all refused; and merging a copy twice gives the same result as merging it once, so a
+double click cannot double a week.
 
 `tests/recorder.test.html` cannot open a microphone headlessly, so it judges the room
 by the impulse response itself: the tail decays from 0.28 to nothing, the level at

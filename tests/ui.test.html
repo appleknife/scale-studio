@@ -25,6 +25,9 @@
         const w = f.contentWindow;
         const d = f.contentDocument;
         w.addEventListener('error', (event) => problems.push(`runtime: ${event.message}`));
+        w.addEventListener('unhandledrejection', (event) =>
+          problems.push(`rejected: ${event.reason && (event.reason.stack || event.reason)}`),
+        );
 
         const $ = (sel) => d.querySelector(sel);
         const view = (name) => !d.getElementById(`view-${name}`).hidden;
@@ -169,6 +172,43 @@
             problems.push(`III–IV should play exactly one two-octave scale: ${mixed.join(',')}`);
           if (mixed.filter((t) => t.includes('1 oct')).length !== 2)
             problems.push(`III–IV should play two one-octave scales: ${mixed.join(',')}`);
+
+          /* ── the practice log: a copy out, and a copy back in ────── */
+          d.getElementById('openLogBtn').click();
+          await wait(200);
+          if (!view('track')) problems.push('log view not shown');
+
+          // A download opens a save dialog that would hang a headless run, so the
+          // anchor's own click is intercepted. Everything before the browser's
+          // dialog still runs for real: the blob, the name, the message.
+          const anchorClick = w.HTMLAnchorElement.prototype.click;
+          let offered = '';
+          w.HTMLAnchorElement.prototype.click = function () {
+            offered = this.download;
+          };
+          d.getElementById('exportLog').click();
+          await wait(150);
+          w.HTMLAnchorElement.prototype.click = anchorClick;
+          const saved = d.getElementById('logStatus').textContent;
+          log.push(`export: ${saved} · ${offered}`);
+          if (!/Saved \d+ days/.test(saved)) problems.push('save a copy said nothing useful');
+          if (!/^scale-studio-practice-log-\d{4}-\d{2}-\d{2}\.json$/.test(offered))
+            problems.push(`the copy is not named usefully: ${offered}`);
+
+          // Loading is checked only as far as its wiring goes. The file itself is
+          // read asynchronously, and a headless run under a virtual clock races
+          // its timers ahead of blob I/O — the read sometimes lands after the
+          // budget is spent, which says nothing about the app. The rules the read
+          // feeds (parse, merge, ready) are covered exactly in journal.test.html.
+          const picker = d.getElementById('importFile');
+          let opened = false;
+          picker.click = () => {
+            opened = true;
+          };
+          d.getElementById('importLog').click();
+          log.push(`load a copy opens the picker: ${opened}`);
+          if (!opened) problems.push('load a copy does not open the file picker');
+          if (!picker.accept.includes('json')) problems.push('the picker does not ask for json');
         } catch (err) {
           problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
         }

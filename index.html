@@ -18,7 +18,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610311732" />
+    <link rel="stylesheet" href="app.css?v=202610311930" />
   </head>
   <body>
     <div class="shell">
@@ -502,8 +502,48 @@
           <pre class="sheet" id="lessonSheet"></pre>
           <div class="actions">
             <button class="quiet-btn" id="copySheet" type="button">Copy the week</button>
+          </div>
+
+          <h3 class="section-title">Keeping it safe</h3>
+          <p class="log-warn" id="logWarn" hidden>
+            This browser is not letting the app save anything, so this log will be gone
+            when the page reloads. Save a copy before you leave.
+          </p>
+          <p class="subtle small" id="logSafety">
+            This log lives in this browser on this device. Save a copy to keep it, or to
+            carry it to another one.
+          </p>
+          <div class="actions">
+            <button class="quiet-btn" id="exportLog" type="button">Save a copy</button>
+            <button class="quiet-btn" id="importLog" type="button">Load a copy</button>
+            <input class="visually-hidden" id="importFile" type="file" accept=".json,application/json" tabindex="-1" />
             <button class="quiet-btn" id="clearLog" type="button">Start over</button>
           </div>
+          <p class="rec-status" id="logStatus" role="status" aria-live="polite"></p>
+
+          <details class="safety-note">
+            <summary>What can lose it</summary>
+            <ul class="hear-list">
+              <li data-i18n="log.safety.data">
+                <strong>Clearing the browser's website data</strong> — the usual
+                "clear history and data" — removes it, as does a private window.
+              </li>
+              <li data-i18n="log.safety.ios">
+                <strong>On an iPhone or iPad</strong>, Safari can clear a site's
+                storage after seven days without a visit. Adding Scale Studio to the
+                home screen keeps it.
+              </li>
+              <li data-i18n="log.safety.device">
+                <strong>Another device is another log.</strong> The school iPad and the
+                laptop at home keep separate records — load a copy to bring one across.
+              </li>
+            </ul>
+            <p class="subtle small" data-i18n="log.safety.copy">
+              Saving a copy writes one small file, named with today's date. Loading it
+              adds what is missing and keeps what is here, so loading the same file
+              twice does no harm.
+            </p>
+          </details>
         </section>
 
         <!-- ── Practice ────────────────────────────────────────────────── -->
@@ -763,7 +803,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610311732"></script>
+    <script type="module" src="src/app.js?v=202610311930"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

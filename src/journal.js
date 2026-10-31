@@ -208,8 +208,12 @@ export function load(storage = globalThis.localStorage) {
 export function save(state, storage = globalThis.localStorage) {
   try {
     storage.setItem(KEY, JSON.stringify(state));
+    return true;
   } catch {
-    // A full or blocked store must never break the practice screen.
+    // A full or blocked store must never break the practice screen — but the
+    // screen has to know, because a log that is not being written is gone at the
+    // next reload, and the student deserves to hear that now.
+    return false;
   }
 }
 
@@ -219,4 +223,80 @@ export function clear(storage = globalThis.localStorage) {
   } catch {
     /* ignore */
   }
+}
+
+/* ── Copies ────────────────────────────────────────────────────────────── */
+
+/**
+ * The log as a file the student can keep. The same shape as the stored state,
+ * in a small envelope so a file can be recognised before it is trusted, and
+ * dated so two copies in a downloads folder can be told apart.
+ */
+export function serialise(state, date = new Date()) {
+  return JSON.stringify(
+    { app: 'scale-studio', kind: 'practice-log', v: 1, saved: dayKey(date), state },
+    null,
+    2,
+  );
+}
+
+/** The log inside a file, or null if the text is not one. */
+export function parse(text) {
+  try {
+    const data = JSON.parse(text);
+    if (!data || data.app !== 'scale-studio' || data.kind !== 'practice-log') return null;
+    // The envelope without a log inside is not a log: refusing it is better than
+    // reporting "loaded" over a file that carried nothing.
+    if (!data.state || typeof data.state !== 'object') return null;
+    const state = { ...emptyState(), ...data.state };
+    if (!state.days || typeof state.days !== 'object') return null;
+    if (!Array.isArray(state.rests) || !state.scales || typeof state.scales !== 'object') return null;
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Adds a second copy into the first. Everything is a union, and takes are the
+ * *larger* of the two rather than the sum, so loading the same file twice — or
+ * loading it after the log has moved on — can never inflate a week's numbers.
+ */
+export function merge(into, other) {
+  const out = {
+    ...emptyState(),
+    days: { ...(into.days || {}) },
+    rests: [...(into.rests || [])],
+    scales: { ...(into.scales || {}) },
+    plan: into.plan || (other && other.plan) || '',
+  };
+
+  for (const [key, day] of Object.entries((other && other.days) || {})) {
+    const mine = out.days[key] || { tags: [], takes: 0, hard: [] };
+    out.days[key] = {
+      tags: [...new Set([...(mine.tags || []), ...(day.tags || [])])],
+      takes: Math.max(mine.takes || 0, day.takes || 0),
+      hard: [...new Set([...(mine.hard || []), ...(day.hard || [])])],
+    };
+  }
+
+  for (const key of (other && other.rests) || []) {
+    if (!out.rests.includes(key)) out.rests.push(key);
+  }
+  out.rests.sort();
+
+  for (const [id, entry] of Object.entries((other && other.scales) || {})) {
+    const mine = out.scales[id] || { days: [], best: 0 };
+    out.scales[id] = {
+      days: [...new Set([...(mine.days || []), ...(entry.days || [])])],
+      best: Math.max(mine.best || 0, entry.best || 0),
+    };
+  }
+
+  return out;
+}
+
+/** How many days the log has an entry for — the number a copy is worth. */
+export function totalDays(state) {
+  return Object.keys(state.days || {}).length;
 }

@@ -488,6 +488,20 @@ export const S = {
   'log.take': ['Take {n}', '第 {n} 段'],
   'log.sheet.week': ['Week of {date}', '本周（{date} 起）'],
   'log.sheet.days': ['Practiced {n} days, rested {rests}', '练了 {n} 天，休息 {rests} 天'],
+  'log.savedCopy': [
+    'Saved {n} days to a file — look in your downloads.',
+    '已把 {n} 天的记录存成文件——在「下载」里。',
+  ],
+  'log.loaded': [
+    'Loaded. The log now has {n} days ({added} new).',
+    '已载入。记录现在有 {n} 天（新增 {added} 天）。',
+  ],
+  'log.loadedSame': [
+    'That copy is already here — still {n} days.',
+    '这份副本已经在这里了——仍然是 {n} 天。',
+  ],
+  'log.loadFailed': ['That file could not be read.', '这个文件读不出来。'],
+  'log.loadBad': ['That is not a Scale Studio log.', '这不是 Scale Studio 的记录文件。'],
   'log.sheet.takes': ['{n} takes heard and scored', '听完并打分的次数：{n}'],
   'log.sheet.did': ['Did: {list}', '练了：{list}'],
   'log.sheet.hard': ['Hard this week: {list}', '这周觉得难的地方：{list}'],
@@ -658,6 +672,22 @@ export const STATIC = {
   'A scale counts as ready once you have played it cleanly on two different days.':
     '一条音阶在两个不同的日子都拉得干净，就算就绪。',
   'Practice log': '练习记录',
+  'Keeping it safe': '留住这份记录',
+  'This log lives in this browser on this device. Save a copy to keep it, or to carry it to another one.':
+    '这份记录只存在这台设备的这个浏览器里。存一份副本可以留住它，也可以带到别的设备。',
+  'This browser is not letting the app save anything, so this log will be gone when the page reloads. Save a copy before you leave.':
+    '这个浏览器不让应用保存任何东西，刷新页面后记录就会消失。离开前先存一份副本。',
+  'Save a copy': '存一份副本',
+  'Load a copy': '载入副本',
+  'What can lose it': '什么情况下会丢',
+  'log.safety.data':
+    '<strong>清除浏览器的网站数据</strong>——就是常说的“清除历史记录和数据”——会把它删掉；无痕窗口也一样。',
+  'log.safety.ios':
+    '<strong>在 iPhone 或 iPad 上</strong>，Safari 可能会清掉七天没有访问的网站所存的数据。把 Scale Studio 加到主屏幕就不会。',
+  'log.safety.device':
+    '<strong>换一台设备就是另一份记录。</strong>学校的 iPad 和家里的电脑各记各的——载入副本可以把其中一份带过去。',
+  'log.safety.copy':
+    '存副本会写一个小文件，文件名带当天的日期。载入时缺的补上、已有的保留，所以同一个文件载两次也没关系。',
   'Copy the week': '复制这一周',
   'Listen back': '听回放',
   'Add a hall': '加一点厅堂混响',

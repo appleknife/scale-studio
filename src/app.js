@@ -1,14 +1,14 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311732';
-import { renderStaff } from './staff.js?v=202610311732';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610311732';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311732';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311732';
-import { generatePassage } from './sightreading.js?v=202610311732';
-import { renderScore } from './score.js?v=202610311732';
-import * as Journal from './journal.js?v=202610311732';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202610311732';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311930';
+import { renderStaff } from './staff.js?v=202610311930';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610311930';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311930';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311930';
+import { generatePassage } from './sightreading.js?v=202610311930';
+import { renderScore } from './score.js?v=202610311930';
+import * as Journal from './journal.js?v=202610311930';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202610311930';
 import {
   STRINGS,
   FIFTHS,
@@ -16,7 +16,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610311732';
+} from './tuner.js?v=202610311930';
 
 const LANG = initLang();
 
@@ -67,6 +67,11 @@ const el = {
   readyList: $('readyList'),
   recBtn: $('recBtn'),
   recStatus: $('recStatus'),
+  logWarn: $('logWarn'),
+  logStatus: $('logStatus'),
+  exportLog: $('exportLog'),
+  importLog: $('importLog'),
+  importFile: $('importFile'),
   recList: $('recList'),
   reverbToggle: $('reverbToggle'),
   lessonSheet: $('lessonSheet'),
@@ -825,17 +830,29 @@ function openTuner(withMic = true) {
 async function startTunerMic() {
   if (!state.tune) return;
   closeMic();
+  let mic;
   try {
-    state.mic = await openMic(routeFrame);
-    state.micMode = 'tune';
-    state.tune.listening = true;
-    el.tuneMicBtn.hidden = true;
+    mic = await openMic(routeFrame);
   } catch (err) {
+    // Leaving the tuner while the browser is still asking must not write to a
+    // screen that is gone — that used to throw at a null `state.tune`.
+    if (!state.tune) return;
     state.tune.listening = false;
     el.tuneMicBtn.hidden = false;
     el.tuneStatus.textContent = micErrorMessage(err);
     return;
   }
+  if (!state.tune) {
+    // The student walked away while the microphone was opening. Hand it back, or
+    // it stays open (and the recording light stays on) behind a screen nobody is
+    // looking at.
+    mic.close();
+    return;
+  }
+  state.mic = mic;
+  state.micMode = 'tune';
+  state.tune.listening = true;
+  el.tuneMicBtn.hidden = true;
   paintNeedle();
 }
 
@@ -1217,6 +1234,9 @@ el.sightLevels.addEventListener('click', (event) => {
 
 const journal = Journal.load();
 const recorder = { live: null, takes: [], playing: null };
+// Set when the browser refuses to write. The screen says so rather than letting
+// a whole term's log disappear at the next reload without a word.
+let storageBlocked = false;
 
 function todayKey() {
   return Journal.dayKey();
@@ -1228,7 +1248,8 @@ function keyName(id) {
 }
 
 function saveJournal() {
-  Journal.save(journal);
+  storageBlocked = !Journal.save(journal);
+  if (el.logWarn) el.logWarn.hidden = !storageBlocked;
   renderLogBanner();
 }
 
@@ -1424,8 +1445,59 @@ el.clearLog.addEventListener('click', () => {
   if (!window.confirm(t('log.confirmClear'))) return;
   Journal.clear();
   Object.assign(journal, Journal.emptyState());
+  if (el.logStatus) el.logStatus.textContent = '';
   renderLog();
   renderLogBanner();
+});
+
+/* ── A copy the student keeps ─────────────────────────────────────────── */
+
+function exportLog() {
+  const text = Journal.serialise(journal);
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `scale-studio-practice-log-${todayKey()}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  el.logStatus.textContent = t('log.savedCopy', { n: Journal.totalDays(journal) });
+}
+
+async function importLog(file) {
+  if (!file) return;
+  let text = '';
+  try {
+    text = await file.text();
+  } catch {
+    el.logStatus.textContent = t('log.loadFailed');
+    return;
+  }
+  const other = Journal.parse(text);
+  if (!other) {
+    el.logStatus.textContent = t('log.loadBad');
+    return;
+  }
+  const before = Journal.totalDays(journal);
+  Object.assign(journal, Journal.merge(journal, other));
+  saveJournal();
+  renderLog();
+  const added = Journal.totalDays(journal) - before;
+  el.logStatus.textContent = added
+    ? t('log.loaded', { n: Journal.totalDays(journal), added })
+    : t('log.loadedSame', { n: Journal.totalDays(journal) });
+}
+
+el.exportLog.addEventListener('click', exportLog);
+el.importLog.addEventListener('click', () => el.importFile.click());
+el.importFile.addEventListener('change', async () => {
+  const file = el.importFile.files && el.importFile.files[0];
+  // Read first, clear afterwards: emptying the input takes the file away from
+  // it, and a read that is still in flight can then come back empty.
+  await importLog(file);
+  el.importFile.value = '';
 });
 
 /* ── Recording, with a hall on playback ───────────────────────────────── */
