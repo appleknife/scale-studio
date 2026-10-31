@@ -100,11 +100,11 @@ is tuned in pure fifths while a tuner is equal-tempered, so the two disagree by 
 couple of cents on every string. Hold G+D, D+A and A+E as double stops and move the
 upper string of each pair until the pair rings cleanly.
 
-Each pair has a **Check** button: the app listens for three seconds and says whether
-the sound is steady or wobbling. A slow wobble is the beat between two strings that
-are nearly, but not quite, a pure fifth apart. It is measured from the loudness
-envelope rather than the spectrum — at these frequencies no practical FFT could
-separate two partials a hertz apart, but the pulsing is easy to hear and to measure.
+The three pairs are a tick-list, not a measurement. A bowed double stop always
+wobbles a little — bow pressure alone moves the loudness around more than the beat
+does — so any automatic "is it pure?" judgement would cry wolf. Tick each pair off
+once your ear is satisfied; the app's job here is only to keep the ritual in front of
+you.
 
 ## Levels
 
@@ -248,7 +248,7 @@ app.css               visual design
 src/music.js          note spelling, key signatures, scale library
 src/pitch.js          YIN pitch detector
 src/analyze.js        note segmentation, alignment, scoring, feedback
-src/tuner.js          open-string targets and the double-stop wobble check
+src/tuner.js          open-string targets and the fifth checklist
 src/staff.js          treble-staff renderer (SVG)
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring

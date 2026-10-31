@@ -1,9 +1,9 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302248';
-import { renderStaff } from './staff.js?v=202610302248';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610302248';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610302248';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302253';
+import { renderStaff } from './staff.js?v=202610302253';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610302253';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610302253';
 import {
   STRINGS,
   FIFTHS,
@@ -11,8 +11,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-  analyseDoubleStop,
-} from './tuner.js?v=202610302248';
+} from './tuner.js?v=202610302253';
 
 const $ = (id) => document.getElementById(id);
 
@@ -770,36 +769,21 @@ function renderStrings() {
   ).join('');
 }
 
-function renderPairs() {
+/**
+ * A tick-list, not a measurement: a real double stop always wobbles a little, so
+ * judging a fifth is the student's ear's job. The app only keeps the ritual straight.
+ */
+function renderFifths() {
   const t = state.tune;
-  el.pairRows.innerHTML = FIFTHS.map((pair) => {
-    const running = Boolean(t.check && t.check.pairId === pair.id);
-    const result = t.result && t.result.pairId === pair.id ? t.result.verdict : null;
-    let text = '—';
-    let stateName = 'idle';
-    if (running) {
-      text = 'listening…';
-      stateName = 'listening';
-    } else if (result) {
-      if (result.status === 'wobble') {
-        text = `wobbling ≈ ${result.rateHz.toFixed(1)} Hz`;
-        stateName = 'wobble';
-      } else if (result.status === 'steady') {
-        text = 'steady';
-        stateName = 'good';
-      } else {
-        text = 'nothing heard';
-      }
-    }
-    return `<div class="pair">
+  el.pairRows.innerHTML = FIFTHS.map(
+    (pair) => `<button class="pair" type="button" data-pair="${pair.id}" aria-pressed="${
+      t.fifths.has(pair.id)
+    }">
+      <span class="pair-tick" aria-hidden="true"></span>
       <span class="pair-name">${pair.lower} + ${pair.upper}</span>
       <span class="pair-hint">move ${pair.upper} until the pair rings</span>
-      <span class="pair-result" data-state="${stateName}">${text}</span>
-      <button class="quiet-btn small" type="button" data-check="${pair.id}" ${
-        running ? 'disabled' : ''
-      }>Check</button>
-    </div>`;
-  }).join('');
+    </button>`,
+  ).join('');
 }
 
 function openTuner(withMic = true) {
@@ -808,16 +792,15 @@ function openTuner(withMic = true) {
     stringId: 'A',
     cents: null,
     tuned: new Set(),
+    fifths: new Set(),
     silentFor: 0,
     hold: 0,
     listening: false,
-    check: null,
-    result: null,
   };
   showView('tune');
   renderStrings();
   renderDial();
-  renderPairs();
+  renderFifths();
   if (withMic) startTunerMic();
 }
 
@@ -846,7 +829,6 @@ function closeTuner() {
 function onTuneFrame(frame) {
   const t = state.tune;
   if (!t) return;
-  if (t.check) t.check.samples.push(frame.rms);
 
   if (!frame.freq || frame.clarity < 0.55 || frame.rms < 0.004) {
     t.silentFor += 1;
@@ -873,24 +855,6 @@ function onTuneFrame(frame) {
     renderStrings();
   }
   paintNeedle();
-}
-
-function startBeatCheck(pairId) {
-  const t = state.tune;
-  if (!t || !state.mic || t.check) return;
-  t.check = { pairId, samples: [] };
-  t.result = null;
-  renderPairs();
-  setTimeout(finishBeatCheck, 3000);
-}
-
-function finishBeatCheck() {
-  const t = state.tune;
-  if (!t || !t.check) return;
-  const { pairId, samples } = t.check;
-  t.check = null;
-  t.result = { pairId, verdict: analyseDoubleStop(samples, { fps: 30 }) };
-  renderPairs();
 }
 
 /* ── Practice screen ──────────────────────────────────────────────────── */
@@ -1392,8 +1356,12 @@ el.tuneBack.addEventListener('click', () => {
 el.tuneMicBtn.addEventListener('click', startTunerMic);
 
 el.pairRows.addEventListener('click', (event) => {
-  const btn = event.target.closest('button[data-check]');
-  if (btn) startBeatCheck(btn.dataset.check);
+  const btn = event.target.closest('button[data-pair]');
+  if (!btn || !state.tune) return;
+  const id = btn.dataset.pair;
+  if (state.tune.fifths.has(id)) state.tune.fifths.delete(id);
+  else state.tune.fifths.add(id);
+  renderFifths();
 });
 
 el.levelTabs.addEventListener('click', (event) => {
