@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311331';
-import { CLEF_PATH } from './clef.js?v=202610311331';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311337';
+import { CLEF_PATH } from './clef.js?v=202610311337';
 
-import { beatLength } from './sightreading.js?v=202610311331';
+import { beatLength } from './sightreading.js?v=202610311337';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -506,27 +506,43 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
         // crescent as soon as the page is drawn at phone size.
         const toward = up ? 1 : -1; // which way the head lies from the stem tip
         // The shape of the hook, as [across, down, half-width] from the stem tip.
-        // The width has to fall from the first point to the last: the flag is a
-        // comma, heaviest where it joins the stem and thinning all the way to a
-        // point. Bulging in the middle (0.85 → 1.7 → 1.75 → 1.15 → 0.55) gave
-        // thin → thick → thin, which read as a bandage wrapped round the stem
-        // rather than a flag growing out of it. The base is also wider than the
-        // stem itself, so the join is a solid block of ink.
+        // Two rules make it look like a flag rather than a fin:
+        //
+        // 1. It is heaviest where it joins the stem and only ever thins from
+        //    there. Bulging in the middle gave thin → thick → thin, a bandage
+        //    wrapped round the stem. The base is wider than the stem itself, so
+        //    the join is one solid block of ink.
+        // 2. It is long. A flag that stops a third of the way down reads as a
+        //    tick; this one sweeps almost to the note head, the way an engraved
+        //    and a display-weight flag both do, and the last of the curve turns
+        //    back toward the stem so the point trails off instead of stopping.
+        //
+        // The numbers are the sampled proportions: 9.2 across, 36 along at an
+        // 11 px space (~0.85 × 3.3 staff spaces).
+        // Widths were taken off the sample too: about 3 px of ink at the join
+        // (1.6 of half-width) and barely 1 px a third of the way down, so the
+        // body is a slender band, not a banana. The shoulder is kept, because
+        // that is where the flag and the stem become one piece.
+        // A long, even sweep: out to 11 px, then a gentle turn back so the tail
+        // trails off above the note head instead of stopping mid-stem. The width
+        // only ever falls from the 4 px shoulder at the join to nothing.
         const FLAG_SHAPE = [
-          [0.0, 0.0, 2.3],
-          [1.8, 2.8, 2.1],
-          [4.2, 6.4, 1.75],
-          [6.6, 10.6, 1.25],
-          [8.2, 14.2, 0.7],
-          [7.6, 17.0, 0.25],
-          [6.6, 18.0, 0.04],
+          [1.6, 0.0, 1.9],
+          [4.4, 2.6, 1.7],
+          [7.0, 6.0, 1.45],
+          [9.0, 10.5, 1.2],
+          [10.4, 16.0, 0.95],
+          [11.0, 21.5, 0.7],
+          [10.8, 27.0, 0.45],
+          [10.0, 32.0, 0.2],
+          [9.0, 35.0, 0.03],
         ];
         const flag = (shift) => {
           const pts = FLAG_SHAPE.map(([x, t, w]) => [stemX + x, stemEnd + toward * (t + shift), w]);
           return `<path d="${ribbon(pts, true)}" fill="${INK}"/>`;
         };
         part.push(flag(0));
-        if (event.dur === 1) part.push(flag(10));
+        if (event.dur === 1) part.push(flag(13));
       }
 
       part.push(head(x, y, { hollow }));
