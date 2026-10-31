@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311337';
-import { CLEF_PATH } from './clef.js?v=202610311337';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311354';
+import { CLEF_PATH } from './clef.js?v=202610311354';
 
-import { beatLength } from './sightreading.js?v=202610311337';
+import { beatLength } from './sightreading.js?v=202610311354';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -571,11 +571,45 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
         );
       }
     }
+
+    // ── slurs ───────────────────────────────────────────────────────────
+    // A slur sits on the opposite side of the stems, which is where engravers
+    // put it, and clears the note heads by about half a space. The curve is a
+    // cubic with both control points pushed outward, so it reads as a bow rather
+    // than a straight line with rounded ends. Drawn last in the bar, so it lies
+    // over the beams rather than under them.
+    for (let i = 0; i < events.length; i++) {
+      const a = events[i];
+      if (!a.slurStart || !a.note) continue;
+      let b = null;
+      for (let j = i + 1; j < events.length; j++) {
+        if (events[j].slurEnd) { b = events[j]; break; }
+      }
+      if (!b || !b.note) continue;
+      const x1 = xOf(a);
+      const x2 = xOf(b);
+      if (x2 - x1 < 8) continue;
+      const y1 = yForNote(a.note.letter, a.note.octave, bottom);
+      const y2 = yForNote(b.note.letter, b.note.octave, bottom);
+      const stemsUp = stemUp(a.note.letter, a.note.octave) && stemUp(b.note.letter, b.note.octave);
+      const dir = stemsUp ? 1 : -1; // below the heads when the stems point up
+      const lift = 7.5;
+      const rise = Math.min(15, 5 + (x2 - x1) * 0.16);
+      const f = (v) => v.toFixed(2);
+      part.push(
+        `<path class="score-slur" d="M${f(x1)} ${f(y1 + dir * lift)} ` +
+          `C${f(x1 + (x2 - x1) * 0.28)} ${f(y1 + dir * (lift + rise))} ` +
+          `${f(x2 - (x2 - x1) * 0.28)} ${f(y2 + dir * (lift + rise))} ` +
+          `${f(x2)} ${f(y2 + dir * lift)}" ` +
+          `fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>`,
+      );
+    }
   }
 
-  // closing barline
+  // closing barline: a final double bar — thin line, then a thick one
   part.push(
-    `<line x1="${WIDTH - RIGHT}" y1="${top}" x2="${WIDTH - RIGHT}" y2="${bottom}" stroke="${INK}" stroke-width="1.4"/>`,
+    `<line x1="${WIDTH - RIGHT - 6}" y1="${top}" x2="${WIDTH - RIGHT - 6}" y2="${bottom}" stroke="${INK}" stroke-width="1.2"/>`,
+    `<rect x="${WIDTH - RIGHT - 3}" y="${top}" width="3" height="${bottom - top}" fill="${INK}"/>`,
   );
 
   return part.join('');

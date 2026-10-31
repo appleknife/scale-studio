@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311337';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311354';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -149,7 +149,7 @@ const LEVELS = {
     steps: [1, 2, 3, 4, 5, 6, 7],
     maxSemis: 12,
     rhythms: {
-      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [2, 4, 2], [1, 1, 2, 4], [2, 1, 1, 4]],
+      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [2, 4, 2], [1, 1, 2, 4], [2, 1, 1, 4], [1, 1, 1, 1]],
       '3/4': [
         [4, 4, 4],
         [2, 2, 4, 4],
@@ -158,6 +158,10 @@ const LEVELS = {
         [2, 4, 2, 4],
         [1, 1, 2, 4, 4],
         [4, 2, 1, 1, 4],
+        // four sixteenths under one beam, which the Manual's own level VI
+        // example uses in both beats — a whole beat of them
+        [1, 1, 1, 1, 4, 4],
+        [4, 1, 1, 1, 1, 4],
       ],
       '4/4': [
         [4, 4, 4, 4],
@@ -346,25 +350,37 @@ export function generatePassage({ level = 5, seed = null } = {}) {
 
   // ── rests (level IV and up) — one bar, in the middle, on a weak slot ────
   if (spec.rests && chance(rng, 0.55)) {
-    const b = 1 + Math.floor(rng() * 5);
-    const events = bars[b];
-    // A beat or a half-beat can become a rest anywhere in the bar. A sixteenth
-    // rest only reads properly when it *opens* a pair of sixteenths — the note
-    // that follows still beams with the one after it — so that is the only
-    // sixteenth slot worth considering. Level VI is where those pairs exist.
-    const opensPair = (e, i) =>
-      e.dur === 1 &&
-      events[i + 1] &&
-      events[i + 1].dur === 1 &&
-      (!events[i - 1] || events[i - 1].dur !== 1);
-    const sixteenthSlot = events.findIndex(
-      (e, i) => i > 0 && i < events.length - 1 && opensPair(e, i),
-    );
-    const beatSlot = events.findIndex(
-      (e, i) => i > 0 && e.dur >= 2 && e.dur <= 4 && i < events.length - 1,
-    );
-    const slot = sixteenthSlot > 0 && chance(rng, 0.4) ? sixteenthSlot : beatSlot;
-    if (slot > 0) events[slot].rest = true;
+    // A sixteenth rest needs a run of sixteenths to sit in, and leaving the
+    // choice to a random bar made it appear about once in twenty passages. So
+    // the bar is drawn from those that actually have a run, and only sometimes
+    // from the whole set.
+    const runSlot = (events) => {
+      for (let i = 1; i < events.length - 1; i++) {
+        if (
+          events[i].dur === 1 &&
+          events[i - 1].dur === 1 &&
+          events[i + 1].dur === 1
+        ) {
+          return i;
+        }
+      }
+      return -1;
+    };
+    const runners = bars.filter((events) => runSlot(events) > 0);
+
+    if (runners.length && chance(rng, 0.6)) {
+      // The fourteenth-sixteenth figure: a rest inside the run, which breaks the
+      // beam and leaves the notes on each side to beam among themselves.
+      const events = runners[Math.floor(rng() * runners.length)];
+      events[runSlot(events)].rest = true;
+    } else {
+      // Otherwise a beat or a half-beat rest, never the first or last event.
+      const events = bars[1 + Math.floor(rng() * 5)];
+      const slot = events.findIndex(
+        (e, i) => i > 0 && e.dur >= 2 && e.dur <= 4 && i < events.length - 1,
+      );
+      if (slot > 0) events[slot].rest = true;
+    }
   }
 
   // ── pitches ───────────────────────────────────────────────────────────
@@ -517,6 +533,23 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       if (chance(rng, 0.14)) {
         event.mark = spec.marks.includes('accent') && chance(rng, 0.35) ? 'accent' : 'staccato';
       }
+    }
+  }
+
+  // ── slurs ─────────────────────────────────────────────────────────────
+  // Two to four notes of one bar under a curve. Engraving puts the slur on the
+  // opposite side of the stems; the renderer works that out from the notes.
+  if (level >= 4) {
+    const wanted = 1 + (chance(rng, 0.45) ? 1 : 0);
+    for (let s = 0; s < wanted; s++) {
+      const barEvents = bars[Math.floor(rng() * (BAR_COUNT - 1))].filter((e) => !e.rest);
+      if (barEvents.length < 2) continue;
+      const len = Math.min(barEvents.length, 2 + Math.floor(rng() * 3));
+      const start = Math.floor(rng() * (barEvents.length - len + 1));
+      const run = barEvents.slice(start, start + len);
+      if (run.some((e) => e.slurStart || e.slurEnd)) continue;
+      run[0].slurStart = true;
+      run[run.length - 1].slurEnd = true;
     }
   }
 

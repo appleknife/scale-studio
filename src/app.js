@@ -1,12 +1,12 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311337';
-import { renderStaff } from './staff.js?v=202610311337';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610311337';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610311337';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311337';
-import { generatePassage } from './sightreading.js?v=202610311337';
-import { renderScore } from './score.js?v=202610311337';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311354';
+import { renderStaff } from './staff.js?v=202610311354';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610311354';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610311354';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311354';
+import { generatePassage } from './sightreading.js?v=202610311354';
+import { renderScore } from './score.js?v=202610311354';
 import {
   STRINGS,
   FIFTHS,
@@ -14,7 +14,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610311337';
+} from './tuner.js?v=202610311354';
 
 const LANG = initLang();
 
