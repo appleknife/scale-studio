@@ -6,7 +6,7 @@
     <title>Scale Studio — violin scale trainer</title>
     <meta
       name="description"
-      content="A listening scale trainer for violin students preparing for NYSSMA Levels 5 and 6."
+      content="A listening scale trainer for violin students preparing for NYSSMA Levels I–VI."
     />
     <meta name="theme-color" content="#faf7f1" />
     <link
@@ -39,7 +39,7 @@
           </span>
           <span class="brand-text">
             <strong>Scale Studio</strong>
-            <span>NYSSMA Levels 5–6 · violin</span>
+            <span>NYSSMA Levels I–VI · violin</span>
           </span>
         </button>
         <button class="ghost-btn" id="helpBtn" type="button">How it works</button>
@@ -73,7 +73,7 @@
           <div class="test-banner">
             <div class="test-banner-copy">
               <h3>Mock audition</h3>
-              <p>
+              <p id="testBannerText">
                 The app draws three scales at random — the way a judge does. Play them
                 one after another, no feedback until the end.
               </p>
@@ -82,6 +82,13 @@
           </div>
 
           <div class="mode-row">
+            <span class="control-label">Level</span>
+            <div class="segmented" id="levelTabs" role="tablist" aria-label="NYSSMA level">
+              <button type="button" role="tab" data-level="1-2" aria-selected="false">I–II</button>
+              <button type="button" role="tab" data-level="3-4" aria-selected="false">III–IV</button>
+              <button type="button" role="tab" data-level="5-6" aria-selected="true">V–VI</button>
+            </div>
+            <span class="control-label">Scales</span>
             <div class="segmented" id="modeTabs" role="tablist" aria-label="Scale family">
               <button type="button" role="tab" data-mode="major" aria-selected="true">
                 NYSSMA majors
@@ -100,9 +107,34 @@
           <div class="grid" id="scaleGrid"></div>
 
           <p class="footnote" id="gridNote">
-            Levels 5–6 require fifteen major scales — C plus the seven sharp keys and
+            Levels V–VI require fifteen major scales — C plus the seven sharp keys and
             the seven flat keys — all two octaves, up and down, from memory.
           </p>
+        </section>
+
+        <!-- ── Mock audition: choosing what you prepared (I–IV) ──────── -->
+        <section class="view" id="view-test-pick" hidden>
+          <button class="back-btn" id="pickBack" type="button">
+            <span aria-hidden="true">←</span> All scales
+          </button>
+
+          <h2 class="draw-title" id="pickTitle">Choose three scales</h2>
+          <p class="subtle" id="pickSub">
+            Pick the three you know best — you'll play them one after another.
+          </p>
+
+          <div class="pick-grid" id="pickGrid"></div>
+          <p class="pick-count" id="pickCount">0 of 3 chosen</p>
+
+          <div class="two-oct" id="twoOctPanel" hidden>
+            <h4>Which two will you play in two octaves?</h4>
+            <div class="two-oct-chips" id="twoOctRow"></div>
+          </div>
+
+          <div class="draw-actions">
+            <button class="primary-btn" id="pickContinue" type="button" disabled>Continue</button>
+            <button class="quiet-btn" id="pickClear" type="button">Clear</button>
+          </div>
         </section>
 
         <!-- ── Mock audition: the draw ────────────────────────────────── -->
@@ -157,6 +189,10 @@
             </div>
             <div class="head-tools">
               <div class="spelling" id="spellingRow" hidden></div>
+              <div class="segmented small" id="octaveTabs" role="tablist" aria-label="Octaves">
+                <button type="button" role="tab" data-oct="1" aria-selected="false">1 oct</button>
+                <button type="button" role="tab" data-oct="2" aria-selected="true">2 oct</button>
+              </div>
               <button class="quiet-btn small" id="notationBtn" type="button">Hide notation</button>
             </div>
           </div>
@@ -316,9 +352,10 @@
         notes and missed notes are what move the number.
       </p>
       <p class="help-note">
-        <strong>Mock audition</strong> draws three scales at random, the way a judge
-        does. You play them one after another with no tuner and no score until the
-        end, then get one report for the set.
+        <strong>Mock audition</strong> is always three scales, played one after another
+        with no tuner and no score until the end. At Levels V–VI the app draws them the
+        way a judge does; at I–II and III–IV you choose the scales you prepared and the
+        app picks from those.
       </p>
       <p class="help-note">
         Play in a quiet room, fairly close to the microphone, and let the first note

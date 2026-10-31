@@ -13,12 +13,26 @@ const el = {
     practice: $('view-practice'),
     result: $('view-result'),
     'test-draw': $('view-test-draw'),
+    'test-pick': $('view-test-pick'),
     'test-result': $('view-test-result'),
   },
   grid: $('scaleGrid'),
   gridNote: $('gridNote'),
+  levelTabs: $('levelTabs'),
   modeTabs: $('modeTabs'),
   formTabs: $('formTabs'),
+  testBannerText: $('testBannerText'),
+  drawSub: $('drawSub'),
+  octaveTabs: $('octaveTabs'),
+  pickGrid: $('pickGrid'),
+  pickTitle: $('pickTitle'),
+  pickSub: $('pickSub'),
+  pickCount: $('pickCount'),
+  pickContinue: $('pickContinue'),
+  pickClear: $('pickClear'),
+  pickBack: $('pickBack'),
+  twoOctPanel: $('twoOctPanel'),
+  twoOctRow: $('twoOctRow'),
   brandHome: $('brandHome'),
 
   scaleTitle: $('scaleTitle'),
@@ -113,6 +127,19 @@ const state = {
   // Practice shows the notation by default; the audition never does, because
   // the Manual asks for the scales "from memory without any visual aid".
   showNotation: true,
+  // NYSSMA level tier: it decides how many octaves practice uses by default and
+  // how an audition is assembled (see LEVELS).
+  level: '5-6',
+  practiceOctaves: 2,
+  // What the student picked on the audition picker (Levels I–IV).
+  pick: { ids: [], twoOct: [] },
+};
+
+// The Manual's three tiers of string scale requirements.
+const LEVELS = {
+  '1-2': { label: 'I–II', choose: 3, twoOctave: 0, octaves: 1 },
+  '3-4': { label: 'III–IV', choose: 7, twoOctave: 2, octaves: 2 },
+  '5-6': { label: 'V–VI', choose: 0, twoOctave: 0, octaves: 2 },
 };
 
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
@@ -151,15 +178,61 @@ function renderGrid() {
         <button class="key-card" type="button" data-id="${card.id}">
           <span class="key-name">${names}${suffix}</span>
           <span class="sig-glyphs" aria-hidden="true">${glyphs || '&nbsp;'}</span>
-          <span class="key-sub">${describeKey(scale.fifths)} · 2 octaves</span>
+          <span class="key-sub">${describeKey(scale.fifths)} · ${state.practiceOctaves} octave${
+            state.practiceOctaves === 1 ? '' : 's'
+          }</span>
         </button>`;
     })
     .join('');
 
-  el.gridNote.textContent =
-    state.mode === 'major'
-      ? 'Levels 5–6 require fifteen major scales — C plus the seven sharp keys and the seven flat keys — all two octaves, up and down, from memory.'
-      : 'Minor scales are not part of the NYSSMA scale requirement at these levels, but a lot of the level 5–6 repertoire is in a minor key — so here they are.';
+  updateLevelCopy();
+}
+
+function gridNoteText() {
+  if (state.mode === 'minor') {
+    return 'Minor scales are not part of the NYSSMA scale requirement, but a lot of the level 5–6 repertoire is in a minor key — so here they are.';
+  }
+  if (state.level === '1-2') {
+    return 'Level I–II: three major scales, one octave, and you choose which three. G, D and A are the usual first three — the same finger pattern, all from open strings.';
+  }
+  if (state.level === '3-4') {
+    return 'Level III–IV: seven major scales, two of them in two octaves. The adjudicator picks one two-octave and two one-octave scales.';
+  }
+  return 'Levels V–VI require fifteen major scales — C plus the seven sharp keys and the seven flat keys — all two octaves, up and down, from memory.';
+}
+
+function updateLevelCopy() {
+  el.gridNote.textContent = gridNoteText();
+
+  if (state.mode === 'minor') {
+    el.testBannerText.textContent =
+      'The app draws three scales at random — the way a judge does. Play them one after another, no feedback until the end.';
+    el.drawBtn.textContent = 'Draw three scales';
+    return;
+  }
+
+  if (state.level === '1-2') {
+    el.testBannerText.textContent =
+      'At Level I–II you choose the three scales you prepared. The app listens to all three, then gives you one report.';
+    el.drawBtn.textContent = 'Choose my three';
+  } else if (state.level === '3-4') {
+    el.testBannerText.textContent =
+      'Choose the seven you have prepared; the app picks one two-octave and two one-octave scales, the way a judge does.';
+    el.drawBtn.textContent = 'Choose my seven';
+  } else {
+    el.testBannerText.textContent =
+      'The app draws three scales at random — the way a judge does. Play them one after another, no feedback until the end.';
+    el.drawBtn.textContent = 'Draw three scales';
+  }
+}
+
+function setLevel(level) {
+  state.level = level;
+  state.practiceOctaves = LEVELS[level].octaves;
+  [...el.levelTabs.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(b.dataset.level === level)),
+  );
+  renderGrid();
 }
 
 function setMode(mode) {
@@ -168,6 +241,9 @@ function setMode(mode) {
     b.setAttribute('aria-selected', String(b.dataset.mode === mode)),
   );
   el.formTabs.hidden = mode !== 'minor';
+  el.levelTabs.hidden = mode === 'minor';
+  if (mode === 'minor') state.practiceOctaves = 2;
+  else state.practiceOctaves = LEVELS[state.level].octaves;
   renderGrid();
 }
 
@@ -223,10 +299,10 @@ function shuffle(list) {
  * and in practice nobody is asked for C♭ when B major is the same notes; the
  * practice screen still offers the other spelling for anyone who wants it.
  */
-function drawScales() {
+function drawThreeScales() {
   return shuffle(MAJOR_KEYS.slice())
     .slice(0, TEST_COUNT)
-    .map((card) => buildScale(card, 0, 'major', 'melodic'));
+    .map((card) => buildScale(card, 0, 'major', 'melodic', 2));
 }
 
 function keyGlyphs(scale) {
@@ -235,16 +311,127 @@ function keyGlyphs(scale) {
 }
 
 function drawThree() {
-  cancelListening();
-  history.replaceState(null, '', location.pathname + location.search);
-  state.test = { scales: drawScales(), index: 0, results: [] };
-  state.scale = state.test.scales[0];
-  el.testBar.hidden = true;
-  showView('test-draw');
-  spinReels();
+  showDraw(drawThreeScales(), true);
 }
 
-function spinReels() {
+function showDraw(scales, animate) {
+  cancelListening();
+  history.replaceState(null, '', location.pathname + location.search);
+  state.test = { scales, index: 0, results: [] };
+  state.scale = scales[0];
+  el.testBar.hidden = true;
+  el.redrawBtn.textContent = state.level === '1-2' ? 'Choose again' : 'Draw again';
+  el.drawSub.textContent =
+    state.level === '1-2'
+      ? 'The three you chose — one octave each.'
+      : state.level === '3-4'
+        ? 'One two-octave and two one-octave scales, drawn from your seven.'
+        : 'Drawn from the twelve NYSSMA keys — no repeats.';
+  showView('test-draw');
+  spinReels(animate);
+}
+
+/* ── Levels I–IV: the student chooses what they prepared ─────────────── */
+
+function openPicker() {
+  cancelListening();
+  state.pick = { ids: [], twoOct: [] };
+  showView('test-pick');
+  renderPicker();
+}
+
+function canContinue() {
+  const level = LEVELS[state.level];
+  if (state.pick.ids.length !== level.choose) return false;
+  if (level.twoOctave && state.pick.twoOct.length !== level.twoOctave) return false;
+  return true;
+}
+
+function renderPicker() {
+  const level = LEVELS[state.level];
+  const need = level.choose;
+  const picked = state.pick.ids;
+  const full = picked.length >= need;
+
+  el.pickTitle.textContent = need === 3 ? 'Choose three scales' : 'Choose seven scales';
+  el.pickSub.textContent =
+    need === 3
+      ? 'Pick the three you know best — you will play them one after another.'
+      : 'These are the seven you have prepared. The app then picks one to play in two octaves and two in one octave, the way a judge would.';
+
+  el.pickGrid.innerHTML = MAJOR_KEYS.map((card) => {
+    const scale = buildScale(card, 0, 'major', 'melodic', level.octaves);
+    const on = picked.includes(card.id);
+    const disabled = full && !on;
+    return `<button class="pick-chip" type="button" data-id="${card.id}"
+      aria-pressed="${on}" ${disabled ? 'disabled' : ''}>
+      <span class="pc-name">${card.variants.map((v) => v.name).join(' / ')}</span>
+      <span class="pc-sig" aria-hidden="true">${keyGlyphs(scale)}</span>
+    </button>`;
+  }).join('');
+
+  el.pickCount.textContent = `${picked.length} of ${need} chosen`;
+
+  const showTwo = level.twoOctave > 0 && picked.length === need;
+  el.twoOctPanel.hidden = !showTwo;
+  if (showTwo) {
+    el.twoOctRow.innerHTML = picked
+      .map((id) => {
+        const card = MAJOR_KEYS.find((c) => c.id === id);
+        const on = state.pick.twoOct.includes(id);
+        return `<button type="button" data-id="${id}" aria-pressed="${on}">${card.variants
+          .map((v) => v.name)
+          .join(' / ')}</button>`;
+      })
+      .join('');
+  }
+
+  el.pickContinue.disabled = !canContinue();
+}
+
+function togglePick(id) {
+  const level = LEVELS[state.level];
+  const ids = state.pick.ids;
+  const index = ids.indexOf(id);
+  if (index >= 0) ids.splice(index, 1);
+  else if (ids.length < level.choose) ids.push(id);
+
+  if (level.twoOctave) {
+    state.pick.twoOct = state.pick.twoOct.filter((x) => ids.includes(x));
+    // Once all seven are in, pre-mark the first two so Continue is one tap away.
+    if (ids.length === level.choose) {
+      for (const candidate of ids) {
+        if (state.pick.twoOct.length >= level.twoOctave) break;
+        if (!state.pick.twoOct.includes(candidate)) state.pick.twoOct.push(candidate);
+      }
+    }
+  }
+
+  renderPicker();
+}
+
+function startFromPicks() {
+  if (!canContinue()) return;
+  const level = LEVELS[state.level];
+
+  const scales = state.pick.ids.map((id) => {
+    const card = MAJOR_KEYS.find((c) => c.id === id);
+    const octaves = level.twoOctave && state.pick.twoOct.includes(id) ? 2 : 1;
+    return buildScale(card, 0, 'major', 'melodic', octaves);
+  });
+
+  if (level.twoOctave) {
+    // One of the two-octave scales, then two of the one-octave ones.
+    const two = scales.filter((s) => s.octaves === 2);
+    const one = shuffle(scales.filter((s) => s.octaves === 1));
+    const chosen = [two[Math.floor(Math.random() * two.length)], ...one.slice(0, 2)];
+    showDraw(shuffle(chosen), true);
+  } else {
+    showDraw(scales, false);
+  }
+}
+
+function spinReels(animate = true) {
   const reels = [...el.reels.querySelectorAll('.reel')];
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const pool = MAJOR_KEYS.flatMap((card) => card.variants.map((v) => v.name));
@@ -256,7 +443,7 @@ function spinReels() {
     const sig = reel.querySelector('.reel-sig');
     const target = state.test.scales[i];
 
-    const stops = reduce ? 0 : 9 + i * 4;
+    const stops = reduce || !animate ? 0 : 9 + i * 4;
     const names = [];
     for (let k = 0; k < stops; k++) names.push(pool[Math.floor(Math.random() * pool.length)]);
     names.push(target.name);
@@ -274,14 +461,14 @@ function spinReels() {
     const land = () => {
       track.style.transform = `translateY(-${distance}px)`;
       reel.classList.add('is-landed');
-      sig.textContent = keyGlyphs(target);
+      sig.textContent = `${keyGlyphs(target)} · ${target.octaves} oct`;
       if (i === reels.length - 1) {
         el.beginBtn.disabled = false;
         el.beginBtn.focus({ preventScroll: true });
       }
     };
 
-    if (reduce) {
+    if (reduce || !animate) {
       land();
       return;
     }
@@ -400,7 +587,7 @@ function renderTestResult() {
     .map(
       (r, i) => `
         <button class="test-scale" type="button" data-index="${i}">
-          <span class="ts-name">${r.scale.title}</span>
+          <span class="ts-name">${r.scale.title}<em class="ts-oct">${r.scale.octaves} oct</em></span>
           <span class="ts-bar"><span></span></span>
           <span class="ts-score">${r.score}%</span>
           <span class="ts-note">${shortVerdict(r)}</span>
@@ -454,7 +641,7 @@ function openScale(cardId, variantIndex = 0) {
   el.testBar.hidden = true;
   state.cardId = cardId;
   state.variantIndex = variantIndex;
-  state.scale = buildScale(cardById(cardId), variantIndex, state.mode, state.form);
+  state.scale = buildScale(cardById(cardId), variantIndex, state.mode, state.form, state.practiceOctaves);
   state.phase = 'idle';
   renderPractice();
   showView('practice');
@@ -477,6 +664,10 @@ function renderPractice() {
   el.memoryName.textContent = scale.title;
   el.memoryMeta.textContent = `${scale.meta.replace(/ · \d+ notes$/, '')} · ${scale.rangeText}`;
   el.spellingRow.hidden = Boolean(state.test) || scale.spellings.length < 2;
+  [...el.octaveTabs.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(Number(b.dataset.oct) === scale.octaves)),
+  );
+  el.octaveTabs.hidden = Boolean(state.test);
   applyNotationVisibility();
   if (scale.spellings.length > 1) {
     el.spellingRow.innerHTML = scale.spellings
@@ -834,7 +1025,9 @@ function renderResult(result) {
   const scale = result.scale;
   showView('result');
 
-  el.resultEyebrow.textContent = `${scale.title} · 2 octaves`;
+  el.resultEyebrow.textContent = `${scale.title} · ${scale.octaves} octave${
+    scale.octaves === 1 ? '' : 's'
+  }`;
 
   if (result.stats.heard < 3) {
     el.resultGrade.textContent = 'Nothing to score yet';
@@ -926,6 +1119,50 @@ el.modeTabs.addEventListener('click', (event) => {
   if (btn) setMode(btn.dataset.mode);
 });
 
+el.levelTabs.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-level]');
+  if (btn) setLevel(btn.dataset.level);
+});
+
+el.octaveTabs.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-oct]');
+  if (!btn) return;
+  state.practiceOctaves = Number(btn.dataset.oct);
+  state.scale = buildScale(
+    cardById(state.cardId),
+    state.variantIndex,
+    state.mode,
+    state.form,
+    state.practiceOctaves,
+  );
+  renderPractice();
+});
+
+el.pickGrid.addEventListener('click', (event) => {
+  const chip = event.target.closest('.pick-chip');
+  if (!chip || chip.disabled) return;
+  togglePick(chip.dataset.id);
+});
+
+el.twoOctRow.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-id]');
+  if (!btn) return;
+  const set = state.pick.twoOct;
+  const index = set.indexOf(btn.dataset.id);
+  if (index >= 0) set.splice(index, 1);
+  else if (set.length < LEVELS[state.level].twoOctave) set.push(btn.dataset.id);
+  renderPicker();
+});
+
+el.pickContinue.addEventListener('click', startFromPicks);
+
+el.pickClear.addEventListener('click', () => {
+  state.pick = { ids: [], twoOct: [] };
+  renderPicker();
+});
+
+el.pickBack.addEventListener('click', goHome);
+
 el.formTabs.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-form]');
   if (btn) setForm(btn.dataset.form);
@@ -940,7 +1177,13 @@ el.spellingRow.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-variant]');
   if (!btn) return;
   state.variantIndex = Number(btn.dataset.variant);
-  state.scale = buildScale(cardById(state.cardId), state.variantIndex, state.mode, state.form);
+  state.scale = buildScale(
+    cardById(state.cardId),
+    state.variantIndex,
+    state.mode,
+    state.form,
+    state.practiceOctaves,
+  );
   renderPractice();
 });
 
@@ -949,8 +1192,16 @@ el.brandHome.addEventListener('click', goHome);
 el.resultBack.addEventListener('click', goHome);
 el.anotherBtn.addEventListener('click', goHome);
 
-el.drawBtn.addEventListener('click', drawThree);
-el.redrawBtn.addEventListener('click', drawThree);
+el.drawBtn.addEventListener('click', () => {
+  if (LEVELS[state.level].choose) openPicker();
+  else drawThree();
+});
+
+el.redrawBtn.addEventListener('click', () => {
+  if (state.level === '1-2') openPicker();
+  else if (state.level === '3-4') startFromPicks();
+  else drawThree();
+});
 el.drawBack.addEventListener('click', goHome);
 el.beginBtn.addEventListener('click', beginTest);
 el.endTestBtn.addEventListener('click', endTest);
@@ -1063,6 +1314,16 @@ window.__scaleStudioReady = true;
 
 if (params.has('help')) el.helpDialog.showModal();
 if (params.has('draw')) drawThree();
+if (params.has('pick')) {
+  // Visual check of the picker with a full selection.
+  state.level = LEVELS[params.get('pick')] ? params.get('pick') : '1-2';
+  state.practiceOctaves = LEVELS[state.level].octaves;
+  [...el.levelTabs.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(b.dataset.level === state.level)),
+  );
+  openPicker();
+  for (let i = 0; i < LEVELS[state.level].choose; i++) togglePick(MAJOR_KEYS[i].id);
+}
 if (params.has('testauto')) {
   drawThree();
   setTimeout(beginTest, 2200);

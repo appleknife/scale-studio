@@ -4,7 +4,7 @@
 
 ![Scale Studio — choose a scale](preview.png)
 
-A listening scale trainer for violin students preparing for **NYSSMA Levels 5–6**.
+A listening scale trainer for violin students preparing for **NYSSMA Levels I–VI**.
 
 Pick a key, press *Start listening*, and play. The app waits until you actually
 begin — there is no count-in and no timer — then follows the scale note by note
@@ -84,11 +84,28 @@ everything that follows.
 
 ---
 
+## Levels
+
+The level tabs on the chooser decide what "a scale" means for you, and they follow
+the Manual's three tiers:
+
+| Level | What the Manual asks | What the app does |
+| --- | --- | --- |
+| **I–II** | three distinct major scales, one octave, chosen by you | you pick three; all one octave |
+| **III–IV** | seven major scales, two of them in two octaves | you pick seven and mark your two; the app draws one two-octave and two one-octave |
+| **V–VI** | fifteen major scales, all two octaves, chosen by the adjudicator | three drawn at random |
+
+Practice follows the level as well — I–II opens scales in one octave, III–VI in two —
+and the **1 oct / 2 oct** switch in the scale header overrides it for any single
+scale, which is handy when a student is ready to stretch one key upwards.
+
 ## Mock audition
 
-A judge asks for three of the fifteen scales. **Draw three scales** spins three
-reels — three distinct keys, no repeats — and then you play them one after another,
-exactly as in the audition:
+Every audition is three scales, played back to back, with one report at the end.
+How those three arrive depends on the level: at I–II you choose them, at III–IV the
+app draws from your seven, at V–VI it draws from the twelve keys. At V–VI the draw
+spins three reels — three distinct keys, no repeats — and then you play them one
+after another, exactly as in the audition:
 
 * the microphone opens once and stays open, so there is no re-prompting between scales;
 * the **notation is hidden** — only the key name and range are shown, because the

@@ -207,7 +207,13 @@
       });
       if (slow.score < 85) problems.push(`slow playing punished (${slow.score})`);
 
-      // G. minor scale, raised 7th spelled correctly
+      // G. Levels I–IV use one-octave scales: 15 notes, tonic to tonic
+      const cMajor1 = buildScale(MAJOR_KEYS[0], 0, 'major', 'melodic', 1);
+      const short = run('one octave', cMajor1, { vibrato: 0.15 });
+      if (short.stats.expected !== 15) problems.push(`one-octave scale has ${short.stats.expected} notes`);
+      if (short.score < 90) problems.push(`one-octave take scored only ${short.score}`);
+
+      // H. minor scale, raised 7th spelled correctly
       const aMinor = buildScale(MINOR_KEYS[0], 0, 'minor', 'harmonic');
       const aMinorNotes = aMinor.sequence.map((n) => n.name).join(' ');
       log.push('');

@@ -17,107 +17,150 @@
       const problems = [];
       const log = [];
       const f = document.getElementById('f');
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      f.addEventListener('load', () => {
+      f.addEventListener('load', async () => {
         const w = f.contentWindow;
         const d = f.contentDocument;
-        w.addEventListener('error', (e) => problems.push(`runtime: ${e.message}`));
+        w.addEventListener('error', (event) => problems.push(`runtime: ${event.message}`));
 
-        setTimeout(() => {
-          const q = (sel) => d.querySelector(sel);
-          const view = (name) => !d.getElementById(`view-${name}`).hidden;
-
-          try {
-            // ── major grid ────────────────────────────────────────────
-            const cards = d.querySelectorAll('#scaleGrid .key-card');
-            log.push(`major cards: ${cards.length}`);
-            if (cards.length !== 12) problems.push(`expected 12 major cards, got ${cards.length}`);
-
-            // ── minor tab + forms ─────────────────────────────────────
-            d.querySelector('#modeTabs [data-mode="minor"]').click();
-            const minorCards = d.querySelectorAll('#scaleGrid .key-card');
-            log.push(`minor cards: ${minorCards.length}`);
-            if (minorCards.length !== 12) problems.push(`minor cards: ${minorCards.length}`);
-            if (d.getElementById('formTabs').hidden) problems.push('form tabs hidden on minor');
-
-            d.querySelector('#formTabs [data-form="harmonic"]').click();
-            if (d.querySelector('#formTabs [data-form="harmonic"]').getAttribute('aria-selected') !== 'true')
-              problems.push('harmonic form not selected');
-
-            // ── open a minor scale ────────────────────────────────────
-            d.querySelector('#scaleGrid .key-card').click();
-            if (!view('practice')) problems.push('practice view not shown');
-            log.push(`title: ${d.getElementById('scaleTitle').textContent}`);
-            log.push(`staff svg: ${!!d.querySelector('#staffHost svg')}`);
-            log.push(`notes drawn: ${d.querySelectorAll('#staffHost ellipse').length}`);
-            if (d.querySelectorAll('#staffHost ellipse').length !== 29)
-              problems.push('staff does not show 29 notes');
-            if (!/harmonic minor/.test(d.getElementById('scaleTitle').textContent))
-              problems.push('wrong title for minor scale');
-
-            // ── spelling switch on an enharmonic major scale ──────────
-            d.getElementById('backBtn').click();
-            d.querySelector('#modeTabs [data-mode="major"]').click();
-            d.querySelector('#scaleGrid .key-card[data-id="F#"]').click();
-            const spell = d.querySelectorAll('#spellingRow button');
-            log.push(`spellings: ${[...spell].map((b) => b.textContent).join(' / ')}`);
-            if (spell.length !== 2) problems.push('spelling toggle missing');
-            spell[1].click();
-            log.push(`switched title: ${d.getElementById('scaleTitle').textContent}`);
-            if (!/major/.test(d.getElementById('scaleTitle').textContent))
-              problems.push('title broken after spelling switch');
-            if (d.querySelectorAll('#staffHost text[class="staff-acc"]').length < 5)
-              problems.push('key signature missing after switch');
-
-            // ── help dialog ───────────────────────────────────────────
-            d.getElementById('helpBtn').click();
-            if (!d.getElementById('helpDialog').open) problems.push('help dialog did not open');
-            d.getElementById('closeHelp').click();
-            if (d.getElementById('helpDialog').open) problems.push('help dialog did not close');
-
-            // ── back to the chooser ───────────────────────────────────
-            d.getElementById('brandHome').click();
-            if (!view('choose')) problems.push('brand click did not return home');
-
-            // ── mock audition draw ────────────────────────────────────
-            d.getElementById('drawBtn').click();
-            if (!view('test-draw')) problems.push('draw view not shown');
-            log.push(`reels: ${d.querySelectorAll('#reels .reel').length}`);
-            if (d.querySelectorAll('#reels .reel').length !== 3) problems.push('expected 3 reels');
-            if (!d.getElementById('beginBtn').disabled) problems.push('begin enabled before the reels land');
-
-            setTimeout(() => {
-              try {
-                const names = [...d.querySelectorAll('#reels .reel')].map(
-                  (reel) => reel.querySelector('.reel-track span:last-child').textContent,
-                );
-                log.push(`drawn: ${names.join(' | ')}`);
-                const unique = new Set(names);
-                if (unique.size !== 3) problems.push(`drawn scales repeat: ${names.join(',')}`);
-                if (names.some((n) => n.includes('/'))) problems.push('enharmonic pair drawn as one entry');
-                const forbidden = ['C♭', 'G♭', 'D♭'];
-                if (names.some((n) => forbidden.includes(n)))
-                  problems.push(`rare enharmonic spelling drawn: ${names.join(',')}`);
-                if (d.getElementById('beginBtn').disabled) problems.push('begin still disabled after the spin');
-                if (d.querySelectorAll('#reels .reel.is-landed').length !== 3)
-                  problems.push('reels did not land');
-              } catch (err) {
-                problems.push('draw exception: ' + err.message);
-              }
-
-              fetch('/result', {
-                method: 'POST',
-                body: JSON.stringify({ stage: 'ui', problems, log: log.join('\n') }, null, 2),
-              });
-            }, 2600);
-          } catch (err) {
-            problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
-            fetch('/result', {
-              method: 'POST',
-              body: JSON.stringify({ stage: 'ui', problems, log: log.join('\n') }, null, 2),
-            });
+        const $ = (sel) => d.querySelector(sel);
+        const view = (name) => !d.getElementById(`view-${name}`).hidden;
+        const pickN = (n) => {
+          for (let i = 0; i < n; i++) {
+            const chips = [...d.querySelectorAll('#pickGrid .pick-chip')];
+            chips[i].click();
           }
-        }, 900);
+        };
+
+        try {
+          await wait(900);
+
+          /* ── the chooser ─────────────────────────────────────────── */
+          log.push(`major cards: ${d.querySelectorAll('#scaleGrid .key-card').length}`);
+          if (d.querySelectorAll('#scaleGrid .key-card').length !== 12)
+            problems.push('expected 12 major cards');
+          if (d.querySelector('#levelTabs [data-level="5-6"]').getAttribute('aria-selected') !== 'true')
+            problems.push('V–VI is not the default level');
+
+          /* ── minor tab + forms ───────────────────────────────────── */
+          d.querySelector('#modeTabs [data-mode="minor"]').click();
+          log.push(`minor cards: ${d.querySelectorAll('#scaleGrid .key-card').length}`);
+          if (d.querySelectorAll('#scaleGrid .key-card').length !== 12) problems.push('minor cards');
+          if (d.getElementById('formTabs').hidden) problems.push('form tabs hidden on minor');
+          if (!d.getElementById('levelTabs').hidden) problems.push('level tabs shown on minor');
+
+          d.querySelector('#formTabs [data-form="harmonic"]').click();
+          d.querySelector('#scaleGrid .key-card').click();
+          if (!view('practice')) problems.push('practice view not shown');
+          log.push(`title: ${d.getElementById('scaleTitle').textContent}`);
+          if (!/harmonic minor/.test(d.getElementById('scaleTitle').textContent))
+            problems.push('wrong title for minor scale');
+          if (d.querySelectorAll('#staffHost ellipse').length !== 29)
+            problems.push('minor staff does not show 29 notes');
+
+          /* ── spelling switch on an enharmonic major scale ────────── */
+          d.getElementById('backBtn').click();
+          d.querySelector('#modeTabs [data-mode="major"]').click();
+          d.querySelector('#scaleGrid .key-card[data-id="F#"]').click();
+          const spell = d.querySelectorAll('#spellingRow button');
+          log.push(`spellings: ${[...spell].map((b) => b.textContent).join(' / ')}`);
+          if (spell.length !== 2) problems.push('spelling toggle missing');
+          spell[1].click();
+          log.push(`switched title: ${d.getElementById('scaleTitle').textContent}`);
+          if (!/major/.test(d.getElementById('scaleTitle').textContent))
+            problems.push('title broken after spelling switch');
+          if (d.querySelectorAll('#staffHost text[class="staff-acc"]').length < 5)
+            problems.push('key signature missing after switch');
+
+          /* ── octave toggle ───────────────────────────────────────── */
+          d.querySelector('#octaveTabs [data-oct="1"]').click();
+          if (d.querySelectorAll('#staffHost ellipse').length !== 15)
+            problems.push('one-octave staff should have 15 notes');
+          d.querySelector('#octaveTabs [data-oct="2"]').click();
+          if (d.querySelectorAll('#staffHost ellipse').length !== 29)
+            problems.push('two-octave staff should have 29 notes');
+
+          /* ── help dialog ─────────────────────────────────────────── */
+          d.getElementById('helpBtn').click();
+          if (!d.getElementById('helpDialog').open) problems.push('help dialog did not open');
+          d.getElementById('closeHelp').click();
+          if (d.getElementById('helpDialog').open) problems.push('help dialog did not close');
+
+          /* ── V–VI: the draw ──────────────────────────────────────── */
+          d.getElementById('brandHome').click();
+          if (!view('choose')) problems.push('brand click did not return home');
+
+          d.getElementById('drawBtn').click();
+          if (!view('test-draw')) problems.push('draw view not shown');
+          if (d.querySelectorAll('#reels .reel').length !== 3) problems.push('expected 3 reels');
+          if (!d.getElementById('beginBtn').disabled) problems.push('begin enabled before the reels land');
+
+          await wait(2600);
+
+          const drawn = [...d.querySelectorAll('#reels .reel')].map(
+            (reel) => reel.querySelector('.reel-track span:last-child').textContent,
+          );
+          log.push(`V–VI drawn: ${drawn.join(' | ')}`);
+          if (new Set(drawn).size !== 3) problems.push(`drawn scales repeat: ${drawn.join(',')}`);
+          const forbidden = ['C♭', 'G♭', 'D♭'];
+          if (drawn.some((n) => forbidden.includes(n)))
+            problems.push(`rare enharmonic spelling drawn: ${drawn.join(',')}`);
+          if (d.getElementById('beginBtn').disabled) problems.push('begin still disabled after the spin');
+          if (d.querySelectorAll('#reels .reel.is-landed').length !== 3) problems.push('reels did not land');
+
+          /* ── I–II: choose three, one octave ──────────────────────── */
+          d.getElementById('drawBack').click();
+          d.querySelector('#levelTabs [data-level="1-2"]').click();
+          log.push(`I–II button: ${d.getElementById('drawBtn').textContent}`);
+          if (!/Level I–II/.test(d.getElementById('gridNote').textContent))
+            problems.push('grid note not updated for Level I–II');
+
+          d.getElementById('drawBtn').click();
+          if (!view('test-pick')) problems.push('picker view not shown for I–II');
+          if (d.querySelectorAll('#pickGrid .pick-chip').length !== 12) problems.push('picker chips');
+          if (!d.getElementById('pickContinue').disabled) problems.push('continue enabled before picking');
+
+          pickN(3);
+          log.push(`I–II count: ${d.getElementById('pickCount').textContent}`);
+          if (d.getElementById('pickContinue').disabled) problems.push('continue still disabled at 3 picks');
+
+          d.getElementById('pickContinue').click();
+          if (!view('test-draw')) problems.push('I–II did not reach the draw screen');
+          const oneOct = [...d.querySelectorAll('#reels .reel-sig')].map((s) => s.textContent);
+          log.push(`I–II reels: ${oneOct.join(' | ')}`);
+          if (!oneOct.every((t) => t.includes('1 oct')))
+            problems.push(`I–II reels are not all one octave: ${oneOct.join(',')}`);
+
+          /* ── III–IV: choose seven, two of them two octaves ───────── */
+          d.getElementById('drawBack').click();
+          d.querySelector('#levelTabs [data-level="3-4"]').click();
+          d.getElementById('drawBtn').click();
+          if (!view('test-pick')) problems.push('picker view not shown for III–IV');
+          pickN(7);
+          log.push(`III–IV count: ${d.getElementById('pickCount').textContent}`);
+          if (d.getElementById('twoOctPanel').hidden)
+            problems.push('two-octave panel missing at seven picks');
+          if (d.querySelectorAll('#twoOctRow button[aria-pressed="true"]').length !== 2)
+            problems.push('two-octave chips not pre-marked');
+          if (d.getElementById('pickContinue').disabled) problems.push('continue disabled at seven picks');
+
+          d.getElementById('pickContinue').click();
+          await wait(2600);
+          const mixed = [...d.querySelectorAll('#reels .reel-sig')].map((s) => s.textContent);
+          log.push(`III–IV reels: ${mixed.join(' | ')}`);
+          if (mixed.filter((t) => t.includes('2 oct')).length !== 1)
+            problems.push(`III–IV should play exactly one two-octave scale: ${mixed.join(',')}`);
+          if (mixed.filter((t) => t.includes('1 oct')).length !== 2)
+            problems.push(`III–IV should play two one-octave scales: ${mixed.join(',')}`);
+        } catch (err) {
+          problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
+        }
+
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'ui', problems, log: log.join('\n') }, null, 2),
+        });
       });
     </script>
   </body>

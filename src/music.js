@@ -107,12 +107,10 @@ function buildAscending(tonic, sig, form, octaves) {
   return notes;
 }
 
-export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melodic') {
+export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melodic', octaves = 2) {
   const v = card.variants[Math.min(variantIndex, card.variants.length - 1)];
   const tonic = { letter: v.letter, alter: v.alter, octave: v.octave };
   const sig = keySignature(v.fifths);
-
-  const octaves = 2;
   const up = buildAscending(tonic, sig, mode === 'minor' ? form : 'major', octaves);
   const down =
     mode === 'minor' && form === 'melodic'
@@ -147,7 +145,8 @@ export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melod
     up,
     sequence,
     rangeText: `${sequence[0].name} – ${sequence[octaves * 7].name}`,
-    meta: `${octaves} octaves · up and down · ${sequence.length} notes`,
+    octaves,
+    meta: `${octaves} octave${octaves === 1 ? '' : 's'} · up and down · ${sequence.length} notes`,
     card,
   };
 }

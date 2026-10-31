@@ -1,7 +1,7 @@
 {
   "name": "Scale Studio — violin scale trainer",
   "short_name": "Scale Studio",
-  "description": "A listening scale trainer for violin students preparing for NYSSMA Levels 5–6.",
+  "description": "A listening scale trainer for violin students preparing for NYSSMA Levels I–VI.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
