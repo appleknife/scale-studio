@@ -111,6 +111,12 @@ body {
   color: var(--muted);
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .ghost-btn {
   border: 1px solid var(--line);
   background: rgba(255, 253, 250, 0.7);
@@ -303,6 +309,263 @@ h3 {
   line-height: 1.6;
   color: var(--muted);
   max-width: 640px;
+}
+
+/* ── Tuner ───────────────────────────────────────────────────────────── */
+
+.tuner-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  padding: 22px 24px 18px;
+  margin-bottom: 16px;
+}
+
+.string-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.string-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 13.5px;
+  padding: 6px 13px 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: default;
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.string-chip[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.string-chip .sc-name {
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.string-chip .sc-note {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.sc-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #dbd0be;
+  transition: background 0.25s ease;
+}
+
+.string-chip[data-tuned="true"] .sc-dot {
+  background: var(--accent);
+}
+
+.dial {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.dial svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.dial-arc {
+  fill: none;
+  stroke: #e9e1d4;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.dial-zone-halo {
+  fill: none;
+  stroke: #3f6d59;
+  stroke-width: 26;
+  stroke-linecap: round;
+  opacity: 0.14;
+}
+
+.dial-zone {
+  fill: none;
+  stroke: #3f6d59;
+  stroke-width: 13;
+  stroke-linecap: round;
+  opacity: 0.85;
+  transition: opacity 0.25s ease;
+}
+
+.dial-tick {
+  stroke: #d3c8b6;
+  stroke-width: 1.4;
+}
+
+.dial-tick.major {
+  stroke: #a99e8d;
+  stroke-width: 2;
+}
+
+.dial-label {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  fill: #9a9186;
+  text-anchor: middle;
+}
+
+.dial-needle {
+  transform-box: view-box;
+  transform-origin: 240px 208px;
+  transition: transform 0.09s linear;
+}
+
+.dial-needle line {
+  stroke: var(--ink);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  transition: stroke 0.2s ease;
+}
+
+.dial-needle circle {
+  fill: var(--ink);
+  transition: fill 0.2s ease;
+}
+
+.dial-needle[data-state="good"] line {
+  stroke: var(--accent);
+}
+
+.dial-needle[data-state="good"] circle {
+  fill: var(--accent);
+}
+
+.tune-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  margin-top: -6px;
+}
+
+.tune-note {
+  font-family: var(--serif);
+  font-size: 44px;
+  line-height: 1;
+  min-width: 46px;
+  text-align: center;
+}
+
+.tune-cents {
+  font-size: 14px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tune-status {
+  margin: 6px 0 0;
+  min-height: 20px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.guide-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  padding: 16px 22px 20px;
+  margin-bottom: 16px;
+}
+
+.guide-card .card-title {
+  padding: 2px 0 10px;
+}
+
+.guide-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.guide-list li {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.guide-list strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.guide-intro {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.pair-list {
+  display: grid;
+  gap: 8px;
+}
+
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffdfa;
+}
+
+.pair-name {
+  font-family: var(--serif);
+  font-size: 18px;
+  min-width: 70px;
+}
+
+.pair-hint {
+  flex: 1;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pair-result {
+  min-width: 118px;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.pair-result[data-state="good"] {
+  color: var(--accent);
+}
+
+.pair-result[data-state="wobble"] {
+  color: var(--gold);
+}
+
+.pair-result[data-state="listening"] {
+  color: var(--accent-2);
 }
 
 /* ── Mock audition: entry, draw, progress ────────────────────────────── */
@@ -1471,8 +1734,30 @@ dialog .primary-btn {
   }
 
   .ghost-btn {
-    font-size: 12px;
-    padding: 8px 12px;
+    font-size: 11.5px;
+    padding: 7px 11px;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .tuner-card {
+    padding: 18px 14px 14px;
+  }
+
+  .tune-readout {
+    margin-top: -2px;
+  }
+
+  .pair {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .pair-hint {
+    flex-basis: 100%;
+    order: 3;
   }
 
   .grid {

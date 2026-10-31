@@ -1,9 +1,18 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302206';
-import { renderStaff } from './staff.js?v=202610302206';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610302206';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610302206';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302248';
+import { renderStaff } from './staff.js?v=202610302248';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610302248';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610302248';
+import {
+  STRINGS,
+  FIFTHS,
+  stringById,
+  centsFrom,
+  nearestString,
+  isInTune,
+  analyseDoubleStop,
+} from './tuner.js?v=202610302248';
 
 const $ = (id) => document.getElementById(id);
 
@@ -12,6 +21,7 @@ const el = {
     choose: $('view-choose'),
     practice: $('view-practice'),
     result: $('view-result'),
+    tune: $('view-tune'),
     'test-draw': $('view-test-draw'),
     'test-pick': $('view-test-pick'),
     'test-result': $('view-test-result'),
@@ -33,6 +43,16 @@ const el = {
   pickBack: $('pickBack'),
   twoOctPanel: $('twoOctPanel'),
   twoOctRow: $('twoOctRow'),
+
+  tuneBtn: $('tuneBtn'),
+  tuneBack: $('tuneBack'),
+  tuneMicBtn: $('tuneMicBtn'),
+  tuneStrings: $('tuneStrings'),
+  dialHost: $('dialHost'),
+  tuneNote: $('tuneNote'),
+  tuneCents: $('tuneCents'),
+  tuneStatus: $('tuneStatus'),
+  pairRows: $('pairRows'),
   brandHome: $('brandHome'),
 
   scaleTitle: $('scaleTitle'),
@@ -133,6 +153,9 @@ const state = {
   practiceOctaves: 2,
   // What the student picked on the audition picker (Levels I–IV).
   pick: { ids: [], twoOct: [] },
+  // The tuner's live state, null when the tuner is closed.
+  tune: null,
+  micMode: null, // 'take' | 'tune'
 };
 
 // The Manual's three tiers of string scale requirements.
@@ -634,6 +657,242 @@ function renderTestResult() {
   }
 }
 
+/* ── Tuner ────────────────────────────────────────────────────────────── */
+
+const DIAL = { cx: 240, cy: 208, r: 168, degPerCent: 0.9 };
+let needleEl = null;
+
+function dialAngle(cents) {
+  return Math.max(-50, Math.min(50, cents)) * DIAL.degPerCent;
+}
+
+function dialPoint(radius, deg) {
+  const rad = ((deg - 90) * Math.PI) / 180;
+  return [DIAL.cx + radius * Math.cos(rad), DIAL.cy + radius * Math.sin(rad)];
+}
+
+function dialArc(radius, fromCents, toCents) {
+  const [x1, y1] = dialPoint(radius, dialAngle(fromCents));
+  const [x2, y2] = dialPoint(radius, dialAngle(toCents));
+  return `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${radius} ${radius} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+}
+
+function renderDial() {
+  const string = stringById(state.tune.stringId);
+  const r = DIAL.r;
+  const parts = [`<path class="dial-arc" d="${dialArc(r, -50, 50)}"/>`];
+
+  for (let c = -50; c <= 50; c += 5) {
+    const major = c % 10 === 0;
+    const [x1, y1] = dialPoint(r - (major ? 20 : 12), dialAngle(c));
+    const [x2, y2] = dialPoint(r - 4, dialAngle(c));
+    parts.push(
+      `<line class="dial-tick${major ? ' major' : ''}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(
+        1,
+      )}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`,
+    );
+  }
+
+  [-50, -25, 0, 25, 50].forEach((c) => {
+    const [x, y] = dialPoint(r - 38, dialAngle(c));
+    parts.push(
+      `<text class="dial-label" x="${x.toFixed(1)}" y="${y.toFixed(1)}">${c > 0 ? '+' + c : c}</text>`,
+    );
+  });
+
+  // The green band is where this string wants to sit — a hair sharp for A, D, E
+  // and a hair flat for the G. The wider halo makes it easy to see at a glance.
+  parts.push(
+    `<path class="dial-zone-halo" d="${dialArc(r, string.offset - 3, string.offset + 3)}"/>`,
+  );
+  parts.push(`<path class="dial-zone" d="${dialArc(r, string.offset - 3, string.offset + 3)}"/>`);
+  parts.push(
+    `<g class="dial-needle"><line x1="${DIAL.cx}" y1="${DIAL.cy}" x2="${DIAL.cx}" y2="${
+      DIAL.cy - (r - 24)
+    }"/><circle cx="${DIAL.cx}" cy="${DIAL.cy}" r="7"/></g>`,
+  );
+
+  el.dialHost.innerHTML = `<svg viewBox="0 0 480 250" role="img" aria-label="Tuning dial">${parts.join(
+    '',
+  )}</svg>`;
+  needleEl = el.dialHost.querySelector('.dial-needle');
+  paintNeedle();
+}
+
+function paintNeedle() {
+  const t = state.tune;
+  if (!t || !needleEl) return;
+  const string = stringById(t.stringId);
+
+  el.tuneNote.textContent = string.id;
+
+  if (t.cents == null) {
+    needleEl.style.transform = 'rotate(0deg)';
+    needleEl.dataset.state = 'idle';
+    el.tuneCents.textContent = '—';
+    el.tuneStatus.textContent = t.listening
+      ? 'Bow a string — the dial follows it.'
+      : 'Press “Start listening” to use the microphone.';
+    return;
+  }
+
+  const cents = t.cents;
+  const error = cents - string.offset;
+  const good = Math.abs(error) <= 3;
+
+  needleEl.style.transform = `rotate(${dialAngle(cents)}deg)`;
+  needleEl.dataset.state = good ? 'good' : 'idle';
+  el.tuneCents.textContent = `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢`;
+
+  if (good) {
+    el.tuneStatus.textContent = `${string.id} is sitting where you want it.`;
+  } else if (Math.abs(error) <= 12) {
+    el.tuneStatus.textContent = `A touch ${error > 0 ? 'sharp' : 'flat'} — ease it ${
+      error > 0 ? 'down' : 'up'
+    }.`;
+  } else {
+    el.tuneStatus.textContent = `${Math.abs(error).toFixed(0)}¢ ${
+      error > 0 ? 'sharp' : 'flat'
+    } — bring the peg ${error > 0 ? 'down' : 'up'}.`;
+  }
+}
+
+function renderStrings() {
+  const t = state.tune;
+  el.tuneStrings.innerHTML = STRINGS.map(
+    (s) => `<span class="string-chip" data-id="${s.id}" data-active="${
+      s.id === t.stringId
+    }" data-tuned="${t.tuned.has(s.id)}">
+      <span class="sc-dot"></span>
+      <span class="sc-name">${s.id}</span>
+      <span class="sc-note">${s.note}</span>
+    </span>`,
+  ).join('');
+}
+
+function renderPairs() {
+  const t = state.tune;
+  el.pairRows.innerHTML = FIFTHS.map((pair) => {
+    const running = Boolean(t.check && t.check.pairId === pair.id);
+    const result = t.result && t.result.pairId === pair.id ? t.result.verdict : null;
+    let text = '—';
+    let stateName = 'idle';
+    if (running) {
+      text = 'listening…';
+      stateName = 'listening';
+    } else if (result) {
+      if (result.status === 'wobble') {
+        text = `wobbling ≈ ${result.rateHz.toFixed(1)} Hz`;
+        stateName = 'wobble';
+      } else if (result.status === 'steady') {
+        text = 'steady';
+        stateName = 'good';
+      } else {
+        text = 'nothing heard';
+      }
+    }
+    return `<div class="pair">
+      <span class="pair-name">${pair.lower} + ${pair.upper}</span>
+      <span class="pair-hint">move ${pair.upper} until the pair rings</span>
+      <span class="pair-result" data-state="${stateName}">${text}</span>
+      <button class="quiet-btn small" type="button" data-check="${pair.id}" ${
+        running ? 'disabled' : ''
+      }>Check</button>
+    </div>`;
+  }).join('');
+}
+
+function openTuner(withMic = true) {
+  cancelListening();
+  state.tune = {
+    stringId: 'A',
+    cents: null,
+    tuned: new Set(),
+    silentFor: 0,
+    hold: 0,
+    listening: false,
+    check: null,
+    result: null,
+  };
+  showView('tune');
+  renderStrings();
+  renderDial();
+  renderPairs();
+  if (withMic) startTunerMic();
+}
+
+async function startTunerMic() {
+  if (!state.tune) return;
+  closeMic();
+  try {
+    state.mic = await openMic(onTuneFrame);
+    state.micMode = 'tune';
+    state.tune.listening = true;
+    el.tuneMicBtn.hidden = true;
+  } catch (err) {
+    state.tune.listening = false;
+    el.tuneMicBtn.hidden = false;
+    el.tuneStatus.textContent = micErrorMessage(err);
+    return;
+  }
+  paintNeedle();
+}
+
+function closeTuner() {
+  closeMic();
+  state.tune = null;
+}
+
+function onTuneFrame(frame) {
+  const t = state.tune;
+  if (!t) return;
+  if (t.check) t.check.samples.push(frame.rms);
+
+  if (!frame.freq || frame.clarity < 0.55 || frame.rms < 0.004) {
+    t.silentFor += 1;
+    if (t.silentFor > 20 && t.cents != null) {
+      t.cents = null;
+      paintNeedle();
+    }
+    return;
+  }
+
+  t.silentFor = 0;
+  const heard = nearestString(frame.freq) || stringById(t.stringId);
+  if (heard.id !== t.stringId) {
+    t.stringId = heard.id;
+    t.hold = 0;
+    renderStrings();
+    renderDial();
+  }
+
+  t.cents = centsFrom(frame.freq, heard.freq);
+  t.hold = isInTune(t.cents, heard) ? t.hold + 1 : 0;
+  if (t.hold >= 8 && !t.tuned.has(heard.id)) {
+    t.tuned.add(heard.id);
+    renderStrings();
+  }
+  paintNeedle();
+}
+
+function startBeatCheck(pairId) {
+  const t = state.tune;
+  if (!t || !state.mic || t.check) return;
+  t.check = { pairId, samples: [] };
+  t.result = null;
+  renderPairs();
+  setTimeout(finishBeatCheck, 3000);
+}
+
+function finishBeatCheck() {
+  const t = state.tune;
+  if (!t || !t.check) return;
+  const { pairId, samples } = t.check;
+  t.check = null;
+  t.result = { pairId, verdict: analyseDoubleStop(samples, { fps: 30 }) };
+  renderPairs();
+}
+
 /* ── Practice screen ──────────────────────────────────────────────────── */
 
 function openScale(cardId, variantIndex = 0) {
@@ -651,6 +910,7 @@ function openScale(cardId, variantIndex = 0) {
 function goHome() {
   cancelListening();
   state.test = null;
+  state.tune = null;
   el.testBar.hidden = true;
   history.replaceState(null, '', location.pathname + location.search);
   showView('choose');
@@ -802,10 +1062,13 @@ async function startListening() {
   setStatus(false, 'Waiting for the microphone');
 
   // The microphone is opened once and kept for a whole mock audition, so the
-  // audio context stays unlocked between takes (important on iOS).
+  // audio context stays unlocked between takes (important on iOS). The tuner
+  // uses the same stream object, so hand it back before listening for a take.
+  if (state.mic && state.micMode !== 'take') closeMic();
   if (!state.mic) {
     try {
       state.mic = await openMic(onFrame);
+      state.micMode = 'take';
     } catch (err) {
       state.phase = 'idle';
       el.startBtn.disabled = false;
@@ -1119,6 +1382,20 @@ el.modeTabs.addEventListener('click', (event) => {
   if (btn) setMode(btn.dataset.mode);
 });
 
+el.tuneBtn.addEventListener('click', () => openTuner());
+
+el.tuneBack.addEventListener('click', () => {
+  closeTuner();
+  goHome();
+});
+
+el.tuneMicBtn.addEventListener('click', startTunerMic);
+
+el.pairRows.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-check]');
+  if (btn) startBeatCheck(btn.dataset.check);
+});
+
 el.levelTabs.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-level]');
   if (btn) setLevel(btn.dataset.level);
@@ -1323,6 +1600,14 @@ if (params.has('pick')) {
   );
   openPicker();
   for (let i = 0; i < LEVELS[state.level].choose; i++) togglePick(MAJOR_KEYS[i].id);
+}
+if (params.has('tune')) {
+  // Visual check of the tuner without a microphone.
+  openTuner(false);
+  state.tune.cents = Number(params.get('tune')) || 6;
+  state.tune.tuned = new Set(['G', 'D']);
+  renderStrings();
+  paintNeedle();
 }
 if (params.has('testauto')) {
   drawThree();

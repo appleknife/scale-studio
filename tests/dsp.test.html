@@ -18,6 +18,7 @@
       import { MAJOR_KEYS, MINOR_KEYS, buildScale } from '../src/music.js';
       import { PitchDetector } from '../src/pitch.js';
       import { analyzeTake } from '../src/analyze.js';
+      import { analyseDoubleStop } from '../src/tuner.js';
 
       const SR = 44100;
       const WINDOW = 2048;
@@ -206,6 +207,32 @@
         vibrato: 0.15,
       });
       if (slow.score < 85) problems.push(`slow playing punished (${slow.score})`);
+
+      // F2. Double-stop wobble detection (the tuner's fifth check)
+      const fps = 30;
+      const steady = Array.from({ length: 120 }, () => 0.05 + (Math.random() - 0.5) * 0.002);
+      const steadyVerdict = analyseDoubleStop(steady, { fps });
+      log.push(`\n── double stop, steady: ${steadyVerdict.status}`);
+      if (steadyVerdict.status !== 'steady')
+        problems.push(`steady double stop read as ${steadyVerdict.status}`);
+
+      const wobble = Array.from({ length: 120 }, (_, i) => {
+        const t = i / fps;
+        return 0.05 * (1 + 0.35 * Math.sin(2 * Math.PI * 2 * t)) + (Math.random() - 0.5) * 0.001;
+      });
+      const wobbleVerdict = analyseDoubleStop(wobble, { fps });
+      log.push(
+        `── double stop, 2 Hz wobble: ${wobbleVerdict.status}${
+          wobbleVerdict.rateHz ? ` at ${wobbleVerdict.rateHz.toFixed(2)} Hz` : ''
+        }`,
+      );
+      if (wobbleVerdict.status !== 'wobble') problems.push('2 Hz wobble not detected');
+      else if (Math.abs(wobbleVerdict.rateHz - 2) > 0.35)
+        problems.push(`beat rate ${wobbleVerdict.rateHz.toFixed(2)} Hz instead of 2`);
+
+      const quietVerdict = analyseDoubleStop(new Array(120).fill(0.0001), { fps });
+      log.push(`── double stop, silence: ${quietVerdict.status}`);
+      if (quietVerdict.status !== 'quiet') problems.push('silence read as a double stop');
 
       // G. Levels I–IV use one-octave scales: 15 notes, tonic to tonic
       const cMajor1 = buildScale(MAJOR_KEYS[0], 0, 'major', 'melodic', 1);

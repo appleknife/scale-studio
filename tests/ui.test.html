@@ -87,6 +87,18 @@
           d.getElementById('closeHelp').click();
           if (d.getElementById('helpDialog').open) problems.push('help dialog did not close');
 
+          /* ── the tuner ───────────────────────────────────────────── */
+          d.getElementById('tuneBtn').click();
+          if (!view('tune')) problems.push('tuner view not shown');
+          if (!d.querySelector('#dialHost svg .dial-needle')) problems.push('tuning dial missing');
+          log.push(`string chips: ${d.querySelectorAll('#tuneStrings .string-chip').length}`);
+          if (d.querySelectorAll('#tuneStrings .string-chip').length !== 4)
+            problems.push('tuner should list four strings');
+          if (d.querySelectorAll('#pairRows .pair').length !== 3)
+            problems.push('tuner should list three fifths');
+          d.getElementById('tuneBack').click();
+          if (!view('choose')) problems.push('tuner back did not return home');
+
           /* ── V–VI: the draw ──────────────────────────────────────── */
           d.getElementById('brandHome').click();
           if (!view('choose')) problems.push('brand click did not return home');

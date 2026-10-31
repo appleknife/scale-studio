@@ -84,6 +84,28 @@ everything that follows.
 
 ---
 
+## Tuner
+
+The **Tuner** button in the header opens a needle dial for the open strings. Bow one
+string at a time and the app follows whichever string it hears. The green band shows
+where that string should sit — which is deliberately *not* dead centre:
+
+* **A, D and E** want a hair above centre. A bowed string settles slightly down once
+you play with real weight, so a couple of cents high is where it will actually sit.
+* **G** wants a hair below. Digging into the G lifts its pitch a lot, so tuning it a
+little low keeps it honest when you push.
+
+Then the part that matters more than any number on the dial: **the fifths**. A violin
+is tuned in pure fifths while a tuner is equal-tempered, so the two disagree by a
+couple of cents on every string. Hold G+D, D+A and A+E as double stops and move the
+upper string of each pair until the pair rings cleanly.
+
+Each pair has a **Check** button: the app listens for three seconds and says whether
+the sound is steady or wobbling. A slow wobble is the beat between two strings that
+are nearly, but not quite, a pure fifth apart. It is measured from the loudness
+envelope rather than the spectrum — at these frequencies no practical FFT could
+separate two partials a hertz apart, but the pulsing is easy to hear and to measure.
+
 ## Levels
 
 The level tabs on the chooser decide what "a scale" means for you, and they follow
@@ -226,6 +248,7 @@ app.css               visual design
 src/music.js          note spelling, key signatures, scale library
 src/pitch.js          YIN pitch detector
 src/analyze.js        note segmentation, alignment, scoring, feedback
+src/tuner.js          open-string targets and the double-stop wobble check
 src/staff.js          treble-staff renderer (SVG)
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
