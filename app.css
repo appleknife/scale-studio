@@ -2142,3 +2142,70 @@ dialog .primary-btn {
   /* keeps 「请我喝杯咖啡」 from splitting across a line */
   white-space: nowrap;
 }
+
+/* ── What the listening can and cannot hear ──────────────────────────────── */
+
+/* A closed disclosure, quiet until someone wants it: one line of small text,
+   no border until it is opened, so it does not compete with the pass. */
+.hear-note {
+  margin: 16px 0 4px;
+  border-radius: 14px;
+  border: 1px solid transparent;
+}
+
+.hear-note[open] {
+  border-color: var(--line);
+  background: var(--surface);
+  padding: 0 18px 4px;
+}
+
+.hear-note > summary {
+  cursor: pointer;
+  padding: 9px 2px;
+  font-size: 13px;
+  color: var(--muted);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hear-note > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The marker is drawn, not inherited, so it matches the app's line weights. */
+.hear-note > summary::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.hear-note[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.hear-note > summary:hover {
+  color: var(--ink-soft);
+}
+
+.hear-list {
+  margin: 2px 0 12px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.hear-list li {
+  margin-bottom: 7px;
+}
+
+.hear-list strong {
+  color: var(--ink-soft);
+  font-weight: 600;
+}

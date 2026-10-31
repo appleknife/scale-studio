@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311623';
-import { STAFF_GEOM } from './staff.js?v=202610311623';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311630';
+import { STAFF_GEOM } from './staff.js?v=202610311630';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -151,8 +151,9 @@ const LEVELS = {
     },
     // 6/8 is marked in dotted quarters at both these levels; the Manual's
     // "eighth = 120" belongs to the simple metres, not to 6/8, where it would
-    // be slower than any sight-reading example ever printed.
-    tempo: { '6/8': { unit: 'qd', bpm: 60 }, '*': { unit: 'q', bpm: 60 } },
+    // be slower than any sight-reading example ever printed. The simple metres
+    // are not repeated here — they carry over from level IV at ♩ = 88.
+    tempo: { '6/8': { unit: 'qd', bpm: 60 } },
     dynamics: ['mp', 'f'],
     marks: ['staccato', 'accent'],
     rests: true,
@@ -218,14 +219,24 @@ const LEVELS = {
     },
     // 6/8 is a dotted-quarter metre; ♪ = 120 in the Manual's list belongs to the
     // simple metres. In 6/8 it would come out at 40 beats a minute, slower than
-    // any printed example.
-    tempo: { '6/8': { unit: 'qd', bpm: 72 }, '4/4': { unit: 'q', bpm: 120 }, '*': { unit: 'q', bpm: 72 } },
+    // any printed example. Only what changes is listed: 4/4 goes up to 120 and
+    // 6/8 takes its own marking, while the rest carry on from level V at 88.
+    tempo: { '6/8': { unit: 'qd', bpm: 72 }, '4/4': { unit: 'q', bpm: 120 } },
     dynamics: ['mp', 'mf'],
     marks: ['staccato', 'accent'],
     rests: true,
     accidentals: 2,
   },
 };
+
+// A level's page prints only the tempi that change. Everything else carries
+// over from the level before, so a later level never falls back to a slower
+// speed for a metre it shares: level V's simple metres stay at IV's ♩ = 88, and
+// level VI only lifts 4/4 to 120 and gives 6/8 its own marking.
+for (const level of Object.keys(LEVELS).map(Number).sort((a, b) => a - b)) {
+  if (level === 1) continue;
+  LEVELS[level].tempo = { ...LEVELS[level - 1].tempo, ...LEVELS[level].tempo };
+}
 
 export const SIGHT_LEVELS = Object.keys(LEVELS).map(Number);
 

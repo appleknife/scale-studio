@@ -272,6 +272,10 @@ sight-reading table for that level.
   take with `armSightTake({ live: false })` and hide it.
 * A take left open when the student walks away is closed with the microphone, so
   nothing keeps counting on a screen nobody is watching.
+* **What it can and can't hear** is a disclosure under the buttons, closed until
+  someone opens it: notes and stops are reliable, pitch centre is reliable on a
+  held note, steadiness is a fair judge, tempo is not scored, and dynamics, bowing
+  and tone are not heard at all. The same words sit on the scale screen.
 
 **Level I is deliberately plain.** D major only, one octave from D4 to D5, 2/4 or
 4/4, quarter and half notes with the occasional whole note, and no leap wider than

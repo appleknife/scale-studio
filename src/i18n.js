@@ -581,6 +581,17 @@ export const STATIC = {
   'help.support':
     'Scale Studio 一直免费，也会一直免费。如果它对你或你的学生有帮助，也可以<a href="https://ko-fi.com/apple" target="_blank" rel="noopener noreferrer">请我喝杯咖啡</a>——这样我才能继续把这类东西做下去。',
 
+  /* What the listening can and cannot hear — the same words on both screens. */
+  'hear.summary': '它能听出什么，听不出什么',
+  'hear.list':
+    '<li><strong>音符</strong>——很可靠。每个音都会对上谱上的那一个，所以漏一个或多一个，只影响它自己那一格。</li>' +
+    '<li><strong>音准</strong>——音拉得住的时候可靠。左右 15 音分以内都算准；揉弦很重、音很短的时候会模糊。</li>' +
+    '<li><strong>节奏</strong>——判断得还算准。它不管你快慢，只看间隔是否均匀；四分之一拍以内的偏差算在噪声里。</li>' +
+    '<li><strong>停顿</strong>——可靠。停顿超过大约两拍才算一次。</li>' +
+    '<li><strong>速度</strong>——不打分。比标记慢一点没关系。</li>' +
+    '<li><strong>力度、弓法、音色</strong>——听不出来。一支麦克风分不清渐强和加弓压，也分不清断弓和连弓。</li>' +
+    '<li><strong>重复音</strong>——同一个音连着拉，可能会合成一个音；换弓的位置它只能大致听出来。</li>',
+
   /* the rest of the static sheet */
   'eyebrow.test': '模拟考试 · 三条音阶',
   'You can breathe between scales — the app waits for your first note each time.':

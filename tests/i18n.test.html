@@ -57,6 +57,11 @@ function visible(el) {
 
 function audit(doc) {
   const found = [];
+  // Disclosures are closed by default, so their text is not on screen — but it is
+  // still text a Chinese reader can open, so open them before walking the page.
+  doc.querySelectorAll('details').forEach((d) => {
+    d.open = true;
+  });
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
     const node = walker.currentNode;
