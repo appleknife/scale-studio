@@ -117,10 +117,14 @@
           if (!spec.keys.includes(p.key.id)) problems.push(`${id}: key ${p.key.id} not in the level`);
           if (!spec.meters.includes(p.meter)) problems.push(`${id}: meter ${p.meter} not in the level`);
 
-          // Level VI's 6/8 is marked in eighths — ♪ = 120 — not in dotted
-          // quarters, which is how level V's 6/8 is marked.
-          if (level === 6 && p.meter === '6/8' && (p.tempo.unit !== 'e' || p.tempo.bpm !== 120)) {
-            problems.push(`${id}: 6/8 marked ${p.tempo.unit}=${p.tempo.bpm}`);
+          // 6/8 is a dotted-quarter metre at both levels that use it. The
+          // Manual's "eighth = 120" belongs to the simple metres; read into 6/8
+          // it would come out slower than any printed example.
+          if (p.meter === '6/8') {
+            const want = level === 5 ? 60 : 72;
+            if (p.tempo.unit !== 'qd' || p.tempo.bpm !== want) {
+              problems.push(`${id}: 6/8 marked ${p.tempo.unit}=${p.tempo.bpm}, not dotted-quarter=${want}`);
+            }
           }
 
           // slurs pair up inside one bar: start, then end, never two at once

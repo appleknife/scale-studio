@@ -8,7 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311600';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311618';
+import { STAFF_GEOM } from './staff.js?v=202610311618';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -148,7 +149,10 @@ const LEVELS = {
       '2/2': [[4, 4, 4, 4], [8, 4, 4], [6, 2, 4, 4], [4, 4, 6, 2], [8, 6, 2]],
       '6/8': [[2, 2, 2, 6], [6, 2, 2, 2], [2, 2, 2, 2, 2, 2], [4, 2, 6], [6, 6]],
     },
-    tempo: { '6/8': { unit: 'qd', bpm: 120 }, '*': { unit: 'q', bpm: 60 } },
+    // 6/8 is marked in dotted quarters at both these levels; the Manual's
+    // "eighth = 120" belongs to the simple metres, not to 6/8, where it would
+    // be slower than any sight-reading example ever printed.
+    tempo: { '6/8': { unit: 'qd', bpm: 60 }, '*': { unit: 'q', bpm: 60 } },
     dynamics: ['mp', 'f'],
     marks: ['staccato', 'accent'],
     rests: true,
@@ -212,9 +216,10 @@ const LEVELS = {
         [6, 2, 1, 1, 2],
       ],
     },
-    // The Manual marks level VI's 6/8 in eighths — ♪ = 120 — not in dotted
-    // quarters, which is how level V's 6/8 is marked.
-    tempo: { '6/8': { unit: 'e', bpm: 120 }, '4/4': { unit: 'q', bpm: 120 }, '*': { unit: 'q', bpm: 72 } },
+    // 6/8 is a dotted-quarter metre; ♪ = 120 in the Manual's list belongs to the
+    // simple metres. In 6/8 it would come out at 40 beats a minute, slower than
+    // any printed example.
+    tempo: { '6/8': { unit: 'qd', bpm: 72 }, '4/4': { unit: 'q', bpm: 120 }, '*': { unit: 'q', bpm: 72 } },
     dynamics: ['mp', 'mf'],
     marks: ['staccato', 'accent'],
     rests: true,
@@ -809,14 +814,36 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       ? (chance(rng, level >= 4 ? 0.45 : 0.2) ? 2 : 1)
       : 0;
     for (let s = 0; s < wanted; s++) {
-      const barEvents = bars[Math.floor(rng() * (BAR_COUNT - 1))].filter((e) => !e.rest);
-      if (barEvents.length < 2) continue;
-      const len = Math.min(barEvents.length, 2 + Math.floor(rng() * 3));
-      const start = Math.floor(rng() * (barEvents.length - len + 1));
-      const run = barEvents.slice(start, start + len);
-      if (run.some((e) => e.slurStart || e.slurEnd)) continue;
-      run[0].slurStart = true;
-      run[run.length - 1].slurEnd = true;
+      // A slur is drawn on the side the stems are not, so every stem it spans has
+      // to point the same way. A run that mixes them leaves the curve threading
+      // between two stems, and one of them always ends up poking through it —
+      // so try a few bars before giving up on this slur.
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const barEvents = bars[Math.floor(rng() * (BAR_COUNT - 1))].filter((e) => !e.rest);
+        if (barEvents.length < 2) continue;
+        const len = Math.min(barEvents.length, 2 + Math.floor(rng() * 3));
+        const start = Math.floor(rng() * (barEvents.length - len + 1));
+        const run = barEvents.slice(start, start + len);
+        if (run.some((e) => e.slurStart || e.slurEnd)) continue;
+        const points = new Set(run.map((e) => STAFF_GEOM.stemUp(e.note.letter, e.note.octave)));
+        if (points.size > 1) continue;
+
+        // And the run has to stay on the far side of the curve: an inner note
+        // that reaches further to the slur's side than either end makes the
+        // curve come down over it. The slur sits opposite the stems, so its side
+        // is below the run when the stems point up, and above it when they point
+        // down.
+        const ys = run.map((e) => STAFF_GEOM.yForNote(e.note.letter, e.note.octave));
+        const [first, end] = [ys[0], ys[ys.length - 1]];
+        const inner = ys.slice(1, -1);
+        const stemsUp = [...points][0];
+        if (stemsUp && inner.some((y) => y > Math.max(first, end))) continue;
+        if (!stemsUp && inner.some((y) => y < Math.min(first, end))) continue;
+
+        run[0].slurStart = true;
+        run[run.length - 1].slurEnd = true;
+        break;
+      }
     }
   }
 

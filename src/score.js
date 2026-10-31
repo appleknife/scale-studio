@@ -6,12 +6,12 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311600';
-import { CLEF_PATH } from './clef.js?v=202610311600';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311618';
+import { CLEF_PATH } from './clef.js?v=202610311618';
 
-import { beatLength } from './sightreading.js?v=202610311600';
+import { beatLength } from './sightreading.js?v=202610311618';
 
-const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
+const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
 const WIDTH = 1000;
 const LEFT = 16;
@@ -35,8 +35,7 @@ const STEM = 3.5 * LINE_GAP;
 const BEAM = 0.48 * LINE_GAP;
 const FLAG = 22;
 
-/** Stems follow the convention: below the middle line point up. */
-const stemUp = (letter, octave) => indexOf(letter, octave) < E4 + 4;
+
 
 function ledgerLines(letter, octave, x, bottom) {
   const idx = indexOf(letter, octave);
@@ -602,8 +601,9 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       const a = events[i];
       if (!a.slurStart || !a.note) continue;
       let b = null;
+      let last = i;
       for (let j = i + 1; j < events.length; j++) {
-        if (events[j].slurEnd) { b = events[j]; break; }
+        if (events[j].slurEnd) { b = events[j]; last = j; break; }
       }
       if (!b || !b.note) continue;
       const x1 = xOf(a);
@@ -611,23 +611,122 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       if (x2 - x1 < 8) continue;
       const y1 = yForNote(a.note.letter, a.note.octave, bottom);
       const y2 = yForNote(b.note.letter, b.note.octave, bottom);
-      const stemsUp = stemUp(a.note.letter, a.note.octave) && stemUp(b.note.letter, b.note.octave);
-      const dir = stemsUp ? 1 : -1; // below the heads when the stems point up
+
+      // Look at everything the slur passes over, not just the two notes it
+      // joins. A stem that points the slur's way runs higher (or lower) than
+      // either notehead, and a curve measured from the heads alone goes straight
+      // through it.
+      // A note's stem may follow its beam rather than the notehead rule, so ask
+      // the beam first. `reach` is how far that stem (and the beam riding on it)
+      // runs past the head.
+      const stemInfo = (ev) => {
+        const beam = beamOf.get(ev);
+        const up = beam ? beam.up : stemUp(ev.note.letter, ev.note.octave);
+        return { up, reach: beam ? STEM + BEAM : STEM };
+      };
+      // An articulation mark sits opposite the stem — the same side the slur
+      // takes — so it has to be cleared too, or the slur runs through the dot.
+      const markReach = (ev) =>
+        ev.mark === 'accent' ? HEAD_RY + 13 : ev.mark === 'staccato' ? HEAD_RY + 9.5 : 0;
+      /** How far a note's own ink runs on the slur's side of its head. */
+      const edge = (ev) => {
+        const ym = yForNote(ev.note.letter, ev.note.octave, bottom);
+        const { up, reach } = stemInfo(ev);
+        const mark = markReach(ev);
+        return dir > 0
+          ? Math.max(up ? ym : ym + reach, up && mark ? ym + mark : ym)
+          : Math.min(up ? ym - reach : ym, !up && mark ? ym - mark : ym);
+      };
+      let above = Infinity;
+      let below = -Infinity;
+      let ups = 0;
+      let downs = 0;
+      for (let k = i; k <= last; k++) {
+        const mid = events[k];
+        if (!mid.note) continue;
+        const { up } = stemInfo(mid);
+        if (up) ups++;
+        else downs++;
+      }
+      for (let k = i; k <= last; k++) {
+        const mid = events[k];
+        if (!mid.note) continue;
+        const ym = yForNote(mid.note.letter, mid.note.octave, bottom);
+        const { up, reach } = stemInfo(mid);
+        const mark = markReach(mid);
+        above = Math.min(above, up ? ym - reach : ym, !up && mark ? ym - mark : ym);
+        below = Math.max(below, up ? ym : ym + reach, up && mark ? ym + mark : ym);
+      }
+
+      const dir = ups > downs ? 1 : -1; // below the heads when the stems point up
       const lift = 6.5;
-      // Both control points sit at one height — clear of whichever note is higher
+      // Each end leaves its note on the slur's side of that note's own ink — the
+      // head when the stem points away, the stem tip or the articulation when it
+      // does not — so nothing pokes through the curve at the join.
+      const endY = (ev) => edge(ev);
+      // Both control points sit at one height — clear of everything in the span
       // — so the slur is a symmetric bow. Giving each control point the height of
       // its own note made the curve swoop diagonally, which is what looked wrong
       // on slurs that spanned a wide interval. The bulge also grows far more
       // slowly than the span, so a long slur is a shallow bow rather than an arch.
       const span = Math.hypot(x2 - x1, y2 - y1);
       const rise = Math.min(13, 4 + span * 0.09);
-      const baseY = dir > 0 ? Math.max(y1, y2) + lift : Math.min(y1, y2) - lift;
+      const baseY = (dir > 0 ? below : above) + dir * lift;
       const f = (v) => v.toFixed(2);
+      // The control points sit further in than a plain bow would put them, so the
+      // curve holds its height across the run and dives only at the very ends.
+      // Pulled out to a quarter span, it starts coming down early and clips the
+      // head of the last note before the one it lands on.
+      const grip = 0.18;
+      const startY = endY(a) + dir * lift;
+      const stopY = endY(b) + dir * lift;
+
+      // Every glyph the slur passes, as a box it must stay out of. Modelling the
+      // curve perfectly for every combination of heads, stems, beams and marks
+      // is a losing game; drawing it and then pushing it clear is not.
+      const obstacles = [];
+      for (let k = i; k <= last; k++) {
+        const ev = events[k];
+        if (!ev.note) continue;
+        const ex = xOf(ev);
+        const ey = yForNote(ev.note.letter, ev.note.octave, bottom);
+        const { up, reach } = stemInfo(ev);
+        const mark = markReach(ev);
+        obstacles.push({
+          x0: ex - HEAD_RX - 1,
+          x1: ex + HEAD_RX + 1,
+          y0: Math.min(up ? ey - reach : ey - HEAD_RY, !up && mark ? ey - mark : ey - HEAD_RY),
+          y1: Math.max(up ? ey + HEAD_RY : ey + reach, up && mark ? ey + mark : ey + HEAD_RY),
+        });
+      }
+      const curveY = (t, extra) => {
+        const u = 1 - t;
+        const cy = baseY + dir * (rise + extra);
+        return u * u * u * startY + 3 * u * u * t * cy + 3 * u * t * t * cy + t * t * t * stopY;
+      };
+      const curveX = (t) => {
+        const u = 1 - t;
+        const c1x = x1 + (x2 - x1) * grip;
+        const c2x = x2 - (x2 - x1) * grip;
+        return u * u * u * x1 + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * x2;
+      };
+      const clips = (extra) => {
+        for (let s = 1; s < 60; s++) {
+          const px = curveX(s / 60);
+          const py = curveY(s / 60, extra);
+          if (obstacles.some((o) => px > o.x0 && px < o.x1 && py > o.y0 && py < o.y1)) return true;
+        }
+        return false;
+      };
+      let extra = 0;
+      for (let pass = 0; pass < 10 && clips(extra); pass++) extra += 3;
+
+      const bulge = baseY + dir * (rise + extra);
       part.push(
-        `<path class="score-slur" d="M${f(x1)} ${f(y1 + dir * lift)} ` +
-          `C${f(x1 + (x2 - x1) * 0.26)} ${f(baseY + dir * rise)} ` +
-          `${f(x2 - (x2 - x1) * 0.26)} ${f(baseY + dir * rise)} ` +
-          `${f(x2)} ${f(y2 + dir * lift)}" ` +
+        `<path class="score-slur" d="M${f(x1)} ${f(startY)} ` +
+          `C${f(x1 + (x2 - x1) * grip)} ${f(bulge)} ` +
+          `${f(x2 - (x2 - x1) * grip)} ${f(bulge)} ` +
+          `${f(x2)} ${f(stopY)}" ` +
           `fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>`,
       );
     }

@@ -3,7 +3,7 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202610311600';
+import { CLEF_PATH } from './clef.js?v=202610311618';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -47,6 +47,8 @@ export const STAFF_GEOM = {
     bottom - (octave * 7 + letter - E4) * STEPS,
   /** Diatonic staff index: every step of a third is 2. */
   indexOf: (letter, octave) => octave * 7 + letter,
+  /** Stems follow the convention: below the middle line they point up. */
+  stemUp: (letter, octave) => octave * 7 + letter < E4 + 4,
   /** Where each accidental of a key signature sits, as [letter, octave]. */
   SHARP_POSITIONS,
   FLAT_POSITIONS,

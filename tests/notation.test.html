@@ -37,9 +37,10 @@
       });
     </script>
     <script type="module">
-      // Nothing on a page of music may sit on top of anything else. The one place
-      // this kept happening was a rest pushed into the flag of the note before
-      // it, so the check lives here rather than in the generator test.
+      // Nothing on a page of music may sit on top of anything else. Two places
+      // this kept happening: a rest pushed into the flag of the note before it,
+      // and a slur cutting through a stem it passes over. Both are measured here
+      // rather than eyeballed, because a spot fix is how they come back.
       import { generatePassage, SIGHT_LEVELS } from '../src/sightreading.js';
       import { renderScore } from '../src/score.js';
 
@@ -55,26 +56,53 @@
         const b = node.getBBox();
         return { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height };
       };
-      /** True when `b` is inside `air` of the rest's ink, on both axes. */
-      const overlap = (a, b) =>
-        Math.min(a.x1 + AIR, b.x1) - Math.max(a.x0 - AIR, b.x0) > 0 &&
-        Math.min(a.y1 + AIR, b.y1) - Math.max(a.y0 - AIR, b.y0) > 0;
+      /** True when `b` is inside `air` of `a`, on both axes. */
+      const overlap = (a, b, air = AIR) =>
+        Math.min(a.x1 + air, b.x1) - Math.max(a.x0 - air, b.x0) > 0 &&
+        Math.min(a.y1 + air, b.y1) - Math.max(a.y0 - air, b.y0) > 0;
+
+      /** A point has no extent, so it needs its own test, not `overlap`. */
+      const inside = (pt, b) => pt.x > b.x0 && pt.x < b.x1 && pt.y > b.y0 && pt.y < b.y1;
+
+      /**
+       * The `M … C …` a slur is drawn with, sampled into points — half a unit
+       * apart, because a stem is only about two units wide and a coarser walk
+       * steps straight over it.
+       */
+      function slurPoints(node) {
+        const nums = (node.getAttribute('d').match(/-?\d+(\.\d+)?/g) || []).map(Number);
+        if (nums.length < 8) return [];
+        const [x1, y1, c1x, c1y, c2x, c2y, x2, y2] = nums;
+        const span = Math.hypot(x2 - x1, y2 - y1) + Math.hypot(c1x - x1, c1y - y1);
+        const count = Math.max(64, Math.ceil(span / 0.5));
+        const pts = [];
+        for (let i = 0; i <= count; i++) {
+          const t = i / count;
+          const u = 1 - t;
+          pts.push({
+            x: u * u * u * x1 + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * x2,
+            y: u * u * u * y1 + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * y2,
+            t,
+          });
+        }
+        return pts;
+      }
 
       for (const level of SIGHT_LEVELS) {
         let rests = 0;
-        const hits = [];
+        let slurs = 0;
+        const restHits = [];
+        const slurHits = [];
+
         for (let seed = 0; seed < SEEDS; seed++) {
           const p = generatePassage({ level, seed });
           stage.innerHTML = renderScore(p, { tempoText: '\u2669 = 60' });
           const svg = stage.querySelector('svg');
 
+          // ── rests ------------------------------------------------------
           const restBoxes = [...svg.querySelectorAll('g.score-rest')].map((n) => box(n));
           rests += restBoxes.length;
-          if (!restBoxes.length) continue;
 
-          // Everything a rest must not touch: noteheads, flags, beams, dots and
-          // articulations. Staff lines, barlines and slurs are left out — a slur
-          // is allowed to cross near a rest, and the lines are the page, not ink.
           const ink = [
             ...svg.querySelectorAll('ellipse'),
             ...[...svg.querySelectorAll('path')].filter(
@@ -86,13 +114,44 @@
           for (const r of restBoxes) {
             const bad = ink.find((b) => overlap(r, b));
             if (bad) {
-              hits.push(`L${level} seed ${seed}: rest ${r.x0.toFixed(0)}..${r.x1.toFixed(0)} runs into ink ${bad.x0.toFixed(0)}..${bad.x1.toFixed(0)}`);
+              restHits.push(`L${level} seed ${seed}: rest at ${r.x0.toFixed(0)} runs into ink at ${bad.x0.toFixed(0)}`);
+              break;
+            }
+          }
+
+          // ── slurs ------------------------------------------------------
+          // A stem is a line; a beam or a flag is a path; a head is an ellipse.
+          // The slur must pass clear of all of them, its own two ends excepted.
+          const solids = [
+            ...[...svg.querySelectorAll('line')]
+              .filter((n) => n.getAttribute('stroke-width') === '1.42')
+              .map((n) => {
+                const x = Number(n.getAttribute('x1'));
+                const y1 = Number(n.getAttribute('y1'));
+                const y2 = Number(n.getAttribute('y2'));
+                return { x0: x - 0.9, x1: x + 0.9, y0: Math.min(y1, y2), y1: Math.max(y1, y2) };
+              }),
+            ...ink,
+          ];
+
+          for (const slur of svg.querySelectorAll('path.score-slur')) {
+            slurs += 1;
+            const near = solids.filter((b) => overlap(box(slur), b, 30));
+            const bad = slurPoints(slur)
+              .filter((pt) => pt.t > 0.06 && pt.t < 0.94)
+              .find((pt) => near.find((b) => inside(pt, b)));
+            if (bad) {
+              slurHits.push(`L${level} seed ${seed}: slur passes through ink at ${bad.x.toFixed(0)},${bad.y.toFixed(0)}`);
               break;
             }
           }
         }
-        log.push(`L${level}: ${hits.length} of ${SEEDS} passages have a collision (${rests} rests drawn)`);
-        problems.push(...hits.slice(0, 3));
+
+        log.push(
+          `L${level}: rests ${restHits.length}/${SEEDS} broken (${rests} drawn) · ` +
+            `slurs ${slurHits.length}/${SEEDS} broken (${slurs} drawn)`,
+        );
+        problems.push(...restHits.slice(0, 2), ...slurHits.slice(0, 2));
       }
 
       document.getElementById('report').textContent = problems.length
