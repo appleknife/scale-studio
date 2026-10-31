@@ -248,11 +248,29 @@ until you start it again. If port 8777 is already taken, run
 `powershell -ExecutionPolicy Bypass -File server.ps1 -Port 9000` and open
 <http://localhost:9000/>.
 
+## Languages
+
+The app is in English and Simplified Chinese. The switch is the pill in the top
+right of the header; it remembers the choice on that device and reloads the page
+so every screen comes back in the same language. A link can also force one, which
+is handy for a parent's phone or an emailed link:
+
+* <https://appleknife.github.io/scale-studio/?lang=zh> — Chinese
+* <https://appleknife.github.io/scale-studio/?lang=en> — English
+
+Everything is translated, including the generated feedback on the result screen and
+the tuner's instructions, so a student who reads only Chinese can use the whole app
+without translating anything. Scale names stay in letters (C大调, F♯大调) as they are
+in Chinese music teaching. The wording of the tuner section in particular should be
+read over by a native speaker before it goes to a parent — the terminology (弦轴,
+微调器, 纯五度) is standard, but the sentences were written by a non-native hand.
+
 ## Files
 
 ```
 index.html            the three screens
 app.css               visual design
+src/i18n.js           the English and Chinese text tables
 src/music.js          note spelling, key signatures, scale library
 src/pitch.js          YIN pitch detector
 src/analyze.js        note segmentation, alignment, scoring, feedback
@@ -261,9 +279,13 @@ src/staff.js          treble-staff renderer (SVG)
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
 tests/ui.test.html    click-through smoke test, including the mock-audition draw
+tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/lab-server.ps1  test server that collects results from a headless browser
 server.ps1            the local server used by Start Scale Studio.cmd
 ```
+
+`tests/i18n.test.html` loads each screen with `?lang=zh`, walks the visible text and
+reports anything still in English — the quick check after editing either table.
 
 `tests/dsp.test.html` synthesises a violin-like scale in the browser, runs it
 through the real detector and scorer, and reports pass/fail for a clean take,

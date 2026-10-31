@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>i18n coverage audit</title>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; }
+  iframe { position: fixed; left: -4000px; top: 0; width: 1280px; height: 900px; border: 0; }
+  pre { white-space: pre-wrap; }
+  .ok { color: #0a7a3d; }
+  .bad { color: #a3231c; font-weight: 700; }
+</style>
+</head>
+<body>
+<pre id="out">running…</pre>
+<iframe id="frame" title="app under audit"></iframe>
+<script>
+// Walks every screen in Chinese and lists visible English text that survived
+// the static translation pass. Note names (C4, F♯), the language switch and
+// the product name are expected to stay as they are.
+const VIEWS = [
+  ['chooser', '../index.html?lang=zh'],
+  ['picker 1-2', '../index.html?lang=zh&pick=1-2'],
+  ['picker 3-4', '../index.html?lang=zh&pick=3-4'],
+  ['draw 5-6', '../index.html?lang=zh&draw'],
+  ['practice', '../index.html?lang=zh&demo=1'],
+  ['result', '../index.html?lang=zh&demo=test'],
+  ['tuner', '../index.html?lang=zh&tune=6'],
+  ['help dialog', '../index.html?lang=zh&help'],
+];
+
+const ALLOW = [
+  /[\u4e00-\u9fff]/,          // text that already carries Chinese is fine
+  /^English$/, /^中文$/,
+  /^[IVX]+–[IVX]+$/,            // the level tabs are Roman numerals
+  /^Scale Studio$/,
+  /^Scale Studio — violin scale trainer$/,
+  /^NYSSMA/,
+  /^[A-G][♯♭]?$/,                 // key names on cards and reels
+  /^[A-G][♯♭]?\d( – [A-G][♯♭]?\d)?$/, // ranges such as C4 – C6
+  /^[A-Ga-g][♯♭]?( major| minor| natural| harmonic| melodic)?$/,
+  /^[\d\s♭♯·–—.,:+%≈♩()–-]+$/,
+];
+
+const out = document.getElementById('out');
+const frame = document.getElementById('frame');
+const lines = [];
+
+function visible(el) {
+  const style = getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  if (Number(style.opacity) === 0) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function audit(doc) {
+  const found = [];
+  const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const el = node.parentElement;
+    if (!el) continue;
+    if (['SCRIPT', 'STYLE', 'TITLE'].includes(el.tagName)) continue;
+    if (el.closest('svg') || el.tagName === 'svg') continue;
+    const text = node.nodeValue.replace(/\s+/g, ' ').trim();
+    if (!/[A-Za-z]{3}/.test(text)) continue;
+    if (ALLOW.some((re) => re.test(text))) continue;
+    if (!visible(el)) continue;
+    found.push(text);
+  }
+  doc.querySelectorAll('[aria-label], [title], [placeholder]').forEach((el) => {
+    if (!visible(el)) return;
+    ['aria-label', 'title', 'placeholder'].forEach((attr) => {
+      const value = (el.getAttribute(attr) || '').trim();
+      if (!value || !/[A-Za-z]{3}/.test(value)) return;
+      if (ALLOW.some((re) => re.test(value))) return;
+      found.push(`${attr}="${value}"`);
+    });
+  });
+  return [...new Set(found)];
+}
+
+function load(url, ms) {
+  return new Promise((resolve) => {
+    frame.addEventListener('load', () => setTimeout(resolve, ms), { once: true });
+    frame.src = url;
+  });
+}
+
+(async () => {
+  let total = 0;
+  for (const [name, url] of VIEWS) {
+    await load(url, 900);
+    const found = audit(frame.contentDocument);
+    total += found.length;
+    lines.push(`${found.length ? '✗' : '✓'} ${name}  (${found.length})`);
+    found.forEach((text) => lines.push(`     ${text.slice(0, 140)}`));
+  }
+  lines.unshift(total === 0 ? 'I18N OK — nothing left in English' : `I18N: ${total} untranslated`);
+  out.textContent = lines.join('\n');
+  document.title = total === 0 ? 'I18N OK' : 'I18N FAIL';
+  const report = {
+    problems: total === 0 ? [] : lines.filter((l) => l.startsWith('✗') || l.startsWith('     ')),
+    log: lines.join('\n'),
+  };
+  fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'i18n', ...report }) }).catch(() => {});
+})();
+</script>
+</body>
+</html>

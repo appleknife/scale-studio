@@ -3,7 +3,7 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202610302322';
+import { CLEF_PATH } from './clef.js?v=202610302332';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -35,7 +35,10 @@ function glyph(alter) {
   return '\u266E'; // natural
 }
 
-export function renderStaff(notes, { fifths = 0, colors = null, labels = true, caption = '' } = {}) {
+export function renderStaff(
+  notes,
+  { fifths = 0, colors = null, labels = true, caption = '', ariaLabel = 'Scale notation' } = {},
+) {
   const noteSpacing = 34;
   const leftPad = 18;
   const clefX = leftPad + 4;
@@ -55,7 +58,7 @@ export function renderStaff(notes, { fifths = 0, colors = null, labels = true, c
 
   const part = [];
   part.push(
-    `<svg class="staff" viewBox="0 0 ${width} ${height}" role="img" aria-label="Scale notation">`,
+    `<svg class="staff" viewBox="0 0 ${width} ${height}" role="img" aria-label="${ariaLabel}">`,
   );
 
   // Staff lines

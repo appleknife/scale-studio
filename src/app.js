@@ -1,10 +1,10 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302322';
-import { renderStaff } from './staff.js?v=202610302322';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610302322';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610302322';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610302322';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302332';
+import { renderStaff } from './staff.js?v=202610302332';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610302332';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610302332';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610302332';
 import {
   STRINGS,
   FIFTHS,
@@ -12,7 +12,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610302322';
+} from './tuner.js?v=202610302332';
 
 const LANG = initLang();
 
@@ -263,29 +263,6 @@ function setForm(form) {
 const TEST_COUNT = 3;
 const REEL_ROW_FALLBACK = 104;
 
-const ENCOURAGEMENT = {
-  excellent: [
-    'Three scales, cold, in a row — and they all held together. That is what prepared sounds like.',
-    'You played the set like one piece of music. Judges hear that confidence before they hear anything else.',
-    'Nothing in that set needed apologising for. Keep this tempo; it is clearly yours.',
-  ],
-  strong: [
-    'A genuinely solid set. What is left is small, and small things polish quickly.',
-    'Three scales in a row takes stamina, and you had it. One or two notes slipped — that is all.',
-    'That is already a confident audition. Pick one line from the list below and it becomes a strong one.',
-  ],
-  growing: [
-    'Good bones. The notes are all there — now let them settle instead of going to find them.',
-    'You kept going, which matters more than any single note. Here is what to tidy next.',
-    'This is the stage where it starts to feel easy. Slow, even repetitions of the list below will get you there.',
-  ],
-  keep: [
-    'Every one of these runs counts as practice. Start with the first line below — just that.',
-    'The shape of all three scales is already in your hands. Now it is steadiness, not new notes.',
-    'Nothing here is a mystery: the same two or three habits. Take them one at a time.',
-  ],
-};
-
 let lastEncouragement = '';
 
 function shuffle(list) {
@@ -323,13 +300,8 @@ function showDraw(scales, animate) {
   state.test = { scales, index: 0, results: [] };
   state.scale = scales[0];
   el.testBar.hidden = true;
-  el.redrawBtn.textContent = state.level === '1-2' ? 'Choose again' : 'Draw again';
-  el.drawSub.textContent =
-    state.level === '1-2'
-      ? 'The three you chose — one octave each.'
-      : state.level === '3-4'
-        ? 'One two-octave and two one-octave scales, drawn from your seven.'
-        : 'Drawn from the twelve NYSSMA keys — no repeats.';
+  el.redrawBtn.textContent = state.level === '1-2' ? t('btn.chooseAgain') : t('btn.drawAgain');
+  el.drawSub.textContent = t(`test.sub.${state.level}`);
   showView('test-draw');
   spinReels(animate);
 }
@@ -461,7 +433,7 @@ function spinReels(animate = true) {
     const land = () => {
       track.style.transform = `translateY(-${distance}px)`;
       reel.classList.add('is-landed');
-      sig.textContent = `${keyGlyphs(target)} · ${target.octaves} oct`;
+      sig.textContent = `${keyGlyphs(target)} · ${t('oct.short', { n: target.octaves })}`;
       if (i === reels.length - 1) {
         el.beginBtn.disabled = false;
         el.beginBtn.focus({ preventScroll: true });
@@ -568,9 +540,16 @@ function renderTestResult() {
   const centred = results.reduce((sum, r) => sum + r.stats.exact, 0);
   const total = results.reduce((sum, r) => sum + r.stats.expected, 0);
   const stops = results.reduce((sum, r) => sum + r.stats.stops, 0);
-  el.testSub.textContent = `${results.length} scales · ${centred} of ${total} notes centred · ${
-    stops ? `${stops} stop${stops === 1 ? '' : 's'}` : 'no stops'
-  }`;
+  el.testSub.textContent = t('test.sub', {
+    n: results.length,
+    centred,
+    total,
+    stops: stops
+      ? stops === 1
+        ? t('test.stopOne')
+        : t('test.stops', { n: stops })
+      : t('test.noStops'),
+  });
 
   const colour = average >= 90 ? '#2f5d4e' : average >= 76 ? '#44796a' : average >= 60 ? '#b0843f' : '#a4534a';
   el.testRingValue.style.stroke = colour;
@@ -584,7 +563,9 @@ function renderTestResult() {
     .map(
       (r, i) => `
         <button class="test-scale" type="button" data-index="${i}">
-          <span class="ts-name">${r.scale.title}<em class="ts-oct">${r.scale.octaves} oct</em></span>
+          <span class="ts-name">${r.scale.title}<em class="ts-oct">${t('oct.short', {
+            n: r.scale.octaves,
+          })}</em></span>
           <span class="ts-bar"><span></span></span>
           <span class="ts-score">${r.score}%</span>
           <span class="ts-note">${shortVerdict(r)}</span>
@@ -611,8 +592,8 @@ function renderTestResult() {
         )
         .join('')
     : `<article class="tip" data-kind="praise">
-         <h4>Nothing to fix</h4>
-         <p>All three scales landed, centred and unbroken. That is exactly the shape of an audition you can trust.</p>
+         <h4>${t('test.praise.title')}</h4>
+         <p>${t('test.praise.text')}</p>
        </article>`;
 
   state.phase = 'idle';
@@ -686,7 +667,9 @@ function renderDial() {
     }"/><circle cx="${DIAL.cx}" cy="${DIAL.cy}" r="7"/></g>`,
   );
 
-  el.dialHost.innerHTML = `<svg viewBox="0 0 480 250" role="img" aria-label="Tuning dial">${parts.join(
+  el.dialHost.innerHTML = `<svg viewBox="0 0 480 250" role="img" aria-label="${t(
+    'aria.dial',
+  )}">${parts.join(
     '',
   )}</svg>`;
   needleEl = el.dialHost.querySelector('.dial-needle');
@@ -694,21 +677,21 @@ function renderDial() {
 }
 
 function paintNeedle() {
-  const t = state.tune;
-  if (!t || !needleEl) return;
-  const string = stringById(t.stringId);
+  const tune = state.tune;
+  if (!tune || !needleEl) return;
+  const string = stringById(tune.stringId);
 
   el.tuneNote.textContent = string.id;
 
-  if (t.cents == null) {
+  if (tune.cents == null) {
     needleEl.style.transform = 'rotate(0deg)';
     needleEl.dataset.state = 'idle';
     el.tuneCents.textContent = '—';
-    el.tuneStatus.textContent = t.listening ? t('tuner.idle') : t('tuner.noMic');
+    el.tuneStatus.textContent = tune.listening ? t('tuner.idle') : t('tuner.noMic');
     return;
   }
 
-  const cents = t.cents;
+  const cents = tune.cents;
   const error = cents - string.offset;
   const good = Math.abs(error) <= 3;
 
@@ -720,24 +703,24 @@ function paintNeedle() {
     el.tuneStatus.textContent = t('tuner.stringsNote', { s: string.id });
   } else if (Math.abs(error) <= 12) {
     el.tuneStatus.textContent = t('tuner.close', {
-      dir: error > 0 ? (LANG === 'zh' ? '高' : 'sharp') : LANG === 'zh' ? '低' : 'flat',
-      move: error > 0 ? (LANG === 'zh' ? '下' : 'down') : LANG === 'zh' ? '上' : 'up',
+      dir: t(error > 0 ? 'tuner.dirHigh' : 'tuner.dirLow'),
+      move: t(error > 0 ? 'tuner.moveDown' : 'tuner.moveUp'),
     });
   } else {
     el.tuneStatus.textContent = t('tuner.far', {
       n: Math.abs(error).toFixed(0),
-      dir: error > 0 ? (LANG === 'zh' ? '高' : 'sharp') : LANG === 'zh' ? '低' : 'flat',
-      move: error > 0 ? (LANG === 'zh' ? '下' : 'down') : LANG === 'zh' ? '上' : 'up',
+      dir: t(error > 0 ? 'tuner.dirHigh' : 'tuner.dirLow'),
+      move: t(error > 0 ? 'tuner.moveDown' : 'tuner.moveUp'),
     });
   }
 }
 
 function renderStrings() {
-  const t = state.tune;
+  const tune = state.tune;
   el.tuneStrings.innerHTML = STRINGS.map(
     (s) => `<span class="string-chip" data-id="${s.id}" data-active="${
-      s.id === t.stringId
-    }" data-tuned="${t.tuned.has(s.id)}">
+      s.id === tune.stringId
+    }" data-tuned="${tune.tuned.has(s.id)}">
       <span class="sc-dot"></span>
       <span class="sc-name">${s.id}</span>
       <span class="sc-note">${s.note}</span>
@@ -750,14 +733,14 @@ function renderStrings() {
  * judging a fifth is the student's ear's job. The app only keeps the ritual straight.
  */
 function renderFifths() {
-  const t = state.tune;
+  const tune = state.tune;
   el.pairRows.innerHTML = FIFTHS.map(
     (pair) => `<button class="pair" type="button" data-pair="${pair.id}" aria-pressed="${
-      t.fifths.has(pair.id)
+      tune.fifths.has(pair.id)
     }">
       <span class="pair-tick" aria-hidden="true"></span>
       <span class="pair-name">${pair.label}</span>
-      <span class="pair-hint">tune ${pair.tune} to ${pair.base}</span>
+      <span class="pair-hint">${t('tuner.pairHint', { tune: pair.tune, base: pair.base })}</span>
     </button>`,
   ).join('');
 }
@@ -803,31 +786,31 @@ function closeTuner() {
 }
 
 function onTuneFrame(frame) {
-  const t = state.tune;
-  if (!t) return;
+  const tune = state.tune;
+  if (!tune) return;
 
   if (!frame.freq || frame.clarity < 0.55 || frame.rms < 0.004) {
-    t.silentFor += 1;
-    if (t.silentFor > 20 && t.cents != null) {
-      t.cents = null;
+    tune.silentFor += 1;
+    if (tune.silentFor > 20 && tune.cents != null) {
+      tune.cents = null;
       paintNeedle();
     }
     return;
   }
 
-  t.silentFor = 0;
-  const heard = nearestString(frame.freq) || stringById(t.stringId);
-  if (heard.id !== t.stringId) {
-    t.stringId = heard.id;
-    t.hold = 0;
+  tune.silentFor = 0;
+  const heard = nearestString(frame.freq) || stringById(tune.stringId);
+  if (heard.id !== tune.stringId) {
+    tune.stringId = heard.id;
+    tune.hold = 0;
     renderStrings();
     renderDial();
   }
 
-  t.cents = centsFrom(frame.freq, heard.freq);
-  t.hold = isInTune(t.cents, heard) ? t.hold + 1 : 0;
-  if (t.hold >= 8 && !t.tuned.has(heard.id)) {
-    t.tuned.add(heard.id);
+  tune.cents = centsFrom(frame.freq, heard.freq);
+  tune.hold = isInTune(tune.cents, heard) ? tune.hold + 1 : 0;
+  if (tune.hold >= 8 && !tune.tuned.has(heard.id)) {
+    tune.tuned.add(heard.id);
     renderStrings();
   }
   paintNeedle();
@@ -860,7 +843,10 @@ function renderPractice() {
   const scale = state.scale;
   el.scaleTitle.textContent = scale.title;
   el.scaleMeta.textContent = scale.meta;
-  el.staffHost.innerHTML = renderStaff(scale.sequence, { fifths: scale.fifths });
+  el.staffHost.innerHTML = renderStaff(scale.sequence, {
+    fifths: scale.fifths,
+    ariaLabel: t('aria.notation'),
+  });
   el.memoryName.textContent = scale.title;
   el.memoryMeta.textContent = `${scale.meta} · ${scale.rangeText}`;
   el.spellingRow.hidden = Boolean(state.test) || scale.spellings.length < 2;
@@ -978,15 +964,15 @@ function micErrorMessage(err) {
   switch (err?.name) {
     case 'NotAllowedError':
     case 'SecurityError':
-      return 'Microphone access was blocked. Allow it for this page (the icon at the left of the address bar) and press start again.';
+      return t('mic.denied');
     case 'NotFoundError':
-      return 'No microphone was found. Check that one is plugged in and selected in your sound settings.';
+      return t('mic.notFound');
     case 'NotReadableError':
-      return 'Another app is using the microphone. Close it and try again.';
+      return t('mic.busy');
     case 'InsecureContext':
-      return 'This browser will not share the microphone on a local file. Start the app with “Start Scale Studio” (or serve it over localhost) and it will work.';
+      return t('mic.insecure');
     default:
-      return `The microphone could not start${err?.message ? `: ${err.message}` : '.'}`;
+      return t('mic.generic', { detail: err?.message ? `：${err.message}` : '' });
   }
 }
 
@@ -1100,12 +1086,12 @@ function onFrame(frame) {
     return;
   }
 
-  const t = Math.max(0, frame.t - take.t0);
-  take.frames.push({ t, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
+  const elapsed = Math.max(0, frame.t - take.t0);
+  take.frames.push({ t: elapsed, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
 
   const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > 0.004;
   if (voiced) {
-    take.lastVoiced = t;
+    take.lastVoiced = elapsed;
     const midiFloat = 69 + 12 * Math.log2(frame.freq / 440);
     if (take.lastMidi == null || Math.abs(midiFloat - take.lastMidi) > 0.7) {
       take.noteCount += 1;
@@ -1114,14 +1100,14 @@ function onFrame(frame) {
     updateTuner(midiFloat);
   }
 
-  const silence = t - take.lastVoiced;
+  const silence = elapsed - take.lastVoiced;
   const lastExpected = state.scale.sequence[state.scale.sequence.length - 1].midi;
   const nearEnd =
     take.noteCount >= state.scale.sequence.length - 2 &&
     take.lastMidi != null &&
     Math.round(take.lastMidi) === lastExpected;
 
-  if (silence > (nearEnd ? 1.3 : 3.0) || t > 100) finishTake();
+  if (silence > (nearEnd ? 1.3 : 3.0) || elapsed > 100) finishTake();
 }
 
 function updateTuner(midiFloat) {
@@ -1226,14 +1212,11 @@ function renderResult(result) {
   const scale = result.scale;
   showView('result');
 
-  el.resultEyebrow.textContent = `${scale.title} · ${scale.octaves} octave${
-    scale.octaves === 1 ? '' : 's'
-  }`;
+  el.resultEyebrow.textContent = t('eyebrow.result', { title: scale.title, o: scale.octaves });
 
   if (result.stats.heard < 3) {
-    el.resultGrade.textContent = 'Nothing to score yet';
-    el.resultLine.textContent =
-      "The microphone didn't pick up a clear note. Move a little closer, keep the bow moving, and try again.";
+    el.resultGrade.textContent = t('result.nothing.title');
+    el.resultLine.textContent = t('result.nothing.body');
     el.resultSub.textContent = '';
     el.scoreNumber.textContent = '–';
     el.ringValue.style.strokeDashoffset = RING_CIRCUMFERENCE;
@@ -1249,10 +1232,15 @@ function renderResult(result) {
   el.scoreNumber.textContent = String(result.score);
 
   const s = result.stats;
-  const bits = [`${s.exact} of ${s.expected} notes centred`, `${s.heard} notes heard`];
-  if (s.bpm) bits.push(`♩ ≈ ${s.bpm}`);
-  bits.push(`${s.duration.toFixed(0)}s`);
-  el.resultSub.textContent = bits.join(' · ');
+  el.resultSub.textContent = s.bpm
+    ? t('result.sub', {
+        exact: s.exact,
+        expected: s.expected,
+        heard: s.heard,
+        bpm: s.bpm,
+        dur: s.duration.toFixed(0),
+      })
+    : t('result.subSimple', { exact: s.exact, expected: s.expected, heard: s.heard });
 
   const ringColour =
     result.score >= 90 ? '#2f5d4e' : result.score >= 75 ? '#44796a' : result.score >= 60 ? '#b0843f' : '#a4534a';
@@ -1286,7 +1274,11 @@ function renderResult(result) {
 
   el.resultStaff.innerHTML = renderStaff(
     scale.sequence,
-    { fifths: scale.fifths, colors: result.notes.map(noteColour) },
+    {
+      fifths: scale.fifths,
+      colors: result.notes.map(noteColour),
+      ariaLabel: t('aria.notation'),
+    },
   );
 
   if (result.tips.length) {
@@ -1302,8 +1294,8 @@ function renderResult(result) {
   } else {
     el.tips.innerHTML = `
       <article class="tip" data-kind="praise">
-        <h4>Nothing to fix</h4>
-        <p>Every note landed and stayed centred. Try it once more at a slightly quicker tempo, or take it up a third of the bow.</p>
+        <h4>${t('tip.praise.title')}</h4>
+        <p>${t('tip.praise.text')}</p>
       </article>`;
   }
 }
@@ -1571,8 +1563,8 @@ if (params.has('testbar')) {
   renderPractice();
   updateTestBar();
   showView('practice');
-  setStatus(true, 'Listening — play whenever you are ready');
-  el.listenHint.textContent = 'Feedback comes at the end — play it the way you would for the judge.';
+  setStatus(true, t('status.listening'));
+  el.listenHint.textContent = t('hint.beginTest');
   el.startBtn.hidden = true;
   el.stopBtn.hidden = false;
   el.levelBar.hidden = false;
@@ -1584,8 +1576,8 @@ if (params.has('live')) {
   el.stopBtn.hidden = false;
   el.live.hidden = false;
   el.levelBar.hidden = false;
-  setStatus(true, 'Listening to your scale');
-  el.listenHint.textContent = 'All the way up, then back down.';
+  setStatus(true, t('status.listeningScale'));
+  el.listenHint.textContent = t('hint.allTheWay');
   el.levelBar.firstElementChild.style.width = '58%';
   updateTuner(79.28);
 }

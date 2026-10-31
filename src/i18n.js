@@ -93,6 +93,11 @@ export function applyStatic(root = document.body) {
     const text = STATIC[el.dataset.i18nTitle];
     if (text) el.setAttribute('title', text);
   });
+
+  root.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+    const key = el.dataset.i18nAria;
+    if (S[key]) el.setAttribute('aria-label', t(key));
+  });
 }
 
 /* ── Sentences built in code ──────────────────────────────────────────── */
@@ -111,6 +116,13 @@ export const S = {
     '一至二级由你自己选三条准备好的音阶。系统听完三条，再给一份总的反馈。',
   ],
   'btn.draw3': ['Draw three scales', '抽三条音阶'],
+  'btn.drawAgain': ['Draw again', '重新抽'],
+  'btn.chooseAgain': ['Choose again', '重新选'],
+  'test.praise.title': ['Nothing to fix', '没有需要改的'],
+  'test.praise.text': [
+    'All three scales landed, centred and unbroken. That is exactly the shape of an audition you can trust.',
+    '三条音阶都落准了、也没有断。这正是可以放心的考试状态。',
+  ],
   'btn.choose3': ['Choose my three', '选择我的三条'],
   'btn.choose7': ['Choose my seven', '选择我的七条'],
 
@@ -251,6 +263,41 @@ export const S = {
   ],
   'test.count': ['{n} of {need} chosen', '已选 {n} / {need}'],
 
+  'mic.denied': [
+    'Microphone access was blocked. Allow it for this page (the icon at the left of the address bar) and press start again.',
+    '麦克风被拦住了。在这个页面允许使用（地址栏左边的图标），再按一次开始。',
+  ],
+  'mic.notFound': [
+    'No microphone was found. Check that one is plugged in and selected in your sound settings.',
+    '找不到麦克风。检查一下有没有接上、系统声音设置里有没有选对。',
+  ],
+  'mic.busy': [
+    'Another app is using the microphone. Close it and try again.',
+    '另一个程序正在用麦克风。先关掉它，再试一次。',
+  ],
+  'mic.insecure': [
+    'This browser will not share the microphone on a local file. Start the app with “Start Scale Studio” (or serve it over localhost) and it will work.',
+    '浏览器不会在本地文件上打开麦克风。用“Start Scale Studio”启动（或通过 localhost 打开），就可以用了。',
+  ],
+  'mic.generic': [
+    'The microphone could not start{detail}.',
+    '麦克风启动不了{detail}。',
+  ],
+  'boot.title': ['This page needs its little server', '这个页面需要本地小服务'],
+  'boot.body': [
+    'Double-click <strong>Start Scale Studio.cmd</strong> in the app folder and use the page it opens (<code>http://localhost:8777/</code>). Leave the black window open while you practise — closing it stops the app.',
+    '双击文件夹里的 <strong>Start Scale Studio.cmd</strong>，用它打开的页面（<code>http://localhost:8777/</code>）。练习时那个黑窗口要一直开着——关掉它，应用就停了。',
+  ],
+  'boot.detail': [
+    'Browsers block a page’s scripts — and the microphone — when the page is opened straight from a file.',
+    '直接从文件打开时，浏览器会拦住页面的脚本，也会拦住麦克风。',
+  ],
+  'boot.errorTitle': ['The app did not start', '应用没有启动'],
+  'boot.errorBody': [
+    'Something stopped the scripts from loading. Reload the page, and if it keeps happening open the browser’s developer console for the error.',
+    '有东西让脚本没能加载。刷新一下；如果一直这样，打开浏览器开发者工具看一下报错。',
+  ],
+
   'tip.intonation.title': ['A few notes sat off-centre', '有几个音偏了一点'],
   'tip.intonation.text': [
     '{list}. Slow those notes down and listen for the ring — the pitch should feel like it locks into place rather than being placed.',
@@ -354,9 +401,24 @@ export const S = {
   'tuner.stringsNote': ['{s} is sitting where you want it.', '{s} 弦正好。'],
   'tuner.close': ['A touch {dir} — ease it {move}.', '稍微{dir}了一点——往{move}松一点。'],
   'tuner.far': ['{n}¢ {dir} — bring the peg {move}.', '{dir}了 {n} 音分——把弦轴往{move}放。'],
+  'tuner.dirHigh': ['sharp', '高'],
+  'tuner.dirLow': ['flat', '低'],
+  'tuner.moveDown': ['down', '下'],
+  'tuner.moveUp': ['up', '上'],
   'tuner.idle': ['Bow a string — the dial follows it.', '拉一根空弦，指针会跟着走。'],
   'tuner.noMic': ['Press “Start listening” to use the microphone.', '按“开始聆听”来使用麦克风。'],
   'tuner.pairHint': ['tune {tune} to {base}', '{tune} 对 {base}'],
+
+  'oct.short': ['{n} oct', '{n} 个八度'],
+
+  /* screen-reader labels (also used by [data-i18n-aria] in the HTML) */
+  'aria.back': ['Back to scale list', '回到音阶列表'],
+  'aria.level': ['NYSSMA level', 'NYSSMA 级别'],
+  'aria.family': ['Scale family', '音阶类型'],
+  'aria.form': ['Minor form', '小调形式'],
+  'aria.octaves': ['Octaves', '八度'],
+  'aria.notation': ['Scale notation', '音阶乐谱'],
+  'aria.dial': ['Tuning dial', '调音表盘'],
 };
 
 /* ── Static text that lives in index.html ─────────────────────────────── */
@@ -468,4 +530,9 @@ export const STATIC = {
   'guide.fifthsIntro3':
     '这一段只能靠耳朵——系统判断不了双音。听起来对了，就打勾。',
   'guide.selfCheck': '用双音检查每一对。',
+
+  /* the rest of the static sheet */
+  'eyebrow.test': '模拟考试 · 三条音阶',
+  'You can breathe between scales — the app waits for your first note each time.':
+    '两条之间可以缓一口气——每一条它都会等你的第一个音。',
 };

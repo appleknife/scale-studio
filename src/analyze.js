@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202610302322';
-import { getLang, t } from './i18n.js?v=202610302322';
+import { median } from './pitch.js?v=202610302332';
+import { getLang, t } from './i18n.js?v=202610302332';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -352,6 +352,10 @@ export function centsText(cents) {
   return `${v}¢ ${cents > 0 ? 'high' : 'low'}`;
 }
 
+function aside(text) {
+  return getLang() === 'zh' ? `（${text}）` : ` (${text})`;
+}
+
 function noteList(items) {
   const zh = getLang() === 'zh';
   if (items.length === 1) return items[0];
@@ -379,7 +383,7 @@ export function buildTips(result) {
         kind: 'intonation',
         title: t('tip.intonation.title'),
         text: t('tip.intonation.text', {
-          list: noteList(shown.map((n) => `${n.note.name}（${centsText(n.cents)}）`)),
+          list: noteList(shown.map((n) => `${n.note.name}${aside(centsText(n.cents))}`)),
         }),
       },
       (1 - components.intonation) * 0.2,

@@ -18,12 +18,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610302322" />
+    <link rel="stylesheet" href="app.css?v=202610302332" />
   </head>
   <body>
     <div class="shell">
       <header class="topbar">
-        <button class="brand" id="brandHome" type="button" aria-label="Back to scale list">
+        <button class="brand" id="brandHome" type="button" aria-label="Back to scale list" data-i18n-aria="aria.back">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 32 32">
               <circle cx="12" cy="22.5" r="4.1" fill="currentColor" />
@@ -87,13 +87,13 @@
 
           <div class="mode-row">
             <span class="control-label">Level</span>
-            <div class="segmented" id="levelTabs" role="tablist" aria-label="NYSSMA level">
+            <div class="segmented" id="levelTabs" role="tablist" aria-label="NYSSMA level" data-i18n-aria="aria.level">
               <button type="button" role="tab" data-level="1-2" aria-selected="false">I–II</button>
               <button type="button" role="tab" data-level="3-4" aria-selected="false">III–IV</button>
               <button type="button" role="tab" data-level="5-6" aria-selected="true">V–VI</button>
             </div>
             <span class="control-label">Scales</span>
-            <div class="segmented" id="modeTabs" role="tablist" aria-label="Scale family">
+            <div class="segmented" id="modeTabs" role="tablist" aria-label="Scale family" data-i18n-aria="aria.family">
               <button type="button" role="tab" data-mode="major" aria-selected="true">
                 NYSSMA majors
               </button>
@@ -101,7 +101,7 @@
                 Minor scales
               </button>
             </div>
-            <div class="segmented" id="formTabs" role="tablist" aria-label="Minor form" hidden>
+            <div class="segmented" id="formTabs" role="tablist" aria-label="Minor form" data-i18n-aria="aria.form" hidden>
               <button type="button" role="tab" data-form="natural" aria-selected="false">natural</button>
               <button type="button" role="tab" data-form="harmonic" aria-selected="false">harmonic</button>
               <button type="button" role="tab" data-form="melodic" aria-selected="true">melodic</button>
@@ -310,7 +310,7 @@
             </div>
             <div class="head-tools">
               <div class="spelling" id="spellingRow" hidden></div>
-              <div class="segmented small" id="octaveTabs" role="tablist" aria-label="Octaves">
+              <div class="segmented small" id="octaveTabs" role="tablist" aria-label="Octaves" data-i18n-aria="aria.octaves">
                 <button type="button" role="tab" data-oct="1" aria-selected="false">1 oct</button>
                 <button type="button" role="tab" data-oct="2" aria-selected="true">2 oct</button>
               </div>
@@ -427,7 +427,7 @@
               </div>
             </div>
             <div class="result-copy">
-              <p class="eyebrow">Mock audition · three scales</p>
+              <p class="eyebrow" data-i18n="eyebrow.test">Mock audition · three scales</p>
               <h2 id="testGrade">A strong set</h2>
               <p class="result-line" id="testLine"></p>
               <p class="result-sub" id="testSub"></p>
@@ -456,29 +456,29 @@
 
     <dialog id="helpDialog" aria-labelledby="helpTitle">
       <h2 id="helpTitle">How the score works</h2>
-      <p>
+      <p data-i18n="help.intro">
         Every take is compared with the scale that is written on screen. The 29 notes
         are matched one by one, so an extra note or a skipped note only costs its own
         place instead of upsetting everything after it.
       </p>
-      <ul class="score-legend">
+      <ul class="score-legend" data-i18n="help.legend">
         <li><strong>Notes</strong><span>56%</span><em>Were the right pitches played, in the right order?</em></li>
         <li><strong>Intonation</strong><span>20%</span><em>How close to the centre each note sat, in cents.</em></li>
         <li><strong>Steadiness</strong><span>12%</span><em>Did the notes keep an even pulse?</em></li>
         <li><strong>Flow</strong><span>12%</span><em>Were there stops long enough to break the phrase?</em></li>
       </ul>
-      <p class="help-note">
+      <p class="help-note" data-i18n="help.generous">
         The scoring is deliberately forgiving: anything within about 15 cents counts as
         centred, and a slightly uneven tempo costs very little. Obvious stopping, wrong
         notes and missed notes are what move the number.
       </p>
-      <p class="help-note">
+      <p class="help-note" data-i18n="help.audition">
         <strong>Mock audition</strong> is always three scales, played one after another
         with no tuner and no score until the end. At Levels V–VI the app draws them the
         way a judge does; at I–II and III–IV you choose the scales you prepared and the
         app picks from those.
       </p>
-      <p class="help-note">
+      <p class="help-note" data-i18n="help.mic">
         Play in a quiet room, fairly close to the microphone, and let the first note
         ring for a moment — the app starts on the first sustained pitch it hears.
       </p>
@@ -500,20 +500,30 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610302322"></script>
+    <script type="module" src="src/app.js?v=202610302332"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.
       setTimeout(function () {
         if (window.__scaleStudioReady) return;
+        var zh = document.documentElement.lang.indexOf('zh') === 0;
         var banner = document.getElementById('bootError');
         banner.hidden = false;
         document.getElementById('view-choose').hidden = true;
         if (location.protocol !== 'file:') {
-          document.getElementById('bootTitle').textContent = 'The app did not start';
-          document.getElementById('bootText').textContent =
-            'Something stopped the scripts from loading. Reload the page, and if it keeps happening open the browser’s developer console for the error.';
+          document.getElementById('bootTitle').textContent = zh
+            ? '应用没有启动'
+            : 'The app did not start';
+          document.getElementById('bootText').textContent = zh
+            ? '有东西让脚本没能加载。刷新一下；如果一直这样，打开浏览器开发者工具看一下报错。'
+            : 'Something stopped the scripts from loading. Reload the page, and if it keeps happening open the browser’s developer console for the error.';
           document.getElementById('bootDetail').hidden = true;
+        } else if (zh) {
+          document.getElementById('bootTitle').textContent = '这个页面需要本地小服务';
+          document.getElementById('bootText').innerHTML =
+            '双击文件夹里的 <strong>Start Scale Studio.cmd</strong>，用它打开的页面（<code>http://localhost:8777/</code>）。练习时那个黑窗口要一直开着——关掉它，应用就停了。';
+          document.getElementById('bootDetail').textContent =
+            '直接从文件打开时，浏览器会拦住页面的脚本，也会拦住麦克风。';
         }
       }, 1200);
     </script>
