@@ -1,10 +1,12 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302337';
-import { renderStaff } from './staff.js?v=202610302337';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610302337';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610302337';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610302337';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610310112';
+import { renderStaff } from './staff.js?v=202610310112';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610310112';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610310112';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610310112';
+import { generatePassage } from './sightreading.js?v=202610310112';
+import { renderScore } from './score.js?v=202610310112';
 import {
   STRINGS,
   FIFTHS,
@@ -12,7 +14,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610302337';
+} from './tuner.js?v=202610310112';
 
 const LANG = initLang();
 
@@ -24,10 +26,18 @@ const el = {
     practice: $('view-practice'),
     result: $('view-result'),
     tune: $('view-tune'),
+    sight: $('view-sight'),
     'test-draw': $('view-test-draw'),
     'test-pick': $('view-test-pick'),
     'test-result': $('view-test-result'),
   },
+  openSightBtn: $('openSightBtn'),
+  sightBack: $('sightBack'),
+  sightNewBtn: $('sightNewBtn'),
+  sightTempoBtn: $('sightTempoBtn'),
+  sightLevels: $('sightLevels'),
+  sightMeta: $('sightMeta'),
+  sightStaff: $('sightStaff'),
   grid: $('scaleGrid'),
   gridNote: $('gridNote'),
   levelTabs: $('levelTabs'),
@@ -816,6 +826,94 @@ function onTuneFrame(frame) {
   paintNeedle();
 }
 
+/* ── Sight reading ──────────────────────────────────────────────────── */
+
+const sight = { level: 5, passage: null };
+
+/** The note glyph printed next to a tempo mark. */
+function tempoGlyph(unit) {
+  return { q: '\u2669', h: '\u{1D15E}', qd: '\u2669.' }[unit] || '\u2669';
+}
+
+function renderSight() {
+  const passage = sight.passage;
+  if (!passage) return;
+
+  const keyName =
+    getLang() === 'zh' ? `${passage.key.name}\u5927\u8c03` : `${passage.key.name} major`;
+  const mark = tempoGlyph(passage.tempo.unit);
+  el.sightMeta.textContent = `${keyName} \u00b7 ${passage.meter} \u00b7 ${mark} = ${passage.tempo.bpm}`;
+  el.sightStaff.innerHTML = renderScore(passage, {
+    tempoText: `${mark} = ${passage.tempo.bpm}`,
+    ariaLabel: t('aria.score'),
+  });
+
+  [...el.sightLevels.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(Number(b.dataset.sightLevel) === sight.level)),
+  );
+}
+
+function newPassage(level = sight.level, seed = null) {
+  sight.level = Math.min(6, Math.max(1, level));
+  sight.passage = generatePassage({ level: sight.level, seed });
+  renderSight();
+}
+
+function openSight(level = sight.level, seed = null) {
+  cancelListening();
+  state.test = null;
+  el.testBar.hidden = true;
+  showView('sight');
+  newPassage(level, seed);
+}
+
+let clickCtx = null;
+
+/** Two bars of clicks at the passage's own tempo, with a heavier downbeat. */
+function playTempo(passage) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  if (!clickCtx) clickCtx = new Ctx();
+  if (clickCtx.state === 'suspended') clickCtx.resume();
+
+  const beatSeconds = 60 / passage.tempo.bpm;
+  const beatsPerBar = Math.max(1, Math.round(passage.perBar / passage.beat));
+  const beats = beatsPerBar * 2;
+  const start = clickCtx.currentTime + 0.12;
+
+  el.sightTempoBtn.disabled = true;
+  setTimeout(() => {
+    el.sightTempoBtn.disabled = false;
+  }, (beats * beatSeconds + 0.4) * 1000);
+
+  for (let i = 0; i < beats; i++) {
+    const when = start + i * beatSeconds;
+    const downbeat = i % beatsPerBar === 0;
+    const osc = clickCtx.createOscillator();
+    const gain = clickCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = downbeat ? 1320 : 880;
+    gain.gain.setValueAtTime(0.0001, when);
+    gain.gain.linearRampToValueAtTime(downbeat ? 0.22 : 0.12, when + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.07);
+    osc.connect(gain).connect(clickCtx.destination);
+    osc.start(when);
+    osc.stop(when + 0.09);
+  }
+}
+
+el.openSightBtn.addEventListener('click', () => openSight());
+el.sightBack.addEventListener('click', goHome);
+el.sightNewBtn.addEventListener('click', () => newPassage(sight.level));
+el.sightTempoBtn.addEventListener('click', () => {
+  if (sight.passage) playTempo(sight.passage);
+});
+el.sightLevels.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-sight-level]');
+  if (!btn) return;
+  newPassage(Number(btn.dataset.sightLevel));
+});
+
 /* ── Practice screen ──────────────────────────────────────────────────── */
 
 function openScale(cardId, variantIndex = 0) {
@@ -835,7 +933,10 @@ function goHome() {
   state.test = null;
   state.tune = null;
   el.testBar.hidden = true;
-  history.replaceState(null, '', location.pathname + location.search);
+  const url = new URL(location.href);
+  url.searchParams.delete('sight');
+  url.searchParams.delete('seed');
+  history.replaceState(null, '', url.pathname + url.search);
   showView('choose');
 }
 
@@ -1531,6 +1632,10 @@ window.__scaleStudioReady = true;
 
 if (params.has('help')) el.helpDialog.showModal();
 if (params.has('draw')) drawThree();
+if (params.has('sight')) {
+  // ?sight=5&seed=4471 reproduces one passage exactly — handy for a class
+  openSight(Number(params.get('sight')) || 5, params.has('seed') ? Number(params.get('seed')) : null);
+}
 if (params.has('pick')) {
   // Visual check of the picker with a full selection.
   state.level = LEVELS[params.get('pick')] ? params.get('pick') : '1-2';

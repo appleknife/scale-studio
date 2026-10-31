@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sight-reading generator test</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      h2 { font-size: 15px; margin: 22px 0 6px; letter-spacing: 0.06em; text-transform: uppercase; color: #8b8277; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; overflow: auto; }
+      .score { width: 100%; max-width: 900px; display: block; margin: 4px 0 10px; }
+      .score text { font-family: "Iowan Old Style", Palatino, Georgia, serif; fill: #221e19; }
+      .score-tempo { fill: #4d463e; }
+      .score-time { font-weight: 600; }
+      .ok { color: #0a7a3d; font-weight: 700; }
+      .bad { color: #a3231c; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <div id="gallery"></div>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      import { generatePassage, flatten, SIGHT_LEVELS, levelSpec } from '../src/sightreading.js';
+      import { renderScore } from '../src/score.js';
+      import { MAJOR_KEYS, makeNote } from '../src/music.js';
+
+      const problems = [];
+      const log = [];
+
+      const tonicClass = (keyId) => {
+        const card = MAJOR_KEYS.find((k) => k.id === keyId);
+        const v = card.variants[0];
+        return makeNote(v.letter, v.alter, 4).midi % 12;
+      };
+
+      
+
+      let checked = 0;
+      for (const level of SIGHT_LEVELS) {
+        const spec = levelSpec(level);
+        for (let seed = 0; seed < 120; seed++) {
+          const p = generatePassage({ level, seed });
+          checked++;
+          const id = `L${level} seed ${seed}`;
+          if (!p) {
+            problems.push(`${id}: generator returned nothing`);
+            continue;
+          }
+
+          if (p.bars.length !== 8) problems.push(`${id}: ${p.bars.length} bars`);
+
+          p.bars.forEach((events, i) => {
+            const total = events.reduce((a, e) => a + e.dur, 0);
+            if (total !== p.perBar) problems.push(`${id}: bar ${i + 1} adds to ${total}, not ${p.perBar}`);
+            if (!events.length) problems.push(`${id}: bar ${i + 1} is empty`);
+          });
+
+          const sounding = flatten(p).filter((e) => !e.rest && e.note);
+          if (sounding.length < 12) problems.push(`${id}: only ${sounding.length} notes`);
+
+          for (const e of sounding) {
+            if (e.midi < spec.range[0] || e.midi > spec.range[1]) {
+              problems.push(`${id}: ${e.note.name} outside ${spec.range.join('–')}`);
+            }
+            if (Math.abs(e.note.alter) > 1) problems.push(`${id}: unprintable accidental ${e.note.name}`);
+          }
+
+          // cadence on the tonic
+          const last = sounding[sounding.length - 1];
+          if (last.midi % 12 !== tonicClass(p.key.id)) {
+            problems.push(`${id}: ends on ${last.note.name}, not the tonic`);
+          }
+
+          // opening on a chord tone
+          const first = sounding[0];
+          const t = tonicClass(p.key.id);
+          const chord = [(t + 0) % 12, (t + 4) % 12, (t + 7) % 12];
+          if (!chord.includes(first.midi % 12)) {
+            problems.push(`${id}: opens on ${first.note.name}, not a chord tone`);
+          }
+
+          // intervals stay inside the level's vocabulary
+          for (let i = 1; i < sounding.length; i++) {
+            const interval = Math.abs(sounding[i].midi - sounding[i - 1].midi);
+            if (interval > spec.maxSemis) {
+              problems.push(
+                `${id}: ${sounding[i - 1].note.name}→${sounding[i].note.name} is ${interval} semitones, limit ${spec.maxSemis}`,
+              );
+            }
+          }
+
+          // keys and meters come from the level's list
+          if (!spec.keys.includes(p.key.id)) problems.push(`${id}: key ${p.key.id} not in the level`);
+          if (!spec.meters.includes(p.meter)) problems.push(`${id}: meter ${p.meter} not in the level`);
+        }
+
+        // determinism
+        const a = JSON.stringify(generatePassage({ level, seed: 4471 }));
+        const b = JSON.stringify(generatePassage({ level, seed: 4471 }));
+        if (a !== b) problems.push(`L${level}: seed 4471 is not reproducible`);
+      }
+
+      log.push(`passages generated: ${checked}`);
+
+      // a spread of seeds per level, for the eye
+      const gallery = document.getElementById('gallery');
+      for (const level of SIGHT_LEVELS) {
+        const p = generatePassage({ level, seed: 4471 + level * 13 });
+        const unit = { q: '\u2669', h: '\u{1D15E}', qd: '\u2669.' }[p.tempo.unit] || '\u2669';
+        const h = document.createElement('h2');
+        h.textContent = `Level ${level} — ${p.key.name} major, ${p.meter}, ${p.tempo.bpm} bpm, seed ${p.seed}`;
+        gallery.append(h);
+        const wrap = document.createElement('div');
+        wrap.innerHTML = renderScore(p, { tempoText: `${unit} = ${p.tempo.bpm}` });
+        gallery.append(wrap);
+      }
+
+      const report = document.getElementById('report');
+      report.innerHTML =
+        (problems.length ? `<span class="bad">${problems.length} problems</span>` : '<span class="ok">all invariants hold</span>') +
+        '\n\n' +
+        [...new Set(problems)].slice(0, 25).join('\n') +
+        '\n\n' +
+        log.join('\n');
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'sightreading', problems: [...new Set(problems)].slice(0, 40), log: log.join('\n') }),
+      });
+    </script>
+  </body>
+</html>

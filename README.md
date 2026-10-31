@@ -248,6 +248,25 @@ until you start it again. If port 8777 is already taken, run
 `powershell -ExecutionPolicy Bypass -File server.ps1 -Port 9000` and open
 <http://localhost:9000/>.
 
+## Sight reading
+
+A second kind of practice, next to the scales: **eight bars you have never seen**,
+written to the level you pick (I–VI). Key, time signature, tempo, range, rhythms,
+accidentals, rests, articulations and dynamics all come from the Manual's
+sight-reading table for that level.
+
+* **New passage** draws another one; each is eight bars on two systems.
+* **Hear the tempo** clicks two bars at the printed speed, with a heavier downbeat.
+* Every passage has a **seed**, so `?sight=5&seed=4471` always gives the same eight
+  bars. A teacher can put one passage on a projector, or send the link to a class.
+* The line sits on the staff, opens on a chord tone, steps more than it leaps,
+  resolves its leaps, has one climax and cadences on the tonic — the conventions a
+  human writes sight reading by.
+
+**It does not listen yet.** It is a generator: read from the screen, study it, hear
+its tempo. Hearing the passage and marking it is the next piece of work, and the
+card on screen says so rather than pretending otherwise.
+
 ## Languages
 
 The app is in English and Simplified Chinese. The switch is the pill in the top
@@ -276,8 +295,14 @@ src/pitch.js          YIN pitch detector
 src/analyze.js        note segmentation, alignment, scoring, feedback
 src/tuner.js          open-string targets and the fifth checklist
 src/staff.js          treble-staff renderer (SVG)
+src/score.js          eight bars of notation: beams, rests, dots, marks
+src/sightreading.js   level table and seeded passage generator
+src/onsets.js         bow-change detection (built, not wired in yet)
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
+tests/sightreading.test.html  720 generated passages against the level rules
+tests/onset-probe.html  can a bow change be heard? (parameter sweep)
+tests/rhythm-probe.html why repeated notes merge today
 tests/ui.test.html    click-through smoke test, including the mock-audition draw
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/lab-server.ps1  test server that collects results from a headless browser
@@ -286,6 +311,12 @@ server.ps1            the local server used by Start Scale Studio.cmd
 
 `tests/i18n.test.html` loads each screen with `?lang=zh`, walks the visible text and
 reports anything still in English — the quick check after editing either table.
+
+`tests/sightreading.test.html` generates 720 passages (6 levels × 120 seeds) and
+checks the rules hold: bars add up, every note is in range, the phrase ends on the
+tonic and opens on a chord tone, intervals stay inside the level's vocabulary, and a
+seed always produces the same music. It also prints one passage per level, drawn,
+for the eye — the notation bugs found so far were all found by looking at those.
 
 `tests/dsp.test.html` synthesises a violin-like scale in the browser, runs it
 through the real detector and scorer, and reports pass/fail for a clean take,

@@ -3,7 +3,7 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202610302337';
+import { CLEF_PATH } from './clef.js?v=202610310112';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -26,6 +26,31 @@ const FLAT_POSITIONS = [
 
 // The clef path is drawn in a 1435 x 4066 box.
 const CLEF_BBOX = { w: 1435, h: 4066, x: 1186, y: 5608 };
+
+// Shared with src/score.js so a bar of sight reading sits on the same staff as a
+// scale exercise: one source of truth for the geometry and the ink.
+export const STAFF_GEOM = {
+  LINE_GAP,
+  STEPS,
+  TOP: STAFF_TOP,
+  BOTTOM: STAFF_BOTTOM,
+  E4,
+  INK,
+  MUTED,
+  CLEF_BBOX,
+  /**
+   * Vertical centre of a note head, from its spelled letter and octave.
+   * `bottom` lets a page with several systems say where its staff sits;
+   * without it the note lands on the single staff staff.js draws.
+   */
+  yForNote: (letter, octave, bottom = STAFF_BOTTOM) =>
+    bottom - (octave * 7 + letter - E4) * STEPS,
+  /** Diatonic staff index: every step of a third is 2. */
+  indexOf: (letter, octave) => octave * 7 + letter,
+  /** Where each accidental of a key signature sits, as [letter, octave]. */
+  SHARP_POSITIONS,
+  FLAT_POSITIONS,
+};
 
 function glyph(alter) {
   if (alter === 1) return '\u266F';

@@ -419,6 +419,7 @@ export const S = {
   'aria.octaves': ['Octaves', '八度'],
   'aria.notation': ['Scale notation', '音阶乐谱'],
   'aria.dial': ['Tuning dial', '调音表盘'],
+  'aria.score': ['Sight-reading passage', '视奏乐谱'],
 };
 
 /* ── Static text that lives in index.html ─────────────────────────────── */
@@ -530,6 +531,18 @@ export const STATIC = {
   'guide.fifthsIntro3':
     '这一段只能靠耳朵——系统判断不了双音。听起来对了，就打勾。',
   'guide.selfCheck': '用双音检查每一对。',
+
+  /* sight reading */
+  'Sight reading': '视奏',
+  'Open sight reading': '开始视奏',
+  'Hear the tempo': '听一下速度',
+  'New passage': '换一段',
+  'Eight bars you have never seen, written to your level — key, time signature, rhythms and range all from the Manual.':
+    '八小节没见过的乐谱，按你的级别写出来——调号、拍号、节奏、音域都照考纲。',
+  'Eight bars, your level, drawn fresh each time. Study it, hear the tempo, then play.':
+    '八小节，按你的级别，每次都不一样。先看谱，听一下速度，再开始拉。',
+  'Listening is not wired up yet — this is the passage generator, so you can read from it and see what the level table produces.':
+    '目前还不会听——这是乐谱生成器，可以先照着谱练，也能看看考纲出来的谱子是什么样。',
 
   /* the rest of the static sheet */
   'eyebrow.test': '模拟考试 · 三条音阶',

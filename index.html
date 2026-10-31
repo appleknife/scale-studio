@@ -18,7 +18,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610302337" />
+    <link rel="stylesheet" href="app.css?v=202610310112" />
   </head>
   <body>
     <div class="shell">
@@ -83,6 +83,17 @@
               </p>
             </div>
             <button class="primary-btn" id="drawBtn" type="button">Draw three scales</button>
+          </div>
+
+          <div class="test-banner sight-banner">
+            <div class="test-banner-copy">
+              <h3>Sight reading</h3>
+              <p>
+                Eight bars you have never seen, written to your level — key, time
+                signature, rhythms and range all from the Manual.
+              </p>
+            </div>
+            <button class="primary-btn" id="openSightBtn" type="button">Open sight reading</button>
           </div>
 
           <div class="mode-row">
@@ -289,6 +300,48 @@
           <p class="hint">
             You can breathe between scales — the app waits for your first note each time.
           </p>
+        </section>
+
+        <!-- ── Sight reading ───────────────────────────────────────────── -->
+        <section class="view" id="view-sight" hidden>
+          <button class="back-btn" id="sightBack" type="button">
+            <span aria-hidden="true">←</span> All scales
+          </button>
+
+          <div class="head-row">
+            <div>
+              <h2>Sight reading</h2>
+              <p class="subtle" id="sightSub">
+                Eight bars, your level, drawn fresh each time. Study it, hear the tempo,
+                then play.
+              </p>
+            </div>
+            <div class="head-tools">
+              <button class="ghost-btn" id="sightTempoBtn" type="button">Hear the tempo</button>
+              <button class="primary-btn" id="sightNewBtn" type="button">New passage</button>
+            </div>
+          </div>
+
+          <div class="mode-row">
+            <span class="control-label">Level</span>
+            <div class="segmented" id="sightLevels" role="tablist" aria-label="NYSSMA level" data-i18n-aria="aria.level">
+              <button type="button" role="tab" data-sight-level="1" aria-selected="false">I</button>
+              <button type="button" role="tab" data-sight-level="2" aria-selected="false">II</button>
+              <button type="button" role="tab" data-sight-level="3" aria-selected="false">III</button>
+              <button type="button" role="tab" data-sight-level="4" aria-selected="false">IV</button>
+              <button type="button" role="tab" data-sight-level="5" aria-selected="true">V</button>
+              <button type="button" role="tab" data-sight-level="6" aria-selected="false">VI</button>
+            </div>
+          </div>
+
+          <div class="score-card">
+            <div class="score-meta" id="sightMeta"></div>
+            <div class="score-staff" id="sightStaff"></div>
+            <p class="score-note" id="sightNote">
+              Listening is not wired up yet — this is the passage generator, so you can
+              read from it and see what the level table produces.
+            </p>
+          </div>
         </section>
 
         <!-- ── Practice ────────────────────────────────────────────────── -->
@@ -500,7 +553,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610302337"></script>
+    <script type="module" src="src/app.js?v=202610310112"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

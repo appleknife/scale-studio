@@ -27,12 +27,13 @@ const VIEWS = [
   ['result', '../index.html?lang=zh&demo=test'],
   ['tuner', '../index.html?lang=zh&tune=6'],
   ['help dialog', '../index.html?lang=zh&help'],
+  ['sight reading', '../index.html?lang=zh&sight=5&seed=4471'],
 ];
 
 const ALLOW = [
   /[\u4e00-\u9fff]/,          // text that already carries Chinese is fine
   /^English$/, /^中文$/,
-  /^[IVX]+–[IVX]+$/,            // the level tabs are Roman numerals
+  /^[IVX]+(–[IVX]+)?$/,         // the level tabs are Roman numerals
   /^Scale Studio$/,
   /^Scale Studio — violin scale trainer$/,
   /^NYSSMA/,

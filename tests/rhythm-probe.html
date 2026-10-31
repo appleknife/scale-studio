@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Rhythm probe — can the detector hear sight-reading?</title>
+  </head>
+  <body>
+    <pre id="out">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      import { PitchDetector } from '../src/pitch.js';
+      import { segmentNotes, analyzeTake } from '../src/analyze.js';
+
+      const SR = 44100;
+      const WINDOW = 2048;
+      const HOP = 0.03;
+      const out = document.getElementById('out');
+      const lines = [];
+
+      const M = (name) => {
+        // name -> midi, only what this probe needs
+        const map = { G3: 55, A3: 57, B3: 59, C4: 60, D4: 62, E4: 64, F4: 65, 'F#4': 66, G4: 67, A4: 69, B4: 71, C5: 72, D5: 74 };
+        return map[name];
+      };
+
+      function render(notes) {
+        // notes: [{ name, dur, gap, cents }]
+        let t = 0.6;
+        const starts = [];
+        for (const n of notes) {
+          starts.push(t);
+          t += n.dur + (n.gap || 0);
+        }
+        const buf = new Float32Array(Math.ceil((t + 1.4) * SR));
+        notes.forEach((n, i) => {
+          const f0 = 440 * Math.pow(2, (M(n.name) + (n.cents || 0) / 100 - 69) / 12);
+          const len = Math.floor(n.dur * SR);
+          let phase = 0;
+          for (let s = 0; s < len; s++) {
+            const tt = s / SR;
+            let amp = 1;
+            const attack = 0.03;
+            const release = 0.06;
+            if (tt < attack) amp = tt / attack;
+            else if (tt > n.dur - release) amp = Math.max(0, (n.dur - tt) / release);
+            amp *= 0.85 + 0.15 * Math.exp(-tt * 5);
+            const f = f0 * Math.pow(2, (0.15 * Math.sin(2 * Math.PI * 5.4 * tt)) / 12);
+            phase += (2 * Math.PI * f) / SR;
+            let v = 0;
+            for (let k = 1; k <= 7; k++) v += Math.sin(phase * k) / Math.pow(k, 1.15);
+            buf[Math.floor(starts[i] * SR) + s] += 0.2 * amp * (v * 0.5 + (Math.random() - 0.5) * 0.03);
+          }
+        });
+        return buf;
+      }
+
+      function framesOf(buf) {
+        const det = new PitchDetector({ sampleRate: SR, bufferSize: WINDOW });
+        const frames = [];
+        const win = new Float32Array(WINDOW);
+        const end = buf.length / SR - WINDOW / SR;
+        for (let t = 0; t < end; t += HOP) {
+          const i0 = Math.floor(t * SR);
+          win.set(buf.subarray(i0, i0 + WINDOW));
+          const { freq, clarity, rms } = det.detect(win);
+          frames.push({ t, freq, clarity, rms });
+        }
+        return frames;
+      }
+
+      function probe(title, notes, expectedCount) {
+       	const frames = framesOf(render(notes));
+        const { notes: seg } = segmentNotes(frames);
+        lines.push('');
+        lines.push(`${title}`);
+        lines.push(`  wrote ${expectedCount} notes · detector found ${seg.length}`);
+        lines.push(
+          '  ' +
+            seg
+              .map((n, i) => `${i + 1}:${n.pitch.toFixed(2)}@${n.t0.toFixed(2)}s(${n.duration.toFixed(2)}s)`)
+              .join(' '),
+        );
+        lines.push(
+          seg.length === expectedCount
+            ? '  → every note separated'
+            : `  → ${expectedCount - seg.length} of them merged: the detector needs silence or a pitch change to start a new note`,
+        );
+        return seg;
+      }
+
+      /* 1. eight repeated A4s, detaché with a small gap (a real bow change) */
+      probe(
+        '1. eight repeated A4, 0.28s each, 0.04s gap (detaché)',
+        Array.from({ length: 8 }, () => ({ name: 'A4', dur: 0.28, gap: 0.04 })),
+        8,
+      );
+
+      /* 2. the same, fully legato (no gap at all) */
+      probe(
+        '2. eight repeated A4, 0.28s each, no gap (legato)',
+        Array.from({ length: 8 }, () => ({ name: 'A4', dur: 0.28, gap: 0 })),
+        8,
+      );
+
+      /* 3. a phrase with mixed durations: half, two quarters, four eighths */
+      probe(
+        '3. mixed durations: 1 half (0.8s), 2 quarters (0.4s), 4 eighths (0.2s)',
+        [
+          { name: 'D4', dur: 0.8, gap: 0.03 },
+          { name: 'E4', dur: 0.4, gap: 0.03 },
+          { name: 'F#4', dur: 0.4, gap: 0.03 },
+          { name: 'G4', dur: 0.2, gap: 0.03 },
+          { name: 'A4', dur: 0.2, gap: 0.03 },
+          { name: 'B4', dur: 0.2, gap: 0.03 },
+          { name: 'A4', dur: 0.2, gap: 0.03 },
+        ],
+        7,
+      );
+
+      /* 4. what the *scale* scorer makes of an uneven passage */
+      const melody = [
+        { name: 'D4', dur: 0.8, gap: 0.03 },
+        { name: 'E4', dur: 0.4, gap: 0.03 },
+        { name: 'F#4', dur: 0.4, gap: 0.03 },
+        { name: 'G4', dur: 0.2, gap: 0.03 },
+        { name: 'A4', dur: 0.2, gap: 0.03 },
+        { name: 'B4', dur: 0.2, gap: 0.03 },
+        { name: 'A4', dur: 0.2, gap: 0.03 },
+      ];
+      const fakeScale = {
+        sequence: melody.map((n) => ({ midi: M(n.name), name: n.name })),
+        rangeText: 'D4 – B4',
+        octaves: 1,
+        fifths: 2,
+        title: 'probe',
+        meta: '',
+      };
+      const res = analyzeTake(framesOf(render(melody)), fakeScale);
+      lines.push('');
+      lines.push('4. the existing scale scorer, fed a passage of mixed durations');
+      lines.push(
+        `  score ${res.score}% · notes ${Math.round(res.components.accuracy * 100)}% · ` +
+          `steady ${Math.round(res.components.steadiness * 100)}% · bpm ${res.stats.bpm} · ` +
+          `heard ${res.stats.heard}/${res.stats.expected}`,
+      );
+
+      out.textContent = lines.join('\n');
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({
+          stage: 'rhythm-probe',
+          problems: [],
+          log: lines.join('\n'),
+        }),
+      });
+    </script>
+  </body>
+</html>

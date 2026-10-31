@@ -1,0 +1,196 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Onset probe — can a bow change be heard?</title>
+  </head>
+  <body>
+    <pre id="out">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // Phase 0 of the sight-reading plan: is a bow change between two notes of
+      // the *same* pitch detectable, and how precisely?
+      //
+      // Synthetic audio only models the physics — it is not a violin. The sweep
+      // below chooses the detector's parameters; the next step is a real recording.
+      import { envelopeTrack, bowBoundaries } from '../src/onsets.js';
+
+      const SR = 44100;
+      const lines = [];
+      const MIDI = { G3: 55, A3: 57, B3: 59, C4: 60, D4: 62, E4: 64, 'F#4': 66, G4: 67, A4: 69, B4: 71, C5: 72, D5: 74 };
+
+      function render(notes) {
+        const t0 = 0.6;
+        const starts = [];
+        let t = t0;
+        for (const n of notes) {
+          starts.push(t);
+          t += n.dur + (n.gap || 0);
+        }
+        const buf = new Float32Array(Math.ceil((t + 1.2) * SR));
+
+        notes.forEach((n, i) => {
+          const f0 = 440 * Math.pow(2, (MIDI[n.name] - 69) / 12);
+          const len = Math.floor(n.dur * SR);
+          const startSample = Math.floor(starts[i] * SR);
+          let phase = 0;
+          for (let s = 0; s < len; s++) {
+            const tt = s / SR;
+            let amp = 1;
+            if (tt < 0.012) amp = tt / 0.012;
+            else if (tt > n.dur - n.release) amp = Math.max(0, 1 - (tt - (n.dur - n.release)) / n.release);
+            if (n.dipAt != null) {
+              const d = Math.abs(tt - n.dipAt);
+              if (d < 0.03) amp *= 1 - n.dipDepth * (1 - d / 0.03);
+            }
+            amp *= 0.88 + 0.12 * Math.exp(-tt * 4);
+            const f = f0 * Math.pow(2, (0.15 * Math.sin(2 * Math.PI * 5.2 * tt)) / 12);
+            phase += (2 * Math.PI * f) / SR;
+            let v = 0;
+            for (let k = 1; k <= 7; k++) v += Math.sin(phase * k) / Math.pow(k, 1.15);
+            // the bow catching the string: a short broadband scratch
+            const catchBurst = (Math.random() - 0.5) * 0.55 * Math.exp(-tt / 0.011);
+            const idx = startSample + s;
+            if (idx < buf.length) buf[idx] += 0.2 * amp * (v * 0.5 + catchBurst);
+          }
+        });
+        return buf;
+      }
+
+      /* ── the cases ────────────────────────────────────────────────────── */
+
+      const detache = Array.from({ length: 8 }, () => ({ name: 'A4', dur: 0.28, gap: 0.04, release: 0.04 }));
+      const legato = Array.from({ length: 8 }, () => ({
+        name: 'A4', dur: 0.32, gap: 0, release: 0.02, dipAt: 0.31, dipDepth: 0.3,
+      }));
+      const mixed = [
+        { name: 'D4', dur: 0.8, gap: 0.03, release: 0.05 },
+        { name: 'E4', dur: 0.4, gap: 0.03, release: 0.05 },
+        { name: 'F#4', dur: 0.4, gap: 0.03, release: 0.05 },
+        { name: 'G4', dur: 0.2, gap: 0.03, release: 0.04 },
+        { name: 'A4', dur: 0.2, gap: 0.03, release: 0.04 },
+        { name: 'B4', dur: 0.2, gap: 0.03, release: 0.04 },
+        { name: 'A4', dur: 0.2, gap: 0.03, release: 0.04 },
+      ];
+      const sixEight = ['A4', 'B4', 'C5', 'B4', 'A4', 'G4'].map((name) => ({
+        name, dur: 0.22, gap: 0.03, release: 0.03,
+      }));
+
+      const CASES = [
+        { name: 'detaché', notes: detache, hop: 0.005 },
+        { name: 'detaché @16ms', notes: detache, hop: 0.016 },
+        { name: 'legato', notes: legato, hop: 0.005 },
+        { name: 'mixed pitches', notes: mixed, hop: 0.005 },
+        { name: '6/8 eighths @16ms', notes: sixEight, hop: 0.016 },
+      ];
+
+      function truth(notes) {
+        const out = [];
+        let t = 0.6;
+        for (const n of notes) {
+          out.push(t);
+          t += n.dur + (n.gap || 0);
+        }
+        return out;
+      }
+
+      const buffers = CASES.map((c) => render(c.notes));
+
+      function score(config, ci, sensitivity) {
+        const c = CASES[ci];
+        const track = envelopeTrack(buffers[ci], SR, { hop: c.hop, win: config.win, hpHz: config.hpHz, poles: config.poles });
+        const found = bowBoundaries(track, { sensitivity, metric: config.metric, minGap: 0.08 }).map(
+          (o) => o.t,
+        );
+        const expected = truth(c.notes);
+        let missed = 0;
+        const errors = [];
+        for (const e of expected) {
+          let best = null;
+          for (const f of found) if (best == null || Math.abs(f - e) < Math.abs(best - e)) best = f;
+          if (best == null || Math.abs(best - e) > 0.08) missed++;
+          else errors.push(best - e);
+        }
+        const mean = errors.length ? errors.reduce((a, b) => a + Math.abs(b), 0) / errors.length : 0;
+        const worst = errors.length ? Math.max(...errors.map(Math.abs)) : 0;
+        return { missed, extra: found.length - errors.length, mean, worst, found: found.length, expected: expected.length };
+      }
+
+      /* ── the sweep ────────────────────────────────────────────────────── */
+
+      const configs = [];
+      for (const hpHz of [4000, 6000, 8000]) {
+        for (const poles of [1, 2, 3]) {
+          for (const metric of ['level', 'flux']) {
+            for (const win of [0.01, 0.02]) {
+              configs.push({ hpHz, poles, metric, win });
+            }
+          }
+        }
+      }
+
+      lines.push('config (hp / poles / metric / win)   ' + CASES.map((c) => c.name.padEnd(15)).join(''));
+      let best = null;
+      for (const config of configs) {
+        // pick the sensitivity that scores best on the hard case, then apply it to all
+        let chosen = null;
+        for (const sensitivity of [1.2, 1.6, 2, 2.5, 3, 4]) {
+          const r = score(config, 0, sensitivity);
+          const cost = r.missed * 3 + Math.abs(r.extra);
+          if (!chosen || cost < chosen.cost) chosen = { sensitivity, cost };
+        }
+        const results = CASES.map((_, i) => score(config, i, chosen.sensitivity));
+        const totalCost = results.reduce((a, r) => a + r.missed * 3 + Math.abs(r.extra), 0);
+        const cells = results.map((r) => `${r.found}/${r.expected}`.padEnd(15));
+        lines.push(
+          `${String(config.hpHz).padStart(4)} / ${config.poles} / ${config.metric.padEnd(5)} / ${String(config.win * 1000).padStart(2)}ms  s=${chosen.sensitivity}  ` +
+            cells.join('') + ` cost ${totalCost}`,
+        );
+        if (!best || totalCost < best.totalCost) best = { config, chosen, results, totalCost };
+      }
+
+      lines.push('');
+      lines.push(
+        `best: ${best.config.hpHz} Hz · ${best.config.poles} pole(s) · ${best.config.metric} · ${best.config.win * 1000} ms window · sensitivity ${best.chosen.sensitivity}`,
+      );
+      best.results.forEach((r, i) => {
+        lines.push(
+          `  ${CASES[i].name.padEnd(16)} ${r.found}/${r.expected} onsets · ` +
+            `${r.missed} missed · ${r.extra} extra · mean error ${(r.mean * 1000).toFixed(0)} ms · ` +
+            `worst ${(r.worst * 1000).toFixed(0)} ms`,
+        );
+      });
+
+      /* ── does the minimum gap clear the double-trigger at 16 ms? ──────── */
+      lines.push('');
+      lines.push('best config, varying the minimum gap (live hop):');
+      for (const minGap of [0.08, 0.1, 0.12, 0.14]) {
+        const cells = [];
+        for (const ci of [1, 4]) {
+          const c = CASES[ci];
+          const track = envelopeTrack(buffers[ci], SR, {
+            hop: c.hop, win: best.config.win, hpHz: best.config.hpHz, poles: best.config.poles,
+          });
+          const found = bowBoundaries(track, {
+            sensitivity: best.chosen.sensitivity, metric: best.config.metric, minGap,
+          }).map((o) => o.t);
+          cells.push(`${c.name} ${found.length}/${truth(c.notes).length}`);
+        }
+        lines.push(`  minGap ${(minGap * 1000).toFixed(0)} ms — ${cells.join(' · ')}`);
+      }
+
+      document.getElementById('out').textContent = lines.join('\n');
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'onset-probe', problems: [], log: lines.join('\n') }),
+      });
+    </script>
+  </body>
+</html>
