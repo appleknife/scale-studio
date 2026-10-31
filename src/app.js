@@ -1,9 +1,9 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js';
-import { renderStaff } from './staff.js';
-import { PitchDetector, midiToFreq } from './pitch.js';
-import { analyzeTake, gradeFor } from './analyze.js';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302206';
+import { renderStaff } from './staff.js?v=202610302206';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610302206';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610302206';
 
 const $ = (id) => document.getElementById(id);
 
