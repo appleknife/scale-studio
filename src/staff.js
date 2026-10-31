@@ -3,7 +3,7 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202610310311';
+import { CLEF_PATH } from './clef.js?v=202610311001';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -73,10 +73,10 @@ export function accidentalAt(alter, x, y, colour = INK, size = 1) {
   // the horizontals stop at just over half a space either side of the middle.
   const sharpAt = (cx) =>
     `<g stroke="${colour}" stroke-linecap="butt">` +
-    `<line x1="${cx - 0.27 * s}" y1="${y - 1.45 * s}" x2="${cx - 0.27 * s}" y2="${y + 1.45 * s}" stroke-width="${stem}"/>` +
-    `<line x1="${cx + 0.27 * s}" y1="${y - 1.6 * s}" x2="${cx + 0.27 * s}" y2="${y + 1.3 * s}" stroke-width="${stem}"/>` +
-    `<line x1="${cx - 0.42 * s}" y1="${y - 0.32 * s}" x2="${cx + 0.42 * s}" y2="${y - 0.46 * s}" stroke-width="${0.32 * s}"/>` +
-    `<line x1="${cx - 0.42 * s}" y1="${y + 0.46 * s}" x2="${cx + 0.42 * s}" y2="${y + 0.32 * s}" stroke-width="${0.32 * s}"/>` +
+    `<line x1="${cx - 0.25 * s}" y1="${y - 1.45 * s}" x2="${cx - 0.25 * s}" y2="${y + 1.45 * s}" stroke-width="${stem}"/>` +
+    `<line x1="${cx + 0.25 * s}" y1="${y - 1.6 * s}" x2="${cx + 0.25 * s}" y2="${y + 1.3 * s}" stroke-width="${stem}"/>` +
+    `<line x1="${cx - 0.5 * s}" y1="${y - 0.3 * s}" x2="${cx + 0.5 * s}" y2="${y - 0.45 * s}" stroke-width="${0.26 * s}"/>` +
+    `<line x1="${cx - 0.5 * s}" y1="${y + 0.45 * s}" x2="${cx + 0.5 * s}" y2="${y + 0.3 * s}" stroke-width="${0.26 * s}"/>` +
     `</g>`;
 
   const naturalAt = (cx) => {
@@ -124,7 +124,7 @@ export function renderStaff(
   // two accidentals in a row (G#, then the G natural on the way down) stop
   // colliding.
   const accOffset = (alter) =>
-    (alter === 0 ? 1.25 : Math.abs(alter) >= 2 ? 2.3 : alter > 0 ? 1.4 : 1.6) * LINE_GAP;
+    (alter === 0 ? 1.25 : Math.abs(alter) >= 2 ? 2.2 : alter > 0 ? 1.25 : 1.55) * LINE_GAP;
   const accPad = (alter) => Math.max(0, accOffset(alter) - LINE_GAP);
   const xs = [];
   let cursor = notesX;

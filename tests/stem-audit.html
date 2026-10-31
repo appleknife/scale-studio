@@ -34,7 +34,19 @@
       const stems = allLines.filter(
         (l) => Math.abs(l.x1 - l.x2) < 0.01 && Math.abs(l.y1 - l.y2) > 8 && l.w <= 1.5,
       );
-      const beams = allLines.filter((l) => l.w > 4 && l.w < 6.5);
+      // Beams are filled quads now, not thick lines: read the inner edge (the
+      // first two vertices) of every path the renderer marked as a beam.
+      const beams = [...svg.querySelectorAll('path.score-beam')]
+        .map((p) => (p.getAttribute('d') || '').match(/-?\d+(\.\d+)?/g) || [])
+        .filter((n) => n.length === 8)
+        .map((n) => ({
+          x1: +n[0],
+          y1: +n[1],
+          x2: +n[2],
+          y2: +n[3],
+          w: Math.hypot(+n[2] - +n[0], +n[3] - +n[1]),
+        }))
+        .filter((b) => b.w > 2);
 
       // ── every stem must hug its own head on the correct side ────────────
       for (const s of stems) {

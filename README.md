@@ -267,6 +267,28 @@ sight-reading table for that level.
 its tempo. Hearing the passage and marking it is the next piece of work, and the
 card on screen says so rather than pretending otherwise.
 
+### Drawing the notation
+
+Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave
+trouble are the ones where a stroked line is not good enough:
+
+* Rests and note flags are **filled outlines**, not strokes. A quarter rest is a
+  `ribbon` — a centreline with a width at every point — because the printed glyph is
+  calligraphic: hair-thin at the tick, swelling through the belly, pinched at the
+  waist. A single stroke width collapses it into a crescent.
+* Beams are **filled quadrilaterals** built outward from `beam.at()`, which is where
+  the stems end. A stroke's butt cap is cut square to the line, so slanted beams grew
+  little wedges, and the second beam of a sixteenth run never sat parallel to the
+  first.
+* The eighth rest's measurements (bulb 0.23 of the glyph's height, stem 0.10, the
+  hairline gap between them) were taken off a printed rest pixel by pixel, the same
+  way the sharp in `src/staff.js` was.
+
+If you change a glyph, compare it against a printed one at matched height before
+believing it. Cropping the printed glyph and the render, scaling both to the same
+height and putting them side by side settled every argument about these shapes;
+judging them from two separate screenshots did not.
+
 ## Languages
 
 The app is in English and Simplified Chinese. The switch is the pill in the top

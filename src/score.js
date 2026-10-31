@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610310311';
-import { CLEF_PATH } from './clef.js?v=202610310311';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311001';
+import { CLEF_PATH } from './clef.js?v=202610311001';
 
-import { beatLength } from './sightreading.js?v=202610310311';
+import { beatLength } from './sightreading.js?v=202610311001';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -61,6 +61,83 @@ function head(x, y, { hollow = false, colour = INK } = {}) {
 
 /* ── Rests ─────────────────────────────────────────────────────────────── */
 
+/**
+ * A filled ribbon: a centreline with a half-width at every point, offset along
+ * the normal and closed into one outline. The printed quarter rest is a
+ * calligraphic stroke — hair-thin at the tick, swelling through the belly,
+ * pinched at the waist, heavy again through the foot — so a stroked path with a
+ * single width collapses into a crescent, which is exactly what it looked like.
+ */
+function ribbon(pts, round = false) {
+  const n = pts.length;
+  const normals = pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)];
+    const b = pts[Math.min(n - 1, i + 1)];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const len = Math.hypot(dx, dy) || 1;
+    return [-dy / len, dx / len];
+  });
+  const left = pts.map((p, i) => [p[0] + normals[i][0] * p[2], p[1] + normals[i][1] * p[2]]);
+  const right = pts
+    .map((p, i) => [p[0] - normals[i][0] * p[2], p[1] - normals[i][1] * p[2]])
+    .reverse();
+  const f = (v) => v.toFixed(2);
+  // Catmull-Rom through the offset points: a flag is a curve, while the quarter
+  // rest keeps its corners (its beak and its foot are sharp by nature).
+  const trace = (list) => {
+    if (!round) return list.map((p, i) => `${i ? 'L' : 'M'}${f(p[0])} ${f(p[1])}`).join(' ');
+    const at = (i) => list[Math.min(list.length - 1, Math.max(0, i))];
+    let d = `M${f(list[0][0])} ${f(list[0][1])}`;
+    for (let i = 0; i < list.length - 1; i++) {
+      const p0 = at(i - 1);
+      const p1 = at(i);
+      const p2 = at(i + 1);
+      const p3 = at(i + 2);
+      d +=
+        ` C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)}` +
+        ` ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)}` +
+        ` ${f(p2[0])} ${f(p2[1])}`;
+    }
+    return d;
+  };
+  return `${trace(left)} ${trace(right).replace('M', 'L')} Z`;
+}
+
+/**
+ * The quarter rest, traced off a printed one. Coordinates are u/v inside the glyph
+ * box with the stroke's half-width in staff units; the foot is a hairpin (the
+ * descender runs out right, turns, and the tail comes back left before curling
+ * down again) — without that turn the glyph sags into an S.
+ */
+const QUARTER_REST = [
+  [0.34, 0.01, 0.5],
+  [0.51, 0.08, 0.6],
+  [0.6, 0.13, 1.5],
+  [0.73, 0.25, 2.45],
+  [0.6, 0.33, 2.4],
+  [0.44, 0.42, 1.85],
+  [0.42, 0.49, 0.9],
+  [0.48, 0.56, 0.6],
+  [0.64, 0.63, 0.7],
+  [0.86, 0.7, 0.8],
+  [0.87, 0.76, 0.58],
+  [0.63, 0.79, 0.8],
+  [0.37, 0.81, 1.2],
+  [0.25, 0.86, 1.0],
+  [0.29, 0.92, 0.8],
+  [0.43, 0.98, 0.5],
+];
+
+function quarterRest(x, y, colour) {
+  const H = 2.15 * LINE_GAP;
+  const W = 0.375 * H;
+  const left = x - W / 2;
+  const top = y - H / 2;
+  const pts = QUARTER_REST.map(([u, v, w]) => [left + u * W, top + v * H, w]);
+  return `<path d="${ribbon(pts)}" fill="${colour}"/>`;
+}
+
 function restGlyph(x, y, dur, colour) {
   if (dur >= 16) {
     // whole rest — a block hanging under the fourth line
@@ -70,26 +147,30 @@ function restGlyph(x, y, dur, colour) {
     // half rest — a block sitting on the middle line
     return `<rect x="${x - 6}" y="${y - 2}" width="12" height="5.5" fill="${colour}"/>`;
   }
-  if (dur >= 4) {
-    // quarter rest — a vertical zigzag with a hook at the foot, which is what
-    // the eye is looking for; a straight zigzag reads as the digit 3.
-    return (
-      `<path d="M${x + 1.5} ${y - 12.5} C${x - 3} ${y - 7} ${x + 3.5} ${y - 3.5} ${x - 1} ${y + 2} ` +
-      `C${x + 3} ${y + 5.5} ${x + 1.5} ${y + 9} ${x - 3.5} ${y + 11}" ` +
-      `fill="none" stroke="${colour}" stroke-width="2.9" stroke-linecap="round"/>`
-    );
-  }
-  // Eighth rest — a flat bulb with a slim tail hanging from its right, almost
-  // straight down. Measured off a printed rest: the bulb is about four fifths of
-  // a space wide, the tail drifts a quarter of a space over two spaces of drop,
-  // and the whole glyph stands two spaces. Earlier versions slanted the tail 25
-  // degrees and made it as wide as the glyph was tall, which read as a slash.
+  if (dur >= 4) return quarterRest(x, y, colour);
+  // Eighth rest — measured off a printed one, in fractions of the glyph's own
+  // height H: the bulb is 0.23 H across, the stem is a parallel-sided bar one
+  // bulb-width to its right, drifting about 0.11 H to the left on the way down,
+  // with both ends cut square to the stem's own direction. The hairline gap
+  // between bulb and stem is the whole trick — close it and the glyph turns into
+  // a comma, widen it and it turns into a 9 next to a stick.
+  const H = 1.7 * LINE_GAP;
+  const top = y - H / 2;
+  const bottom = y + H / 2;
+  const w = 0.095 * H;
+  const bulbX = x + 0.5 - 0.17 * H;
+  const bulbY = top + 0.17 * H;
+  const stemX = x + 0.5;
+  const footX = stemX - 0.11 * H;
+  // offset perpendicular to the stem, so the cut ends lean with the glyph
+  const nx = -(H / Math.hypot(footX - stemX, H)) * (w / 2);
+  const ny = ((footX - stemX) / Math.hypot(footX - stemX, H)) * (w / 2);
   return (
-    `<ellipse cx="${x - 0.6}" cy="${y - 10.0}" rx="4.4" ry="3.2" fill="${colour}"/>` +
-    `<path d="M${x + 2.8} ${y - 8.4} ` +
-    `C${x + 3.6} ${y - 3.0} ${x + 2.2} ${y + 2.8} ${x - 1.4} ${y + 7.0} ` +
-    `C${x - 1.0} ${y + 2.2} ${x - 0.2} ${y - 3.4} ${x + 0.6} ${y - 8.8} Z" ` +
-    `fill="${colour}"/>`
+    `<circle cx="${bulbX.toFixed(2)}" cy="${bulbY.toFixed(2)}" r="${(0.115 * H).toFixed(2)}" fill="${colour}"/>` +
+    `<path d="M${(stemX + nx).toFixed(2)} ${(top + ny).toFixed(2)} ` +
+    `L${(footX + nx).toFixed(2)} ${(bottom + ny).toFixed(2)} ` +
+    `L${(footX - nx).toFixed(2)} ${(bottom - ny).toFixed(2)} ` +
+    `L${(stemX - nx).toFixed(2)} ${(top - ny).toFixed(2)} Z" fill="${colour}"/>`
   );
 }
 
@@ -296,21 +377,55 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
 
     groups.forEach((group) => {
       const beam = beamOf.get(group[0]);
-      const stemX = (e) => xOf(e) + (beam.up ? 5.4 : -5.4);
+      const stemX = (e) => xOf(e) + (beam.up ? 5.2 : -5.2);
       const first = group[0];
       const last = group[group.length - 1];
-      part.push(
-        `<line x1="${stemX(first)}" y1="${beam.at(first)}" ` +
-          `x2="${stemX(last)}" y2="${beam.at(last)}" ` +
-          `stroke="${INK}" stroke-width="${BEAM}" stroke-linecap="butt"/>`,
-      );
-      // sixteenths carry a second beam, offset toward the note heads
-      const offset = beam.up ? BEAM + 3.6 : -(BEAM + 3.6);
+
+      // `beam.at()` is where a stem *ends* — the beam's inner edge. Beams are
+      // filled parallelograms built outward from that edge rather than stroked
+      // lines: a stroke's butt cap is cut square to the line, so a slanted beam
+      // grew little wedges at its ends and the second beam never sat parallel.
+      const dx = stemX(last) - stemX(first);
+      const dy = beam.at(last) - beam.at(first);
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      // unit normal pointing away from the note heads
+      const dir = beam.up ? 1 : -1;
+      const ox = uy * dir;
+      const oy = -ux * dir;
+      const GAP2 = 3.4; // white between the two beams of a sixteenth run
+
+      const bar = (x1, y1, x2, y2) => {
+        // a hair of overlap, so the stem and the beam never leave a pale seam
+        const inset = 0.35;
+        const sx1 = x1 - ox * inset;
+        const sy1 = y1 - oy * inset;
+        const sx2 = x2 - ox * inset;
+        const sy2 = y2 - oy * inset;
+        const f = (v) => v.toFixed(2);
+        return (
+          `<path class="score-beam" d="M${f(sx1)} ${f(sy1)} L${f(sx2)} ${f(sy2)} ` +
+          `L${f(sx2 + ox * BEAM)} ${f(sy2 + oy * BEAM)} ` +
+          `L${f(sx1 + ox * BEAM)} ${f(sy1 + oy * BEAM)} Z" fill="${INK}"/>`
+        );
+      };
+
+      part.push(bar(stemX(first), beam.at(first), stemX(last), beam.at(last)));
+      // Sixteenths carry a second beam, one beam-and-a-gap nearer the heads. It
+      // is offset in y only, scaled so the *perpendicular* distance stays right:
+      // sliding the whole beam along its normal pushed its ends 2 units sideways
+      // off the stems, which is what made those pairs look torn.
+      const back = (BEAM + GAP2) / Math.abs(ux);
+      const dy2 = dir * back;
       for (const run of sixteenthRuns(group)) {
         part.push(
-          `<line x1="${stemX(run[0])}" y1="${beam.at(run[0]) + offset}" ` +
-            `x2="${stemX(run[run.length - 1])}" y2="${beam.at(run[run.length - 1]) + offset}" ` +
-            `stroke="${INK}" stroke-width="${BEAM}" stroke-linecap="butt"/>`,
+          bar(
+            stemX(run[0]),
+            beam.at(run[0]) + dy2,
+            stemX(run[run.length - 1]),
+            beam.at(run[run.length - 1]) + dy2,
+          ),
         );
       }
 
@@ -361,22 +476,21 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
         );
       }
       if (event.dur <= 2 && !beam) {
-        // A lone eighth or sixteenth gets a filled flag off the end of the stem,
-        // curling back toward the note head. Drawn as a shape, not a stroke: a
-        // hairline hook is what made these look shrivelled.
-        const dir = up ? 1 : -1;
-        // The hook is drawn as an outline: a wide sweep out from the stem, then a
-        // tighter curve back in, which is what gives a flag its curl rather than
-        // a narrow sliver.
-        const flag = (dy) => {
-          const y0 = stemEnd + dir * dy;
-          const tip = y0 + dir * FLAG;
-          return (
-            `<path d="M${stemX} ${y0} ` +
-            `C${stemX + 10} ${y0 + dir * 4} ${stemX + 12} ${y0 + dir * 15} ${stemX + 6.5} ${tip} ` +
-            `C${stemX + 9} ${y0 + dir * 15} ${stemX + 7} ${y0 + dir * 9} ${stemX} ${y0 + dir * 5.5} Z" ` +
-            `fill="${INK}"/>`
-          );
+        // A lone eighth or sixteenth gets a flag: a calligraphic hook leaving the
+        // stem tip and sweeping back toward the head. Drawn as a ribbon — a
+        // centreline with a width — because a hairline curl turns into a detached
+        // crescent as soon as the page is drawn at phone size.
+        const toward = up ? 1 : -1; // which way the head lies from the stem tip
+        const FLAG_SHAPE = [
+          [0.3, 0.0, 0.8],
+          [3.4, 3.2, 1.9],
+          [7.0, 7.8, 2.0],
+          [8.6, 12.6, 1.2],
+          [7.4, 17.0, 0.35],
+        ];
+        const flag = (shift) => {
+          const pts = FLAG_SHAPE.map(([x, t, w]) => [stemX + x, stemEnd + toward * (t + shift), w]);
+          return `<path d="${ribbon(pts, true)}" fill="${INK}"/>`;
         };
         part.push(flag(0));
         if (event.dur === 1) part.push(flag(10));

@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610310311';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311001';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -347,7 +347,10 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // ── rests (level IV and up) — one bar, in the middle, on a weak slot ────
   if (spec.rests && chance(rng, 0.55)) {
     const b = 1 + Math.floor(rng() * 5);
-    const slot = bars[b].findIndex((e, i) => i > 0 && e.dur <= 4 && i < bars[b].length - 1);
+    // Only a beat or a half-beat can become a rest: a sixteenth rest is a
+    // different glyph, and a rest in the middle of a run of sixteenths is not
+    // something a sight-reading test asks for.
+    const slot = bars[b].findIndex((e, i) => i > 0 && e.dur >= 2 && e.dur <= 4 && i < bars[b].length - 1);
     if (slot > 0) bars[b][slot].rest = true;
   }
 
