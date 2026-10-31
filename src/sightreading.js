@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311421';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311426';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -68,11 +68,16 @@ const LEVELS = {
     rests: false,
     accidentals: 0,
   },
+  // Leaps follow the Manual's ladder: thirds at I–II, a fifth at III, an octave
+  // at V–VI. `steps` is what the walk may choose from, in scale degrees, so it
+  // has to reach the ceiling — a fifth at III, an octave at V and VI — or the
+  // limit is only theoretical; `maxSemis` is the ceiling every interval is held
+  // to afterwards.
   3: {
     keys: ['D', 'G', 'C', 'F'],
     meters: ['2/4', '3/4', '4/4'],
     range: [55, 83],
-    steps: [1, 2, 3, 4],
+    steps: [1, 2, 3, 4, 5],
     maxSemis: 7,
     rhythms: {
       '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2]],
@@ -121,8 +126,8 @@ const LEVELS = {
     keys: ['D', 'G', 'C', 'F', 'A', 'Bb', 'Eb'],
     meters: ['2/4', '3/4', '4/4', '2/2', '6/8'],
     range: [55, 86],
-    steps: [1, 2, 3, 4, 5],
-    maxSemis: 9,
+    steps: [1, 2, 3, 4, 5, 6, 7],
+    maxSemis: 12,
     rhythms: {
       '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2], [4 / 3, 4 / 3, 4 / 3, 4]],
       '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8], [4 / 3, 4 / 3, 4 / 3, 4, 4]],
@@ -573,7 +578,11 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     const event = sounding[i];
     const before = sounding[i - 1];
     if (!event.note || !before.note) continue;
-    if (Math.abs(event.midi - before.midi) < 4) continue; // a third or less: let it be
+    const leap = Math.abs(event.midi - before.midi);
+    if (leap < 4) continue; // a third or less: let it be
+    // Leave the big ones alone. An octave is a test item at V and VI, and nudging
+    // it a step to reach a chord tone would quietly turn it into a seventh.
+    if (leap >= 11) continue;
     if ([0, 2, 4].includes(event.note.degree)) continue; // already a chord tone
     const options = pool.filter(
       (n) =>
