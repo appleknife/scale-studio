@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311547';
-import { CLEF_PATH } from './clef.js?v=202610311547';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311555';
+import { CLEF_PATH } from './clef.js?v=202610311555';
 
-import { beatLength } from './sightreading.js?v=202610311547';
+import { beatLength } from './sightreading.js?v=202610311555';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -327,12 +327,21 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
     for (const allowance of [22, 16, 11, 6, 0]) {
       const xs = new Map();
       let prev = null;
+      let prevEvent = null;
       for (const e of events) {
         let x = at(e);
-        const gap = 16 + (e.accidental ? allowance : 0);
+        // Measured, not guessed: a rest's glyph hangs 6 units to the left of the
+        // position it is given, and a flagged sixteenth sweeps 17 to the right of
+        // its own. Sixteen is enough for two noteheads, but between a flag and a
+        // rest it puts the two glyphs on top of each other — the one place a rest
+        // gets pushed into a note it does not belong to. 29 is those two reaches
+        // plus half a space of air.
+        const tucked = e.rest && prevEvent && !prevEvent.rest && prevEvent.dur <= 2;
+        const gap = (tucked ? 29 : 16) + (e.accidental ? allowance : 0);
         if (prev != null && x - prev < gap) x = prev + gap;
         xs.set(e, x);
         prev = x;
+        prevEvent = e;
       }
       if (prev == null || prev <= limit) return xs;
     }

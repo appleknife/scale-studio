@@ -358,6 +358,8 @@ tests/rhythm-probe.html why repeated notes merge today
 tests/ui.test.html    click-through smoke test, including the mock-audition draw
 tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correct
                       side, every beam ending on a stem
+tests/notation.test.html  renders 360 passages and measures the ink: no rest may
+                      come within two units of another glyph
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/lab-server.ps1  test server that collects results from a headless browser
 server.ps1            the local server used by Start Scale Studio.cmd
