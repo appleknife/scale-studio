@@ -162,7 +162,10 @@
         return result;
       }
 
-      const cMajor = buildScale(MAJOR_KEYS[0], 0, 'major');
+      // Looked up by id, not by position: the key list is ordered the way a
+      // violinist meets the scales, so positions move.
+      const keyById = (id) => MAJOR_KEYS.find((k) => k.id === id);
+      const cMajor = buildScale(keyById('C'), 0, 'major');
 
       // A. clean, steady, in tune
       const clean = run('clean scale', cMajor, { vibrato: 0.18 });
@@ -194,7 +197,7 @@
       if (skip.stats.extra > 2) problems.push('skip produced many spurious extras');
 
       // E. wrong octave (G major started on the G above the open string)
-      const gMajor = buildScale(MAJOR_KEYS[1], 0, 'major');
+      const gMajor = buildScale(keyById('G'), 0, 'major');
       const highSeq = gMajor.sequence.map((n) => ({ ...n, midi: n.midi + 12 }));
       const oct = run('octave high', gMajor, { sequence: highSeq, vibrato: 0.1 });
       if (oct.stats.octaveShift !== 12) problems.push(`octave shift not recognised (${oct.stats.octaveShift})`);
@@ -208,13 +211,13 @@
       if (slow.score < 85) problems.push(`slow playing punished (${slow.score})`);
 
       // G. Levels I–IV use one-octave scales: 15 notes, tonic to tonic
-      const cMajor1 = buildScale(MAJOR_KEYS[0], 0, 'major', 'melodic', 1);
+      const cMajor1 = buildScale(keyById('C'), 0, 'major', 'melodic', 1);
       const short = run('one octave', cMajor1, { vibrato: 0.15 });
       if (short.stats.expected !== 15) problems.push(`one-octave scale has ${short.stats.expected} notes`);
       if (short.score < 90) problems.push(`one-octave take scored only ${short.score}`);
 
       // H. minor scale, raised 7th spelled correctly
-      const aMinor = buildScale(MINOR_KEYS[0], 0, 'minor', 'harmonic');
+      const aMinor = buildScale(MINOR_KEYS.find((k) => k.id === 'Am'), 0, 'minor', 'harmonic');
       const aMinorNotes = aMinor.sequence.map((n) => n.name).join(' ');
       log.push('');
       log.push(`A harmonic minor: ${aMinorNotes}`);

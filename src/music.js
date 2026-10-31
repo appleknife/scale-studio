@@ -4,7 +4,7 @@
 // than raw MIDI numbers, so the staff can be drawn with the right accidentals
 // and the app can show enharmonic spellings (F♯ / G♭, C♯ / D♭, B / C♭).
 
-import { getLang, t } from './i18n.js?v=202610311528';
+import { getLang, t } from './i18n.js?v=202610311543';
 
 export const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const LETTER_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
@@ -59,36 +59,41 @@ function variant(name, letter, alter, fifths, octave) {
   return { name, letter, alter, fifths, octave };
 }
 
+// Ordered the way a violinist meets them — by where the scale starts on the
+// instrument, from G on the open G string up to F♯, the highest tonic still in
+// first position. The old order was the circle of fifths, which is a theorist's
+// order rather than a player's.
 export const MAJOR_KEYS = [
-  { id: 'C', variants: [variant('C', 0, 0, 0, 4)] },
   { id: 'G', variants: [variant('G', 4, 0, 1, 3)] },
-  { id: 'D', variants: [variant('D', 1, 0, 2, 4)] },
-  { id: 'A', variants: [variant('A', 5, 0, 3, 3)] },
-  { id: 'E', variants: [variant('E', 2, 0, 4, 4)] },
-  { id: 'B', variants: [variant('B', 6, 0, 5, 3), variant('C\u266D', 0, -1, -7, 4)] },
-  { id: 'F#', variants: [variant('F\u266F', 3, 1, 6, 4), variant('G\u266D', 4, -1, -6, 4)] },
-  { id: 'C#', variants: [variant('C\u266F', 0, 1, 7, 4), variant('D\u266D', 1, -1, -5, 4)] },
-  { id: 'F', variants: [variant('F', 3, 0, -1, 4)] },
-  { id: 'Bb', variants: [variant('B\u266D', 6, -1, -2, 3)] },
-  { id: 'Eb', variants: [variant('E\u266D', 2, -1, -3, 4)] },
   { id: 'Ab', variants: [variant('A\u266D', 5, -1, -4, 3)] },
+  { id: 'A', variants: [variant('A', 5, 0, 3, 3)] },
+  { id: 'Bb', variants: [variant('B\u266D', 6, -1, -2, 3)] },
+  { id: 'B', variants: [variant('B', 6, 0, 5, 3), variant('C\u266D', 0, -1, -7, 4)] },
+  { id: 'C', variants: [variant('C', 0, 0, 0, 4)] },
+  { id: 'C#', variants: [variant('C\u266F', 0, 1, 7, 4), variant('D\u266D', 1, -1, -5, 4)] },
+  { id: 'D', variants: [variant('D', 1, 0, 2, 4)] },
+  { id: 'Eb', variants: [variant('E\u266D', 2, -1, -3, 4)] },
+  { id: 'E', variants: [variant('E', 2, 0, 4, 4)] },
+  { id: 'F', variants: [variant('F', 3, 0, -1, 4)] },
+  { id: 'F#', variants: [variant('F\u266F', 3, 1, 6, 4), variant('G\u266D', 4, -1, -6, 4)] },
 ];
 
 // Not required by NYSSMA at these levels, but the same students are playing
 // minor-key repertoire, so the app offers the parallel set as a bonus.
+// Same order as the majors: by the pitch the scale starts on, G minor first.
 export const MINOR_KEYS = [
-  { id: 'Am', variants: [variant('A', 5, 0, 0, 3)] },
-  { id: 'Em', variants: [variant('E', 2, 0, 1, 4)] },
-  { id: 'Bm', variants: [variant('B', 6, 0, 2, 3)] },
-  { id: 'F#m', variants: [variant('F\u266F', 3, 1, 3, 4)] },
-  { id: 'C#m', variants: [variant('C\u266F', 0, 1, 4, 4)] },
-  { id: 'G#m', variants: [variant('G\u266F', 4, 1, 5, 3)] },
-  { id: 'Dm', variants: [variant('D', 1, 0, -1, 4)] },
   { id: 'Gm', variants: [variant('G', 4, 0, -2, 3)] },
-  { id: 'Cm', variants: [variant('C', 0, 0, -3, 4)] },
-  { id: 'Fm', variants: [variant('F', 3, 0, -4, 4)] },
+  { id: 'G#m', variants: [variant('G\u266F', 4, 1, 5, 3)] },
+  { id: 'Am', variants: [variant('A', 5, 0, 0, 3)] },
   { id: 'Bbm', variants: [variant('B\u266D', 6, -1, -5, 3)] },
+  { id: 'Bm', variants: [variant('B', 6, 0, 2, 3)] },
+  { id: 'Cm', variants: [variant('C', 0, 0, -3, 4)] },
+  { id: 'C#m', variants: [variant('C\u266F', 0, 1, 4, 4)] },
+  { id: 'Dm', variants: [variant('D', 1, 0, -1, 4)] },
   { id: 'Ebm', variants: [variant('E\u266D', 2, -1, -6, 4)] },
+  { id: 'Em', variants: [variant('E', 2, 0, 1, 4)] },
+  { id: 'Fm', variants: [variant('F', 3, 0, -4, 4)] },
+  { id: 'F#m', variants: [variant('F\u266F', 3, 1, 3, 4)] },
 ];
 
 function buildAscending(tonic, sig, form, octaves) {
