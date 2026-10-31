@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311508';
-import { CLEF_PATH } from './clef.js?v=202610311508';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311518';
+import { CLEF_PATH } from './clef.js?v=202610311518';
 
-import { beatLength } from './sightreading.js?v=202610311508';
+import { beatLength } from './sightreading.js?v=202610311518';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -316,12 +316,17 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
     const x0 = barX + inset;
     const span = barWidth - inset - 8;
     const limit = barX + barWidth - 9;
+    // A whole note alone in a bar is set in the middle of it, the way an
+    // engraver sets one. Measured from its beat it sits hard against the
+    // barline, which reads as a mistake rather than as a long note.
+    const lone = events.length === 1 && events[0].dur >= 16;
+    const at = (e) => (lone ? x0 + span / 2 : x0 + (e.start / passage.perBar) * span);
 
     for (const allowance of [22, 16, 11, 6, 0]) {
       const xs = new Map();
       let prev = null;
       for (const e of events) {
-        let x = x0 + (e.start / passage.perBar) * span;
+        let x = at(e);
         const gap = 16 + (e.accidental ? allowance : 0);
         if (prev != null && x - prev < gap) x = prev + gap;
         xs.set(e, x);
@@ -332,7 +337,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
 
     // pathological bar: plain time positions, which at least stay inside the bar
     const xs = new Map();
-    for (const e of events) xs.set(e, x0 + (e.start / passage.perBar) * span);
+    for (const e of events) xs.set(e, at(e));
     return xs;
   }
 

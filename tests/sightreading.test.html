@@ -39,6 +39,18 @@
       const problems = [];
       const log = [];
 
+      /** Duration codes are sixteenths; names make a failure readable. */
+      const DUR = {
+        1: 'a sixteenth',
+        2: 'an eighth',
+        3: 'a dotted eighth',
+        4: 'a quarter',
+        6: 'a dotted quarter',
+        8: 'a half',
+        12: 'a dotted half',
+        16: 'a whole',
+      };
+
       const tonicClass = (keyId) => {
         const card = MAJOR_KEYS.find((k) => k.id === keyId);
         const v = card.variants[0];
@@ -104,6 +116,18 @@
           // keys and meters come from the level's list
           if (!spec.keys.includes(p.key.id)) problems.push(`${id}: key ${p.key.id} not in the level`);
           if (!spec.meters.includes(p.meter)) problems.push(`${id}: meter ${p.meter} not in the level`);
+
+          // Level I is D major, one octave, quarter notes and slower, no rests —
+          // the Manual's page for level I has nothing else on it.
+          if (level === 1) {
+            if (p.key.id !== 'D') problems.push(`${id}: key ${p.key.id} at level 1`);
+            for (const e of flatten(p)) {
+              if (e.rest) problems.push(`${id}: a rest at level 1`);
+              else if (![4, 8, 16].includes(e.dur)) {
+                problems.push(`${id}: ${DUR[e.dur] || e.dur} at level 1`);
+              }
+            }
+          }
         }
 
         // determinism
@@ -113,6 +137,24 @@
       }
 
       log.push(`passages generated: ${checked}`);
+
+      // Level I should actually use all three note values, not just quarters.
+      {
+        const counts = {};
+        for (let seed = 0; seed < 120; seed++) {
+          for (const e of flatten(generatePassage({ level: 1, seed }))) {
+            counts[e.dur] = (counts[e.dur] || 0) + 1;
+          }
+        }
+        const total = Object.values(counts).reduce((a, b) => a + b, 0);
+        log.push(
+          'L1 note values: ' +
+            Object.entries(counts)
+              .sort((a, b) => b[1] - a[1])
+              .map(([d, n]) => `${DUR[d] || d} ${Math.round((n / total) * 100)}%`)
+              .join(' · '),
+        );
+      }
 
       // Where does the music actually sit? A passage can obey every rule and still
       // live on ledger lines, so this is reported per level rather than asserted.

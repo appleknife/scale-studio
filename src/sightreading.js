@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311508';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311518';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -36,14 +36,17 @@ const chance = (rng, p) => rng() < p;
 
 const LEVELS = {
   1: {
+    // The Manual prints level I's range as two notes — D4 under the staff and D5
+    // on the fourth line — so the window is one octave of D major. Nothing faster
+    // than a quarter note, nothing wider than a third, and only 2/4 or 4/4.
     keys: ['D'],
     meters: ['2/4', '4/4'],
-    range: [62, 71],
+    range: [62, 74],
     steps: [1, 2],
     maxSemis: 4,
     rhythms: {
-      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8]],
-      '4/4': [[4, 4, 4, 4], [8, 4, 4], [4, 4, 8], [4, 2, 2, 4, 4]],
+      '2/4': [[4, 4], [8]],
+      '4/4': [[4, 4, 4, 4], [8, 4, 4], [4, 4, 8], [8, 8], [16]],
     },
     tempo: { '*': { unit: 'q', bpm: 60 } },
     dynamics: ['mf'],

@@ -273,6 +273,11 @@ sight-reading table for that level.
 * A take left open when the student walks away is closed with the microphone, so
   nothing keeps counting on a screen nobody is watching.
 
+**Level I is deliberately plain.** D major only, one octave from D4 to D5, 2/4 or
+4/4, quarter and half notes with the occasional whole note, and no leap wider than
+a third — the page the Manual prints for level I. A whole note alone in a bar is
+centred in it, the way an engraver sets one.
+
 ### Drawing the notation
 
 Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave
