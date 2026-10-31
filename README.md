@@ -304,6 +304,8 @@ tests/sightreading.test.html  720 generated passages against the level rules
 tests/onset-probe.html  can a bow change be heard? (parameter sweep)
 tests/rhythm-probe.html why repeated notes merge today
 tests/ui.test.html    click-through smoke test, including the mock-audition draw
+tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correct
+                      side, every beam ending on a stem
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/lab-server.ps1  test server that collects results from a headless browser
 server.ps1            the local server used by Start Scale Studio.cmd
@@ -317,6 +319,12 @@ checks the rules hold: bars add up, every note is in range, the phrase ends on t
 tonic and opens on a chord tone, intervals stay inside the level's vocabulary, and a
 seed always produces the same music. It also prints one passage per level, drawn,
 for the eye — the notation bugs found so far were all found by looking at those.
+
+`tests/stem-audit.html` renders 1,560 passages and then *reads the SVG back*
+instead of trusting the generator: it pairs every stem with a note head and checks
+the stem is on the side its direction demands, and that no beam begins or ends in
+mid-air. That is the bug that kept appearing as "mutated" note pairs, so it is now
+checked mechanically rather than by eye.
 
 `tests/dsp.test.html` synthesises a violin-like scale in the browser, runs it
 through the real detector and scorer, and reports pass/fail for a clean take,

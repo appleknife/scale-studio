@@ -1,0 +1,74 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Stem & beam audit</title>
+<style>body{font:14px system-ui;margin:24px}pre{font:12px ui-monospace}</style>
+<pre id="out">running…</pre>
+<script type="module">
+  import { generatePassage } from '/src/sightreading.js';
+  import { renderScore } from '/src/score.js';
+
+  const out = document.getElementById('out');
+  const problems = [];
+  const tally = new Map();
+  const bump = (k) => tally.set(k, (tally.get(k) || 0) + 1);
+
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+  for (let level = 1; level <= 6; level++) {
+    for (let seed = 0; seed < 260; seed++) {
+      const p = generatePassage({ level, seed });
+      const host = document.createElement('div');
+      host.innerHTML = renderScore(p, {});
+      const svg = host.querySelector('svg');
+
+      const heads = [...svg.querySelectorAll('ellipse')].map((e) => ({
+        x: +e.getAttribute('cx'),
+        y: +e.getAttribute('cy'),
+      }));
+      const allLines = [...svg.querySelectorAll('line')].map((l) => ({
+        x1: +l.getAttribute('x1'), y1: +l.getAttribute('y1'),
+        x2: +l.getAttribute('x2'), y2: +l.getAttribute('y2'),
+        w: +(l.getAttribute('stroke-width') || 0),
+      }));
+
+      const stems = allLines.filter(
+        (l) => Math.abs(l.x1 - l.x2) < 0.01 && Math.abs(l.y1 - l.y2) > 8 && l.w <= 1.5,
+      );
+      const beams = allLines.filter((l) => l.w > 4 && l.w < 6.5);
+
+      // ── every stem must hug its own head on the correct side ────────────
+      for (const s of stems) {
+        const lo = Math.min(s.y1, s.y2) - 1.5;
+        const hi = Math.max(s.y1, s.y2) + 1.5;
+        const head = heads.find((h) => near(h.x, s.x1, 7) && h.y >= lo && h.y <= hi);
+        if (!head) continue;
+        const goesDown = Math.max(s.y1, s.y2) > head.y + 4;
+        const onRight = s.x1 > head.x;
+        if (goesDown && onRight) {
+          bump('stem down, drawn on the right');
+          if (problems.length < 6) problems.push(`L${level} seed ${seed}: stem ${s.x1.toFixed(1)} is right of head ${head.x.toFixed(1)} but runs down`);
+        }
+        if (!goesDown && !onRight) {
+          bump('stem up, drawn on the left');
+          if (problems.length < 6) problems.push(`L${level} seed ${seed}: stem ${s.x1.toFixed(1)} is left of head ${head.x.toFixed(1)} but runs up`);
+        }
+      }
+
+      // ── a beam must start and end on a stem ─────────────────────────────
+      for (const b of beams) {
+        for (const [x, y] of [[b.x1, b.y1], [b.x2, b.y2]]) {
+          const hit = stems.some(
+            (s) => near(s.x1, x, 1.6) && y >= Math.min(s.y1, s.y2) - 2.5 && y <= Math.max(s.y1, s.y2) + 2.5,
+          );
+          if (!hit) {
+            bump('beam end on no stem');
+            if (problems.length < 6) problems.push(`L${level} seed ${seed}: beam end ${x.toFixed(1)},${y.toFixed(1)} touches no stem`);
+          }
+        }
+      }
+    }
+  }
+
+  const summary = [...tally.entries()].map(([k, v]) => `${k}: ${v}`).join('\n') || 'none';
+  out.textContent = `${problems.length ? problems.join('\n') : 'no structural problems'}\n\n${summary}\n`;
+</script>

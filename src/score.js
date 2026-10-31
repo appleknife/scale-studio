@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610310200';
-import { CLEF_PATH } from './clef.js?v=202610310200';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610310305';
+import { CLEF_PATH } from './clef.js?v=202610310305';
 
-import { beatLength } from './sightreading.js?v=202610310200';
+import { beatLength } from './sightreading.js?v=202610310305';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -79,12 +79,15 @@ function restGlyph(x, y, dur, colour) {
       `fill="none" stroke="${colour}" stroke-width="2.9" stroke-linecap="round"/>`
     );
   }
-  // eighth rest — the familiar "7": a bulb at the top and one curved stroke
-  // leaning down and left, about two and a half spaces tall.
+  // Eighth rest — the "7" every player knows: a bulb with a sickle blade
+  // leaning down and left to a sharp point. Drawn as a filled shape rather than
+  // a stroke, because a constant-width stroke reads as a slash with a dot on it.
   return (
-    `<circle cx="${x + 3}" cy="${y - 11}" r="3.3" fill="${colour}"/>` +
-    `<path d="M${x + 3} ${y - 10} C${x + 1} ${y - 3.5} ${x - 2.5} ${y + 2} ${x - 5.5} ${y + 6.5}" ` +
-    `fill="none" stroke="${colour}" stroke-width="2.8" stroke-linecap="round"/>`
+    `<circle cx="${x + 2.4}" cy="${y - 10.6}" r="3.0" fill="${colour}"/>` +
+    `<path d="M${x + 1.8} ${y - 8.4} ` +
+    `C${x + 3.0} ${y - 2.0} ${x + 0.8} ${y + 3.6} ${x - 4.8} ${y + 6.8} ` +
+    `C${x - 3.0} ${y + 3.0} ${x - 2.2} ${y - 1.6} ${x - 1.2} ${y - 7.2} Z" ` +
+    `fill="${colour}"/>`
   );
 }
 
@@ -309,16 +312,16 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
         );
       }
 
-      // a triplet gets its number, and a small bracket when it is not obvious
+      // A triplet gets its number. It needs no bracket: the beam has already
+      // gathered the three notes, and a bracket on top of a beam is the one thing
+      // engravers never print.
       if (isTriplet(group)) {
         const x1 = xOf(first);
         const x2 = xOf(last);
-        const by = beam.at(first) + (beam.up ? -11 : 11);
+        const by = beam.at(first) + (beam.up ? -12 : 12);
         part.push(
           `<text class="score-tuplet" x="${(x1 + x2) / 2}" y="${by + (beam.up ? 0 : 10)}" ` +
             `font-size="15" font-style="italic" text-anchor="middle">3</text>`,
-          `<path d="M${x1} ${by + (beam.up ? 5 : -5)} v${beam.up ? -5 : 5} H${x2} v${beam.up ? 5 : -5}" ` +
-            `fill="none" stroke="${INK}" stroke-width="1.1"/>`,
         );
       }
     });
@@ -381,8 +384,13 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
 
       // dot
       if (event.dur === 6 || event.dur === 12 || event.dur === 3) {
+        // The dot belongs in the middle of the space beside the head; a note
+        // sitting on a line takes its dot one step away, or it reads as a smudge
+        // on the line.
         const onLine = indexOf(event.note.letter, event.note.octave) % 2 === 0;
-        part.push(`<circle cx="${x + 10.5}" cy="${y - (onLine ? 4.5 : 1.5)}" r="1.9" fill="${INK}"/>`);
+        part.push(
+          `<circle cx="${x + 10.8}" cy="${y - (onLine ? STEPS : 0)}" r="2.05" fill="${INK}"/>`,
+        );
       }
 
       // articulations
