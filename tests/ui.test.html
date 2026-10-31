@@ -95,6 +95,9 @@
                 const unique = new Set(names);
                 if (unique.size !== 3) problems.push(`drawn scales repeat: ${names.join(',')}`);
                 if (names.some((n) => n.includes('/'))) problems.push('enharmonic pair drawn as one entry');
+                const forbidden = ['C♭', 'G♭', 'D♭'];
+                if (names.some((n) => forbidden.includes(n)))
+                  problems.push(`rare enharmonic spelling drawn: ${names.join(',')}`);
                 if (d.getElementById('beginBtn').disabled) problems.push('begin still disabled after the spin');
                 if (d.querySelectorAll('#reels .reel.is-landed').length !== 3)
                   problems.push('reels did not land');

@@ -87,8 +87,8 @@ everything that follows.
 ## Mock audition
 
 A judge asks for three of the fifteen scales. **Draw three scales** spins three
-reels — one spelling of each enharmonic pair, no repeats — and then you play them
-one after another, exactly as in the audition:
+reels — three distinct keys, no repeats — and then you play them one after another,
+exactly as in the audition:
 
 * the microphone opens once and stays open, so there is no re-prompting between scales;
 * the live tuner is hidden (a judge gives nothing away);
@@ -101,7 +101,27 @@ single most useful tip from each scale, and an encouraging line drawn at random
 from a small pool. Tap any scale row to open its full breakdown — score ring,
 coloured staff, all the tips.
 
-The draw is majors only, because that is what Levels 5–6 require.
+The draw is majors only, because that is what Levels 5–6 require, and it always
+uses the familiar spelling: **B**, **F♯**, **C♯** — never C♭, G♭ or D♭.
+
+### Why not C♭?
+
+Because the Manual never actually names its fifteen scales. It says "fifteen major
+scales" and leaves the list to interpretation; the usual reading is C plus the seven
+sharp keys and the seven flat keys, which counts B/C♭, F♯/G♭ and C♯/D♭ as separate
+scales even though they are the same notes and the same fingerings.
+
+A 2026 review of the violin section of the Manual ([CUNY Academic Works](https://academicworks.cuny.edu/cgi/viewcontent.cgi?article=1000&context=yc_pubs))
+points this out directly — *"the Manual requires Levels V-VI students prepare fifteen
+major scales although it does not indicate which fifteen"* — and argues for twelve,
+noting that we do not even have statistics on *how often a key like C♭ has ever been
+picked by an adjudicator*. Flesch and Galamian both use twelve. On the ground, the
+enharmonic pairs get taught as one scale: a Long Island studio's NYSSMA video series
+teaches D♭ for Level 5–6 and says outright that it *"is the same exact note as C
+sharp"*.
+
+So C♭ is here for completeness, but it is off by default. If you want to drill it,
+open the B / C♭ card on the practice screen and switch the spelling.
 
 ## The scales
 

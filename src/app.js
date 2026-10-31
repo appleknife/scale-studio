@@ -209,14 +209,16 @@ function shuffle(list) {
   return list;
 }
 
-/** Three distinct keys — one spelling of each enharmonic pair, as a judge would ask. */
+/**
+ * Three distinct keys — one spelling of each enharmonic pair, and always the
+ * familiar one (B, F♯, C♯). The NYSSMA Manual never names its fifteen scales,
+ * and in practice nobody is asked for C♭ when B major is the same notes; the
+ * practice screen still offers the other spelling for anyone who wants it.
+ */
 function drawScales() {
   return shuffle(MAJOR_KEYS.slice())
     .slice(0, TEST_COUNT)
-    .map((card) => {
-      const variant = card.variants.length > 1 ? Math.floor(Math.random() * card.variants.length) : 0;
-      return buildScale(card, variant, 'major', 'melodic');
-    });
+    .map((card) => buildScale(card, 0, 'major', 'melodic'));
 }
 
 function keyGlyphs(scale) {
