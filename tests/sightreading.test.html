@@ -63,7 +63,7 @@
 
           p.bars.forEach((events, i) => {
             const total = events.reduce((a, e) => a + e.dur, 0);
-            if (total !== p.perBar) problems.push(`${id}: bar ${i + 1} adds to ${total}, not ${p.perBar}`);
+            if (Math.abs(total - p.perBar) > 0.01) problems.push(`${id}: bar ${i + 1} adds to ${total}, not ${p.perBar}`);
             if (!events.length) problems.push(`${id}: bar ${i + 1} is empty`);
           });
 

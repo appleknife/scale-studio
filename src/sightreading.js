@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610310146';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610310200';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -124,9 +124,15 @@ const LEVELS = {
     steps: [1, 2, 3, 4, 5],
     maxSemis: 9,
     rhythms: {
-      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2]],
-      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8]],
-      '4/4': [[4, 4, 4, 4], [4, 2, 2, 4, 4], [8, 4, 4], [4, 4, 2, 2, 4]],
+      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2], [4 / 3, 4 / 3, 4 / 3, 4]],
+      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8], [4 / 3, 4 / 3, 4 / 3, 4, 4]],
+      '4/4': [
+        [4, 4, 4, 4],
+        [4, 2, 2, 4, 4],
+        [8, 4, 4],
+        [4, 4, 2, 2, 4],
+        [4 / 3, 4 / 3, 4 / 3, 4, 4, 4],
+      ],
       '2/2': [[4, 4, 4, 4], [8, 4, 4], [6, 2, 4, 4], [4, 4, 6, 2], [8, 6, 2]],
       '6/8': [[2, 2, 2, 6], [6, 2, 2, 2], [2, 2, 2, 2, 2, 2], [4, 2, 6], [6, 6]],
     },
@@ -165,6 +171,8 @@ const LEVELS = {
         [1, 1, 1, 1, 4, 4, 4],
         [2, 1, 1, 4, 4, 4],
         [4, 2, 1, 1, 4, 4],
+        [4 / 3, 4 / 3, 4 / 3, 4, 4, 4],
+        [4 / 3, 4 / 3, 4 / 3, 4 / 3, 4 / 3, 4 / 3, 4, 4],
       ],
       '2/2': [
         [4, 4, 4, 4],
@@ -173,6 +181,7 @@ const LEVELS = {
         [8, 6, 2],
         [4, 4, 4, 1, 1, 2],
         [8, 4, 1, 1, 2],
+        [4 / 3, 4 / 3, 4 / 3, 4, 8],
       ],
       '6/8': [
         [2, 2, 2, 6],
@@ -329,7 +338,9 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       start += dur;
     });
     // guard against a typo in the table: a bar that does not add up is a bug
-    if (start !== perBar) events.push({ start, dur: perBar - start, rest: false, midi: null });
+    if (Math.abs(start - perBar) > 0.01) {
+      events.push({ start, dur: perBar - start, rest: false, midi: null });
+    }
     bars.push(events);
   }
 

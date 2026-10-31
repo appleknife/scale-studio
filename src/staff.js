@@ -3,7 +3,7 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202610310146';
+import { CLEF_PATH } from './clef.js?v=202610310200';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -52,12 +52,52 @@ export const STAFF_GEOM = {
   FLAT_POSITIONS,
 };
 
-function glyph(alter) {
-  if (alter === 1) return '\u266F';
-  if (alter === -1) return '\u266D';
-  if (alter === 2) return '\u266F\u266F';
-  if (alter === -2) return '\u266D\u266D';
-  return '\u266E'; // natural
+/**
+ * Sharps, flats and naturals drawn as paths, sized in staff spaces: a flat's
+ * bowl is exactly one space and the glyph stands about three. Text glyphs sit on
+ * a font baseline nobody controls, so they came out small and off-centre — and
+ * the two staves in the app then looked like they came from different books.
+ * `y` is the centre of the note's line or space.
+ */
+export function accidentalAt(alter, x, y, colour = INK, size = 1) {
+  const s = LINE_GAP * size;
+  const stem = 0.17 * s;
+
+  const flatAt = (cx) =>
+    `<path d="M${cx} ${y - 1.95 * s} L${cx} ${y + 0.5 * s}" stroke="${colour}" stroke-width="${0.2 * s}"/>` +
+    `<path d="M${cx} ${y - 0.5 * s} A ${0.66 * s} ${0.5 * s} 0 0 1 ${cx} ${y + 0.5 * s}" ` +
+    `fill="none" stroke="${colour}" stroke-width="${0.44 * s}" stroke-linecap="round"/>`;
+
+  // A sharp is about one staff space wide and 2.8 tall. Drawn wider than that
+  // (as it first was) a six-sharp key signature merges into one dark block, so
+  // the horizontals stop at just over half a space either side of the middle.
+  const sharpAt = (cx) =>
+    `<g stroke="${colour}" stroke-linecap="butt">` +
+    `<line x1="${cx - 0.27 * s}" y1="${y - 1.45 * s}" x2="${cx - 0.27 * s}" y2="${y + 1.45 * s}" stroke-width="${stem}"/>` +
+    `<line x1="${cx + 0.27 * s}" y1="${y - 1.6 * s}" x2="${cx + 0.27 * s}" y2="${y + 1.3 * s}" stroke-width="${stem}"/>` +
+    `<line x1="${cx - 0.42 * s}" y1="${y - 0.32 * s}" x2="${cx + 0.42 * s}" y2="${y - 0.46 * s}" stroke-width="${0.32 * s}"/>` +
+    `<line x1="${cx - 0.42 * s}" y1="${y + 0.46 * s}" x2="${cx + 0.42 * s}" y2="${y + 0.32 * s}" stroke-width="${0.32 * s}"/>` +
+    `</g>`;
+
+  const naturalAt = (cx) => {
+    const l = cx - 0.36 * s;
+    const r = cx + 0.36 * s;
+    const bar = 0.36 * s;
+    return (
+      `<g stroke="${colour}" stroke-linecap="butt">` +
+      `<line x1="${l}" y1="${y - 1.5 * s}" x2="${l}" y2="${y + 0.5 * s}" stroke-width="${stem}"/>` +
+      `<line x1="${r}" y1="${y - 0.5 * s}" x2="${r}" y2="${y + 1.5 * s}" stroke-width="${stem}"/>` +
+      `<line x1="${l}" y1="${y - 0.5 * s}" x2="${r}" y2="${y - 0.5 * s}" stroke-width="${bar}"/>` +
+      `<line x1="${l}" y1="${y + 0.5 * s}" x2="${r}" y2="${y + 0.5 * s}" stroke-width="${bar}"/>` +
+      `</g>`
+    );
+  };
+
+  if (alter === -1) return flatAt(x);
+  if (alter === 1) return sharpAt(x);
+  if (alter === -2) return flatAt(x - 0.75 * s) + flatAt(x + 0.75 * s);
+  if (alter === 2) return sharpAt(x - 0.75 * s) + sharpAt(x + 0.75 * s);
+  return naturalAt(x);
 }
 
 export function renderStaff(
@@ -76,9 +116,29 @@ export function renderStaff(
   const sigCount = Math.min(Math.abs(fifths), 7);
   const sigWidth = sigCount * 13;
   const sigX = clefX + clefWidth + 10;
-  const notesX = sigX + sigWidth + (sigCount ? 26 : 18);
+  const notesX = sigX + sigWidth + (sigCount ? 30 : 18);
 
-  const width = Math.max(520, notesX + (notes.length - 1) * noteSpacing + 34);
+  // An accidental needs horizontal room, as it does in engraved music. A note
+  // that carries one is pushed a little to the right, so the glyph sits against
+  // the head it belongs to instead of drifting toward the note before it — and
+  // two accidentals in a row (G#, then the G natural on the way down) stop
+  // colliding.
+  const accOffset = (alter) =>
+    (alter === 0 ? 1.25 : Math.abs(alter) >= 2 ? 2.3 : alter > 0 ? 1.4 : 1.6) * LINE_GAP;
+  const accPad = (alter) => Math.max(0, accOffset(alter) - LINE_GAP);
+  const xs = [];
+  let cursor = notesX;
+  for (const note of notes) {
+    xs.push(cursor);
+    cursor += noteSpacing + (note.courtesy ? accPad(note.alter) : 0);
+  }
+  if (notes.length) {
+    // (`notes.at(-1)` would be tidier but needs iOS 15.4; students' iPads are older)
+    const last = notes[notes.length - 1];
+    cursor -= noteSpacing + (last.courtesy ? accPad(last.alter) : 0);
+  }
+
+  const width = Math.max(520, cursor + 34);
   const height = 196;
 
   const part = [];
@@ -100,22 +160,21 @@ export function renderStaff(
       `<path d="${CLEF_PATH}" fill="${INK}" stroke="${INK}" stroke-width="4"/></g>`,
   );
 
-  // Key signature
+  // Key signature — grouped so it can be found (and checked) as one thing.
   if (sigCount) {
     const positions = fifths > 0 ? SHARP_POSITIONS : FLAT_POSITIONS;
-    const symbol = fifths > 0 ? '\u266F' : '\u266D';
+    const glyphs = [];
     for (let i = 0; i < sigCount; i++) {
       const [letter, octave] = positions[i];
       const y = yFor({ letter, octave });
-      part.push(
-        `<text class="staff-acc" x="${sigX + i * 13}" y="${y + 5.5}" font-size="16">${symbol}</text>`,
-      );
+      glyphs.push(accidentalAt(fifths > 0 ? 1 : -1, sigX + i * 14, y));
     }
+    part.push(`<g class="staff-key-sig">${glyphs.join('')}</g>`);
   }
 
   // Notes
   notes.forEach((note, i) => {
-    const x = notesX + i * noteSpacing;
+    const x = xs[i];
     const y = yFor(note);
     const idx = note.octave * 7 + note.letter;
     const color = (colors && colors[i]) || INK;
@@ -131,10 +190,12 @@ export function renderStaff(
       );
     }
 
-    // Courtesy accidental (anything the key signature does not already cover)
+    // Courtesy accidental (anything the key signature does not already cover).
+    // Tucked against its own head, and small enough to read as a reminder
+    // rather than as loud as the key signature.
     if (note.courtesy) {
       part.push(
-        `<text class="staff-acc" x="${x - 20}" y="${y + 5.5}" font-size="16" fill="${color}">${glyph(note.alter)}</text>`,
+        accidentalAt(note.alter, x - accOffset(note.alter), y, color, 0.92),
       );
     }
 

@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM } from './staff.js?v=202610310146';
-import { CLEF_PATH } from './clef.js?v=202610310146';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610310200';
+import { CLEF_PATH } from './clef.js?v=202610310200';
 
-import { beatLength } from './sightreading.js?v=202610310146';
+import { beatLength } from './sightreading.js?v=202610310200';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -52,49 +52,6 @@ function ledgerLines(letter, octave, x, bottom) {
  * baseline nobody controls, which is why they came out small and off-centre.
  * `y` is the centre of the note's line or space.
  */
-function accidental(alter, x, y, colour = INK) {
-  const s = LINE_GAP;
-  const stem = 0.17 * s;
-
-  // The bowl is a thick arc rather than a filled outline: it keeps its weight at
-  // small sizes, and its height is exactly one staff space as the eye expects.
-  const flatAt = (cx) =>
-    `<path d="M${cx} ${y - 1.95 * s} L${cx} ${y + 0.5 * s}" ` +
-    `stroke="${colour}" stroke-width="${0.2 * s}"/>` +
-    `<path d="M${cx} ${y - 0.5 * s} A ${0.66 * s} ${0.5 * s} 0 0 1 ${cx} ${y + 0.5 * s}" ` +
-    `fill="none" stroke="${colour}" stroke-width="${0.44 * s}" stroke-linecap="round"/>`;
-
-  const sharpAt = (cx) =>
-    `<g stroke="${colour}" stroke-linecap="butt">` +
-    `<line x1="${cx - 0.34 * s}" y1="${y - 1.45 * s}" x2="${cx - 0.34 * s}" y2="${y + 1.45 * s}" stroke-width="${stem}"/>` +
-    `<line x1="${cx + 0.34 * s}" y1="${y - 1.6 * s}" x2="${cx + 0.34 * s}" y2="${y + 1.3 * s}" stroke-width="${stem}"/>` +
-    `<line x1="${cx - 0.75 * s}" y1="${y - 0.3 * s}" x2="${cx + 0.75 * s}" y2="${y - 0.46 * s}" stroke-width="${0.34 * s}"/>` +
-    `<line x1="${cx - 0.75 * s}" y1="${y + 0.46 * s}" x2="${cx + 0.75 * s}" y2="${y + 0.3 * s}" stroke-width="${0.34 * s}"/>` +
-    `</g>`;
-
-  // The natural's two uprights and two crossbars meet exactly, square and
-  // horizontal — slanted crossbars left visible notches at the corners.
-  const naturalAt = (cx) => {
-    const l = cx - 0.36 * s;
-    const r = cx + 0.36 * s;
-    const bar = 0.36 * s;
-    return (
-      `<g stroke="${colour}" stroke-linecap="butt">` +
-      `<line x1="${l}" y1="${y - 1.5 * s}" x2="${l}" y2="${y + 0.5 * s}" stroke-width="${stem}"/>` +
-      `<line x1="${r}" y1="${y - 0.5 * s}" x2="${r}" y2="${y + 1.5 * s}" stroke-width="${stem}"/>` +
-      `<line x1="${l}" y1="${y - 0.5 * s}" x2="${r}" y2="${y - 0.5 * s}" stroke-width="${bar}"/>` +
-      `<line x1="${l}" y1="${y + 0.5 * s}" x2="${r}" y2="${y + 0.5 * s}" stroke-width="${bar}"/>` +
-      `</g>`
-    );
-  };
-
-  if (alter === -1) return flatAt(x);
-  if (alter === 1) return sharpAt(x);
-  if (alter === -2) return flatAt(x - 0.75 * s) + flatAt(x + 0.75 * s);
-  if (alter === 2) return sharpAt(x - 0.75 * s) + sharpAt(x + 0.75 * s);
-  return naturalAt(x);
-}
-
 function head(x, y, { hollow = false, colour = INK } = {}) {
   if (hollow) {
     return `<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="none" stroke="${colour}" stroke-width="1.7" transform="rotate(-18 ${x} ${y})"/>`;
@@ -114,10 +71,12 @@ function restGlyph(x, y, dur, colour) {
     return `<rect x="${x - 6}" y="${y - 2}" width="12" height="5.5" fill="${colour}"/>`;
   }
   if (dur >= 4) {
-    // quarter rest — a bolder squiggle, so it reads at a glance on a phone
+    // quarter rest — a vertical zigzag with a hook at the foot, which is what
+    // the eye is looking for; a straight zigzag reads as the digit 3.
     return (
-      `<path d="M${x - 1.2} ${y - 12} l5 5.6 -4.6 4.4 5.6 5 -3.6 9" ` +
-      `fill="none" stroke="${colour}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`
+      `<path d="M${x + 1.5} ${y - 12.5} C${x - 3} ${y - 7} ${x + 3.5} ${y - 3.5} ${x - 1} ${y + 2} ` +
+      `C${x + 3} ${y + 5.5} ${x + 1.5} ${y + 9} ${x - 3.5} ${y + 11}" ` +
+      `fill="none" stroke="${colour}" stroke-width="2.9" stroke-linecap="round"/>`
     );
   }
   // eighth rest — the familiar "7": a bulb at the top and one curved stroke
@@ -155,6 +114,11 @@ function beamGroups(events, beat) {
   }
   close();
   return groups;
+}
+
+/** Three notes in the space of two — an eighth-note triplet. */
+function isTriplet(group) {
+  return group.length === 3 && group.every((e) => Math.abs(e.dur - 4 / 3) < 0.01);
 }
 
 /** Runs of consecutive sixteenths inside one beam group. */
@@ -204,7 +168,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
     for (let i = 0; i < sigCount; i++) {
       const [letter, octave] = order[i];
       part.push(
-        accidental(passage.key.fifths > 0 ? 1 : -1, sigX + i * 16, yForNote(letter, octave, bottom)),
+        accidentalAt(passage.key.fifths > 0 ? 1 : -1, sigX + i * 16, yForNote(letter, octave, bottom)),
       );
     }
   }
@@ -216,8 +180,8 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
     const midY = top + 2 * LINE_GAP;
     // Each digit is about two spaces tall, so the pair fills the staff.
     part.push(
-      `<text class="score-time" x="${cursor}" y="${midY - 1}" font-size="29" text-anchor="middle">${num}</text>`,
-      `<text class="score-time" x="${cursor}" y="${midY + 23}" font-size="29" text-anchor="middle">${den}</text>`,
+      `<text class="score-time" x="${cursor}" y="${midY - 2}" font-size="31" text-anchor="middle">${num}</text>`,
+      `<text class="score-time" x="${cursor}" y="${midY + 24}" font-size="31" text-anchor="middle">${den}</text>`,
     );
     cursor += 30;
   }
@@ -225,7 +189,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
   // tempo mark
   if (showTempo && tempoText) {
     part.push(
-      `<text class="score-tempo" x="${cursor + 6}" y="${top - 17}" font-size="15">${tempoText}</text>`,
+      `<text class="score-tempo" x="${cursor + 6}" y="${top - 18}" font-size="17">${tempoText}</text>`,
     );
   }
 
@@ -284,17 +248,27 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
     const groups = beamGroups(events, beat);
     const beamOf = new Map();
     let deepest = bottom;
+
     for (const group of groups) {
       const ups = group.map((e) => stemUp(e.note.letter, e.note.octave));
       const up = ups.filter(Boolean).length >= ups.length / 2;
       const ys = group.map((e) => yForNote(e.note.letter, e.note.octave, bottom));
-      // Only a very deep beam is capped, and then generously: shortening stems
-      // to squeeze a beam upward is what made sixteenths look deformed.
-      const beamY = up
-        ? Math.min(...ys) - STEM
-        : Math.min(Math.max(...ys) + STEM, bottom + 40);
-      deepest = Math.max(deepest, beamY);
-      group.forEach((e) => beamOf.set(e, { beamY, up }));
+      const xs = group.map((e) => xOf(e));
+
+      // The beam follows the shape of the group (the interval between its first
+      // and last note, gently), then is slid until it clears every stem by at
+      // least three and a half spaces. A flat beam on notes far apart leaves the
+      // high note with a stub of a stem.
+      const span = Math.max(1, Math.abs(xs[xs.length - 1] - xs[0]));
+      const contour = ys[ys.length - 1] - ys[0];
+      const slope = Math.max(-0.3, Math.min(0.3, contour / span));
+
+      const ends = ys.map((y, i) => (up ? y - STEM : y + STEM) - slope * (xs[i] - xs[0]));
+      const anchor = up ? Math.min(...ends) : Math.max(...ends);
+      const at = (event) => anchor + slope * (xOf(event) - xs[0]);
+
+      deepest = Math.max(deepest, ...group.map((e) => at(e)));
+      group.forEach((e) => beamOf.set(e, { at, up }));
     }
 
     // dynamics: below everything else in the bar
@@ -306,30 +280,45 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
     const firstWithDynamic = events.find((e) => e.dynamic);
     if (firstWithDynamic) {
       part.push(
-        `<text class="score-dyn" x="${xOf(firstWithDynamic)}" y="${dynY}" font-size="16" text-anchor="middle">${firstWithDynamic.dynamic}</text>`,
+        `<text class="score-dyn" x="${xOf(firstWithDynamic)}" y="${dynY}" font-size="19" text-anchor="middle">${firstWithDynamic.dynamic}</text>`,
       );
     }
     if (passage.swell && passage.swell.bar === bar) {
       part.push(
-        `<text class="score-dyn" x="${barX + barWidth * 0.35}" y="${dynY}" font-size="13" font-style="italic">cresc.</text>`,
+        `<text class="score-dyn" x="${barX + barWidth * 0.35}" y="${dynY}" font-size="15" font-style="italic">cresc.</text>`,
       );
     }
 
     groups.forEach((group) => {
       const beam = beamOf.get(group[0]);
       const stemX = (e) => xOf(e) + (beam.up ? 5.4 : -5.4);
+      const first = group[0];
+      const last = group[group.length - 1];
       part.push(
-        `<line x1="${stemX(group[0])}" y1="${beam.beamY}" ` +
-          `x2="${stemX(group[group.length - 1])}" y2="${beam.beamY}" ` +
+        `<line x1="${stemX(first)}" y1="${beam.at(first)}" ` +
+          `x2="${stemX(last)}" y2="${beam.at(last)}" ` +
           `stroke="${INK}" stroke-width="${BEAM}" stroke-linecap="butt"/>`,
       );
       // sixteenths carry a second beam, offset toward the note heads
       const offset = beam.up ? BEAM + 3.6 : -(BEAM + 3.6);
       for (const run of sixteenthRuns(group)) {
         part.push(
-          `<line x1="${stemX(run[0])}" y1="${beam.beamY + offset}" ` +
-            `x2="${stemX(run[run.length - 1])}" y2="${beam.beamY + offset}" ` +
+          `<line x1="${stemX(run[0])}" y1="${beam.at(run[0]) + offset}" ` +
+            `x2="${stemX(run[run.length - 1])}" y2="${beam.at(run[run.length - 1]) + offset}" ` +
             `stroke="${INK}" stroke-width="${BEAM}" stroke-linecap="butt"/>`,
+        );
+      }
+
+      // a triplet gets its number, and a small bracket when it is not obvious
+      if (isTriplet(group)) {
+        const x1 = xOf(first);
+        const x2 = xOf(last);
+        const by = beam.at(first) + (beam.up ? -11 : 11);
+        part.push(
+          `<text class="score-tuplet" x="${(x1 + x2) / 2}" y="${by + (beam.up ? 0 : 10)}" ` +
+            `font-size="15" font-style="italic" text-anchor="middle">3</text>`,
+          `<path d="M${x1} ${by + (beam.up ? 5 : -5)} v${beam.up ? -5 : 5} H${x2} v${beam.up ? 5 : -5}" ` +
+            `fill="none" stroke="${INK}" stroke-width="1.1"/>`,
         );
       }
     });
@@ -344,18 +333,22 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       if (!event.note) continue;
 
       const y = yForNote(event.note.letter, event.note.octave, bottom);
-      const up = stemUp(event.note.letter, event.note.octave);
+      const beam = beamOf.get(event);
+      // Inside a beamed group the *group's* direction wins for everything — stem
+      // side, articulations and all. A note whose own direction disagreed was
+      // drawn with its stem on the wrong side of the head, which is what made
+      // those pairs look mutated.
+      const up = beam ? beam.up : stemUp(event.note.letter, event.note.octave);
       const hollow = event.dur >= 8;
 
       part.push(ledgerLines(event.note.letter, event.note.octave, x, bottom));
 
       if (event.accidental) {
-        part.push(accidental(event.note.alter, x - 2 * LINE_GAP, y));
+        part.push(accidentalAt(event.note.alter, x - 2 * LINE_GAP, y));
       }
 
-      const beam = beamOf.get(event);
       const stemX = up ? x + 5.2 : x - 5.2;
-      const stemEnd = beam ? beam.beamY : up ? y - STEM : y + STEM;
+      const stemEnd = beam ? beam.at(event) : up ? y - STEM : y + STEM;
       // a stem is drawn for everything but a whole note and a beamed eighth
       if (!(event.dur >= 16)) {
         part.push(

@@ -1986,3 +1986,10 @@ dialog .primary-btn {
     padding: 8px 10px 8px 14px;
   }
 }
+
+/* Score annotations: dynamics and the tempo mark carry as much weight as the
+   notes, or they read as a smudge at the size this staff is displayed. */
+.score-staff .score-dyn,
+.score-staff .score-tempo {
+  font-weight: 600;
+}
