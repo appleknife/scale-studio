@@ -1,0 +1,1070 @@
+// app.js — screen flow, microphone capture and rendering.
+
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js';
+import { renderStaff } from './staff.js';
+import { PitchDetector, midiToFreq } from './pitch.js';
+import { analyzeTake, gradeFor } from './analyze.js';
+
+const $ = (id) => document.getElementById(id);
+
+const el = {
+  views: {
+    choose: $('view-choose'),
+    practice: $('view-practice'),
+    result: $('view-result'),
+    'test-draw': $('view-test-draw'),
+    'test-result': $('view-test-result'),
+  },
+  grid: $('scaleGrid'),
+  gridNote: $('gridNote'),
+  modeTabs: $('modeTabs'),
+  formTabs: $('formTabs'),
+  brandHome: $('brandHome'),
+
+  scaleTitle: $('scaleTitle'),
+  scaleMeta: $('scaleMeta'),
+  staffHost: $('staffHost'),
+  spellingRow: $('spellingRow'),
+  backBtn: $('backBtn'),
+
+  listenCard: $('listenCard'),
+  listenStatus: $('listenStatus'),
+  listenText: $('listenText'),
+  listenHint: $('listenHint'),
+  live: $('live'),
+  liveNote: $('liveNote'),
+  liveCents: $('liveCents'),
+  tunerMarker: $('tunerMarker'),
+  levelBar: $('levelBar'),
+  startBtn: $('startBtn'),
+  stopBtn: $('stopBtn'),
+
+  resultBack: $('resultBack'),
+  scoreRing: $('scoreRing'),
+  ringValue: $('ringValue'),
+  scoreNumber: $('scoreNumber'),
+  resultEyebrow: $('resultEyebrow'),
+  resultGrade: $('resultGrade'),
+  resultLine: $('resultLine'),
+  resultSub: $('resultSub'),
+  breakdown: $('breakdown'),
+  resultStaff: $('resultStaff'),
+  tips: $('tips'),
+  retryBtn: $('retryBtn'),
+  anotherBtn: $('anotherBtn'),
+
+  drawBtn: $('drawBtn'),
+  reels: $('reels'),
+  beginBtn: $('beginBtn'),
+  redrawBtn: $('redrawBtn'),
+  drawBack: $('drawBack'),
+
+  testBar: $('testBar'),
+  testStep: $('testStep'),
+  testDots: $('testDots'),
+  endTestBtn: $('endTestBtn'),
+
+  testScore: $('testScore'),
+  testRingValue: $('testRingValue'),
+  testGrade: $('testGrade'),
+  testLine: $('testLine'),
+  testSub: $('testSub'),
+  testScales: $('testScales'),
+  testTips: $('testTips'),
+  againBtn: $('againBtn'),
+  newDrawBtn: $('newDrawBtn'),
+  testHomeBtn: $('testHomeBtn'),
+  testResultBack: $('testResultBack'),
+
+  helpBtn: $('helpBtn'),
+  helpDialog: $('helpDialog'),
+  closeHelp: $('closeHelp'),
+};
+
+const RING_CIRCUMFERENCE = 2 * Math.PI * 52;
+const params = new URLSearchParams(location.search);
+// Development helpers (undocumented): ?demo renders a sample result,
+// ?autostart begins listening immediately, ?dev reports the take back.
+const DEV = params.has('dev');
+
+/** Verbose progress reporting for the headless test harness only. */
+function devLog(stage, data = {}) {
+  if (!DEV) return;
+  fetch('/result', { method: 'POST', body: JSON.stringify({ stage, ...data }) }).catch(() => {});
+}
+
+const state = {
+  mode: 'major',
+  form: 'melodic',
+  cardId: 'C',
+  variantIndex: 0,
+  scale: null,
+  phase: 'idle', // idle | requesting | armed | taking | finishing | between
+  take: null,
+  mic: null,
+  // A mock audition: the three drawn scales, which one is being played, and
+  // the result of each take. Null when practising a single scale.
+  test: null,
+};
+
+const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+/* ── Screens ──────────────────────────────────────────────────────────── */
+
+function showView(name) {
+  Object.entries(el.views).forEach(([key, node]) => {
+    node.hidden = key !== name;
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cardList() {
+  return state.mode === 'major' ? MAJOR_KEYS : MINOR_KEYS;
+}
+
+function cardById(id) {
+  return cardList().find((c) => c.id === id) || cardList()[0];
+}
+
+/* ── Scale chooser ────────────────────────────────────────────────────── */
+
+function renderGrid() {
+  const cards = cardList();
+  el.grid.innerHTML = cards
+    .map((card) => {
+      const scale = buildScale(card, 0, state.mode, state.form);
+      const names = card.variants.map((v) => v.name).join(' / ');
+      const suffix = state.mode === 'minor' ? '<span class="minor-suffix"> minor</span>' : '';
+      const glyphs =
+        scale.fifths === 0
+          ? ''
+          : (scale.fifths > 0 ? '\u266F' : '\u266D').repeat(Math.abs(scale.fifths));
+      return `
+        <button class="key-card" type="button" data-id="${card.id}">
+          <span class="key-name">${names}${suffix}</span>
+          <span class="sig-glyphs" aria-hidden="true">${glyphs || '&nbsp;'}</span>
+          <span class="key-sub">${describeKey(scale.fifths)} · 2 octaves</span>
+        </button>`;
+    })
+    .join('');
+
+  el.gridNote.textContent =
+    state.mode === 'major'
+      ? 'Levels 5–6 require fifteen major scales — C plus the seven sharp keys and the seven flat keys — all two octaves, up and down, from memory.'
+      : 'Minor scales are not part of the NYSSMA scale requirement at these levels, but a lot of the level 5–6 repertoire is in a minor key — so here they are.';
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  [...el.modeTabs.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(b.dataset.mode === mode)),
+  );
+  el.formTabs.hidden = mode !== 'minor';
+  renderGrid();
+}
+
+function setForm(form) {
+  state.form = form;
+  [...el.formTabs.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(b.dataset.form === form)),
+  );
+  renderGrid();
+}
+
+/* ── Mock audition: drawing three scales ──────────────────────────────── */
+
+const TEST_COUNT = 3;
+const REEL_ROW_FALLBACK = 104;
+
+const ENCOURAGEMENT = {
+  excellent: [
+    'Three scales, cold, in a row — and they all held together. That is what prepared sounds like.',
+    'You played the set like one piece of music. Judges hear that confidence before they hear anything else.',
+    'Nothing in that set needed apologising for. Keep this tempo; it is clearly yours.',
+  ],
+  strong: [
+    'A genuinely solid set. What is left is small, and small things polish quickly.',
+    'Three scales in a row takes stamina, and you had it. One or two notes slipped — that is all.',
+    'That is already a confident audition. Pick one line from the list below and it becomes a strong one.',
+  ],
+  growing: [
+    'Good bones. The notes are all there — now let them settle instead of going to find them.',
+    'You kept going, which matters more than any single note. Here is what to tidy next.',
+    'This is the stage where it starts to feel easy. Slow, even repetitions of the list below will get you there.',
+  ],
+  keep: [
+    'Every one of these runs counts as practice. Start with the first line below — just that.',
+    'The shape of all three scales is already in your hands. Now it is steadiness, not new notes.',
+    'Nothing here is a mystery: the same two or three habits. Take them one at a time.',
+  ],
+};
+
+let lastEncouragement = '';
+
+function shuffle(list) {
+  for (let i = list.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [list[i], list[j]] = [list[j], list[i]];
+  }
+  return list;
+}
+
+/** Three distinct keys — one spelling of each enharmonic pair, as a judge would ask. */
+function drawScales() {
+  return shuffle(MAJOR_KEYS.slice())
+    .slice(0, TEST_COUNT)
+    .map((card) => {
+      const variant = card.variants.length > 1 ? Math.floor(Math.random() * card.variants.length) : 0;
+      return buildScale(card, variant, 'major', 'melodic');
+    });
+}
+
+function keyGlyphs(scale) {
+  if (!scale.fifths) return '\u266E';
+  return (scale.fifths > 0 ? '\u266F' : '\u266D').repeat(Math.abs(scale.fifths));
+}
+
+function drawThree() {
+  cancelListening();
+  history.replaceState(null, '', location.pathname + location.search);
+  state.test = { scales: drawScales(), index: 0, results: [] };
+  state.scale = state.test.scales[0];
+  el.testBar.hidden = true;
+  showView('test-draw');
+  spinReels();
+}
+
+function spinReels() {
+  const reels = [...el.reels.querySelectorAll('.reel')];
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pool = MAJOR_KEYS.flatMap((card) => card.variants.map((v) => v.name));
+
+  el.beginBtn.disabled = true;
+
+  reels.forEach((reel, i) => {
+    const track = reel.querySelector('.reel-track');
+    const sig = reel.querySelector('.reel-sig');
+    const target = state.test.scales[i];
+
+    const stops = reduce ? 0 : 9 + i * 4;
+    const names = [];
+    for (let k = 0; k < stops; k++) names.push(pool[Math.floor(Math.random() * pool.length)]);
+    names.push(target.name);
+
+    // A previous spin may still be filling forwards; clear it or it wins over inline styles.
+    track.getAnimations().forEach((animation) => animation.cancel());
+    track.innerHTML = names.map((name) => `<span>${name}</span>`).join('');
+    reel.classList.remove('is-landed');
+    sig.textContent = '';
+    track.style.transform = 'translateY(0px)';
+
+    const row = track.firstElementChild?.getBoundingClientRect().height || REEL_ROW_FALLBACK;
+    const distance = (names.length - 1) * row;
+
+    const land = () => {
+      track.style.transform = `translateY(-${distance}px)`;
+      reel.classList.add('is-landed');
+      sig.textContent = keyGlyphs(target);
+      if (i === reels.length - 1) {
+        el.beginBtn.disabled = false;
+        el.beginBtn.focus({ preventScroll: true });
+      }
+    };
+
+    if (reduce) {
+      land();
+      return;
+    }
+
+    const animation = track.animate(
+      [{ transform: 'translateY(0px)' }, { transform: `translateY(-${distance}px)` }],
+      { duration: 900 + i * 380, easing: 'cubic-bezier(.12,.7,.16,1)', fill: 'forwards' },
+    );
+    animation.onfinish = land;
+  });
+}
+
+function updateTestBar() {
+  if (!state.test) {
+    el.testBar.hidden = true;
+    return;
+  }
+  const i = state.test.index;
+  el.testBar.hidden = false;
+  el.testStep.textContent = `Scale ${i + 1} of ${state.test.scales.length}`;
+  [...el.testDots.children].forEach((dot, k) => {
+    dot.dataset.state = k < i ? 'done' : k === i ? 'current' : 'todo';
+  });
+}
+
+async function beginTest() {
+  if (!state.test) return;
+  devLog('beginTest', { scales: state.test.scales.map((s) => s.title) });
+  state.test.index = 0;
+  state.test.results = [];
+  state.scale = state.test.scales[0];
+  renderPractice();
+  updateTestBar();
+  showView('practice');
+  await startListening();
+}
+
+function nextTestScale() {
+  if (!state.test) return;
+  state.test.index += 1;
+  state.scale = state.test.scales[state.test.index];
+  renderPractice();
+  updateTestBar();
+  beginTake();
+}
+
+function endTest() {
+  cancelListening();
+  state.test = null;
+  el.testBar.hidden = true;
+  goHome();
+}
+
+function pickEncouragement(score) {
+  const band = score >= 93 ? 'excellent' : score >= 84 ? 'strong' : score >= 70 ? 'growing' : 'keep';
+  const pool = ENCOURAGEMENT[band];
+  let line = pool[Math.floor(Math.random() * pool.length)];
+  if (line === lastEncouragement && pool.length > 1) {
+    line = pool[(pool.indexOf(line) + 1) % pool.length];
+  }
+  lastEncouragement = line;
+  return line;
+}
+
+function testGradeLabel(score) {
+  if (score >= 93) return 'An audition-ready set';
+  if (score >= 84) return 'A strong set';
+  if (score >= 70) return 'A good set';
+  if (score >= 58) return 'Coming together';
+  return 'A set worth repeating';
+}
+
+function shortVerdict(result) {
+  if (result.stats.heard < 3) return 'nothing heard';
+  if (result.stats.stops) {
+    return result.stats.stops === 1 ? 'stopped once' : `stopped ${result.stats.stops} times`;
+  }
+  if (result.stats.missed) {
+    return `${result.stats.missed} note${result.stats.missed === 1 ? '' : 's'} missed`;
+  }
+  const outliers = result.notes.filter(
+    (note) => note.status === 'exact' && Math.abs(note.cents) > 30,
+  ).length;
+  if (outliers) return 'a few notes off-centre';
+  if (result.components.steadiness < 0.88) return 'the pulse wandered';
+  return result.score >= 95 ? 'clean' : 'solid';
+}
+
+function renderTestResult() {
+  const results = state.test.results;
+  const average = Math.round(results.reduce((sum, r) => sum + r.score, 0) / Math.max(1, results.length));
+
+  showView('test-result');
+  el.testBar.hidden = true;
+
+  el.testScore.textContent = String(average);
+  el.testGrade.textContent = testGradeLabel(average);
+  el.testLine.textContent = pickEncouragement(average);
+
+  const centred = results.reduce((sum, r) => sum + r.stats.exact, 0);
+  const total = results.reduce((sum, r) => sum + r.stats.expected, 0);
+  const stops = results.reduce((sum, r) => sum + r.stats.stops, 0);
+  el.testSub.textContent = `${results.length} scales · ${centred} of ${total} notes centred · ${
+    stops ? `${stops} stop${stops === 1 ? '' : 's'}` : 'no stops'
+  }`;
+
+  const colour = average >= 90 ? '#2f5d4e' : average >= 76 ? '#44796a' : average >= 60 ? '#b0843f' : '#a4534a';
+  el.testRingValue.style.stroke = colour;
+  el.testRingValue.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+  el.testRingValue.style.strokeDashoffset = String(RING_CIRCUMFERENCE);
+  requestAnimationFrame(() => {
+    el.testRingValue.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - average / 100));
+  });
+
+  el.testScales.innerHTML = results
+    .map(
+      (r, i) => `
+        <button class="test-scale" type="button" data-index="${i}">
+          <span class="ts-name">${r.scale.title}</span>
+          <span class="ts-bar"><span></span></span>
+          <span class="ts-score">${r.score}%</span>
+          <span class="ts-note">${shortVerdict(r)}</span>
+          <span class="ts-open" aria-hidden="true">›</span>
+        </button>`,
+    )
+    .join('');
+
+  requestAnimationFrame(() => {
+    [...el.testScales.querySelectorAll('.ts-bar span')].forEach((bar, i) => {
+      bar.style.width = `${results[i].score}%`;
+    });
+  });
+
+  const tips = results.filter((r) => r.tips.length).map((r) => ({ ...r.tips[0], scale: r.scale.title }));
+  el.testTips.innerHTML = tips.length
+    ? tips
+        .map(
+          (tip) => `
+          <article class="tip" data-kind="${tip.kind}">
+            <h4>${tip.scale} — ${tip.title}</h4>
+            <p>${tip.text}</p>
+          </article>`,
+        )
+        .join('')
+    : `<article class="tip" data-kind="praise">
+         <h4>Nothing to fix</h4>
+         <p>All three scales landed, centred and unbroken. That is exactly the shape of an audition you can trust.</p>
+       </article>`;
+
+  state.phase = 'idle';
+
+  if (DEV) {
+    fetch('/result', {
+      method: 'POST',
+      body: JSON.stringify({
+        stage: 'test',
+        scales: results.map((r) => r.scale.title),
+        scores: results.map((r) => r.score),
+        average,
+        verdicts: results.map(shortVerdict),
+      }),
+    }).catch(() => {});
+  }
+}
+
+/* ── Practice screen ──────────────────────────────────────────────────── */
+
+function openScale(cardId, variantIndex = 0) {
+  state.test = null;
+  el.testBar.hidden = true;
+  state.cardId = cardId;
+  state.variantIndex = variantIndex;
+  state.scale = buildScale(cardById(cardId), variantIndex, state.mode, state.form);
+  state.phase = 'idle';
+  renderPractice();
+  showView('practice');
+  history.replaceState(null, '', hashFor());
+}
+
+function goHome() {
+  cancelListening();
+  state.test = null;
+  el.testBar.hidden = true;
+  history.replaceState(null, '', location.pathname + location.search);
+  showView('choose');
+}
+
+function renderPractice() {
+  const scale = state.scale;
+  el.scaleTitle.textContent = scale.title;
+  el.scaleMeta.textContent = scale.meta;
+  el.staffHost.innerHTML = renderStaff(scale.sequence, { fifths: scale.fifths });
+  el.spellingRow.hidden = Boolean(state.test) || scale.spellings.length < 2;
+  if (scale.spellings.length > 1) {
+    el.spellingRow.innerHTML = scale.spellings
+      .map(
+        (name, i) =>
+          `<button type="button" data-variant="${i}" aria-pressed="${i === state.variantIndex}">${name}</button>`,
+      )
+      .join('');
+  }
+  resetListenUI();
+}
+
+function resetListenUI() {
+  el.listenCard.classList.remove('is-live');
+  el.listenStatus.classList.remove('is-live');
+  el.listenText.textContent = 'Ready when you are';
+  el.listenHint.textContent = 'No rush — the take begins the moment you play your first note.';
+  el.live.hidden = true;
+  el.levelBar.hidden = true;
+  el.stopBtn.hidden = true;
+  el.startBtn.hidden = false;
+  el.startBtn.disabled = false;
+  el.startBtn.textContent = 'Start listening';
+}
+
+function setStatus(live, text) {
+  el.listenStatus.classList.toggle('is-live', live);
+  el.listenText.textContent = text;
+  el.listenCard.classList.toggle('is-live', live);
+}
+
+/* ── Microphone ───────────────────────────────────────────────────────── */
+
+async function openMic(onFrame) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    const err = new Error('no-media');
+    err.name = 'InsecureContext';
+    throw err;
+  }
+
+  // Create (and unlock) the audio context *inside* the click handler. iOS Safari
+  // only lets audio start from a gesture, and awaiting getUserMedia first can
+  // consume that gesture — the context then stays suspended and stays silent.
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const unlocked = ctx.resume().catch(() => {});
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: 1,
+      },
+      video: false,
+    });
+  } catch (err) {
+    ctx.close().catch(() => {});
+    throw err;
+  }
+
+  await unlocked;
+  await ctx.resume().catch(() => {});
+
+  const source = ctx.createMediaStreamSource(stream);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0;
+  source.connect(analyser);
+
+  const buf = new Float32Array(analyser.fftSize);
+  const detector = new PitchDetector({
+    sampleRate: ctx.sampleRate,
+    bufferSize: analyser.fftSize,
+    minFreq: 150,
+    maxFreq: 1800,
+  });
+
+  const startedAt = performance.now();
+  const timer = setInterval(() => {
+    analyser.getFloatTimeDomainData(buf);
+    const { freq, clarity, rms } = detector.detect(buf);
+    onFrame({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms });
+  }, 30);
+
+  return {
+    stream,
+    ctx,
+    close() {
+      clearInterval(timer);
+      stream.getTracks().forEach((t) => t.stop());
+      ctx.close().catch(() => {});
+    },
+  };
+}
+
+function micErrorMessage(err) {
+  switch (err?.name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'Microphone access was blocked. Allow it for this page (the icon at the left of the address bar) and press start again.';
+    case 'NotFoundError':
+      return 'No microphone was found. Check that one is plugged in and selected in your sound settings.';
+    case 'NotReadableError':
+      return 'Another app is using the microphone. Close it and try again.';
+    case 'InsecureContext':
+      return 'This browser will not share the microphone on a local file. Start the app with “Start Scale Studio” (or serve it over localhost) and it will work.';
+    default:
+      return `The microphone could not start${err?.message ? `: ${err.message}` : '.'}`;
+  }
+}
+
+/* ── Listening ────────────────────────────────────────────────────────── */
+
+async function startListening() {
+  if (['requesting', 'taking', 'armed'].includes(state.phase)) return;
+
+  state.phase = 'requesting';
+  el.startBtn.disabled = true;
+  el.startBtn.hidden = false;
+  el.startBtn.textContent = 'Starting…';
+  setStatus(false, 'Waiting for the microphone');
+
+  // The microphone is opened once and kept for a whole mock audition, so the
+  // audio context stays unlocked between takes (important on iOS).
+  if (!state.mic) {
+    try {
+      state.mic = await openMic(onFrame);
+    } catch (err) {
+      state.phase = 'idle';
+      el.startBtn.disabled = false;
+      el.startBtn.textContent = 'Start listening';
+      setStatus(false, 'Microphone unavailable');
+      el.listenHint.textContent = micErrorMessage(err);
+      return;
+    }
+  }
+
+  beginTake();
+}
+
+/** Arm the app for one take. The take starts on the student's first note. */
+function beginTake() {
+  state.phase = 'armed';
+  devLog('beginTake', { index: state.test ? state.test.index : -1 });
+  state.take = {
+    frames: [],
+    started: false,
+    t0: 0,
+    lastVoiced: 0,
+    strong: 0,
+    noteCount: 0,
+    lastMidi: null,
+    done: false,
+    peak: 0,
+  };
+
+  setStatus(true, 'Listening — play whenever you are ready');
+  el.listenHint.textContent = state.test
+    ? 'Feedback comes at the end — play it the way you would for the judge.'
+    : 'The take starts with your first note and ends after you stop.';
+
+  el.startBtn.hidden = true;
+  el.startBtn.disabled = false;
+  el.startBtn.textContent = 'Start listening';
+  el.stopBtn.hidden = false;
+  // No tuner during a mock audition: a judge gives nothing away either.
+  el.live.hidden = Boolean(state.test);
+  el.levelBar.hidden = false;
+  el.liveNote.textContent = '—';
+  el.liveCents.textContent = '';
+  el.tunerMarker.style.left = '50%';
+
+  // If nothing at all reaches the microphone, say so rather than looking
+  // broken — usually the wrong input is selected for the site.
+  setTimeout(() => {
+    const take = state.take;
+    if (state.phase === 'armed' && take && !take.started && (take.peak || 0) < 0.002) {
+      el.listenHint.textContent =
+        'No sound is reaching the app yet — check which microphone this site is allowed to use, and that it is not muted.';
+    }
+  }, 4500);
+
+  // In an audition the app waits as long as it takes — but after a long silence
+  // it is worth reminding the student that they can finish early.
+  if (state.test) {
+    setTimeout(() => {
+      const take = state.take;
+      if (state.phase === 'armed' && take && !take.started) {
+        el.listenHint.textContent =
+          'Take your time. When you are done for now, press “End audition” above.';
+      }
+    }, 45000);
+  }
+}
+
+let levelSmooth = 0;
+
+function onFrame(frame) {
+  const take = state.take;
+  if (!take || take.done) return;
+
+  // A gentle mic-level indicator so it is obvious the app is hearing something.
+  take.peak = Math.max(take.peak || 0, frame.rms);
+  levelSmooth = levelSmooth * 0.75 + frame.rms * 0.25;
+  const level = Math.min(100, Math.sqrt(levelSmooth) * 340);
+  el.levelBar.firstElementChild.style.width = `${level}%`;
+
+  if (!take.started) {
+    const strong = frame.rms > 0.007 && frame.clarity > 0.7;
+    take.strong = strong ? take.strong + 1 : 0;
+    if (take.strong >= 3) {
+      take.started = true;
+      devLog('take-started', { index: state.test ? state.test.index : -1, rms: Number(frame.rms.toFixed(4)) });
+      take.t0 = Math.max(0, frame.t - 0.1);
+      setStatus(true, 'Listening to your scale');
+      el.listenHint.textContent = 'All the way up, then back down.';
+    }
+    return;
+  }
+
+  const t = Math.max(0, frame.t - take.t0);
+  take.frames.push({ t, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
+
+  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > 0.004;
+  if (voiced) {
+    take.lastVoiced = t;
+    const midiFloat = 69 + 12 * Math.log2(frame.freq / 440);
+    if (take.lastMidi == null || Math.abs(midiFloat - take.lastMidi) > 0.7) {
+      take.noteCount += 1;
+      take.lastMidi = midiFloat;
+    }
+    updateTuner(midiFloat);
+  }
+
+  const silence = t - take.lastVoiced;
+  const lastExpected = state.scale.sequence[state.scale.sequence.length - 1].midi;
+  const nearEnd =
+    take.noteCount >= state.scale.sequence.length - 2 &&
+    take.lastMidi != null &&
+    Math.round(take.lastMidi) === lastExpected;
+
+  if (silence > (nearEnd ? 1.3 : 3.0) || t > 100) finishTake();
+}
+
+function updateTuner(midiFloat) {
+  const midi = Math.round(midiFloat);
+  const cents = (midiFloat - midi) * 100;
+  const name = NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+
+  el.liveNote.textContent = name;
+  el.liveCents.textContent = `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢`;
+
+  const abs = Math.abs(cents);
+  const colour = abs <= 15 ? '#2f5d4e' : abs <= 35 ? '#b0843f' : '#a4534a';
+  el.liveNote.style.color = colour;
+  el.tunerMarker.style.left = `${50 + Math.max(-1, Math.min(1, cents / 50)) * 47}%`;
+  el.tunerMarker.style.background = colour;
+  el.tunerMarker.style.boxShadow = `0 0 0 3px ${colour}22`;
+}
+
+function finishTake() {
+  const take = state.take;
+  if (!take || take.done) return;
+  take.done = true;
+  state.phase = 'finishing';
+
+  el.stopBtn.hidden = true;
+  el.live.hidden = true;
+  el.levelBar.hidden = true;
+
+  const result = analyzeTake(take.frames, state.scale);
+
+  // In a mock audition the microphone stays open, the score stays hidden, and
+  // the next scale arrives after a short pause.
+  if (state.test) {
+    state.test.results.push(result);
+
+    if (DEV) {
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({
+          stage: 'test-take',
+          index: state.test.index,
+          scale: state.scale.title,
+          score: result.score,
+        }),
+      }).catch(() => {});
+    }
+
+    if (state.test.index < state.test.scales.length - 1) {
+      state.phase = 'between';
+      state.take = null;
+      setStatus(false, `Scale ${state.test.index + 1} done`);
+      el.listenHint.textContent = 'Next scale in a moment — breathe, then play when you are ready.';
+      setTimeout(nextTestScale, 1700);
+      return;
+    }
+
+    closeMic();
+    state.phase = 'idle';
+    renderTestResult();
+    return;
+  }
+
+  closeMic();
+  el.startBtn.hidden = false;
+  setStatus(false, 'Take finished');
+  renderResult(result);
+
+  if (DEV) {
+    // Lets the headless test harness read what the app actually computed.
+    fetch('/result', {
+      method: 'POST',
+      body: JSON.stringify({
+        stage: 'take',
+        scale: state.scale.title,
+        score: result.score,
+        components: result.components,
+        stats: result.stats,
+        tips: result.tips.map((t) => t.title),
+      }),
+    }).catch(() => {});
+  }
+}
+
+/* ── Results ──────────────────────────────────────────────────────────── */
+
+function closeMic() {
+  if (state.mic) {
+    state.mic.close();
+    state.mic = null;
+  }
+}
+
+function noteColour(entry) {
+  if (entry.status !== 'exact') return '#c2b7a6';
+  const c = Math.abs(entry.cents);
+  if (c <= 15) return '#3f6d59';
+  if (c <= 30) return '#b58a44';
+  return '#a4534a';
+}
+
+function renderResult(result) {
+  const scale = result.scale;
+  showView('result');
+
+  el.resultEyebrow.textContent = `${scale.title} · 2 octaves`;
+
+  if (result.stats.heard < 3) {
+    el.resultGrade.textContent = 'Nothing to score yet';
+    el.resultLine.textContent =
+      "The microphone didn't pick up a clear note. Move a little closer, keep the bow moving, and try again.";
+    el.resultSub.textContent = '';
+    el.scoreNumber.textContent = '–';
+    el.ringValue.style.strokeDashoffset = RING_CIRCUMFERENCE;
+    el.breakdown.innerHTML = '';
+    el.tips.innerHTML = '';
+    el.resultStaff.innerHTML = '';
+    return;
+  }
+
+  const grade = gradeFor(result.score);
+  el.resultGrade.textContent = grade.label;
+  el.resultLine.textContent = grade.note;
+  el.scoreNumber.textContent = String(result.score);
+
+  const s = result.stats;
+  const bits = [`${s.exact} of ${s.expected} notes centred`, `${s.heard} notes heard`];
+  if (s.bpm) bits.push(`♩ ≈ ${s.bpm}`);
+  bits.push(`${s.duration.toFixed(0)}s`);
+  el.resultSub.textContent = bits.join(' · ');
+
+  const ringColour =
+    result.score >= 90 ? '#2f5d4e' : result.score >= 75 ? '#44796a' : result.score >= 60 ? '#b0843f' : '#a4534a';
+  el.ringValue.style.stroke = ringColour;
+  el.ringValue.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+  el.ringValue.style.strokeDashoffset = String(RING_CIRCUMFERENCE);
+  requestAnimationFrame(() => {
+    el.ringValue.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - result.score / 100));
+  });
+
+  const metrics = [
+    ['Notes', result.components.accuracy],
+    ['Intonation', result.components.intonation],
+    ['Steadiness', result.components.steadiness],
+    ['Flow', result.components.continuity],
+  ];
+  el.breakdown.innerHTML = metrics
+    .map(
+      ([label, value]) => `
+        <div class="metric">
+          <div class="metric-label"><span>${label}</span><span class="metric-value">${Math.round(value * 100)}%</span></div>
+          <div class="metric-bar"><span style="width:0%"></span></div>
+        </div>`,
+    )
+    .join('');
+  requestAnimationFrame(() => {
+    [...el.breakdown.querySelectorAll('.metric-bar span')].forEach((bar, i) => {
+      bar.style.width = `${Math.round(metrics[i][1] * 100)}%`;
+    });
+  });
+
+  el.resultStaff.innerHTML = renderStaff(
+    scale.sequence,
+    { fifths: scale.fifths, colors: result.notes.map(noteColour) },
+  );
+
+  if (result.tips.length) {
+    el.tips.innerHTML = result.tips
+      .map(
+        (tip) => `
+        <article class="tip" data-kind="${tip.kind}">
+          <h4>${tip.title}</h4>
+          <p>${tip.text}</p>
+        </article>`,
+      )
+      .join('');
+  } else {
+    el.tips.innerHTML = `
+      <article class="tip" data-kind="praise">
+        <h4>Nothing to fix</h4>
+        <p>Every note landed and stayed centred. Try it once more at a slightly quicker tempo, or take it up a third of the bow.</p>
+      </article>`;
+  }
+}
+
+/* ── Wiring ───────────────────────────────────────────────────────────── */
+
+el.grid.addEventListener('click', (event) => {
+  const card = event.target.closest('.key-card');
+  if (card) openScale(card.dataset.id);
+});
+
+el.modeTabs.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-mode]');
+  if (btn) setMode(btn.dataset.mode);
+});
+
+el.formTabs.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-form]');
+  if (btn) setForm(btn.dataset.form);
+});
+
+el.spellingRow.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-variant]');
+  if (!btn) return;
+  state.variantIndex = Number(btn.dataset.variant);
+  state.scale = buildScale(cardById(state.cardId), state.variantIndex, state.mode, state.form);
+  renderPractice();
+});
+
+el.backBtn.addEventListener('click', goHome);
+el.brandHome.addEventListener('click', goHome);
+el.resultBack.addEventListener('click', goHome);
+el.anotherBtn.addEventListener('click', goHome);
+
+el.drawBtn.addEventListener('click', drawThree);
+el.redrawBtn.addEventListener('click', drawThree);
+el.drawBack.addEventListener('click', goHome);
+el.beginBtn.addEventListener('click', beginTest);
+el.endTestBtn.addEventListener('click', endTest);
+el.againBtn.addEventListener('click', beginTest);
+el.newDrawBtn.addEventListener('click', drawThree);
+el.testHomeBtn.addEventListener('click', goHome);
+el.testResultBack.addEventListener('click', goHome);
+
+el.startBtn.addEventListener('click', startListening);
+el.stopBtn.addEventListener('click', finishTake);
+
+el.retryBtn.addEventListener('click', () => {
+  // Retrying a single scale is practice, even if it came from a mock audition.
+  state.test = null;
+  el.testBar.hidden = true;
+  resetListenUI();
+  showView('practice');
+  startListening();
+});
+
+el.testScales.addEventListener('click', (event) => {
+  const row = event.target.closest('.test-scale');
+  if (!row || !state.test) return;
+  const result = state.test.results[Number(row.dataset.index)];
+  if (result) renderResult(result);
+});
+
+el.helpBtn.addEventListener('click', () => {
+  // <dialog> needs Safari 15.4; fall back to showing it inline on older iOS.
+  if (typeof el.helpDialog.showModal === 'function') el.helpDialog.showModal();
+  else el.helpDialog.setAttribute('open', '');
+});
+
+el.closeHelp.addEventListener('click', () => {
+  if (typeof el.helpDialog.close === 'function') el.helpDialog.close();
+  else el.helpDialog.removeAttribute('open');
+});
+
+function cancelListening() {
+  if (state.mic) {
+    state.mic.close();
+    state.mic = null;
+  }
+  state.phase = 'idle';
+  state.take = null;
+}
+
+window.addEventListener('pagehide', cancelListening);
+
+/* ── Deep links & dev helpers ──────────────────────────────────────── */
+
+function hashFor() {
+  return `#${state.mode}/${state.cardId}`;
+}
+
+function applyHash() {
+  const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+  if (!raw) return false;
+  const [mode, cardId] = raw.split('/');
+  if ((mode === 'major' || mode === 'minor') && cardId) {
+    setMode(mode);
+    openScale(cardId);
+    return true;
+  }
+  return false;
+}
+
+/** Synthetic pitch frames, so the result screen can be reviewed silently. */
+function demoFrames(scale, offset = 0) {
+  const frames = [];
+  const step = 0.03;
+  const detune = { 8: 34 + offset, 9: -31 + offset, 20: 42 + offset };
+  let t = 0.6;
+  scale.sequence.forEach((note, i) => {
+    const cents = detune[i] || 0;
+    const freq = midiToFreq(note.midi + cents / 100);
+    const duration = 0.55 + (i === 14 ? 1.2 : 0);
+    for (let x = 0; x < duration; x += step) {
+      frames.push({ t: t + x, freq, clarity: 0.95, rms: 0.06 });
+    }
+    t += duration + 0.02;
+  });
+  return frames;
+}
+
+/* ── Boot ─────────────────────────────────────────────────────────────── */
+
+state.scale = buildScale(cardById(state.cardId), 0, state.mode, state.form);
+renderGrid();
+
+if (!applyHash()) showView('choose');
+
+if (params.has('demo') && params.get('demo') !== 'test') {
+  renderResult(analyzeTake(demoFrames(state.scale), state.scale));
+}
+if (params.get('demo') === 'test') {
+  const cards = ['C', 'F#', 'Ab'].map((id) => MAJOR_KEYS.find((c) => c.id === id));
+  const scales = cards.map((card) => buildScale(card, 0, 'major', 'melodic'));
+  state.test = {
+    scales,
+    index: 2,
+    results: scales.map((scale, i) => analyzeTake(demoFrames(scale, [0, 16, -9][i]), scale)),
+  };
+  renderTestResult();
+}
+if (params.has('autostart')) {
+  startListening();
+}
+window.__scaleStudioReady = true;
+
+if (params.has('help')) el.helpDialog.showModal();
+if (params.has('draw')) drawThree();
+if (params.has('testauto')) {
+  drawThree();
+  setTimeout(beginTest, 2200);
+}
+if (params.has('testbar')) {
+  // Visual check of the in-audition screen, without a microphone.
+  const scales = ['C', 'F#', 'Ab'].map((id) =>
+    buildScale(MAJOR_KEYS.find((c) => c.id === id), 0, 'major', 'melodic'),
+  );
+  state.test = { scales, index: 1, results: [] };
+  state.scale = scales[1];
+  renderPractice();
+  updateTestBar();
+  showView('practice');
+  setStatus(true, 'Listening — play whenever you are ready');
+  el.listenHint.textContent = 'Feedback comes at the end — play it the way you would for the judge.';
+  el.startBtn.hidden = true;
+  el.stopBtn.hidden = false;
+  el.levelBar.hidden = false;
+  el.levelBar.firstElementChild.style.width = '46%';
+}
+if (params.has('live')) {
+  // Paints the listening state without a microphone (visual checks only).
+  el.startBtn.hidden = true;
+  el.stopBtn.hidden = false;
+  el.live.hidden = false;
+  el.levelBar.hidden = false;
+  setStatus(true, 'Listening to your scale');
+  el.listenHint.textContent = 'All the way up, then back down.';
+  el.levelBar.firstElementChild.style.width = '58%';
+  updateTuner(79.28);
+}

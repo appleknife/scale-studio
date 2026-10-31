@@ -1,0 +1,224 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>DSP + scoring test</title>
+  </head>
+  <body>
+    <pre id="out">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      import { MAJOR_KEYS, MINOR_KEYS, buildScale } from '../src/music.js';
+      import { PitchDetector } from '../src/pitch.js';
+      import { analyzeTake } from '../src/analyze.js';
+
+      const SR = 44100;
+      const WINDOW = 2048;
+      const HOP = 0.03;
+
+      const problems = [];
+      const log = [];
+      fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'started' }) });
+
+      /* ── 1. Scale data sanity ───────────────────────────────────────── */
+
+      function checkScale(card, mode, form, variantIndex = 0) {
+        const scale = buildScale(card, variantIndex, mode, form);
+        const seq = scale.sequence;
+        const id = `${scale.title} (${mode}${mode === 'minor' ? '/' + form : ''})`;
+        if (seq.length !== 29) problems.push(`${id}: ${seq.length} notes`);
+        if (seq[0].midi !== seq[28].midi) problems.push(`${id}: does not end on the tonic`);
+        if (seq[14].midi !== seq[0].midi + 24) problems.push(`${id}: top is not two octaves up`);
+        for (let i = 1; i <= 14; i++) {
+          if (seq[i].midi <= seq[i - 1].midi) problems.push(`${id}: not ascending at ${i}`);
+        }
+        for (let i = 15; i < 29; i++) {
+          if (seq[i].midi >= seq[i - 1].midi) problems.push(`${id}: not descending at ${i}`);
+        }
+        for (const n of seq) {
+          if (n.midi < 55 || n.midi > 100) problems.push(`${id}: ${n.name} outside violin range`);
+        }
+        return scale;
+      }
+
+      const allScales = [];
+      for (const card of MAJOR_KEYS) {
+        for (let v = 0; v < card.variants.length; v++) {
+          allScales.push(checkScale(card, 'major', 'melodic', v));
+        }
+      }
+      for (const card of MINOR_KEYS) {
+        for (const form of ['natural', 'harmonic', 'melodic']) {
+          allScales.push(checkScale(card, 'minor', form));
+        }
+      }
+      log.push(`scales checked: ${allScales.length}`);
+
+      // Enharmonic pairs must sound identical.
+      const byId = Object.fromEntries(MAJOR_KEYS.map((c) => [c.id, c]));
+      for (const [a, b] of [['B', 'C\u266D'], ['F\u266F', 'G\u266D'], ['C\u266F', 'D\u266D']]) {
+        const card = MAJOR_KEYS.find((c) => c.variants.length === 2 && c.variants.some((v) => v.name === a));
+        const s1 = buildScale(card, 0, 'major');
+        const s2 = buildScale(card, 1, 'major');
+        const same = s1.sequence.every((n, i) => n.midi === s2.sequence[i].midi);
+        if (!same) problems.push(`enharmonic mismatch: ${a} vs ${b}`);
+      }
+
+      /* ── 2. Synthesis ───────────────────────────────────────────────── */
+
+      function renderSynth(sequence, opts = {}) {
+        const {
+          durations = null,
+          detune = [],
+          gaps = {},
+          lead = 0.7,
+          vibrato = 0.18,
+          amplitude = 0.2,
+        } = opts;
+        const durs = durations || sequence.map(() => 0.55);
+        const starts = [];
+        let t = lead;
+        for (let i = 0; i < sequence.length; i++) {
+          starts.push(t);
+          t += durs[i] + (gaps[i] || 0);
+        }
+        const total = t + 1.6;
+        const buf = new Float32Array(Math.ceil(total * SR));
+
+        sequence.forEach((note, i) => {
+          const start = starts[i];
+          const dur = durs[i];
+          if (dur <= 0) return;
+          const cents = detune[i] || 0;
+          const f0 = 440 * Math.pow(2, (note.midi + cents / 100 - 69) / 12);
+          const len = Math.floor(dur * SR);
+          let phase = 0;
+          for (let s = 0; s < len; s++) {
+            const tt = s / SR;
+            let amp = 1;
+            const attack = 0.03;
+            const release = 0.06;
+            if (tt < attack) amp = tt / attack;
+            else if (tt > dur - release) amp = Math.max(0, (dur - tt) / release);
+            amp *= 0.85 + 0.15 * Math.exp(-tt * 5);
+            const vib = vibrato * Math.sin(2 * Math.PI * 5.4 * tt + i * 0.7);
+            const f = f0 * Math.pow(2, vib / 12);
+            phase += (2 * Math.PI * f) / SR;
+            let v = 0;
+            for (let k = 1; k <= 7; k++) v += Math.sin(phase * k) / Math.pow(k, 1.15);
+            const noise = (Math.random() - 0.5) * 0.03;
+            const idx = Math.floor(start * SR) + s;
+            if (idx < buf.length) buf[idx] += amplitude * amp * (v * 0.5 + noise);
+          }
+        });
+        return buf;
+      }
+
+      function framesOf(buf) {
+        const det = new PitchDetector({ sampleRate: SR, bufferSize: WINDOW });
+        const frames = [];
+        const win = new Float32Array(WINDOW);
+        const end = buf.length / SR - WINDOW / SR;
+        for (let t = 0; t < end; t += HOP) {
+          const i0 = Math.floor(t * SR);
+          win.set(buf.subarray(i0, i0 + WINDOW));
+          const { freq, clarity, rms } = det.detect(win);
+          frames.push({ t, freq, clarity, rms });
+        }
+        return frames;
+      }
+
+      function run(name, scale, opts, expectedSequence = scale.sequence) {
+        const buf = renderSynth(opts.sequence || scale.sequence, opts);
+        const frames = framesOf(buf);
+        const result = analyzeTake(frames, { ...scale, sequence: expectedSequence });
+        const s = result.stats;
+        log.push('');
+        log.push(`── ${name}`);
+        log.push(
+          `   score ${result.score}%  | notes ${Math.round(result.components.accuracy * 100)}%  ` +
+            `int ${Math.round(result.components.intonation * 100)}%  ` +
+            `steady ${Math.round(result.components.steadiness * 100)}%  ` +
+            `flow ${Math.round(result.components.continuity * 100)}%`,
+        );
+        log.push(
+          `   heard ${s.heard}/${s.expected} · exact ${s.exact} · wrong ${s.wrong} · missed ${s.missed} ` +
+            `· extra ${s.extra} · stops ${s.stops} · bpm ${s.bpm}`,
+        );
+        if (result.tips.length) {
+          for (const tip of result.tips) log.push(`   tip: ${tip.title} — ${tip.text.slice(0, 90)}…`);
+        }
+        const off = result.notes
+          .filter((n) => n.status === 'exact' && Math.abs(n.cents) > 22)
+          .map((n) => `${n.note.name}:${n.cents.toFixed(0)}c`);
+        log.push(`   off-pitch: ${off.join(', ') || 'none'}`);
+        return result;
+      }
+
+      const cMajor = buildScale(MAJOR_KEYS[0], 0, 'major');
+
+      // A. clean, steady, in tune
+      const clean = run('clean scale', cMajor, { vibrato: 0.18 });
+      if (clean.score < 88) problems.push(`clean scale scored only ${clean.score}`);
+
+      // B. a few notes off
+      const detune = [];
+      detune[8] = 38;
+      detune[9] = -34;
+      detune[20] = 46;
+      const detuned = run('three notes out of tune', cMajor, { vibrato: 0.12, detune });
+      if (detuned.score >= clean.score) problems.push('detuned take did not score lower');
+      if (detuned.components.intonation > 0.97) problems.push('intonation not penalised');
+
+      // C. uneven + a real pause
+      const durs = cMajor.sequence.map((_, i) => (i % 2 ? 0.42 : 0.72));
+      const uneven = run('uneven tempo with a stop at the top', cMajor, {
+        durations: durs,
+        gaps: { 14: 1.4 },
+        vibrato: 0.1,
+      });
+      if (uneven.components.steadiness > 0.9) problems.push('steadiness not penalised');
+      if (uneven.stats.stops < 1) problems.push('stop not detected');
+
+      // D. skipped note
+      const skipped = cMajor.sequence.filter((_, i) => i !== 5);
+      const skip = run('one note skipped', cMajor, { sequence: skipped, vibrato: 0.1 });
+      if (skip.components.accuracy > 0.97) problems.push('skip not penalised');
+      if (skip.stats.extra > 2) problems.push('skip produced many spurious extras');
+
+      // E. wrong octave (G major started on the G above the open string)
+      const gMajor = buildScale(MAJOR_KEYS[1], 0, 'major');
+      const highSeq = gMajor.sequence.map((n) => ({ ...n, midi: n.midi + 12 }));
+      const oct = run('octave high', gMajor, { sequence: highSeq, vibrato: 0.1 });
+      if (oct.stats.octaveShift !== 12) problems.push(`octave shift not recognised (${oct.stats.octaveShift})`);
+      if (!oct.tips.some((t) => t.kind === 'range')) problems.push('no octave tip');
+
+      // F. slow, but accurate
+      const slow = run('slow and accurate', cMajor, {
+        durations: cMajor.sequence.map(() => 0.9),
+        vibrato: 0.15,
+      });
+      if (slow.score < 85) problems.push(`slow playing punished (${slow.score})`);
+
+      // G. minor scale, raised 7th spelled correctly
+      const aMinor = buildScale(MINOR_KEYS[0], 0, 'minor', 'harmonic');
+      const aMinorNotes = aMinor.sequence.map((n) => n.name).join(' ');
+      log.push('');
+      log.push(`A harmonic minor: ${aMinorNotes}`);
+
+      const payload = {
+        problems,
+        log: log.join('\n'),
+      };
+      document.getElementById('out').textContent = 'PROBLEMS: ' + (problems.length ? problems.join(' | ') : 'none') + '\n' + log.join('\n');
+      fetch('/result', { method: 'POST', body: JSON.stringify(payload, null, 2) });
+    </script>
+  </body>
+</html>

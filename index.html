@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scale Studio — violin scale trainer</title>
+    <meta
+      name="description"
+      content="A listening scale trainer for violin students preparing for NYSSMA Levels 5 and 6."
+    />
+    <meta name="theme-color" content="#faf7f1" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f5d4e'/%3E%3Ccircle cx='13' cy='22' r='4' fill='%23faf7f1'/%3E%3Crect x='15.4' y='8' width='1.8' height='14' fill='%23faf7f1'/%3E%3Cpath d='M17.2 8c3.4.6 5.4 2.4 5.4 5.2' stroke='%23faf7f1' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Scale Studio" />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <button class="brand" id="brandHome" type="button" aria-label="Back to scale list">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32">
+              <circle cx="12" cy="22.5" r="4.1" fill="currentColor" />
+              <rect x="14.6" y="7" width="1.9" height="15.5" rx="0.9" fill="currentColor" />
+              <path
+                d="M16.5 7.2c3.6.5 5.6 2.3 5.6 5.4"
+                stroke="currentColor"
+                stroke-width="1.9"
+                fill="none"
+                stroke-linecap="round"
+              />
+            </svg>
+          </span>
+          <span class="brand-text">
+            <strong>Scale Studio</strong>
+            <span>NYSSMA Levels 5–6 · violin</span>
+          </span>
+        </button>
+        <button class="ghost-btn" id="helpBtn" type="button">How it works</button>
+      </header>
+
+      <main>
+        <div class="boot-error" id="bootError" hidden>
+          <h2 id="bootTitle">This page needs its little server</h2>
+          <p id="bootText">
+            Double-click <strong>Start Scale Studio.cmd</strong> in the app folder and use
+            the page it opens (<code>http://localhost:8777/</code>). Leave the black window
+            open while you practise — closing it stops the app.
+          </p>
+          <p class="boot-detail" id="bootDetail">
+            Browsers block a page's scripts — and the microphone — when the page is opened
+            straight from a file.
+          </p>
+        </div>
+
+        <!-- ── Choose a scale ─────────────────────────────────────────── -->
+        <section class="view" id="view-choose">
+          <div class="intro">
+            <h1>Which scale today?</h1>
+            <p>
+              Pick a key and press start. The app stays quiet until you play your
+              first note, then listens to the whole scale and tells you what it
+              heard — no timer, no rush.
+            </p>
+          </div>
+
+          <div class="test-banner">
+            <div class="test-banner-copy">
+              <h3>Mock audition</h3>
+              <p>
+                The app draws three scales at random — the way a judge does. Play them
+                one after another, no feedback until the end.
+              </p>
+            </div>
+            <button class="primary-btn" id="drawBtn" type="button">Draw three scales</button>
+          </div>
+
+          <div class="mode-row">
+            <div class="segmented" id="modeTabs" role="tablist" aria-label="Scale family">
+              <button type="button" role="tab" data-mode="major" aria-selected="true">
+                NYSSMA majors
+              </button>
+              <button type="button" role="tab" data-mode="minor" aria-selected="false">
+                Minor scales
+              </button>
+            </div>
+            <div class="segmented" id="formTabs" role="tablist" aria-label="Minor form" hidden>
+              <button type="button" role="tab" data-form="natural" aria-selected="false">natural</button>
+              <button type="button" role="tab" data-form="harmonic" aria-selected="false">harmonic</button>
+              <button type="button" role="tab" data-form="melodic" aria-selected="true">melodic</button>
+            </div>
+          </div>
+
+          <div class="grid" id="scaleGrid"></div>
+
+          <p class="footnote" id="gridNote">
+            Levels 5–6 require fifteen major scales — C plus the seven sharp keys and
+            the seven flat keys — all two octaves, up and down, from memory.
+          </p>
+        </section>
+
+        <!-- ── Mock audition: the draw ────────────────────────────────── -->
+        <section class="view" id="view-test-draw" hidden>
+          <button class="back-btn" id="drawBack" type="button">
+            <span aria-hidden="true">←</span> All scales
+          </button>
+
+          <h2 class="draw-title">Your three scales</h2>
+          <p class="subtle" id="drawSub">Drawn from the twelve NYSSMA keys — no repeats.</p>
+
+          <div class="reels" id="reels">
+            <div class="reel">
+              <div class="reel-window"><div class="reel-track"></div></div>
+              <div class="reel-sig"></div>
+            </div>
+            <div class="reel">
+              <div class="reel-window"><div class="reel-track"></div></div>
+              <div class="reel-sig"></div>
+            </div>
+            <div class="reel">
+              <div class="reel-window"><div class="reel-track"></div></div>
+              <div class="reel-sig"></div>
+            </div>
+          </div>
+
+          <div class="draw-actions">
+            <button class="primary-btn" id="beginBtn" type="button" disabled>Begin audition</button>
+            <button class="quiet-btn" id="redrawBtn" type="button">Draw again</button>
+          </div>
+          <p class="hint">
+            You can breathe between scales — the app waits for your first note each time.
+          </p>
+        </section>
+
+        <!-- ── Practice ────────────────────────────────────────────────── -->
+        <section class="view" id="view-practice" hidden>
+          <button class="back-btn" id="backBtn" type="button">
+            <span aria-hidden="true">←</span> All scales
+          </button>
+
+          <div class="test-bar" id="testBar" hidden>
+            <span class="test-step" id="testStep">Scale 1 of 3</span>
+            <span class="test-dots" id="testDots"><i></i><i></i><i></i></span>
+            <button class="quiet-btn small" id="endTestBtn" type="button">End audition</button>
+          </div>
+
+          <div class="head-row">
+            <div>
+              <h2 id="scaleTitle">C major</h2>
+              <p id="scaleMeta" class="subtle">2 octaves · up and down · 29 notes</p>
+            </div>
+            <div class="spelling" id="spellingRow" hidden></div>
+          </div>
+
+          <div class="staff-card">
+            <div class="staff-scroll" id="staffHost"></div>
+            <p class="staff-hint">Swipe the staff to see every note →</p>
+          </div>
+
+          <div class="listen-card" id="listenCard">
+            <div class="listen-top">
+              <div class="listen-left">
+                <div class="status" id="listenStatus">
+                  <span class="status-dot"></span>
+                  <span id="listenText">Ready when you are</span>
+                </div>
+                <div class="level" id="levelBar" hidden aria-hidden="true"><span></span></div>
+              </div>
+              <button class="quiet-btn" id="stopBtn" type="button" hidden>Finish early</button>
+            </div>
+
+            <div class="live" id="live" hidden>
+              <div class="live-read">
+                <span class="live-note" id="liveNote">—</span>
+                <span class="live-cents" id="liveCents">0¢</span>
+              </div>
+              <div class="tuner" aria-hidden="true">
+                <div class="tuner-zero"></div>
+                <div class="tuner-marker" id="tunerMarker"></div>
+              </div>
+              <div class="tuner-labels" aria-hidden="true">
+                <span>♭ 50</span><span>in tune</span><span>50 ♯</span>
+              </div>
+            </div>
+
+            <button class="primary-btn" id="startBtn" type="button">Start listening</button>
+            <p class="hint" id="listenHint">
+              No rush — the take begins the moment you play your first note.
+            </p>
+          </div>
+        </section>
+
+        <!-- ── Result ──────────────────────────────────────────────────── -->
+        <section class="view" id="view-result" hidden>
+          <button class="back-btn" id="resultBack" type="button">
+            <span aria-hidden="true">←</span> All scales
+          </button>
+
+          <div class="result-head">
+            <div class="ring" id="scoreRing">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="ring-track" cx="60" cy="60" r="52" />
+                <circle class="ring-value" id="ringValue" cx="60" cy="60" r="52" />
+              </svg>
+              <div class="ring-centre">
+                <span class="ring-score" id="scoreNumber">0</span>
+                <span class="ring-unit">%</span>
+              </div>
+            </div>
+            <div class="result-copy">
+              <p class="eyebrow" id="resultEyebrow">C major · 2 octaves</p>
+              <h2 id="resultGrade">Good work</h2>
+              <p class="result-line" id="resultLine"></p>
+              <p class="result-sub" id="resultSub"></p>
+            </div>
+          </div>
+
+          <div class="breakdown" id="breakdown"></div>
+
+          <div class="staff-card">
+            <h3 class="card-title">Where it landed</h3>
+            <div class="staff-scroll" id="resultStaff"></div>
+            <p class="staff-hint">Swipe the staff to see every note →</p>
+            <div class="legend">
+              <span><i class="sw good"></i> centred</span>
+              <span><i class="sw slight"></i> slightly off</span>
+              <span><i class="sw off"></i> off</span>
+              <span><i class="sw missed"></i> not heard</span>
+            </div>
+          </div>
+
+          <div class="tips" id="tips"></div>
+
+          <div class="actions">
+            <button class="primary-btn" id="retryBtn" type="button">Play it again</button>
+            <button class="quiet-btn" id="anotherBtn" type="button">Choose another scale</button>
+          </div>
+        </section>
+
+        <!-- ── Mock audition: the report ──────────────────────────────── -->
+        <section class="view" id="view-test-result" hidden>
+          <button class="back-btn" id="testResultBack" type="button">
+            <span aria-hidden="true">←</span> All scales
+          </button>
+
+          <div class="result-head">
+            <div class="ring">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="ring-track" cx="60" cy="60" r="52" />
+                <circle class="ring-value" id="testRingValue" cx="60" cy="60" r="52" />
+              </svg>
+              <div class="ring-centre">
+                <span class="ring-score" id="testScore">0</span>
+                <span class="ring-unit">%</span>
+              </div>
+            </div>
+            <div class="result-copy">
+              <p class="eyebrow">Mock audition · three scales</p>
+              <h2 id="testGrade">A strong set</h2>
+              <p class="result-line" id="testLine"></p>
+              <p class="result-sub" id="testSub"></p>
+            </div>
+          </div>
+
+          <div class="test-scales" id="testScales"></div>
+
+          <h3 class="section-title">What to work on</h3>
+          <div class="tips" id="testTips"></div>
+
+          <div class="actions">
+            <button class="primary-btn" id="againBtn" type="button">Play these three again</button>
+            <button class="quiet-btn" id="newDrawBtn" type="button">Draw three new</button>
+            <button class="quiet-btn" id="testHomeBtn" type="button">All scales</button>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>Tuned to A = 440 Hz</span>
+        <span class="dot-sep">·</span>
+        <span>Nothing is recorded or uploaded — audio is analysed in your browser.</span>
+      </footer>
+    </div>
+
+    <dialog id="helpDialog" aria-labelledby="helpTitle">
+      <h2 id="helpTitle">How the score works</h2>
+      <p>
+        Every take is compared with the scale that is written on screen. The 29 notes
+        are matched one by one, so an extra note or a skipped note only costs its own
+        place instead of upsetting everything after it.
+      </p>
+      <ul class="score-legend">
+        <li><strong>Notes</strong><span>56%</span><em>Were the right pitches played, in the right order?</em></li>
+        <li><strong>Intonation</strong><span>20%</span><em>How close to the centre each note sat, in cents.</em></li>
+        <li><strong>Steadiness</strong><span>12%</span><em>Did the notes keep an even pulse?</em></li>
+        <li><strong>Flow</strong><span>12%</span><em>Were there stops long enough to break the phrase?</em></li>
+      </ul>
+      <p class="help-note">
+        The scoring is deliberately forgiving: anything within about 15 cents counts as
+        centred, and a slightly uneven tempo costs very little. Obvious stopping, wrong
+        notes and missed notes are what move the number.
+      </p>
+      <p class="help-note">
+        <strong>Mock audition</strong> draws three scales at random, the way a judge
+        does. You play them one after another with no tuner and no score until the
+        end, then get one report for the set.
+      </p>
+      <p class="help-note">
+        Play in a quiet room, fairly close to the microphone, and let the first note
+        ring for a moment — the app starts on the first sustained pitch it hears.
+      </p>
+      <button class="primary-btn" id="closeHelp" type="button">Got it</button>
+    </dialog>
+
+    <script>
+      // With ?dev the test harness also hears about runtime errors.
+      if (location.search.includes('dev')) {
+        window.addEventListener('error', function (event) {
+          fetch('/result', {
+            method: 'POST',
+            body: JSON.stringify({
+              stage: 'error',
+              message: event.message,
+              stack: event.error && event.error.stack,
+            }),
+          });
+        });
+      }
+    </script>
+    <script type="module" src="src/app.js"></script>
+    <script>
+      // If the app never boots — usually because the file was opened directly —
+      // say so instead of leaving an empty page on screen.
+      setTimeout(function () {
+        if (window.__scaleStudioReady) return;
+        var banner = document.getElementById('bootError');
+        banner.hidden = false;
+        document.getElementById('view-choose').hidden = true;
+        if (location.protocol !== 'file:') {
+          document.getElementById('bootTitle').textContent = 'The app did not start';
+          document.getElementById('bootText').textContent =
+            'Something stopped the scripts from loading. Reload the page, and if it keeps happening open the browser’s developer console for the error.';
+          document.getElementById('bootDetail').hidden = true;
+        }
+      }, 1200);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "Scale Studio — violin scale trainer",
+  "short_name": "Scale Studio",
+  "description": "A listening scale trainer for violin students preparing for NYSSMA Levels 5–6.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#faf7f1",
+  "theme_color": "#2f5d4e",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

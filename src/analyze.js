@@ -1,0 +1,462 @@
+// analyze.js — turns a stream of pitch frames into notes, compares them with
+// the requested scale, and produces a score plus plain-language feedback.
+//
+// This module is deliberately free of DOM and audio code so it can be tested
+// in isolation (see tests/dsp.test.html).
+
+import { median } from './pitch.js';
+
+export const DEFAULTS = {
+  minClarity: 0.5,
+  // Anything shorter than ~90 ms is almost always a bow change or a blip
+  // caught mid-shift, not a note the student meant to play.
+  minNoteFrames: 3,
+  minNoteSeconds: 0.07,
+  jumpSemitones: 0.7,
+  // How the final percentage is assembled.
+  weights: { accuracy: 0.56, intonation: 0.2, steadiness: 0.12, continuity: 0.12 },
+  // Cents error that still counts as "centred" / where credit reaches zero.
+  intonationPerfect: 15,
+  intonationZero: 55,
+  // Notes quieter than this are treated as silence (refined per take).
+  minRms: 0.0035,
+};
+
+const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+
+function percentile(sorted, p) {
+  if (!sorted.length) return 0;
+  const i = clamp(p, 0, 1) * (sorted.length - 1);
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+/**
+ * Group pitch frames into discrete notes.
+ * @param {{t:number, freq:number, clarity:number, rms:number}[]} frames
+ */
+export function segmentNotes(frames, options = {}) {
+  const o = { ...DEFAULTS, ...options };
+  if (!frames.length) return { notes: [], gate: o.minRms };
+
+  // The gate follows the room, but it is capped: a quiet passage on the G
+  // string must never be mistaken for silence just because the average is high.
+  const rmsSorted = frames.map((f) => f.rms).sort((a, b) => a - b);
+  const noiseFloor = percentile(rmsSorted, 0.1);
+  const gate = Math.max(o.minRms, Math.min(0.015, noiseFloor * 1.5));
+
+  // Frame-wise pitch in semitones (float), or null when unvoiced.
+  const raw = frames.map((f) => {
+    if (!f.freq || f.clarity < o.minClarity || f.rms < gate) return null;
+    return 69 + 12 * Math.log2(f.freq / 440);
+  });
+
+  // Three-frame median smoothing removes isolated octave jumps and jitter.
+  const smooth = raw.map((v, i) => {
+    if (v == null) return null;
+    const window = [];
+    for (let k = Math.max(0, i - 1); k <= Math.min(raw.length - 1, i + 1); k++) {
+      if (raw[k] != null) window.push(raw[k]);
+    }
+    return median(window);
+  });
+
+  // Runs of voiced frames (a one-frame dropout does not end a note).
+  const runs = [];
+  let run = null;
+  for (let i = 0; i < smooth.length; i++) {
+    const v = smooth[i];
+    if (v == null) {
+      if (run) {
+        run.gap = (run.gap || 0) + 1;
+        if (run.gap > 1) {
+          runs.push(run);
+          run = null;
+        }
+      }
+      continue;
+    }
+    if (!run) run = { idx: [i], values: [v], gap: 0 };
+    else {
+      run.gap = 0;
+      run.idx.push(i);
+      run.values.push(v);
+    }
+  }
+  if (run) runs.push(run);
+
+  // Within a run, split wherever the pitch settles somewhere else — this
+  // catches legato / sloppy shifts that never fully lose energy.
+  const notes = [];
+  for (const r of runs) {
+    // Compare the median just before a frame with the median just after it.
+    // A single-frame reading in between a semitone step would otherwise hide
+    // the step (B5 -> C6, E5 -> F5) and glue two notes together.
+    const cuts = [0];
+    let lastCut = 0;
+    for (let k = 1; k < r.values.length - 1; k++) {
+      const before = median(r.values.slice(Math.max(0, k - 3), k));
+      const after = median(r.values.slice(k, Math.min(r.values.length, k + 3)));
+      if (Math.abs(after - before) > o.jumpSemitones && k - lastCut >= 3) {
+        cuts.push(k);
+        lastCut = k;
+      }
+    }
+    cuts.push(r.values.length);
+
+    for (let c = 0; c < cuts.length - 1; c++) {
+      const a = cuts[c];
+      const b = cuts[c + 1];
+      if (b - a < o.minNoteFrames) continue;
+      const idx = r.idx.slice(a, b);
+      const t0 = frames[idx[0]].t;
+      const t1 = frames[idx[idx.length - 1]].t;
+      if (t1 - t0 < o.minNoteSeconds) continue;
+
+      // Ignore the attack and release when measuring the pitch.
+      const vals = r.values.slice(a, b);
+      const trimA = Math.floor(vals.length * 0.2);
+      const trimB = Math.max(trimA + 1, vals.length - Math.max(1, Math.round(vals.length * 0.15)));
+      const core = vals.slice(trimA, trimB);
+      const pitch = median(core);
+      const midi = Math.round(pitch);
+
+      notes.push({
+        t0,
+        t1,
+        pitch,
+        midi,
+        cents: (pitch - midi) * 100,
+        frames: idx.length,
+        duration: t1 - t0,
+      });
+    }
+  }
+
+  notes.sort((a, b) => a.t0 - b.t0);
+  return { notes, gate };
+}
+
+function substitutionCost(detected, expected) {
+  const diff = Math.abs(detected - expected);
+  if (diff === 0) return 0;
+  if (diff % 12 === 0) return 0.8; // right note, wrong octave
+  return 1.5 + Math.min(diff, 12) * 0.05;
+}
+
+/**
+ * Needleman–Wunsch style alignment between what was heard and what was asked
+ * for. This is what makes the scoring forgiving: an extra note or a skip only
+ * costs its own slot instead of throwing off every note that follows.
+ */
+export function align(detected, expected) {
+  const n = detected.length;
+  const m = expected.length;
+  const extraCost = 0.65;
+  const missCost = 1.0;
+
+  const dp = Array.from({ length: n + 1 }, () => new Float64Array(m + 1));
+  for (let i = 1; i <= n; i++) dp[i][0] = dp[i - 1][0] + extraCost;
+  for (let j = 1; j <= m; j++) dp[0][j] = dp[0][j - 1] + missCost;
+
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const sub = dp[i - 1][j - 1] + substitutionCost(detected[i - 1], expected[j - 1]);
+      const del = dp[i - 1][j] + extraCost;
+      const ins = dp[i][j - 1] + missCost;
+      dp[i][j] = Math.min(sub, del, ins);
+    }
+  }
+
+  const pairs = [];
+  const extras = [];
+  const missed = [];
+  let i = n;
+  let j = m;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0) {
+      const sub = dp[i - 1][j - 1] + substitutionCost(detected[i - 1], expected[j - 1]);
+      if (Math.abs(dp[i][j] - sub) < 1e-9) {
+        pairs.push({ d: i - 1, e: j - 1 });
+        i--;
+        j--;
+        continue;
+      }
+    }
+    if (i > 0 && Math.abs(dp[i][j] - (dp[i - 1][j] + extraCost)) < 1e-9) {
+      extras.push(i - 1);
+      i--;
+      continue;
+    }
+    if (j > 0) {
+      missed.push(j - 1);
+      j--;
+    }
+  }
+
+  pairs.sort((a, b) => a.e - b.e);
+  extras.sort((a, b) => a - b);
+  missed.sort((a, b) => a - b);
+  return { pairs, extras, missed };
+}
+
+/**
+ * @param frames pitch frames (seconds since the take started)
+ * @param expectedScale result of buildScale()
+ */
+export function analyzeTake(frames, expectedScale, options = {}) {
+  const o = { ...DEFAULTS, ...options, weights: { ...DEFAULTS.weights, ...(options.weights || {}) } };
+  const expected = expectedScale.sequence;
+  const expectedMidi = expected.map((n) => n.midi);
+
+  const { notes, gate } = segmentNotes(frames, o);
+  const { pairs, extras } = align(notes.map((n) => n.midi), expectedMidi);
+  const octaveShift = detectOctaveShift(notes, expectedMidi);
+
+  const noteResults = expected.map((note, index) => ({
+    note,
+    index,
+    status: 'missed',
+    cents: 0,
+    detectedName: null,
+  }));
+
+  let exact = 0;
+  let octaveErrors = 0;
+  let wrong = 0;
+
+  for (const { d, e } of pairs) {
+    const det = notes[d];
+    const target = expectedMidi[e];
+    const diff = det.midi - target;
+    const r = noteResults[e];
+    r.detectedName = det.midi;
+    if (diff === 0) {
+      r.status = 'exact';
+      r.cents = det.cents;
+      exact++;
+    } else if (Math.abs(diff) % 12 === 0) {
+      r.status = 'octave';
+      r.cents = (det.pitch - target) * 100;
+      octaveErrors++;
+    } else {
+      r.status = 'wrong';
+      r.cents = (det.pitch - target) * 100;
+      wrong++;
+    }
+  }
+
+  // --- Accuracy -----------------------------------------------------------
+  let credit = 0;
+  for (const r of noteResults) {
+    if (r.status === 'exact') credit += 1;
+    else if (r.status === 'octave') credit += 0.4;
+    else if (r.status === 'wrong') credit += 0.1;
+  }
+  const accuracy = clamp(credit / expected.length - Math.min(0.08, extras.length * 0.015));
+
+  // --- Intonation ---------------------------------------------------------
+  const tuned = noteResults.filter((r) => r.status === 'exact');
+  const P = o.intonationPerfect;
+  const Z = o.intonationZero;
+  let intonation = 0.6;
+  if (tuned.length) {
+    const sum = tuned.reduce((acc, r) => {
+      const abs = Math.abs(r.cents);
+      return acc + clamp(1 - (abs - P) / (Z - P));
+    }, 0);
+    intonation = clamp(sum / tuned.length);
+  }
+
+  // --- Steadiness ---------------------------------------------------------
+  const iois = [];
+  for (let k = 1; k < pairs.length; k++) {
+    if (pairs[k].e === pairs[k - 1].e + 1) {
+      iois.push(notes[pairs[k].d].t0 - notes[pairs[k - 1].d].t0);
+    }
+  }
+  const medianIoi = iois.length ? median(iois) : 0;
+  let steadiness = 1;
+  if (iois.length >= 4) {
+    const devs = iois.map((v) => Math.abs(v - medianIoi) / medianIoi).sort((a, b) => a - b);
+    // Ignore the longest 10%: those are the pauses, scored separately below.
+    const kept = devs.slice(0, Math.max(1, Math.ceil(devs.length * 0.9)));
+    const meanDev = kept.reduce((a, b) => a + b, 0) / kept.length;
+    steadiness = clamp(1 - (meanDev - 0.07) / 0.4);
+  }
+
+  // --- Continuity ---------------------------------------------------------
+  const stopThreshold = Math.max(0.3, medianIoi * 0.8);
+  let stops = 0;
+  let longStops = 0;
+  for (let k = 1; k < notes.length; k++) {
+    const gap = notes[k].t0 - notes[k - 1].t1;
+    if (gap > stopThreshold) {
+      stops++;
+      if (gap > 1.0) longStops++;
+    }
+  }
+  const continuity = clamp(1 - 0.16 * stops - 0.1 * longStops);
+
+  const w = o.weights;
+  const raw = w.accuracy * accuracy + w.intonation * intonation + w.steadiness * steadiness + w.continuity * continuity;
+  const score = Math.round(clamp(raw) * 100);
+
+  const result = {
+    score,
+    components: { accuracy, intonation, steadiness, continuity },
+    notes: noteResults,
+    scale: expectedScale,
+    stats: {
+      expected: expected.length,
+      heard: notes.length,
+      exact,
+      wrong,
+      missed: noteResults.filter((r) => r.status === 'missed').length,
+      extra: extras.length,
+      octaveErrors,
+      octaveShift,
+      stops,
+      longStops,
+      bpm: medianIoi ? Math.round(60 / medianIoi) : 0,
+      duration: notes.length ? notes[notes.length - 1].t1 - notes[0].t0 : 0,
+      gate,
+    },
+    detected: notes,
+  };
+  result.tips = buildTips(result);
+  return result;
+}
+
+/** Did the student play the right notes, but in another octave? */
+function detectOctaveShift(notes, expected) {
+  const n = Math.min(10, notes.length, expected.length);
+  if (n < 6) return 0;
+  for (const shift of [12, -12, 24, -24]) {
+    let hits = 0;
+    for (let i = 0; i < n; i++) {
+      if (notes[i].midi - expected[i] === shift) hits++;
+    }
+    if (hits >= n * 0.7) return shift;
+  }
+  return 0;
+}
+
+export function centsText(cents) {
+  const v = Math.round(Math.abs(cents));
+  if (v === 0) return 'dead on';
+  return `${v}¢ ${cents > 0 ? 'high' : 'low'}`;
+}
+
+function noteList(items) {
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+/** Gentle, specific feedback. Ordered by how much each item cost. */
+export function buildTips(result) {
+  const { stats, components, notes } = result;
+  const tips = [];
+  const push = (tip, impact) => tips.push({ ...tip, impact });
+
+  const tuned = notes.filter((n) => n.status === 'exact');
+  const offPitch = tuned
+    .filter((n) => Math.abs(n.cents) > 28)
+    .sort((a, b) => Math.abs(b.cents) - Math.abs(a.cents));
+
+  if (offPitch.length >= 1) {
+    const shown = offPitch.slice(0, 3);
+    push(
+      {
+        kind: 'intonation',
+        title: 'A few notes sat off-centre',
+        text: `${noteList(shown.map((n) => `${n.note.name} (${centsText(n.cents)})`))}. Slow those notes down and listen for the ring — the pitch should feel like it locks into place rather than being placed.`,
+      },
+      (1 - components.intonation) * 0.2,
+    );
+  }
+
+  // A whole-scale tendency is worth naming: it is usually a tuning or hand
+  // position issue rather than 29 separate mistakes.
+  if (tuned.length >= 6) {
+    const avg = tuned.reduce((a, n) => a + n.cents, 0) / tuned.length;
+    if (Math.abs(avg) > 14) {
+      push(
+        {
+          kind: 'intonation',
+          title: avg > 0 ? 'You sat a little high overall' : 'You sat a little low overall',
+          text:
+            avg > 0
+              ? `Across the scale you averaged ${Math.abs(avg).toFixed(0)}¢ sharp. Check your open strings against a drone before you start — most of the time it is the A string creeping up.`
+              : `Across the scale you averaged ${Math.abs(avg).toFixed(0)}¢ flat. That is often a bow-speed or hand-frame thing rather than a listening thing — play the scale again with a fuller, slower bow.`,
+        },
+        Math.min(0.12, Math.abs(avg) / 200),
+      );
+    }
+  }
+
+  if (components.steadiness < 0.92) {
+    push(
+      {
+        kind: 'rhythm',
+        title: 'The pulse wandered a little',
+        text: `The notes were mostly even, but the spacing drifted${
+          stats.bpm ? ` around ♩=${stats.bpm}` : ''
+        }. Set a metronome a notch slower and let each note take exactly the same space before adding speed.`,
+      },
+      (1 - components.steadiness) * 0.12,
+    );
+  }
+
+  if (stats.stops >= 1) {
+    const where = stats.stops === 1 ? 'once' : `${stats.stops} times`;
+    push(
+      {
+        kind: 'flow',
+        title: `You stopped ${where}`,
+        text: `${stats.longStops ? 'Some of those were long enough to break the phrase. ' : ''}Stops usually mean the next note is not yet automatic — loop that spot on its own three times, then rejoin the scale from two notes before it.`,
+      },
+      (1 - components.continuity) * 0.12,
+    );
+  }
+
+  if (stats.missed > 0) {
+    push(
+      {
+        kind: 'notes',
+        title: `${stats.missed} note${stats.missed === 1 ? '' : 's'} not heard`,
+        text:
+          'Either a note was skipped, or it was too quiet for the microphone. Play the scale again at a confident dynamic — a clear, even bow helps the app hear every note.',
+      },
+      (1 - components.accuracy) * 0.5,
+    );
+  }
+
+  if (stats.octaveShift) {
+    push(
+      {
+        kind: 'range',
+        title:
+          stats.octaveShift > 0
+            ? 'You started an octave above the written range'
+            : 'You started an octave below the written range',
+        text: `This scale runs ${result.scale.rangeText}. The notes were right — just in the other octave — so reset the hand to the note shown in the diagram and begin there.`,
+      },
+      0.5,
+    );
+  }
+
+  tips.sort((a, b) => b.impact - a.impact);
+  return tips.slice(0, 3).map(({ impact, ...t }) => t);
+}
+
+export function gradeFor(score) {
+  if (score >= 96) return { label: 'Exceptional', note: 'That is adjudication-ready.' };
+  if (score >= 90) return { label: 'Excellent', note: 'Clean, centred and even.' };
+  if (score >= 82) return { label: 'Very good', note: 'A small polish and it is there.' };
+  if (score >= 72) return { label: 'Good work', note: 'The shape is secure — now the details.' };
+  if (score >= 60) return { label: 'Coming along', note: 'The notes are arriving; keep the pulse steady.' };
+  return { label: 'Keep building', note: 'Slow it down and let each note settle.' };
+}
