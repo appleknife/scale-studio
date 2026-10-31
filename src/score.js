@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311410';
-import { CLEF_PATH } from './clef.js?v=202610311410';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311421';
+import { CLEF_PATH } from './clef.js?v=202610311421';
 
-import { beatLength } from './sightreading.js?v=202610311410';
+import { beatLength } from './sightreading.js?v=202610311421';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -242,7 +242,7 @@ function sixteenthRuns(group) {
 
 /* ── One system of four bars ───────────────────────────────────────────── */
 
-function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, showTempo }) {
+function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, showTempo, final = false }) {
   const part = [];
   const bottom = top + 4 * LINE_GAP;
 
@@ -593,24 +593,39 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       const y2 = yForNote(b.note.letter, b.note.octave, bottom);
       const stemsUp = stemUp(a.note.letter, a.note.octave) && stemUp(b.note.letter, b.note.octave);
       const dir = stemsUp ? 1 : -1; // below the heads when the stems point up
-      const lift = 7.5;
-      const rise = Math.min(15, 5 + (x2 - x1) * 0.16);
+      const lift = 6.5;
+      // Both control points sit at one height — clear of whichever note is higher
+      // — so the slur is a symmetric bow. Giving each control point the height of
+      // its own note made the curve swoop diagonally, which is what looked wrong
+      // on slurs that spanned a wide interval. The bulge also grows far more
+      // slowly than the span, so a long slur is a shallow bow rather than an arch.
+      const span = Math.hypot(x2 - x1, y2 - y1);
+      const rise = Math.min(13, 4 + span * 0.09);
+      const baseY = dir > 0 ? Math.max(y1, y2) + lift : Math.min(y1, y2) - lift;
       const f = (v) => v.toFixed(2);
       part.push(
         `<path class="score-slur" d="M${f(x1)} ${f(y1 + dir * lift)} ` +
-          `C${f(x1 + (x2 - x1) * 0.28)} ${f(y1 + dir * (lift + rise))} ` +
-          `${f(x2 - (x2 - x1) * 0.28)} ${f(y2 + dir * (lift + rise))} ` +
+          `C${f(x1 + (x2 - x1) * 0.26)} ${f(baseY + dir * rise)} ` +
+          `${f(x2 - (x2 - x1) * 0.26)} ${f(baseY + dir * rise)} ` +
           `${f(x2)} ${f(y2 + dir * lift)}" ` +
           `fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>`,
       );
     }
   }
 
-  // closing barline: a final double bar — thin line, then a thick one
-  part.push(
-    `<line x1="${WIDTH - RIGHT - 6}" y1="${top}" x2="${WIDTH - RIGHT - 6}" y2="${bottom}" stroke="${INK}" stroke-width="1.2"/>`,
-    `<rect x="${WIDTH - RIGHT - 3}" y="${top}" width="3" height="${bottom - top}" fill="${INK}"/>`,
-  );
+  // Closing barline: a plain line where the music carries on — only the last
+  // system gets the double bar. A double bar mid-piece tells a player the music
+  // has stopped, which is the wrong thing to teach a sight-reader.
+  if (final) {
+    part.push(
+      `<line x1="${WIDTH - RIGHT - 6}" y1="${top}" x2="${WIDTH - RIGHT - 6}" y2="${bottom}" stroke="${INK}" stroke-width="1.2"/>`,
+      `<rect x="${WIDTH - RIGHT - 3}" y="${top}" width="3" height="${bottom - top}" fill="${INK}"/>`,
+    );
+  } else {
+    part.push(
+      `<line x1="${WIDTH - RIGHT}" y1="${top}" x2="${WIDTH - RIGHT}" y2="${bottom}" stroke="${INK}" stroke-width="1.3"/>`,
+    );
+  }
 
   return part.join('');
 }
@@ -632,6 +647,7 @@ export function renderScore(passage, { tempoText = '', ariaLabel = 'Sight-readin
       timeSignature: false,
       tempoText: '',
       showTempo: false,
+      final: true,
     }),
     '</svg>',
   ];

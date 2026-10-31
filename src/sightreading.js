@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311410';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311421';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -332,14 +332,27 @@ export function generatePassage({ level = 5, seed = null } = {}) {
 
   const bars = [];
   let previous = null;
+  let runBars = 0;
   for (let b = 0; b < BAR_COUNT; b++) {
     // Avoid the same bar twice in a row when there is a choice: eight identical
     // bars of half notes is not a sight-reading test, it is a warm-up.
     const fresh = patterns.filter((p) => p !== previous);
     const base = fresh.length ? fresh : patterns;
-    // three copies of the run patterns, one of everything else
+    // One beat of sixteenths is usually the point of the passage, two is a
+    // handful, four is a workout. Before the passage has one, the run patterns
+    // are weighted up; afterwards they are usually taken out of the draw, with
+    // enough of a chance left that a second one still happens — a lean, not a
+    // lock.
     const runs = base.filter(hasRunOfFour);
-    const pool_ = base.concat(runs, runs);
+    const plain = base.filter((p) => !hasRunOfFour(p));
+    let pool_;
+    if (runBars === 0) {
+      pool_ = base.concat(runs, runs, runs, runs);
+    } else if (plain.length && chance(rng, 0.85)) {
+      pool_ = plain;
+    } else {
+      pool_ = base;
+    }
 
     let pattern;
     if (b === BAR_COUNT - 1) {
@@ -353,6 +366,7 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     } else {
       pattern = pick(rng, pool_);
     }
+    if (hasRunOfFour(pattern)) runBars++;
     previous = pattern;
 
     const events = [];
@@ -434,8 +448,15 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // Home to an octave above it, and never more than a third below home. Without
   // the clamp the random walk drifts: a level III passage would climb to B5 and
   // stay there, however well the arc was aimed.
-  const peak = Math.min(pool.length - 1, home + 7);
-  const lowest = Math.max(0, home - 3);
+  //
+  // Levels V and VI are allowed the whole printed range, though. The Manual's
+  // own level V example climbs to the D above the staff, two octaves above home,
+  // and capping the climax at an octave meant that note could never appear.
+  const top = pool.length - 1;
+  const headroom = Math.max(1, top - home - 6);
+  const reach = level >= 5 ? 7 + Math.floor(rng() * headroom) : 7;
+  const peak = Math.min(top, home + reach);
+  const lowest = Math.max(0, home - 3 - (level >= 5 ? Math.floor(rng() * 3) : 0));
 
   let prev = home;
   let lastStep = 0;
@@ -459,7 +480,13 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       }
       if (best != null) prev = best;
     } else {
-      const step = chooseStep(rng, [...spec.steps, -1, -2, -3, -4, -5, -6].filter((s) => spec.steps.includes(Math.abs(s))), directionBias, lastStep);
+      // Short notes step, long notes may leap. A sixteenth in the middle of a run
+      // that jumps a fifth is the sort of thing that makes a random line sound
+      // random; quarter notes and longer are where a leap belongs.
+      const allowed = [...spec.steps, -1, -2, -3, -4, -5, -6]
+        .filter((s) => spec.steps.includes(Math.abs(s)))
+        .filter((s) => event.dur > 2 || Math.abs(s) <= 2);
+      const step = chooseStep(rng, allowed, directionBias, lastStep);
       let next = prev + step;
       if (next < lowest || next > peak) next = prev - step;
       prev = Math.max(lowest, Math.min(peak, next));
@@ -534,6 +561,32 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     if (gap <= spec.maxSemis) continue;
     const fixed = within(next.midi, sounding[i].midi, spec.maxSemis);
     if (fixed) setNote(sounding[i], fixed);
+  }
+
+  // ── leaps land on a chord tone ─────────────────────────────────────────
+  // Jumping from anywhere to anywhere is what makes eight random notes sound
+  // generated rather than intended. Landing a leap on the tonic, third or fifth
+  // — and then carrying on — is the oldest trick that makes a line read as a
+  // phrase. Nudged by a step at most, and left alone if the nudge would break an
+  // interval or repeat a pitch.
+  for (let i = 1; i < sounding.length - 1; i++) {
+    const event = sounding[i];
+    const before = sounding[i - 1];
+    if (!event.note || !before.note) continue;
+    if (Math.abs(event.midi - before.midi) < 4) continue; // a third or less: let it be
+    if ([0, 2, 4].includes(event.note.degree)) continue; // already a chord tone
+    const options = pool.filter(
+      (n) =>
+        [0, 2, 4].includes(n.degree) &&
+        Math.abs(n.midi - event.midi) <= 2 &&
+        !samePitch(event, n) &&
+        neighbourOk(event, n),
+    );
+    if (!options.length) continue;
+    const nearest = options.reduce((a, b) =>
+      Math.abs(b.midi - event.midi) < Math.abs(a.midi - event.midi) ? b : a,
+    );
+    setNote(event, nearest);
   }
 
   // ── accidentals (level IV and up) ──────────────────────────────────────
