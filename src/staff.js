@@ -3,7 +3,7 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202610311001';
+import { CLEF_PATH } from './clef.js?v=202610311309';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -68,16 +68,28 @@ export function accidentalAt(alter, x, y, colour = INK, size = 1) {
     `<path d="M${cx} ${y - 0.5 * s} A ${0.66 * s} ${0.5 * s} 0 0 1 ${cx} ${y + 0.5 * s}" ` +
     `fill="none" stroke="${colour}" stroke-width="${0.44 * s}" stroke-linecap="round"/>`;
 
-  // A sharp is about one staff space wide and 2.8 tall. Drawn wider than that
-  // (as it first was) a six-sharp key signature merges into one dark block, so
-  // the horizontals stop at just over half a space either side of the middle.
+  // A sharp: the engraved sample the app was matched against, traced once from a
+  // high-resolution bitmap of it and kept as a path. The outline is the printed
+  // one — thin uprights, bars nearly a whole space apart so a note head fits
+  // between them, ends cut vertically — and because it is a path it stays crisp
+  // at any size instead of going soft the way an embedded bitmap would.
+  //
+  // Coordinates are in staff spaces, centred on the note's line or space: x from
+  // -0.481 to 0.481, y from -1.510 to 1.400. The second subpath is the counter
+  // (the gap enclosed by the two bars and the two uprights), so it has to be
+  // filled with even-odd.
+  const SHARP_PATH =
+    'M0.168 -1.510 L0.276 -1.504 L0.275 -0.793 L0.481 -0.833 L0.481 -0.447 L0.275 -0.397 ' +
+    'L0.275 0.150 L0.480 0.110 L0.481 0.505 L0.454 0.517 L0.283 0.553 L0.275 0.561 L0.273 1.275 ' +
+    'L0.150 1.272 L0.148 0.586 L-0.146 0.651 L-0.146 1.397 L-0.268 1.400 L-0.271 0.681 ' +
+    'L-0.464 0.723 L-0.479 0.725 L-0.481 0.716 L-0.480 0.325 L-0.271 0.275 L-0.271 -0.271 ' +
+    'L-0.481 -0.231 L-0.481 -0.617 L-0.271 -0.667 L-0.268 -1.416 L-0.146 -1.414 L-0.144 -0.697 ' +
+    'L0.148 -0.762 L0.148 -1.504 Z ' +
+    'M0.138 -0.368 L0.149 -0.362 L0.150 0.180 L-0.143 0.246 L-0.145 -0.301 Z';
+
   const sharpAt = (cx) =>
-    `<g stroke="${colour}" stroke-linecap="butt">` +
-    `<line x1="${cx - 0.25 * s}" y1="${y - 1.45 * s}" x2="${cx - 0.25 * s}" y2="${y + 1.45 * s}" stroke-width="${stem}"/>` +
-    `<line x1="${cx + 0.25 * s}" y1="${y - 1.6 * s}" x2="${cx + 0.25 * s}" y2="${y + 1.3 * s}" stroke-width="${stem}"/>` +
-    `<line x1="${cx - 0.5 * s}" y1="${y - 0.3 * s}" x2="${cx + 0.5 * s}" y2="${y - 0.45 * s}" stroke-width="${0.26 * s}"/>` +
-    `<line x1="${cx - 0.5 * s}" y1="${y + 0.45 * s}" x2="${cx + 0.5 * s}" y2="${y + 0.3 * s}" stroke-width="${0.26 * s}"/>` +
-    `</g>`;
+    `<path d="${SHARP_PATH}" transform="translate(${cx} ${y}) scale(${s})" ` +
+    `fill="${colour}" fill-rule="evenodd"/>`;
 
   const naturalAt = (cx) => {
     const l = cx - 0.36 * s;

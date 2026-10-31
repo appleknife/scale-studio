@@ -1,12 +1,12 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311001';
-import { renderStaff } from './staff.js?v=202610311001';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610311001';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610311001';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311001';
-import { generatePassage } from './sightreading.js?v=202610311001';
-import { renderScore } from './score.js?v=202610311001';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311309';
+import { renderStaff } from './staff.js?v=202610311309';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610311309';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610311309';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311309';
+import { generatePassage } from './sightreading.js?v=202610311309';
+import { renderScore } from './score.js?v=202610311309';
 import {
   STRINGS,
   FIFTHS,
@@ -14,7 +14,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610311001';
+} from './tuner.js?v=202610311309';
 
 const LANG = initLang();
 
@@ -1587,11 +1587,16 @@ function applyHash() {
   return false;
 }
 
-/** Synthetic pitch frames, so the result screen can be reviewed silently. */
-function demoFrames(scale, offset = 0) {
+/**
+ * Synthetic pitch frames, so the result screen can be reviewed silently.
+ * `base` maps a note index to how many cents it sits off; `offset` shifts the
+ * whole take, which is how ?demo=test gets three different-looking takes.
+ */
+function demoFrames(scale, offset = 0, base = { 8: 34, 9: -31, 20: 42 }) {
   const frames = [];
   const step = 0.03;
-  const detune = { 8: 34 + offset, 9: -31 + offset, 20: 42 + offset };
+  const detune = {};
+  for (const [i, cents] of Object.entries(base)) detune[i] = cents + offset;
   let t = 0.6;
   scale.sequence.forEach((note, i) => {
     const cents = detune[i] || 0;
@@ -1613,7 +1618,9 @@ renderGrid();
 if (!applyHash()) showView('choose');
 
 if (params.has('demo') && params.get('demo') !== 'test') {
-  renderResult(analyzeTake(demoFrames(state.scale), state.scale));
+  // A take that is clean all the way through: every note green, every bar at
+  // 100%, so the staff colours and the score can never contradict each other.
+  renderResult(analyzeTake(demoFrames(state.scale, 0, { 8: 8, 20: -6 }), state.scale));
 }
 if (params.get('demo') === 'test') {
   const cards = ['C', 'F#', 'Ab'].map((id) => MAJOR_KEYS.find((c) => c.id === id));

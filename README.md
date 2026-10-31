@@ -280,9 +280,22 @@ trouble are the ones where a stroked line is not good enough:
   the stems end. A stroke's butt cap is cut square to the line, so slanted beams grew
   little wedges, and the second beam of a sixteenth run never sat parallel to the
   first.
-* The eighth rest's measurements (bulb 0.23 of the glyph's height, stem 0.10, the
+* The eighth rest's measurements (bulb 0.30 of the glyph's height, stem 0.10, the
   hairline gap between them) were taken off a printed rest pixel by pixel, the same
-  way the sharp in `src/staff.js` was.
+  way the sharp in `src/staff.js` was. The sixteenth rest is that glyph with a
+  second hook 0.48 of the way down, a shade smaller and nudged left so the notch
+  between hook and stem survives.
+* The **sharp** started as four stroked lines with measured proportions (uprights
+  0.12 of a space wide, bars 0.38 thick, the two bars almost a whole space apart so
+  a note head sits between them). It is now a single **traced path** in
+  `src/staff.js`: the printed glyph was cut out of a scan at 728 × 736, the alpha
+  edge traced with marching squares, simplified to 38 points and normalised into
+  staff spaces — 0.96 wide, 2.91 tall, centred on the note's line or space. The
+  path carries the printer's own lean and its counter (the gap enclosed by the two
+  bars and the two uprights) as a second subpath, hence `fill-rule="evenodd"`. It
+  agrees with the bitmap to 97.9% and, unlike the stroked version, never has its
+  bar ends sheared by a butt cap. A traced path also stays crisp at any size, which
+  an embedded bitmap would not.
 
 If you change a glyph, compare it against a printed one at matched height before
 believing it. Cropping the printed glyph and the render, scaling both to the same

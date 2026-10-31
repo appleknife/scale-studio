@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311001';
-import { CLEF_PATH } from './clef.js?v=202610311001';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311309';
+import { CLEF_PATH } from './clef.js?v=202610311309';
 
-import { beatLength } from './sightreading.js?v=202610311001';
+import { beatLength } from './sightreading.js?v=202610311309';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -154,7 +154,9 @@ function restGlyph(x, y, dur, colour) {
   // with both ends cut square to the stem's own direction. The hairline gap
   // between bulb and stem is the whole trick — close it and the glyph turns into
   // a comma, widen it and it turns into a 9 next to a stick.
-  const H = 1.7 * LINE_GAP;
+  // Both hooked rests stand just under two spaces tall, which is what a printed
+  // eighth rest measures. At 1.7 they read as small marks rather than rests.
+  const H = 1.9 * LINE_GAP;
   const top = y - H / 2;
   const bottom = y + H / 2;
   const w = 0.095 * H;
@@ -165,13 +167,25 @@ function restGlyph(x, y, dur, colour) {
   // offset perpendicular to the stem, so the cut ends lean with the glyph
   const nx = -(H / Math.hypot(footX - stemX, H)) * (w / 2);
   const ny = ((footX - stemX) / Math.hypot(footX - stemX, H)) * (w / 2);
-  return (
-    `<circle cx="${bulbX.toFixed(2)}" cy="${bulbY.toFixed(2)}" r="${(0.115 * H).toFixed(2)}" fill="${colour}"/>` +
+  const bulb = (cy, r, dx = 0) =>
+    `<circle cx="${(bulbX + dx).toFixed(2)}" cy="${cy.toFixed(2)}" r="${(r * H).toFixed(2)}" fill="${colour}"/>`;
+  const stem =
     `<path d="M${(stemX + nx).toFixed(2)} ${(top + ny).toFixed(2)} ` +
     `L${(footX + nx).toFixed(2)} ${(bottom + ny).toFixed(2)} ` +
     `L${(footX - nx).toFixed(2)} ${(bottom - ny).toFixed(2)} ` +
-    `L${(stemX - nx).toFixed(2)} ${(top - ny).toFixed(2)} Z" fill="${colour}"/>`
-  );
+    `L${(stemX - nx).toFixed(2)} ${(top - ny).toFixed(2)} Z" fill="${colour}"/>`;
+  // Sixteenth rest: the eighth rest with a second hook. The printed glyph is
+  // exactly that — the same bulb repeated at 0.47 of the height, a shade smaller
+  // — and at that spacing the two bulbs stay apart while the stem still runs
+  // clear of them down to the staff line.
+  if (dur < 2) {
+    // The lower hook sits a touch further left: the stem has already drifted
+    // that way by the time it gets there, and without the nudge the two hooks and
+    // the stem merge into one dark peanut instead of reading as two hooks with
+    // the hairline notch an engraved rest has.
+    return bulb(top + 0.17 * H, 0.15) + bulb(top + 0.48 * H, 0.135, -0.035 * H) + stem;
+  }
+  return bulb(top + 0.17 * H, 0.155) + stem;
 }
 
 /* ── Beams ─────────────────────────────────────────────────────────────── */
@@ -433,8 +447,12 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       // gathered the three notes, and a bracket on top of a beam is the one thing
       // engravers never print.
       if (isTriplet(group)) {
-        const x1 = xOf(first);
-        const x2 = xOf(last);
+        // Centre the numeral on the beam, which is the part the eye reads as the
+        // group's body. Centring it on the note heads instead put it half a head
+        // to the right whenever the stems were on the left of the heads, which is
+        // exactly how a triplet with down stems looked off-centre.
+        const x1 = stemX(first);
+        const x2 = stemX(last);
         const by = beam.at(first) + (beam.up ? -12 : 12);
         part.push(
           `<text class="score-tuplet" x="${(x1 + x2) / 2}" y="${by + (beam.up ? 0 : 10)}" ` +
@@ -447,7 +465,9 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       const x = xOf(event);
 
       if (event.rest) {
-        part.push(restGlyph(x, top + 2 * LINE_GAP, event.dur, INK));
+        part.push(
+          `<g class="score-rest" data-dur="${event.dur}">${restGlyph(x, top + 2 * LINE_GAP, event.dur, INK)}</g>`,
+        );
         continue;
       }
       if (!event.note) continue;

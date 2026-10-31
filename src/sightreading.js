@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311001';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311309';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -347,11 +347,24 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // ── rests (level IV and up) — one bar, in the middle, on a weak slot ────
   if (spec.rests && chance(rng, 0.55)) {
     const b = 1 + Math.floor(rng() * 5);
-    // Only a beat or a half-beat can become a rest: a sixteenth rest is a
-    // different glyph, and a rest in the middle of a run of sixteenths is not
-    // something a sight-reading test asks for.
-    const slot = bars[b].findIndex((e, i) => i > 0 && e.dur >= 2 && e.dur <= 4 && i < bars[b].length - 1);
-    if (slot > 0) bars[b][slot].rest = true;
+    const events = bars[b];
+    // A beat or a half-beat can become a rest anywhere in the bar. A sixteenth
+    // rest only reads properly when it *opens* a pair of sixteenths — the note
+    // that follows still beams with the one after it — so that is the only
+    // sixteenth slot worth considering. Level VI is where those pairs exist.
+    const opensPair = (e, i) =>
+      e.dur === 1 &&
+      events[i + 1] &&
+      events[i + 1].dur === 1 &&
+      (!events[i - 1] || events[i - 1].dur !== 1);
+    const sixteenthSlot = events.findIndex(
+      (e, i) => i > 0 && i < events.length - 1 && opensPair(e, i),
+    );
+    const beatSlot = events.findIndex(
+      (e, i) => i > 0 && e.dur >= 2 && e.dur <= 4 && i < events.length - 1,
+    );
+    const slot = sixteenthSlot > 0 && chance(rng, 0.4) ? sixteenthSlot : beatSlot;
+    if (slot > 0) events[slot].rest = true;
   }
 
   // ── pitches ───────────────────────────────────────────────────────────

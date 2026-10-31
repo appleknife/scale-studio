@@ -198,10 +198,10 @@ export const S = {
     '麦克风没有收到清楚的音。靠近一点，弓继续拉，再试一次。',
   ],
   'result.sub': [
-    '{exact} of {expected} notes centred · {heard} notes heard · ♩ ≈ {bpm} · {dur}s',
-    '{expected} 个音里 {exact} 个准 · 听到 {heard} 个音 · ♩ ≈ {bpm} · {dur} 秒',
+    '{exact} of {expected} notes matched · {heard} notes heard · ♩ ≈ {bpm} · {dur}s',
+    '{expected} 个音里 {exact} 个对上 · 听到 {heard} 个音 · ♩ ≈ {bpm} · {dur} 秒',
   ],
-  'result.subSimple': ['{exact} of {expected} notes centred · {heard} notes heard', '{expected} 个音里 {exact} 个准 · 听到 {heard} 个音'],
+  'result.subSimple': ['{exact} of {expected} notes matched · {heard} notes heard', '{expected} 个音里 {exact} 个对上 · 听到 {heard} 个音'],
 
   'component.notes': ['Notes', '音符'],
   'component.intonation': ['Intonation', '音准'],
@@ -239,8 +239,8 @@ export const S = {
 
   'test.step': ['Scale {i} of {n}', '第 {i} / {n} 条'],
   'test.sub': [
-    '{n} scales · {centred} of {total} notes centred · {stops}',
-    '{n} 条音阶 · {total} 个音里 {centred} 个准 · {stops}',
+    '{n} scales · {centred} of {total} notes matched · {stops}',
+    '{n} 条音阶 · {total} 个音里 {centred} 个对上 · {stops}',
   ],
   'test.noStops': ['no stops', '没有停顿'],
   'test.stops': ['{n} stops', '{n} 次停顿'],
