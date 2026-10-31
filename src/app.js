@@ -1,9 +1,10 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302313';
-import { renderStaff } from './staff.js?v=202610302313';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610302313';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610302313';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302322';
+import { renderStaff } from './staff.js?v=202610302322';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610302322';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610302322';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610302322';
 import {
   STRINGS,
   FIFTHS,
@@ -11,7 +12,9 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610302313';
+} from './tuner.js?v=202610302322';
+
+const LANG = initLang();
 
 const $ = (id) => document.getElementById(id);
 
@@ -43,6 +46,7 @@ const el = {
   twoOctPanel: $('twoOctPanel'),
   twoOctRow: $('twoOctRow'),
 
+  langBtn: $('langBtn'),
   tuneBtn: $('tuneBtn'),
   tuneBack: $('tuneBack'),
   tuneMicBtn: $('tuneMicBtn'),
@@ -200,9 +204,10 @@ function renderGrid() {
         <button class="key-card" type="button" data-id="${card.id}">
           <span class="key-name">${names}${suffix}</span>
           <span class="sig-glyphs" aria-hidden="true">${glyphs || '&nbsp;'}</span>
-          <span class="key-sub">${describeKey(scale.fifths)} · ${state.practiceOctaves} octave${
-            state.practiceOctaves === 1 ? '' : 's'
-          }</span>
+          <span class="key-sub">${t('card.sub', {
+            key: describeKey(scale.fifths),
+            o: state.practiceOctaves,
+          })}</span>
         </button>`;
     })
     .join('');
@@ -211,41 +216,17 @@ function renderGrid() {
 }
 
 function gridNoteText() {
-  if (state.mode === 'minor') {
-    return 'Minor scales are not part of the NYSSMA scale requirement, but a lot of the level 5–6 repertoire is in a minor key — so here they are.';
-  }
-  if (state.level === '1-2') {
-    return 'Level I–II: three major scales, one octave, and you choose which three. G, D and A are the usual first three — the same finger pattern, all from open strings.';
-  }
-  if (state.level === '3-4') {
-    return 'Level III–IV: seven major scales, two of them in two octaves. The adjudicator picks one two-octave and two one-octave scales.';
-  }
-  return 'Levels V–VI require fifteen major scales — C plus the seven sharp keys and the seven flat keys — all two octaves, up and down, from memory.';
+  if (state.mode === 'minor') return t('note.minor');
+  return t(`note.${state.level}`);
 }
 
 function updateLevelCopy() {
   el.gridNote.textContent = gridNoteText();
 
-  if (state.mode === 'minor') {
-    el.testBannerText.textContent =
-      'The app draws three scales at random — the way a judge does. Play them one after another, no feedback until the end.';
-    el.drawBtn.textContent = 'Draw three scales';
-    return;
-  }
-
-  if (state.level === '1-2') {
-    el.testBannerText.textContent =
-      'At Level I–II you choose the three scales you prepared. The app listens to all three, then gives you one report.';
-    el.drawBtn.textContent = 'Choose my three';
-  } else if (state.level === '3-4') {
-    el.testBannerText.textContent =
-      'Choose the seven you have prepared; the app picks one two-octave and two one-octave scales, the way a judge does.';
-    el.drawBtn.textContent = 'Choose my seven';
-  } else {
-    el.testBannerText.textContent =
-      'The app draws three scales at random — the way a judge does. Play them one after another, no feedback until the end.';
-    el.drawBtn.textContent = 'Draw three scales';
-  }
+  const level = state.mode === 'minor' ? '5-6' : state.level;
+  el.testBannerText.textContent = t(`banner.${level}`);
+  el.drawBtn.textContent =
+    level === '1-2' ? t('btn.choose3') : level === '3-4' ? t('btn.choose7') : t('btn.draw3');
 }
 
 function setLevel(level) {
@@ -375,11 +356,8 @@ function renderPicker() {
   const picked = state.pick.ids;
   const full = picked.length >= need;
 
-  el.pickTitle.textContent = need === 3 ? 'Choose three scales' : 'Choose seven scales';
-  el.pickSub.textContent =
-    need === 3
-      ? 'Pick the three you know best — you will play them one after another.'
-      : 'These are the seven you have prepared. The app then picks one to play in two octaves and two in one octave, the way a judge would.';
+  el.pickTitle.textContent = need === 3 ? t('test.pickTitle.3') : t('test.pickTitle.7');
+  el.pickSub.textContent = need === 3 ? t('test.pickSub.3') : t('test.pickSub.7');
 
   el.pickGrid.innerHTML = MAJOR_KEYS.map((card) => {
     const scale = buildScale(card, 0, 'major', 'melodic', level.octaves);
@@ -392,7 +370,7 @@ function renderPicker() {
     </button>`;
   }).join('');
 
-  el.pickCount.textContent = `${picked.length} of ${need} chosen`;
+  el.pickCount.textContent = t('test.count', { n: picked.length, need });
 
   const showTwo = level.twoOctave > 0 && picked.length === need;
   el.twoOctPanel.hidden = !showTwo;
@@ -510,7 +488,7 @@ function updateTestBar() {
   }
   const i = state.test.index;
   el.testBar.hidden = false;
-  el.testStep.textContent = `Scale ${i + 1} of ${state.test.scales.length}`;
+  el.testStep.textContent = t('test.step', { i: i + 1, n: state.test.scales.length });
   [...el.testDots.children].forEach((dot, k) => {
     dot.dataset.state = k < i ? 'done' : k === i ? 'current' : 'todo';
   });
@@ -546,37 +524,34 @@ function endTest() {
 
 function pickEncouragement(score) {
   const band = score >= 93 ? 'excellent' : score >= 84 ? 'strong' : score >= 70 ? 'growing' : 'keep';
-  const pool = ENCOURAGEMENT[band];
-  let line = pool[Math.floor(Math.random() * pool.length)];
-  if (line === lastEncouragement && pool.length > 1) {
-    line = pool[(pool.indexOf(line) + 1) % pool.length];
-  }
-  lastEncouragement = line;
-  return line;
+  const index = 1 + Math.floor(Math.random() * 3);
+  let key = `encourage.${band}.${index}`;
+  if (key === lastEncouragement) key = `encourage.${band}.${(index % 3) + 1}`;
+  lastEncouragement = key;
+  return t(key);
 }
 
 function testGradeLabel(score) {
-  if (score >= 93) return 'An audition-ready set';
-  if (score >= 84) return 'A strong set';
-  if (score >= 70) return 'A good set';
-  if (score >= 58) return 'Coming together';
-  return 'A set worth repeating';
+  const band = score >= 93 ? 93 : score >= 84 ? 84 : score >= 70 ? 70 : score >= 58 ? 58 : 0;
+  return t(`test.grade.${band}`);
 }
 
 function shortVerdict(result) {
-  if (result.stats.heard < 3) return 'nothing heard';
+  if (result.stats.heard < 3) return t('verdict.nothing');
   if (result.stats.stops) {
-    return result.stats.stops === 1 ? 'stopped once' : `stopped ${result.stats.stops} times`;
+    return result.stats.stops === 1 ? t('verdict.stoppedOne') : t('verdict.stopped', { n: result.stats.stops });
   }
   if (result.stats.missed) {
-    return `${result.stats.missed} note${result.stats.missed === 1 ? '' : 's'} missed`;
+    return result.stats.missed === 1
+      ? t('verdict.missedOne')
+      : t('verdict.missed', { n: result.stats.missed });
   }
   const outliers = result.notes.filter(
     (note) => note.status === 'exact' && Math.abs(note.cents) > 30,
   ).length;
-  if (outliers) return 'a few notes off-centre';
-  if (result.components.steadiness < 0.88) return 'the pulse wandered';
-  return result.score >= 95 ? 'clean' : 'solid';
+  if (outliers) return t('verdict.offCentre');
+  if (result.components.steadiness < 0.88) return t('verdict.pulse');
+  return result.score >= 95 ? t('verdict.clean') : t('verdict.solid');
 }
 
 function renderTestResult() {
@@ -729,9 +704,7 @@ function paintNeedle() {
     needleEl.style.transform = 'rotate(0deg)';
     needleEl.dataset.state = 'idle';
     el.tuneCents.textContent = '—';
-    el.tuneStatus.textContent = t.listening
-      ? 'Bow a string — the dial follows it.'
-      : 'Press “Start listening” to use the microphone.';
+    el.tuneStatus.textContent = t.listening ? t('tuner.idle') : t('tuner.noMic');
     return;
   }
 
@@ -744,15 +717,18 @@ function paintNeedle() {
   el.tuneCents.textContent = `${cents > 0 ? '+' : ''}${cents.toFixed(0)}¢`;
 
   if (good) {
-    el.tuneStatus.textContent = `${string.id} is sitting where you want it.`;
+    el.tuneStatus.textContent = t('tuner.stringsNote', { s: string.id });
   } else if (Math.abs(error) <= 12) {
-    el.tuneStatus.textContent = `A touch ${error > 0 ? 'sharp' : 'flat'} — ease it ${
-      error > 0 ? 'down' : 'up'
-    }.`;
+    el.tuneStatus.textContent = t('tuner.close', {
+      dir: error > 0 ? (LANG === 'zh' ? '高' : 'sharp') : LANG === 'zh' ? '低' : 'flat',
+      move: error > 0 ? (LANG === 'zh' ? '下' : 'down') : LANG === 'zh' ? '上' : 'up',
+    });
   } else {
-    el.tuneStatus.textContent = `${Math.abs(error).toFixed(0)}¢ ${
-      error > 0 ? 'sharp' : 'flat'
-    } — bring the peg ${error > 0 ? 'down' : 'up'}.`;
+    el.tuneStatus.textContent = t('tuner.far', {
+      n: Math.abs(error).toFixed(0),
+      dir: error > 0 ? (LANG === 'zh' ? '高' : 'sharp') : LANG === 'zh' ? '低' : 'flat',
+      move: error > 0 ? (LANG === 'zh' ? '下' : 'down') : LANG === 'zh' ? '上' : 'up',
+    });
   }
 }
 
@@ -886,7 +862,7 @@ function renderPractice() {
   el.scaleMeta.textContent = scale.meta;
   el.staffHost.innerHTML = renderStaff(scale.sequence, { fifths: scale.fifths });
   el.memoryName.textContent = scale.title;
-  el.memoryMeta.textContent = `${scale.meta.replace(/ · \d+ notes$/, '')} · ${scale.rangeText}`;
+  el.memoryMeta.textContent = `${scale.meta} · ${scale.rangeText}`;
   el.spellingRow.hidden = Boolean(state.test) || scale.spellings.length < 2;
   [...el.octaveTabs.querySelectorAll('button')].forEach((b) =>
     b.setAttribute('aria-selected', String(Number(b.dataset.oct) === scale.octaves)),
@@ -909,21 +885,21 @@ function applyNotationVisibility() {
   el.staffCard.hidden = hide;
   el.memoryCard.hidden = !hide;
   el.notationBtn.hidden = Boolean(state.test);
-  el.notationBtn.textContent = state.showNotation ? 'Hide notation' : 'Show notation';
+  el.notationBtn.textContent = state.showNotation ? t('btn.hideNotation') : t('btn.showNotation');
   el.notationBtn.setAttribute('aria-pressed', String(!state.showNotation));
 }
 
 function resetListenUI() {
   el.listenCard.classList.remove('is-live');
   el.listenStatus.classList.remove('is-live');
-  el.listenText.textContent = 'Ready when you are';
-  el.listenHint.textContent = 'No rush — the take begins the moment you play your first note.';
+  el.listenText.textContent = t('status.ready');
+  el.listenHint.textContent = t('hint.begin');
   el.live.hidden = true;
   el.levelBar.hidden = true;
   el.stopBtn.hidden = true;
   el.startBtn.hidden = false;
   el.startBtn.disabled = false;
-  el.startBtn.textContent = 'Start listening';
+  el.startBtn.textContent = t('btn.startListening');
 }
 
 function setStatus(live, text) {
@@ -1022,8 +998,8 @@ async function startListening() {
   state.phase = 'requesting';
   el.startBtn.disabled = true;
   el.startBtn.hidden = false;
-  el.startBtn.textContent = 'Starting…';
-  setStatus(false, 'Waiting for the microphone');
+  el.startBtn.textContent = t('btn.starting');
+  setStatus(false, t('status.waitingMic'));
 
   // The microphone is opened once and kept for a whole mock audition, so the
   // audio context stays unlocked between takes (important on iOS). The tuner
@@ -1036,8 +1012,8 @@ async function startListening() {
     } catch (err) {
       state.phase = 'idle';
       el.startBtn.disabled = false;
-      el.startBtn.textContent = 'Start listening';
-      setStatus(false, 'Microphone unavailable');
+      el.startBtn.textContent = t('btn.startListening');
+      setStatus(false, t('status.micUnavailable'));
       el.listenHint.textContent = micErrorMessage(err);
       return;
     }
@@ -1062,14 +1038,12 @@ function beginTake() {
     peak: 0,
   };
 
-  setStatus(true, 'Listening — play whenever you are ready');
-  el.listenHint.textContent = state.test
-    ? 'Feedback comes at the end — play it the way you would for the judge.'
-    : 'The take starts with your first note and ends after you stop.';
+  setStatus(true, t('status.listening'));
+  el.listenHint.textContent = state.test ? t('hint.beginTest') : t('hint.playing');
 
   el.startBtn.hidden = true;
   el.startBtn.disabled = false;
-  el.startBtn.textContent = 'Start listening';
+  el.startBtn.textContent = t('btn.startListening');
   el.stopBtn.hidden = false;
   // No tuner during a mock audition: a judge gives nothing away either.
   el.live.hidden = Boolean(state.test);
@@ -1120,8 +1094,8 @@ function onFrame(frame) {
       take.started = true;
       devLog('take-started', { index: state.test ? state.test.index : -1, rms: Number(frame.rms.toFixed(4)) });
       take.t0 = Math.max(0, frame.t - 0.1);
-      setStatus(true, 'Listening to your scale');
-      el.listenHint.textContent = 'All the way up, then back down.';
+      setStatus(true, t('status.listeningScale'));
+      el.listenHint.textContent = t('hint.allTheWay');
     }
     return;
   }
@@ -1198,8 +1172,8 @@ function finishTake() {
     if (state.test.index < state.test.scales.length - 1) {
       state.phase = 'between';
       state.take = null;
-      setStatus(false, `Scale ${state.test.index + 1} done`);
-      el.listenHint.textContent = 'Next scale in a moment — breathe, then play when you are ready.';
+      setStatus(false, t('status.scaleDone', { n: state.test.index + 1 }));
+      el.listenHint.textContent = t('hint.next');
       setTimeout(nextTestScale, 1700);
       return;
     }
@@ -1212,7 +1186,7 @@ function finishTake() {
 
   closeMic();
   el.startBtn.hidden = false;
-  setStatus(false, 'Take finished');
+  setStatus(false, t('status.finished'));
   renderResult(result);
 
   if (DEV) {
@@ -1290,10 +1264,10 @@ function renderResult(result) {
   });
 
   const metrics = [
-    ['Notes', result.components.accuracy],
-    ['Intonation', result.components.intonation],
-    ['Steadiness', result.components.steadiness],
-    ['Flow', result.components.continuity],
+    [t('component.notes'), result.components.accuracy],
+    [t('component.intonation'), result.components.intonation],
+    [t('component.steadiness'), result.components.steadiness],
+    [t('component.flow'), result.components.continuity],
   ];
   el.breakdown.innerHTML = metrics
     .map(
@@ -1345,6 +1319,12 @@ el.modeTabs.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-mode]');
   if (btn) setMode(btn.dataset.mode);
 });
+
+el.langBtn.addEventListener('click', () => setLang(LANG === 'zh' ? 'en' : 'zh'));
+if (LANG === 'zh') {
+  el.langBtn.textContent = 'English';
+  applyStatic();
+}
 
 el.tuneBtn.addEventListener('click', () => openTuner());
 

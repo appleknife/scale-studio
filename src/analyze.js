@@ -4,7 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202610302313';
+import { median } from './pitch.js?v=202610302322';
+import { getLang, t } from './i18n.js?v=202610302322';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -345,14 +346,19 @@ function detectOctaveShift(notes, expected) {
 
 export function centsText(cents) {
   const v = Math.round(Math.abs(cents));
-  if (v === 0) return 'dead on';
+  const zh = getLang() === 'zh';
+  if (v === 0) return zh ? '正好' : 'dead on';
+  if (zh) return `${cents > 0 ? '高' : '低'} ${v} 音分`;
   return `${v}¢ ${cents > 0 ? 'high' : 'low'}`;
 }
 
 function noteList(items) {
+  const zh = getLang() === 'zh';
   if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+  if (items.length === 2) return zh ? `${items[0]} 和 ${items[1]}` : `${items[0]} and ${items[1]}`;
+  return zh
+    ? `${items.slice(0, -1).join('、')} 和 ${items[items.length - 1]}`
+    : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
 /** Gentle, specific feedback. Ordered by how much each item cost. */
@@ -371,8 +377,10 @@ export function buildTips(result) {
     push(
       {
         kind: 'intonation',
-        title: 'A few notes sat off-centre',
-        text: `${noteList(shown.map((n) => `${n.note.name} (${centsText(n.cents)})`))}. Slow those notes down and listen for the ring — the pitch should feel like it locks into place rather than being placed.`,
+        title: t('tip.intonation.title'),
+        text: t('tip.intonation.text', {
+          list: noteList(shown.map((n) => `${n.note.name}（${centsText(n.cents)}）`)),
+        }),
       },
       (1 - components.intonation) * 0.2,
     );
@@ -386,11 +394,10 @@ export function buildTips(result) {
       push(
         {
           kind: 'intonation',
-          title: avg > 0 ? 'You sat a little high overall' : 'You sat a little low overall',
-          text:
-            avg > 0
-              ? `Across the scale you averaged ${Math.abs(avg).toFixed(0)}¢ sharp. Check your open strings against a drone before you start — most of the time it is the A string creeping up.`
-              : `Across the scale you averaged ${Math.abs(avg).toFixed(0)}¢ flat. That is often a bow-speed or hand-frame thing rather than a listening thing — play the scale again with a fuller, slower bow.`,
+          title: t(avg > 0 ? 'tip.high.title' : 'tip.low.title'),
+          text: t(avg > 0 ? 'tip.high.text' : 'tip.low.text', {
+            cents: Math.abs(avg).toFixed(0),
+          }),
         },
         Math.min(0.12, Math.abs(avg) / 200),
       );
@@ -401,10 +408,10 @@ export function buildTips(result) {
     push(
       {
         kind: 'rhythm',
-        title: 'The pulse wandered a little',
-        text: `The notes were mostly even, but the spacing drifted${
-          stats.bpm ? ` around ♩=${stats.bpm}` : ''
-        }. Set a metronome a notch slower and let each note take exactly the same space before adding speed.`,
+        title: t('tip.rhythm.title'),
+        text: t('tip.rhythm.text', {
+          tempo: stats.bpm ? t('tip.rhythm.tempo', { bpm: stats.bpm }) : '',
+        }),
       },
       (1 - components.steadiness) * 0.12,
     );
@@ -414,20 +421,20 @@ export function buildTips(result) {
     push(
       {
         kind: 'tempo',
-        title: 'There is room to move a little',
-        text: `You played around ♩=${stats.bpm}. The Manual asks for “a moderate speed” — not fast, just flowing. Once the notes feel secure, nudge toward ♩=60–72; scales usually get easier there, not harder.`,
+        title: t('tip.tempo.title'),
+        text: t('tip.tempo.text', { bpm: stats.bpm }),
       },
       0.04,
     );
   }
 
   if (stats.stops >= 1) {
-    const where = stats.stops === 1 ? 'once' : `${stats.stops} times`;
     push(
       {
         kind: 'flow',
-        title: `You stopped ${where}`,
-        text: `${stats.longStops ? 'Some of those were long enough to break the phrase. ' : ''}Stops usually mean the next note is not yet automatic — loop that spot on its own three times, then rejoin the scale from two notes before it.`,
+        title:
+          stats.stops === 1 ? t('tip.flow.titleOne') : t('tip.flow.title', { n: stats.stops }),
+        text: t('tip.flow.text', { long: stats.longStops ? t('tip.flow.long') : '' }),
       },
       (1 - components.continuity) * 0.12,
     );
@@ -437,9 +444,11 @@ export function buildTips(result) {
     push(
       {
         kind: 'notes',
-        title: `${stats.missed} note${stats.missed === 1 ? '' : 's'} not heard`,
-        text:
-          'Either a note was skipped, or it was too quiet for the microphone. Play the scale again at a confident dynamic — a clear, even bow helps the app hear every note.',
+        title:
+          stats.missed === 1
+            ? t('tip.notes.titleOne')
+            : t('tip.notes.title', { n: stats.missed }),
+        text: t('tip.notes.text'),
       },
       (1 - components.accuracy) * 0.5,
     );
@@ -449,25 +458,19 @@ export function buildTips(result) {
     push(
       {
         kind: 'range',
-        title:
-          stats.octaveShift > 0
-            ? 'You started an octave above the written range'
-            : 'You started an octave below the written range',
-        text: `This scale runs ${result.scale.rangeText}. The notes were right — just in the other octave — so reset the hand to the note shown in the diagram and begin there.`,
+        title: t(stats.octaveShift > 0 ? 'tip.range.titleHigh' : 'tip.range.titleLow'),
+        text: t('tip.range.text', { range: result.scale.rangeText }),
       },
       0.5,
     );
   }
 
   tips.sort((a, b) => b.impact - a.impact);
-  return tips.slice(0, 3).map(({ impact, ...t }) => t);
+  return tips.slice(0, 3).map(({ impact, ...rest }) => rest);
 }
 
 export function gradeFor(score) {
-  if (score >= 96) return { label: 'Exceptional', note: 'That is adjudication-ready.' };
-  if (score >= 90) return { label: 'Excellent', note: 'Clean, centred and even.' };
-  if (score >= 82) return { label: 'Very good', note: 'A small polish and it is there.' };
-  if (score >= 72) return { label: 'Good work', note: 'The shape is secure — now the details.' };
-  if (score >= 60) return { label: 'Coming along', note: 'The notes are arriving; keep the pulse steady.' };
-  return { label: 'Keep building', note: 'Slow it down and let each note settle.' };
+  const band = score >= 96 ? 96 : score >= 90 ? 90 : score >= 82 ? 82 : score >= 72 ? 72 : score >= 60 ? 60 : 0;
+  return { label: t(`grade.${band}.label`), note: t(`grade.${band}.note`) };
 }
+

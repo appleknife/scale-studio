@@ -18,7 +18,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610302313" />
+    <link rel="stylesheet" href="app.css?v=202610302322" />
   </head>
   <body>
     <div class="shell">
@@ -43,6 +43,7 @@
           </span>
         </button>
         <div class="topbar-actions">
+          <button class="ghost-btn" id="langBtn" type="button">中文</button>
           <button class="ghost-btn" id="tuneBtn" type="button">Tuner</button>
           <button class="ghost-btn" id="helpBtn" type="button">How it works</button>
         </div>
@@ -143,7 +144,7 @@
 
           <div class="guide-card">
             <h3 class="card-title">How to tune it</h3>
-            <ol class="guide-list">
+            <ol class="guide-list" data-i18n="guide.howTo">
               <li>
                 <strong>Start with A.</strong> Everything else is measured against it,
                 so get the A string settled first.
@@ -168,12 +169,12 @@
 
           <div class="guide-card">
             <h3 class="card-title">Pegs and fine tuners</h3>
-            <p class="guide-intro">
+            <p class="guide-intro" data-i18n="guide.pegsIntro">
               Most tuning is a few small turns of a fine tuner. Pegs are for when a
               string is a long way off — and they deserve respect: a small turn moves
               the pitch a long way, and that is how strings get broken.
             </p>
-            <ol class="guide-list">
+            <ol class="guide-list" data-i18n="guide.pegs">
               <li>
                 <strong>Fine tuners first, almost always.</strong> If the note is close,
                 a little screwing in is the whole job.
@@ -184,14 +185,21 @@
                 one.
               </li>
               <li>
-                <strong>Come up from below.</strong> Ease the string slightly flat first,
-                then bring it up to pitch. Arriving from underneath seats the peg, and
-                it means you never have to go past the note and come back down.
+                <strong>Brace the violin first.</strong> Hold the instrument against the
+                push with your other hand. For the upper pegs, support the scroll or the
+                pegbox — never the body: pushing a peg while holding the lower bout
+                twists the neck, and that is how necks break.
               </li>
               <li>
-                <strong>Don't overshoot.</strong> Passing above the pitch adds tension to
-                a string that is already near its limit. If you do go over, come back and
-                start again from below.
+                <strong>Push the peg in as you turn it.</strong> Press it gently into the
+                pegbox while turning. A peg holds by friction, so without that inward
+                pressure it slips back the moment you let go.
+              </li>
+              <li>
+                <strong>Come up from below — and don't overshoot.</strong> Ease the string
+                slightly flat first, then bring it up to pitch. Arriving from underneath
+                seats the peg, and it means you never have to go past the note and come
+                back down, which is what puts a string near breaking.
               </li>
               <li>
                 <strong>If a fine tuner runs out of travel</strong>, reset it: unscrew it
@@ -199,7 +207,7 @@
                 the fine tuner. A bottomed-out fine tuner cannot tune anything.
               </li>
             </ol>
-            <p class="guide-warning">
+            <p class="guide-warning" data-i18n="guide.warning">
               <strong>The E is the fragile one.</strong> Thinnest string, highest
               tension — the smallest turns of all, and never force a peg that has seized.
             </p>
@@ -207,17 +215,17 @@
 
           <div class="guide-card">
             <h3 class="card-title">Check the fifths — this matters most</h3>
-            <p class="guide-intro">
+            <p class="guide-intro" data-i18n="guide.fifthsIntro1">
               A violin is tuned in pure fifths, but a tuner is equal-tempered, so the two
               disagree by a couple of cents on every string. Hold each pair as a double
               stop and listen for a clean ring with no slow wobble.
             </p>
-            <p class="guide-intro">
+            <p class="guide-intro" data-i18n="guide.fifthsIntro2">
               <strong>A is the base.</strong> Tune E to A, then D to A, then G to D. Only
               the second string of each pair moves — and re-check the dial afterwards,
               because the fifth is the better judge of the two.
             </p>
-            <p class="guide-intro">
+            <p class="guide-intro" data-i18n="guide.fifthsIntro3">
               This is the one part your ear has to do — the app can't judge a double
               stop for you. Tick each pair off once it rings.
             </p>
@@ -492,7 +500,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610302313"></script>
+    <script type="module" src="src/app.js?v=202610302322"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

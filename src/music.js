@@ -4,6 +4,8 @@
 // than raw MIDI numbers, so the staff can be drawn with the right accidentals
 // and the app can show enharmonic spellings (F♯ / G♭, C♯ / D♭, B / C♭).
 
+import { getLang, t } from './i18n.js?v=202610302322';
+
 export const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const LETTER_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
 
@@ -129,8 +131,11 @@ export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melod
   const sequence = up.concat(down.slice(0, octaves * 7).reverse());
 
   const name = v.name;
-  const title =
-    mode === 'minor' ? `${name} ${form} minor` : `${name} major`;
+  const zh = getLang() === 'zh';
+  const formName = zh
+    ? { natural: '自然', harmonic: '和声', melodic: '旋律' }[form]
+    : form;
+  const title = mode === 'minor' ? `${name} ${formName}${zh ? '小调' : ' minor'}` : `${name}${zh ? '大调' : ' major'}`;
 
   return {
     cardId: card.id,
@@ -146,13 +151,14 @@ export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melod
     sequence,
     rangeText: `${sequence[0].name} – ${sequence[octaves * 7].name}`,
     octaves,
-    meta: `${octaves} octave${octaves === 1 ? '' : 's'} · up and down · ${sequence.length} notes`,
+    meta: t(`meta.${octaves === 1 ? 1 : 2}`, { o: octaves, n: sequence.length }),
     card,
   };
 }
 
 export function describeKey(fifths) {
   const n = Math.abs(fifths);
-  if (n === 0) return 'no sharps or flats';
-  return `${n} ${fifths > 0 ? 'sharp' : 'flat'}${n === 1 ? '' : 's'}`;
+  if (n === 0) return t('key.none');
+  const key = fifths > 0 ? (n === 1 ? 'key.sharp' : 'key.sharps') : n === 1 ? 'key.flat' : 'key.flats';
+  return t(key, { n });
 }
