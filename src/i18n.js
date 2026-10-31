@@ -275,7 +275,6 @@ export const S = {
     '{n} stop(s). Read it a bar at a time, slowly, until it flows.',
     '停顿了 {n} 次。一小节一小节慢慢读，直到顺下来。',
   ],
-  'donate.button': ['Support me', '支持我'],
   'test.stops': ['{n} stops', '{n} 次停顿'],
   'test.stopOne': ['1 stop', '1 次停顿'],
   'test.sub.1-2': ['The three you chose — one octave each.', '你选的三条——每条一个八度。'],
@@ -576,9 +575,11 @@ export const STATIC = {
     '八小节，按你的级别，每次都不一样。先看谱，听一下速度，再开始拉。',
   Finish: '完成',
   'Try again': '再试一次',
-  'Support me': '♥ 支持我',
+  'Support Scale Studio': '支持 Scale Studio',
   'sight.intro':
     '先看一遍，听一下速度，然后开始拉——应用会等你第一个音。它只听音高和节拍；力度和弓法它判断不了，速度也比评委宽容。',
+  'help.support':
+    'Scale Studio 一直免费，也会一直免费。如果它对你或你的学生有帮助，也可以<a href="https://ko-fi.com/apple" target="_blank" rel="noopener noreferrer">请我喝杯咖啡</a>——这样我才能继续把这类东西做下去。',
 
   /* the rest of the static sheet */
   'eyebrow.test': '模拟考试 · 三条音阶',

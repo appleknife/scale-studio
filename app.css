@@ -2124,3 +2124,10 @@ dialog .primary-btn {
 .donate-link:focus-visible {
   border-bottom-color: currentColor;
 }
+
+.help-support a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+  /* keeps 「请我喝杯咖啡」 from splitting across a line */
+  white-space: nowrap;
+}
