@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM } from './staff.js?v=202610310132';
-import { CLEF_PATH } from './clef.js?v=202610310132';
+import { STAFF_GEOM } from './staff.js?v=202610310146';
+import { CLEF_PATH } from './clef.js?v=202610310146';
 
-import { beatLength } from './sightreading.js?v=202610310132';
+import { beatLength } from './sightreading.js?v=202610310146';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -39,7 +39,7 @@ function ledgerLines(letter, octave, x, bottom) {
   const out = [];
   const line = (l) => {
     const y = bottom - (l - E4) * STEPS;
-    out.push(`<line x1="${x - 9.5}" y1="${y}" x2="${x + 9.5}" y2="${y}" stroke="#cfc4b3" stroke-width="1"/>`);
+    out.push(`<line x1="${x - 9.5}" y1="${y}" x2="${x + 9.5}" y2="${y}" stroke="#c3b49d" stroke-width="1.15"/>`);
   };
   if (idx < E4) for (let l = E4 - 2; l >= idx; l -= 2) line(l);
   else if (idx > E4 + 8) for (let l = E4 + 10; l <= idx; l += 2) line(l);
@@ -72,13 +72,21 @@ function accidental(alter, x, y, colour = INK) {
     `<line x1="${cx - 0.75 * s}" y1="${y + 0.46 * s}" x2="${cx + 0.75 * s}" y2="${y + 0.3 * s}" stroke-width="${0.34 * s}"/>` +
     `</g>`;
 
-  const naturalAt = (cx) =>
-    `<g stroke="${colour}" stroke-linecap="butt">` +
-    `<line x1="${cx - 0.36 * s}" y1="${y - 1.45 * s}" x2="${cx - 0.36 * s}" y2="${y + 0.22 * s}" stroke-width="${stem}"/>` +
-    `<line x1="${cx + 0.36 * s}" y1="${y - 0.22 * s}" x2="${cx + 0.36 * s}" y2="${y + 1.45 * s}" stroke-width="${stem}"/>` +
-    `<line x1="${cx - 0.36 * s}" y1="${y - 0.22 * s}" x2="${cx + 0.36 * s}" y2="${y - 0.38 * s}" stroke-width="${0.34 * s}"/>` +
-    `<line x1="${cx - 0.36 * s}" y1="${y + 0.38 * s}" x2="${cx + 0.36 * s}" y2="${y + 0.22 * s}" stroke-width="${0.34 * s}"/>` +
-    `</g>`;
+  // The natural's two uprights and two crossbars meet exactly, square and
+  // horizontal — slanted crossbars left visible notches at the corners.
+  const naturalAt = (cx) => {
+    const l = cx - 0.36 * s;
+    const r = cx + 0.36 * s;
+    const bar = 0.36 * s;
+    return (
+      `<g stroke="${colour}" stroke-linecap="butt">` +
+      `<line x1="${l}" y1="${y - 1.5 * s}" x2="${l}" y2="${y + 0.5 * s}" stroke-width="${stem}"/>` +
+      `<line x1="${r}" y1="${y - 0.5 * s}" x2="${r}" y2="${y + 1.5 * s}" stroke-width="${stem}"/>` +
+      `<line x1="${l}" y1="${y - 0.5 * s}" x2="${r}" y2="${y - 0.5 * s}" stroke-width="${bar}"/>` +
+      `<line x1="${l}" y1="${y + 0.5 * s}" x2="${r}" y2="${y + 0.5 * s}" stroke-width="${bar}"/>` +
+      `</g>`
+    );
+  };
 
   if (alter === -1) return flatAt(x);
   if (alter === 1) return sharpAt(x);
@@ -112,11 +120,12 @@ function restGlyph(x, y, dur, colour) {
       `fill="none" stroke="${colour}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`
     );
   }
-  // eighth rest — a dot with a hook, big enough to read at phone size
+  // eighth rest — the familiar "7": a bulb at the top and one curved stroke
+  // leaning down and left, about two and a half spaces tall.
   return (
-    `<circle cx="${x + 2.4}" cy="${y - 8}" r="3" fill="${colour}"/>` +
-    `<path d="M${x + 2.4} ${y - 8} q4.6 -2.6 2 -7.4" fill="none" stroke="${colour}" stroke-width="2.2" stroke-linecap="round"/>` +
-    `<path d="M${x + 2.4} ${y - 8} q-2.4 5.4 -4.6 9.6" fill="none" stroke="${colour}" stroke-width="2.2" stroke-linecap="round"/>`
+    `<circle cx="${x + 3}" cy="${y - 11}" r="3.3" fill="${colour}"/>` +
+    `<path d="M${x + 3} ${y - 10} C${x + 1} ${y - 3.5} ${x - 2.5} ${y + 2} ${x - 5.5} ${y + 6.5}" ` +
+    `fill="none" stroke="${colour}" stroke-width="2.8" stroke-linecap="round"/>`
   );
 }
 
@@ -170,7 +179,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
   const bottom = top + 4 * LINE_GAP;
 
   // staff lines
-  part.push(`<g stroke="#cfc4b3" stroke-width="1" stroke-linecap="round">`);
+  part.push(`<g stroke="#c3b49d" stroke-width="1.15" stroke-linecap="round">`);
   for (let i = 0; i < 5; i++) {
     const y = top + i * LINE_GAP;
     part.push(`<line x1="${LEFT}" y1="${y}" x2="${WIDTH - RIGHT}" y2="${y}"/>`);
@@ -207,8 +216,8 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
     const midY = top + 2 * LINE_GAP;
     // Each digit is about two spaces tall, so the pair fills the staff.
     part.push(
-      `<text class="score-time" x="${cursor}" y="${midY - 1}" font-size="27" text-anchor="middle">${num}</text>`,
-      `<text class="score-time" x="${cursor}" y="${midY + 23}" font-size="27" text-anchor="middle">${den}</text>`,
+      `<text class="score-time" x="${cursor}" y="${midY - 1}" font-size="29" text-anchor="middle">${num}</text>`,
+      `<text class="score-time" x="${cursor}" y="${midY + 23}" font-size="29" text-anchor="middle">${den}</text>`,
     );
     cursor += 30;
   }
@@ -229,28 +238,33 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
 
   /**
    * Horizontal positions for one bar: time first, then a floor on the gap so a
-   * sixteenth and the accidental in front of it never land on top of each other.
-   * If the nudge pushes the bar past its own width, the whole bar is compressed
-   * back inside it rather than colliding with the barline.
+   * note never lands on the accidental in front of it.
+   *
+   * The floor is generous; if it would push the bar past its width, it is relaxed
+   * step by step rather than scaling the finished bar back — scaling re-creates
+   * the very collision the floor was there to prevent.
    */
   function positions(events, barX) {
     const x0 = barX + inset;
     const span = barWidth - inset - 8;
-    const xs = new Map();
-    let prev = null;
-    for (const e of events) {
-      let x = x0 + (e.start / passage.perBar) * span;
-      const gap = 15 + (e.accidental ? 9 : 0);
-      if (prev != null && x - prev < gap) x = prev + gap;
-      xs.set(e, x);
-      prev = x;
-    }
     const limit = barX + barWidth - 9;
-    if (prev != null && prev > limit) {
-      const first = xs.get(events[0]);
-      const scale = prev > first ? (limit - first) / (prev - first) : 1;
-      for (const e of events) xs.set(e, first + (xs.get(e) - first) * scale);
+
+    for (const allowance of [22, 16, 11, 6, 0]) {
+      const xs = new Map();
+      let prev = null;
+      for (const e of events) {
+        let x = x0 + (e.start / passage.perBar) * span;
+        const gap = 16 + (e.accidental ? allowance : 0);
+        if (prev != null && x - prev < gap) x = prev + gap;
+        xs.set(e, x);
+        prev = x;
+      }
+      if (prev == null || prev <= limit) return xs;
     }
+
+    // pathological bar: plain time positions, which at least stay inside the bar
+    const xs = new Map();
+    for (const e of events) xs.set(e, x0 + (e.start / passage.perBar) * span);
     return xs;
   }
 
@@ -265,12 +279,30 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       `<line x1="${barX}" y1="${top}" x2="${barX}" y2="${bottom}" stroke="${INK}" stroke-width="1.3"/>`,
     );
 
-    // dynamics: below everything else in the bar, so a low note never hides them
+    // Beam geometry first: the dynamics are placed below the deepest beam, so a
+    // beamed group can never sit on top of an mf.
+    const groups = beamGroups(events, beat);
+    const beamOf = new Map();
+    let deepest = bottom;
+    for (const group of groups) {
+      const ups = group.map((e) => stemUp(e.note.letter, e.note.octave));
+      const up = ups.filter(Boolean).length >= ups.length / 2;
+      const ys = group.map((e) => yForNote(e.note.letter, e.note.octave, bottom));
+      // Only a very deep beam is capped, and then generously: shortening stems
+      // to squeeze a beam upward is what made sixteenths look deformed.
+      const beamY = up
+        ? Math.min(...ys) - STEM
+        : Math.min(Math.max(...ys) + STEM, bottom + 40);
+      deepest = Math.max(deepest, beamY);
+      group.forEach((e) => beamOf.set(e, { beamY, up }));
+    }
+
+    // dynamics: below everything else in the bar
     const lowest = Math.max(
       bottom,
       ...events.map((e) => (e.note ? yForNote(e.note.letter, e.note.octave, bottom) : 0)),
     );
-    const dynY = Math.max(bottom + 34, lowest + 26);
+    const dynY = Math.max(bottom + 34, lowest + 26, deepest + 26);
     const firstWithDynamic = events.find((e) => e.dynamic);
     if (firstWithDynamic) {
       part.push(
@@ -283,31 +315,20 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       );
     }
 
-    // beams first, so stems can be drawn to the beam line
-    const groups = beamGroups(events, beat);
-    const beamOf = new Map();
-    groups.forEach((group, gi) => {
-      const ups = group.map((e) => stemUp(e.note.letter, e.note.octave));
-      const up = ups.filter(Boolean).length >= ups.length / 2;
-      const ys = group.map((e) => yForNote(e.note.letter, e.note.octave, bottom));
-      // A beam that hangs far below the staff would run into the dynamics and the
-      // system beneath, so its depth is capped (stems shorten to meet it).
-      const beamY = up
-        ? Math.min(...ys) - STEM
-        : Math.min(Math.max(...ys) + STEM, bottom + 18);
-      group.forEach((e) => beamOf.set(e, { beamY, up, gi }));
-      const stemX = (e) => xOf(e) + (up ? 5.4 : -5.4);
+    groups.forEach((group) => {
+      const beam = beamOf.get(group[0]);
+      const stemX = (e) => xOf(e) + (beam.up ? 5.4 : -5.4);
       part.push(
-        `<line x1="${stemX(group[0])}" y1="${beamY}" ` +
-          `x2="${stemX(group[group.length - 1])}" y2="${beamY}" ` +
+        `<line x1="${stemX(group[0])}" y1="${beam.beamY}" ` +
+          `x2="${stemX(group[group.length - 1])}" y2="${beam.beamY}" ` +
           `stroke="${INK}" stroke-width="${BEAM}" stroke-linecap="butt"/>`,
       );
       // sixteenths carry a second beam, offset toward the note heads
-      const offset = up ? BEAM + 3.4 : -(BEAM + 3.4);
+      const offset = beam.up ? BEAM + 3.6 : -(BEAM + 3.6);
       for (const run of sixteenthRuns(group)) {
         part.push(
-          `<line x1="${stemX(run[0])}" y1="${beamY + offset}" ` +
-            `x2="${stemX(run[run.length - 1])}" y2="${beamY + offset}" ` +
+          `<line x1="${stemX(run[0])}" y1="${beam.beamY + offset}" ` +
+            `x2="${stemX(run[run.length - 1])}" y2="${beam.beamY + offset}" ` +
             `stroke="${INK}" stroke-width="${BEAM}" stroke-linecap="butt"/>`,
         );
       }
@@ -317,7 +338,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       const x = xOf(event);
 
       if (event.rest) {
-        part.push(restGlyph(x, top + 2 * LINE_GAP, event.dur, MUTED));
+        part.push(restGlyph(x, top + 2 * LINE_GAP, event.dur, INK));
         continue;
       }
       if (!event.note) continue;
@@ -329,7 +350,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       part.push(ledgerLines(event.note.letter, event.note.octave, x, bottom));
 
       if (event.accidental) {
-        part.push(accidental(event.note.alter, x - 2.4 * LINE_GAP, y));
+        part.push(accidental(event.note.alter, x - 2 * LINE_GAP, y));
       }
 
       const beam = beamOf.get(event);
@@ -346,19 +367,21 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
         // curling back toward the note head. Drawn as a shape, not a stroke: a
         // hairline hook is what made these look shrivelled.
         const dir = up ? 1 : -1;
-        const tip = stemEnd + dir * FLAG;
-        part.push(
-          `<path d="M${stemX} ${stemEnd} C${stemX + 8} ${stemEnd + dir * 5} ${stemX + 8.5} ${stemEnd + dir * 14} ${stemX + 3.5} ${tip} ` +
-            `C${stemX + 5} ${stemEnd + dir * 13} ${stemX + 3.5} ${stemEnd + dir * 8} ${stemX} ${stemEnd + dir * 5} Z" ` +
-            `fill="${INK}"/>`,
-        );
-        if (event.dur === 1) {
-          part.push(
-            `<path d="M${stemX} ${stemEnd + dir * 8} C${stemX + 7} ${stemEnd + dir * 12} ${stemX + 7.5} ${stemEnd + dir * 19} ${stemX + 3} ${stemEnd + dir * 24} ` +
-              `C${stemX + 4.5} ${stemEnd + dir * 19} ${stemX + 3} ${stemEnd + dir * 15} ${stemX} ${stemEnd + dir * 12} Z" ` +
-              `fill="${INK}"/>`,
+        // The hook is drawn as an outline: a wide sweep out from the stem, then a
+        // tighter curve back in, which is what gives a flag its curl rather than
+        // a narrow sliver.
+        const flag = (dy) => {
+          const y0 = stemEnd + dir * dy;
+          const tip = y0 + dir * FLAG;
+          return (
+            `<path d="M${stemX} ${y0} ` +
+            `C${stemX + 10} ${y0 + dir * 4} ${stemX + 12} ${y0 + dir * 15} ${stemX + 6.5} ${tip} ` +
+            `C${stemX + 9} ${y0 + dir * 15} ${stemX + 7} ${y0 + dir * 9} ${stemX} ${y0 + dir * 5.5} Z" ` +
+            `fill="${INK}"/>`
           );
-        }
+        };
+        part.push(flag(0));
+        if (event.dur === 1) part.push(flag(10));
       }
 
       part.push(head(x, y, { hollow }));
@@ -373,9 +396,12 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
       if (event.mark === 'staccato') {
         part.push(`<circle cx="${x}" cy="${up ? y + HEAD_RY + 7 : y - HEAD_RY - 7}" r="2.2" fill="${INK}"/>`);
       } else if (event.mark === 'accent') {
-        const ay = up ? y + HEAD_RY + 5 : y - HEAD_RY - 5;
+        // A wedge, not a triangle: an accent points along the note, and drawing it
+        // as a triangle (then turning it over for down-stems) read as a ▽.
+        const ay = up ? y + HEAD_RY + 9 : y - HEAD_RY - 9;
         part.push(
-          `<path d="M${x - 5} ${ay} L${x + 5} ${ay} L${x} ${ay + (up ? 5 : -5)} Z" fill="${INK}" transform="${up ? '' : `rotate(180 ${x} ${ay})`}"/>`,
+          `<path d="M${x - 5.5} ${ay - 4} L${x + 5.5} ${ay} L${x - 5.5} ${ay + 4}" ` +
+            `fill="none" stroke="${INK}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>`,
         );
       }
     }

@@ -3,7 +3,7 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202610310132';
+import { CLEF_PATH } from './clef.js?v=202610310146';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -87,7 +87,7 @@ export function renderStaff(
   );
 
   // Staff lines
-  part.push('<g stroke="#cfc4b3" stroke-width="1" stroke-linecap="round">');
+  part.push('<g stroke="#c3b49d" stroke-width="1.15" stroke-linecap="round">');
   for (let i = 0; i < 5; i++) {
     const y = STAFF_TOP + i * LINE_GAP;
     part.push(`<line x1="${leftPad}" y1="${y}" x2="${width - leftPad}" y2="${y}"/>`);
@@ -127,7 +127,7 @@ export function renderStaff(
     for (const l of ledgers) {
       const ly = STAFF_BOTTOM - (l - E4) * STEPS;
       part.push(
-        `<line x1="${x - 9}" y1="${ly}" x2="${x + 9}" y2="${ly}" stroke="#cfc4b3" stroke-width="1"/>`,
+        `<line x1="${x - 9}" y1="${ly}" x2="${x + 9}" y2="${ly}" stroke="#c3b49d" stroke-width="1.15"/>`,
       );
     }
 
