@@ -1,5 +1,7 @@
 # Scale Studio
 
+**Live:** <https://appleknife.github.io/scale-studio/> — works on phones and tablets.
+
 ![Scale Studio — choose a scale](preview.png)
 
 A listening scale trainer for violin students preparing for **NYSSMA Levels 5–6**.
@@ -31,9 +33,14 @@ you do double-click it, the page now explains this instead of sitting blank.
 **macOS / Linux:** from this folder run `python3 -m http.server 8777` and open
 <http://localhost:8777/>.
 
-**On a tablet or Chromebook:** drop this folder on any static host (GitHub Pages,
-Netlify — anything that serves the files as they are), and the microphone will be
-available over HTTPS.
+**On a tablet or Chromebook:** open the published link above. It is served from
+GitHub Pages over HTTPS, which is what lets the microphone work on iOS and
+Android. Any static host would do the same — nothing here needs a server-side
+language.
+
+**Sharing it:** the link is public, and nothing is stored: audio is analysed in
+the page and thrown away, and there is no account, no database and no analytics.
+Students can bookmark it or add it to their home screen.
 
 ### iPhone and iPad
 
