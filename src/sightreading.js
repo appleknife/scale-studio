@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311426';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311435';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -273,14 +273,27 @@ function arc(progress, peakAt = 0.62) {
 }
 
 function chooseStep(rng, allowed, directionBias, lastStep) {
+  // A leap is answered by a step back the other way. Every source says it the
+  // same way — “leap up, step down” — and weighting it was not enough: only 30%
+  // of leaps were actually resolved, because the arc kept pulling the line on.
+  // So after a leap this is the only move considered.
+  if (Math.abs(lastStep) >= 3) {
+    const back = allowed.filter((s) => Math.sign(s) === -Math.sign(lastStep) && Math.abs(s) <= 2);
+    if (back.length) {
+      const weights = back.map((s) => STEP_WEIGHTS[Math.abs(s)] || 1);
+      const total = weights.reduce((a, b) => a + b, 0);
+      let roll = rng() * total;
+      for (let i = 0; i < back.length; i++) {
+        roll -= weights[i];
+        if (roll <= 0) return back[i];
+      }
+      return back[back.length - 1];
+    }
+  }
+
   const options = [];
   for (const step of allowed) {
-    // After a leap, a step is much more likely — and usually back the other way.
     let weight = STEP_WEIGHTS[step] || 0.3;
-    if (Math.abs(lastStep) >= 3) {
-      if (step === 1) weight *= 4;
-      if (Math.sign(step) === Math.sign(lastStep)) weight *= 0.25;
-    }
     if (directionBias > 0 && Math.sign(step) === -1) weight *= 0.35;
     if (directionBias < 0 && Math.sign(step) === 1) weight *= 0.35;
     options.push({ step, weight });
@@ -494,7 +507,15 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       const step = chooseStep(rng, allowed, directionBias, lastStep);
       let next = prev + step;
       if (next < lowest || next > peak) next = prev - step;
-      prev = Math.max(lowest, Math.min(peak, next));
+      next = Math.max(lowest, Math.min(peak, next));
+      // No augmented fourth: the one interval every melody text forbids. A
+      // fourth between F and B is the usual accident; take the step next door
+      // instead.
+      if (Math.abs(pool[next].midi - pool[prev].midi) === 6) {
+        const alt = prev + (next > prev ? 1 : -1);
+        if (alt > lowest && alt < peak) next = alt;
+      }
+      prev = next;
       lastStep = step;
     }
 
@@ -527,10 +548,13 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     const i = sounding.indexOf(event);
     const before = sounding[i - 1];
     const after = sounding[i + 1];
-    return (
-      (!before || Math.abs(note.midi - before.midi) <= spec.maxSemis) &&
-      (!after || Math.abs(note.midi - after.midi) <= spec.maxSemis)
-    );
+    const ok = (other) =>
+      !other ||
+      (Math.abs(note.midi - other.midi) <= spec.maxSemis &&
+        // An augmented fourth is the one interval every melody text forbids, so
+        // no repair may introduce one either.
+        Math.abs(note.midi - other.midi) !== 6);
+    return ok(before) && ok(after);
   };
 
   /**
@@ -568,22 +592,112 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     if (fixed) setNote(sounding[i], fixed);
   }
 
-  // ── leaps land on a chord tone ─────────────────────────────────────────
-  // Jumping from anywhere to anywhere is what makes eight random notes sound
-  // generated rather than intended. Landing a leap on the tonic, third or fifth
-  // — and then carrying on — is the oldest trick that makes a line read as a
-  // phrase. Nudged by a step at most, and left alone if the nudge would break an
-  // interval or repeat a pitch.
-  for (let i = 1; i < sounding.length - 1; i++) {
-    const event = sounding[i];
+  // ── a motive comes back ────────────────────────────────────────────────
+  // “Without repetition the listener hears successive ideas as random and
+  // unrelated” — every source says some version of that. So one later bar
+  // restates an earlier bar's line exactly, transposed so its first note stays
+  // put. Only whole-tone-or-bigger steps survive the transposition, so if the
+  // shape does not fit the key it is simply not used.
+  const restateBar = (fromBar, toBar) => {
+    const from = bars[fromBar].filter((e) => !e.rest);
+    const to = bars[toBar].filter((e) => !e.rest);
+    const n = Math.min(from.length, to.length);
+    if (n < 3) return false;
+    let idx = pool.findIndex((x) => x.midi === to[0].midi);
+    if (idx < 0) return false;
+    const copy = [pool[idx]];
+    for (let i = 1; i < n; i++) {
+      const step = from[i].midi - from[i - 1].midi;
+      if (Math.abs(step) > spec.maxSemis) return false;
+      const next = pool.findIndex((x) => x.midi === pool[idx].midi + step);
+      if (next < 0) return false;
+      copy.push(pool[next]);
+      idx = next;
+    }
+    // The copy must not break an interval at either end of the bar either.
+    const ok = (a, b) =>
+      !a ||
+      !b ||
+      (Math.abs(a.midi - b.midi) <= spec.maxSemis && Math.abs(a.midi - b.midi) !== 6);
+    const at = sounding.indexOf(to[0]);
+    if (!ok(sounding[at - 1], copy[0])) return false;
+    if (!ok(copy[copy.length - 1], sounding[at + copy.length])) return false;
+    copy.forEach((note, i) => setNote(to[i], note));
+    return true;
+  };
+
+  if (level >= 3 && chance(rng, 0.75)) {
+    // Try the answer phrase first (bars 5–8 restating 1–4), then any pair. The
+    // copy only fits when the two bars have the same number of notes and every
+    // step survives the transposition, so the search has to be a search.
+    const pairs = [];
+    // never into the last bar: the cadence has to stay where it was
+    for (let a = 0; a < 4; a++) for (let b = 4; b < BAR_COUNT - 1; b++) pairs.push([a, b]);
+    for (let a = 0; a < 3; a++) for (let b = a + 2; b < 4; b++) pairs.push([a, b]);
+    for (const [fromBar, toBar] of pairs) {
+      if (restateBar(fromBar, toBar)) break;
+    }
+  }
+
+  // ── every leap is answered by a step back ──────────────────────────────
+  // “Leap up, step down” is the one rule every melody text states identically,
+  // and weighting it inside the walk left three quarters of leaps unresolved.
+  // So it is enforced outright — and enforced twice, because the harmony and
+  // peak passes that follow can nibble at a resolution even when told not to.
+  const answerLeaps = () => {
+    for (let i = 0; i < sounding.length - 2; i++) {
+      const a = sounding[i];
+      const b = sounding[i + 1];
+      const c = sounding[i + 2];
+      if (!a.note || !b.note || !c.note) continue;
+      // The cadence is fixed: a line that does not end on the tonic is a bug, not
+      // a resolution problem.
+      if (i + 2 === sounding.length - 1) continue;
+      const leap = b.midi - a.midi;
+      if (Math.abs(leap) < 4) continue;
+      if (Math.sign(c.midi - b.midi) === -Math.sign(leap) && Math.abs(c.midi - b.midi) <= 2) {
+        continue; // already resolved
+      }
+      // The note that has to move is c, and it must land a scale step from b,
+      // the other way from the leap. If the range or an interval blocks that, it stays.
+      const wantUp = -Math.sign(leap) > 0;
+      const candidates = wantUp
+        ? pool.filter((n) => n.midi > b.midi)
+        : [...pool].reverse().filter((n) => n.midi < b.midi);
+      const stepBack = candidates.find((n) => !samePitch(c, n) && neighbourOk(c, n));
+      if (stepBack) setNote(c, stepBack);
+    }
+  };
+
+  answerLeaps();
+
+  // ── the polish pass ────────────────────────────────────────────────────
+  // Two rules the sources state plainly, applied once the line exists so each
+  // note can see its neighbours:
+  //
+  //  * a note that lands on a beat should be a chord tone — that is what the ear
+  //    hears as the harmony — while passing notes belong off the beat. Before
+  //    this, only 56% of on-beat notes were chord tones.
+  //  * the highest note should sound once. Spending the peak twice erodes it.
+  /**
+   * True when note i is the step back that answers a leap into it. Getting this
+   * the wrong way round (protecting the leap rather than its resolution) is why
+   * the first attempt at this pass halved the number of resolved leaps.
+   */
+  const resolvesALeap = (i) => {
+    const twoBack = sounding[i - 2];
     const before = sounding[i - 1];
-    if (!event.note || !before.note) continue;
-    const leap = Math.abs(event.midi - before.midi);
-    if (leap < 4) continue; // a third or less: let it be
-    // Leave the big ones alone. An octave is a test item at V and VI, and nudging
-    // it a step to reach a chord tone would quietly turn it into a seventh.
-    if (leap >= 11) continue;
-    if ([0, 2, 4].includes(event.note.degree)) continue; // already a chord tone
+    const note = sounding[i];
+    if (!twoBack || !before || !note) return false;
+    const leap = before.midi - twoBack.midi;
+    if (Math.abs(leap) < 4) return false;
+    return (
+      Math.sign(note.midi - before.midi) === -Math.sign(leap) &&
+      Math.abs(note.midi - before.midi) <= 2
+    );
+  };
+
+  const nearestChordTone = (event) => {
     const options = pool.filter(
       (n) =>
         [0, 2, 4].includes(n.degree) &&
@@ -591,12 +705,52 @@ export function generatePassage({ level = 5, seed = null } = {}) {
         !samePitch(event, n) &&
         neighbourOk(event, n),
     );
-    if (!options.length) continue;
-    const nearest = options.reduce((a, b) =>
+    if (!options.length) return null;
+    return options.reduce((a, b) =>
       Math.abs(b.midi - event.midi) < Math.abs(a.midi - event.midi) ? b : a,
     );
-    setNote(event, nearest);
+  };
+
+  for (let i = 0; i < sounding.length; i++) {
+    const event = sounding[i];
+    if (!event.note) continue;
+    // Only the genuinely strong positions — the bar line and the half bar — so
+    // a passing note is still free to sit elsewhere on the beat.
+    if (event.start % (perBar / 2) !== 0) continue;
+    if (i === sounding.length - 1) continue; // never the cadence
+    if ([0, 2, 4].includes(event.note.degree)) continue;
+    if (resolvesALeap(i)) continue; // answering a leap outranks the harmony
+    // Nor may this move a note a leap lands on: shortening the leap would break
+    // the step back that has just been put in place after it.
+    const previous = sounding[i - 1];
+    if (previous && Math.abs(event.midi - previous.midi) >= 4) continue;
+    const note = nearestChordTone(event);
+    if (note) setNote(event, note);
   }
+
+  // The peak sounds once — but never at the cadence's expense. When the tonic
+  // *is* the highest note the line reaches (usual at levels I–II, where the
+  // range is narrow), the cadence keeps it and the earlier arrivals move.
+  const highest = Math.max(...sounding.map((e) => e.midi));
+  const cadence = sounding.length - 1;
+  const keeper =
+    sounding[cadence] && sounding[cadence].midi === highest
+      ? cadence
+      : sounding.findIndex((e) => e.midi === highest);
+  for (let i = 0; i < sounding.length; i++) {
+    const event = sounding[i];
+    if (event.midi !== highest) continue;
+    if (i === keeper) continue;
+    if (resolvesALeap(i)) continue; // the step back outranks the peak
+    const below = pool
+      .filter((n) => n.midi < highest && !samePitch(event, n) && neighbourOk(event, n))
+      .sort((a, b) => b.midi - a.midi)[0];
+    if (below) setNote(event, below);
+  }
+
+  // The harmony and peak passes can shorten a leap or break the step back that
+  // followed it, so the leap rule gets the last word.
+  answerLeaps();
 
   // ── accidentals (level IV and up) ──────────────────────────────────────
   // Last, and only where they do not push the line outside its vocabulary.
