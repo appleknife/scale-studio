@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311543';
-import { CLEF_PATH } from './clef.js?v=202610311543';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610311547';
+import { CLEF_PATH } from './clef.js?v=202610311547';
 
-import { beatLength } from './sightreading.js?v=202610311543';
+import { beatLength } from './sightreading.js?v=202610311547';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -349,10 +349,14 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
     const xs = positions(events, barX);
     const xOf = (event) => xs.get(event);
 
-    // barlines
-    part.push(
-      `<line x1="${barX}" y1="${top}" x2="${barX}" y2="${bottom}" stroke="${INK}" stroke-width="1.3"/>`,
-    );
+    // Barlines go between bars, never in front of the first one. A line at the
+    // opening of a system sits right after the clef and key signature and reads
+    // as the end of a pickup measure that was never written.
+    if (bar > barFrom) {
+      part.push(
+        `<line x1="${barX}" y1="${top}" x2="${barX}" y2="${bottom}" stroke="${INK}" stroke-width="1.3"/>`,
+      );
+    }
 
     // Beam geometry first: the dynamics are placed below the deepest beam, so a
     // beamed group can never sit on top of an mf.
