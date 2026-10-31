@@ -117,6 +117,12 @@
           if (!spec.keys.includes(p.key.id)) problems.push(`${id}: key ${p.key.id} not in the level`);
           if (!spec.meters.includes(p.meter)) problems.push(`${id}: meter ${p.meter} not in the level`);
 
+          // Level VI's 6/8 is marked in eighths — ♪ = 120 — not in dotted
+          // quarters, which is how level V's 6/8 is marked.
+          if (level === 6 && p.meter === '6/8' && (p.tempo.unit !== 'e' || p.tempo.bpm !== 120)) {
+            problems.push(`${id}: 6/8 marked ${p.tempo.unit}=${p.tempo.bpm}`);
+          }
+
           // slurs pair up inside one bar: start, then end, never two at once
           for (const barEvents of p.bars) {
             let open = false;
@@ -210,7 +216,7 @@
       const gallery = document.getElementById('gallery');
       for (const level of SIGHT_LEVELS) {
         const p = generatePassage({ level, seed: 4471 + level * 13 });
-        const unit = { q: '\u2669', h: '\u{1D15E}', qd: '\u2669.' }[p.tempo.unit] || '\u2669';
+        const unit = { e: '\u266A', q: '\u2669', h: '\u{1D15E}', qd: '\u2669.' }[p.tempo.unit] || '\u2669';
         const h = document.createElement('h2');
         h.textContent = `Level ${level} — ${p.key.name} major, ${p.meter}, ${p.tempo.bpm} bpm, seed ${p.seed}`;
         gallery.append(h);

@@ -157,7 +157,7 @@ From the sheet (needs confirming — see §8):
 | III | + C, F | same | ♩=60 | all strings, 1st pos. | + 4ths, 5ths | staccato, martelé; *f*, *ff* |
 | IV | + B♭, A | + cut time | ♩=88, half=76 | G3 to high D on E | all within an octave | dotted rhythms, rests |
 | V | + E♭ | + 6/8 | ♩=60, dotted-♩=120 | same | same | triplets; *mp* |
-| VI | + E, A♭ | same | ♩=72, ♩=120, ♩=96 | G3 to high F on E | same | syncopation |
+| VI | + E, A♭ | same | ♩=72, ♩=120, and ♪=120 in 6/8 | G3 to high F on E | same | syncopation |
 
 ### 4.2 Making it sound like music, not dice
 

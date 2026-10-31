@@ -8,7 +8,7 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311555';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311600';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -212,7 +212,9 @@ const LEVELS = {
         [6, 2, 1, 1, 2],
       ],
     },
-    tempo: { '6/8': { unit: 'qd', bpm: 120 }, '4/4': { unit: 'q', bpm: 120 }, '*': { unit: 'q', bpm: 72 } },
+    // The Manual marks level VI's 6/8 in eighths — ♪ = 120 — not in dotted
+    // quarters, which is how level V's 6/8 is marked.
+    tempo: { '6/8': { unit: 'e', bpm: 120 }, '4/4': { unit: 'q', bpm: 120 }, '*': { unit: 'q', bpm: 72 } },
     dynamics: ['mp', 'mf'],
     marks: ['staccato', 'accent'],
     rests: true,

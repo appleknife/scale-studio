@@ -1,12 +1,12 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311555';
-import { renderStaff } from './staff.js?v=202610311555';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610311555';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311555';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311555';
-import { generatePassage } from './sightreading.js?v=202610311555';
-import { renderScore } from './score.js?v=202610311555';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311600';
+import { renderStaff } from './staff.js?v=202610311600';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610311600';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311600';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311600';
+import { generatePassage } from './sightreading.js?v=202610311600';
+import { renderScore } from './score.js?v=202610311600';
 import {
   STRINGS,
   FIFTHS,
@@ -14,7 +14,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610311555';
+} from './tuner.js?v=202610311600';
 
 const LANG = initLang();
 
@@ -854,7 +854,12 @@ const sight = {
 
 /** The note glyph printed next to a tempo mark. */
 function tempoGlyph(unit) {
-  return { q: '\u2669', h: '\u{1D15E}', qd: '\u2669.' }[unit] || '\u2669';
+  return { e: '\u266A', q: '\u2669', h: '\u{1D15E}', qd: '\u2669.' }[unit] || '\u2669';
+}
+
+/** That glyph's length in sixteenths, for turning a marking into a click. */
+function unitLength(unit) {
+  return { e: 2, q: 4, qd: 6, h: 8 }[unit] || 4;
 }
 
 function renderSight() {
@@ -1111,32 +1116,42 @@ function sightDemoFrames(passage, unit = 0.32, centsByIndex = {}) {
 
 let clickCtx = null;
 
-/** Two bars of clicks at the passage's own tempo, with a heavier downbeat. */
+/**
+ * Two bars of clicks at the passage's own tempo, with a heavier downbeat.
+ *
+ * The marking is in whatever note value the Manual prints — quarter in most
+ * metres, half in cut time, eighth in level VI's 6/8 — so the click track
+ * ticks at *that* value and puts the accent on each beat. A marking of
+ * "♪ = 120" has to sound like 120 eighths, not 40 dotted quarters.
+ */
 function playTempo(passage) {
   const Ctx = window.AudioContext || window.webkitAudioContext;
   if (!Ctx) return;
   if (!clickCtx) clickCtx = new Ctx();
   if (clickCtx.state === 'suspended') clickCtx.resume();
 
-  const beatSeconds = 60 / passage.tempo.bpm;
-  const beatsPerBar = Math.max(1, Math.round(passage.perBar / passage.beat));
-  const beats = beatsPerBar * 2;
+  const unit = unitLength(passage.tempo.unit);
+  const tickSeconds = 60 / passage.tempo.bpm;
+  const ticksPerBar = Math.max(1, Math.round(passage.perBar / unit));
+  const ticksPerBeat = Math.max(1, Math.round(passage.beat / unit));
+  const ticks = ticksPerBar * 2;
   const start = clickCtx.currentTime + 0.12;
 
   el.sightTempoBtn.disabled = true;
   setTimeout(() => {
     el.sightTempoBtn.disabled = false;
-  }, (beats * beatSeconds + 0.4) * 1000);
+  }, (ticks * tickSeconds + 0.4) * 1000);
 
-  for (let i = 0; i < beats; i++) {
-    const when = start + i * beatSeconds;
-    const downbeat = i % beatsPerBar === 0;
+  for (let i = 0; i < ticks; i++) {
+    const when = start + i * tickSeconds;
+    const downbeat = i % ticksPerBar === 0;
+    const beat = i % ticksPerBeat === 0;
     const osc = clickCtx.createOscillator();
     const gain = clickCtx.createGain();
     osc.type = 'sine';
-    osc.frequency.value = downbeat ? 1320 : 880;
+    osc.frequency.value = downbeat ? 1320 : beat ? 880 : 760;
     gain.gain.setValueAtTime(0.0001, when);
-    gain.gain.linearRampToValueAtTime(downbeat ? 0.22 : 0.12, when + 0.005);
+    gain.gain.linearRampToValueAtTime(downbeat ? 0.22 : beat ? 0.12 : 0.07, when + 0.005);
     gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.07);
     osc.connect(gain).connect(clickCtx.destination);
     osc.start(when);
