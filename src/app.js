@@ -1,9 +1,9 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302307';
-import { renderStaff } from './staff.js?v=202610302307';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610302307';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610302307';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610302313';
+import { renderStaff } from './staff.js?v=202610302313';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610302313';
+import { analyzeTake, gradeFor } from './analyze.js?v=202610302313';
 import {
   STRINGS,
   FIFTHS,
@@ -11,7 +11,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610302307';
+} from './tuner.js?v=202610302313';
 
 const $ = (id) => document.getElementById(id);
 
@@ -780,8 +780,8 @@ function renderFifths() {
       t.fifths.has(pair.id)
     }">
       <span class="pair-tick" aria-hidden="true"></span>
-      <span class="pair-name">${pair.lower} + ${pair.upper}</span>
-      <span class="pair-hint">move ${pair.upper} until the pair rings</span>
+      <span class="pair-name">${pair.label}</span>
+      <span class="pair-hint">tune ${pair.tune} to ${pair.base}</span>
     </button>`,
   ).join('');
 }

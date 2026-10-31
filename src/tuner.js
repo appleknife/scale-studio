@@ -11,10 +11,11 @@ export const STRINGS = [
   { id: 'E', note: 'E5', freq: 659.26, offset: 2.5, label: 'E' },
 ];
 
+// A is the base. Everything is tuned outward from it: E to A, D to A, then G to D.
 export const FIFTHS = [
-  { id: 'G+D', lower: 'G', upper: 'D' },
-  { id: 'D+A', lower: 'D', upper: 'A' },
-  { id: 'A+E', lower: 'A', upper: 'E' },
+  { id: 'A+E', label: 'A + E', base: 'A', tune: 'E' },
+  { id: 'D+A', label: 'D + A', base: 'A', tune: 'D' },
+  { id: 'G+D', label: 'G + D', base: 'D', tune: 'G' },
 ];
 
 export function stringById(id) {

@@ -104,8 +104,9 @@ E, which snaps first.
 
 Then the part that matters more than any number on the dial: **the fifths**. A violin
 is tuned in pure fifths while a tuner is equal-tempered, so the two disagree by a
-couple of cents on every string. Hold G+D, D+A and A+E as double stops and move the
-upper string of each pair until the pair rings cleanly.
+couple of cents on every string. **A is the base:** hold each pair as a double stop and
+tune outward from it — E to A, D to A, then G to D. Only the second string of each pair
+moves, and the dial is re-checked afterwards because the fifth is the better judge.
 
 The three pairs are a tick-list, not a measurement. A bowed double stop always
 wobbles a little — bow pressure alone moves the loudness around more than the beat
