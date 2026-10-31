@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202610311435';
-import { getLang, t } from './i18n.js?v=202610311435';
+import { median } from './pitch.js?v=202610311450';
+import { getLang, t } from './i18n.js?v=202610311450';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -478,3 +478,137 @@ export function gradeFor(score) {
   return { label: t(`grade.${band}.label`), note: t(`grade.${band}.note`) };
 }
 
+
+/**
+ * Score a sight-reading take against the passage that was on the page.
+ *
+ * Two things differ from a scale. The notes have different lengths, so
+ * "steadiness" cannot be a constant inter-onset interval: what matters is the
+ * ratio between what was played and the rhythm as written, at whatever tempo the
+ * student chose. And the tempo itself is not scored — no adjudicator stops a
+ * sight-reader for taking it slowly — but a pulse that wanders, and stops, are.
+ */
+export function analyzeSightTake(frames, passage, options = {}) {
+  const o = { ...DEFAULTS, ...options, weights: { ...DEFAULTS.weights, ...(options.weights || {}) } };
+  // `start` inside a bar is bar-relative, so the flat list needs absolute
+  // positions — bar 2's first note starts a bar after bar 1's, not at zero.
+  const events = [];
+  passage.bars.forEach((barEvents, barIndex) => {
+    for (const event of barEvents) {
+      if (event.rest || !event.note) continue;
+      events.push({ ...event, abs: barIndex * passage.perBar + event.start });
+    }
+  });
+  const expectedMidi = events.map((e) => e.note.midi);
+
+  const { notes } = segmentNotes(frames, o);
+  const { pairs, extras } = align(notes.map((n) => n.midi), expectedMidi);
+
+  const results = events.map((event, index) => ({
+    event,
+    index,
+    status: 'missed',
+    cents: 0,
+    detected: null,
+  }));
+
+  let exact = 0;
+  let octaveErrors = 0;
+  let wrong = 0;
+
+  for (const { d, e } of pairs) {
+    const det = notes[d];
+    const diff = det.midi - expectedMidi[e];
+    const r = results[e];
+    r.detected = det.midi;
+    if (diff === 0) {
+      r.status = 'exact';
+      r.cents = det.cents;
+      exact++;
+    } else if (Math.abs(diff) % 12 === 0) {
+      r.status = 'octave';
+      r.cents = (det.pitch - expectedMidi[e]) * 100;
+      octaveErrors++;
+    } else {
+      r.status = 'wrong';
+      r.cents = (det.pitch - expectedMidi[e]) * 100;
+      wrong++;
+    }
+  }
+
+  // --- Notes --------------------------------------------------------------
+  let credit = 0;
+  for (const r of results) {
+    credit += r.status === 'exact' ? 1 : r.status === 'octave' ? 0.4 : r.status === 'wrong' ? 0.1 : 0;
+  }
+  const accuracy = clamp(credit / Math.max(1, events.length) - Math.min(0.08, extras.length * 0.015));
+
+  // --- Intonation ---------------------------------------------------------
+  const tuned = results.filter((r) => r.status === 'exact');
+  const P = o.intonationPerfect;
+  const Z = o.intonationZero;
+  let intonation = 0.6;
+  if (tuned.length) {
+    const sum = tuned.reduce((acc, r) => acc + clamp(1 - (Math.abs(r.cents) - P) / (Z - P)), 0);
+    intonation = clamp(sum / tuned.length);
+  }
+
+  // --- Pulse --------------------------------------------------------------
+  // Seconds per written unit, one ratio per matched pair of notes. If the
+  // student is steady, every ratio is the same number however slow they were.
+  const ratios = [];
+  for (let k = 1; k < pairs.length; k++) {
+    if (pairs[k].e !== pairs[k - 1].e + 1) continue;
+    const units = events[pairs[k].e].abs - events[pairs[k - 1].e].abs;
+    if (units <= 0) continue;
+    ratios.push((notes[pairs[k].d].t0 - notes[pairs[k - 1].d].t0) / units);
+  }
+  const unit = ratios.length ? median(ratios) : 0;
+  let rhythm = 0.6;
+  let stops = 0;
+  if (ratios.length >= 4 && unit > 0) {
+    let sum = 0;
+    for (const r of ratios) {
+      const err = Math.abs(r - unit) / unit;
+      // A quarter of the pulse is within the noise: at 30 ms per frame, a note
+      // shorter than a third of a second already jitters by 10%. Full credit to
+      // 25%, nothing by 75%.
+      sum += clamp(1 - (err - 0.25) / 0.5);
+      if (err > 1.6) stops++; // near three times the pulse is a stop, not a wobble
+    }
+    rhythm = sum / ratios.length;
+  } else if (ratios.length) {
+    rhythm = 0.75; // too little to judge
+  }
+
+  const continuity = clamp(1 - stops * 0.16);
+  const w = o.weights;
+  const score = Math.round(
+    100 *
+      clamp(
+        accuracy * w.accuracy +
+          intonation * w.intonation +
+          rhythm * w.steadiness +
+          continuity * w.continuity,
+      ),
+  );
+
+  return {
+    score,
+    accuracy,
+    intonation,
+    rhythm,
+    continuity,
+    unit,
+    results,
+    extras,
+    missed: results.filter((r) => r.status === 'missed'),
+    stops,
+    heard: notes.length,
+    expected: events.length,
+    exact,
+    octaveErrors,
+    wrong,
+    duration: frames.length ? frames[frames.length - 1].t : 0,
+  };
+}

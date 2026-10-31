@@ -1,12 +1,12 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311435';
-import { renderStaff } from './staff.js?v=202610311435';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610311435';
-import { analyzeTake, gradeFor } from './analyze.js?v=202610311435';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311435';
-import { generatePassage } from './sightreading.js?v=202610311435';
-import { renderScore } from './score.js?v=202610311435';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311450';
+import { renderStaff } from './staff.js?v=202610311450';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610311450';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311450';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311450';
+import { generatePassage } from './sightreading.js?v=202610311450';
+import { renderScore } from './score.js?v=202610311450';
 import {
   STRINGS,
   FIFTHS,
@@ -14,7 +14,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610311435';
+} from './tuner.js?v=202610311450';
 
 const LANG = initLang();
 
@@ -38,6 +38,17 @@ const el = {
   sightLevels: $('sightLevels'),
   sightMeta: $('sightMeta'),
   sightStaff: $('sightStaff'),
+  sightStart: $('sightStart'),
+  sightStop: $('sightStop'),
+  sightStatus: $('sightStatus'),
+  sightResult: $('sightResult'),
+  sightPct: $('sightPct'),
+  sightGrade: $('sightGrade'),
+  sightLine: $('sightLine'),
+  sightParts: $('sightParts'),
+  sightTips: $('sightTips'),
+  sightAgain: $('sightAgain'),
+  sightNext: $('sightNext'),
   grid: $('scaleGrid'),
   gridNote: $('gridNote'),
   levelTabs: $('levelTabs'),
@@ -828,7 +839,14 @@ function onTuneFrame(frame) {
 
 /* ── Sight reading ──────────────────────────────────────────────────── */
 
-const sight = { level: 5, passage: null };
+const sight = {
+  level: 5,
+  passage: null,
+  // idle | armed | taking. `armed` means the microphone is open and the app is
+  // waiting for the first note; nothing is scored until the student starts.
+  phase: 'idle',
+  take: null,
+};
 
 /** The note glyph printed next to a tempo mark. */
 function tempoGlyph(unit) {
@@ -856,15 +874,177 @@ function renderSight() {
 function newPassage(level = sight.level, seed = null) {
   sight.level = Math.min(6, Math.max(1, level));
   sight.passage = generatePassage({ level: sight.level, seed });
+  stopSightTake(false);
+  el.sightResult.hidden = true;
+  el.sightStatus.textContent = '';
   renderSight();
 }
 
 function openSight(level = sight.level, seed = null) {
   cancelListening();
+  stopSightTake(false);
   state.test = null;
   el.testBar.hidden = true;
   showView('sight');
   newPassage(level, seed);
+}
+
+/* ── Sight reading: listening ──────────────────────────────────────── */
+
+async function startSightTake() {
+  if (!sight.passage || sight.phase !== 'idle') return;
+  el.sightStart.disabled = true;
+  el.sightStatus.textContent = t('sight.waitingMic');
+  el.sightResult.hidden = true;
+
+  if (state.mic && state.micMode !== 'take') closeMic();
+  if (!state.mic) {
+    try {
+      state.mic = await openMic(onFrame);
+      state.micMode = 'take';
+    } catch (err) {
+      el.sightStart.disabled = false;
+      el.sightStatus.textContent = micErrorMessage(err);
+      return;
+    }
+  }
+
+  sight.phase = 'armed';
+  sight.take = { frames: [], started: false, t0: 0, strong: 0, lastVoiced: 0, peak: 0 };
+  el.sightStart.disabled = false;
+  el.sightStart.hidden = true;
+  el.sightStop.hidden = false;
+  el.sightStatus.textContent = t('sight.armed');
+}
+
+function ingestSightFrame(frame) {
+  const take = sight.take;
+  if (!take) return;
+  take.peak = Math.max(take.peak || 0, frame.rms);
+
+  if (!take.started) {
+    const strong = frame.rms > 0.007 && frame.clarity > 0.7;
+    take.strong = strong ? take.strong + 1 : 0;
+    if (take.strong >= 3) {
+      take.started = true;
+      sight.phase = 'taking';
+      take.t0 = Math.max(0, frame.t - 0.1);
+      el.sightStatus.textContent = t('sight.playing');
+    }
+    return;
+  }
+
+  const elapsed = Math.max(0, frame.t - take.t0);
+  take.frames.push({ t: elapsed, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
+  if (frame.freq > 0 && frame.clarity > 0.5 && frame.rms > 0.004) take.lastVoiced = elapsed;
+
+  // Ends on its own after a real pause once something has been played, so nobody
+  // has to reach for a button with a violin under their chin.
+  if (take.frames.length > 40 && elapsed - take.lastVoiced > 2.2) finishSightTake();
+}
+
+function stopSightTake(analyse = true) {
+  if (sight.phase === 'idle' && !sight.take) return;
+  const take = sight.take;
+  sight.phase = 'idle';
+  sight.take = null;
+  el.sightStop.hidden = true;
+  el.sightStart.hidden = false;
+  if (analyse && take && take.started) {
+    renderSightResult(analyzeSightTake(take.frames, sight.passage));
+  } else {
+    el.sightStatus.textContent = '';
+  }
+}
+
+function finishSightTake() {
+  stopSightTake(true);
+}
+
+function renderSightResult(result) {
+  el.sightResult.hidden = false;
+  el.sightStatus.textContent = '';
+
+  if (!result.heard || result.heard < 3) {
+    el.sightPct.textContent = '–';
+    el.sightGrade.textContent = t('result.nothing.title');
+    el.sightLine.textContent = t('result.nothing.body');
+    el.sightParts.innerHTML = '';
+    el.sightTips.innerHTML = '';
+    return;
+  }
+
+  const grade = gradeFor(result.score);
+  el.sightPct.textContent = `${result.score}%`;
+  el.sightGrade.textContent = grade.label;
+  el.sightLine.textContent = grade.note;
+
+  const pct = (v) => `${Math.round(v * 100)}%`;
+  const rows = [
+    [t('sight.partNotes'), pct(result.exact / Math.max(1, result.expected))],
+    [t('sight.partTuned'), pct(result.intonation)],
+    [t('sight.partPulse'), pct(result.rhythm)],
+    [
+      t('sight.partStops'),
+      result.stops === 0 ? t('test.noStops') : t('test.stops', { n: result.stops }),
+    ],
+  ];
+  el.sightParts.innerHTML = rows
+    .map(([label, value]) => `<li><span>${label}</span><span>${value}</span></li>`)
+    .join('');
+
+  // A handful of kind, specific observations rather than a verdict.
+  const tips = [];
+  const missed = result.missed.length;
+  if (missed > 0) {
+    tips.push(t('sight.tipMissed', { n: missed, total: result.expected }));
+  } else if (result.wrong + result.octaveErrors > 0) {
+    tips.push(
+      t('sight.tipWrong', { n: result.wrong + result.octaveErrors, total: result.expected }),
+    );
+  } else {
+    tips.push(t('sight.tipAllNotes'));
+  }
+  const off = result.results.filter((r) => r.status === 'exact' && Math.abs(r.cents) > 25);
+  if (off.length) {
+    const first = off[0];
+    tips.push(
+      t('sight.tipIntonation', {
+        n: off.length,
+        dir: first.cents > 0 ? t('sight.sharp') : t('sight.flat'),
+      }),
+    );
+  }
+  if (result.rhythm < 0.75) tips.push(t('sight.tipPulse'));
+  if (result.stops > 0) tips.push(t('sight.tipStops', { n: result.stops }));
+
+  el.sightTips.innerHTML = tips.slice(0, 3).map((text) => `<li>${text}</li>`).join('');
+}
+
+/**
+ * Synthetic frames for a sight-reading take, so the result screen can be looked
+ * at without a microphone — the same trick the scale demo uses.
+ */
+function sightDemoFrames(passage, unit = 0.32, centsByIndex = {}) {
+  const events = [];
+  passage.bars.forEach((barEvents, barIndex) => {
+    for (const event of barEvents) {
+      if (event.rest || !event.note) continue;
+      events.push({ ...event, abs: barIndex * passage.perBar + event.start });
+    }
+  });
+  const frames = [];
+  events.forEach((event, i) => {
+    const start = event.abs * unit;
+    const dur = Math.max(0.12, event.dur * unit * 0.85);
+    const cents = centsByIndex[i] || 0;
+    const freq = midiToFreq(event.note.midi) * Math.pow(2, cents / 1200);
+    for (let t = 0; t < dur; t += 0.03) {
+      frames.push({ t: start + t, freq, clarity: 0.95, rms: 0.06 });
+    }
+    frames.push({ t: start + dur + 0.01, freq: 0, clarity: 0, rms: 0.0005 });
+  });
+  return frames;
 }
 
 let clickCtx = null;
@@ -905,6 +1085,13 @@ function playTempo(passage) {
 el.openSightBtn.addEventListener('click', () => openSight());
 el.sightBack.addEventListener('click', goHome);
 el.sightNewBtn.addEventListener('click', () => newPassage(sight.level));
+el.sightStart.addEventListener('click', startSightTake);
+el.sightStop.addEventListener('click', () => stopSightTake(true));
+el.sightAgain.addEventListener('click', () => {
+  el.sightResult.hidden = true;
+  startSightTake();
+});
+el.sightNext.addEventListener('click', () => newPassage(sight.level));
 el.sightTempoBtn.addEventListener('click', () => {
   if (sight.passage) playTempo(sight.passage);
 });
@@ -1639,6 +1826,10 @@ window.__scaleStudioReady = true;
 
 if (params.has('help')) el.helpDialog.showModal();
 if (params.has('draw')) drawThree();
+if (params.has('sightdemo')) {
+  openSight(Number(params.get('sightdemo')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
+  renderSightResult(analyzeSightTake(sightDemoFrames(sight.passage), sight.passage));
+}
 if (params.has('sight')) {
   // ?sight=5&seed=4471 reproduces one passage exactly — handy for a class
   openSight(Number(params.get('sight')) || 5, params.has('seed') ? Number(params.get('seed')) : null);

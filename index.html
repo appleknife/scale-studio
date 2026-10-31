@@ -18,7 +18,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610311435" />
+    <link rel="stylesheet" href="app.css?v=202610311450" />
   </head>
   <body>
     <div class="shell">
@@ -329,10 +329,33 @@
           <div class="score-card">
             <div class="score-meta" id="sightMeta"></div>
             <div class="score-staff" id="sightStaff"></div>
-            <p class="score-note" id="sightNote">
-              Listening is not wired up yet — this is the passage generator, so you can
-              read from it and see what the level table produces.
+            <p class="score-note" id="sightNote" data-i18n="sight.intro">
+              Study it, hear the tempo, then play — the app waits for your first note. It
+              listens for the notes and the pulse; it cannot judge dynamics or articulation,
+              and it is deliberately kind about tempo.
             </p>
+          </div>
+
+          <div class="sight-listen">
+            <button class="primary-btn" id="sightStart" type="button" data-i18n="Start listening">Start listening</button>
+            <button class="quiet-btn" id="sightStop" type="button" hidden data-i18n="Finish">Finish</button>
+            <p class="sight-status" id="sightStatus" role="status" aria-live="polite"></p>
+          </div>
+
+          <div class="sight-result" id="sightResult" hidden>
+            <div class="sight-head">
+              <span class="sight-pct" id="sightPct">–</span>
+              <div class="sight-head-copy">
+                <p class="sight-grade" id="sightGrade"></p>
+                <p class="sight-line" id="sightLine"></p>
+              </div>
+            </div>
+            <ul class="sight-parts" id="sightParts"></ul>
+            <ul class="sight-tips" id="sightTips"></ul>
+            <div class="sight-actions">
+              <button class="ghost-btn" id="sightAgain" type="button" data-i18n="Try again">Try again</button>
+              <button class="primary-btn" id="sightNext" type="button" data-i18n="New passage">New passage</button>
+            </div>
           </div>
         </section>
 
@@ -496,6 +519,14 @@
         <span>Tuned to A = 440 Hz</span>
         <span class="dot-sep">·</span>
         <span>Nothing is recorded or uploaded — audio is analysed in your browser.</span>
+        <span class="dot-sep">·</span>
+        <a
+          class="donate-link"
+          href="https://ko-fi.com/apple"
+          target="_blank"
+          rel="noopener noreferrer"
+          >☕ <span data-i18n="Support me">Support me</span></a
+        >
       </footer>
     </div>
 
@@ -545,7 +576,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610311435"></script>
+    <script type="module" src="src/app.js?v=202610311450"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

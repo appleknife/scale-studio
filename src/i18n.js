@@ -243,6 +243,39 @@ export const S = {
     '{n} 条音阶 · {total} 个音里 {centred} 个对上 · {stops}',
   ],
   'test.noStops': ['no stops', '没有停顿'],
+
+  // ── Sight reading: listening ──
+  'sight.waitingMic': ['Asking for the microphone…', '正在请求麦克风…'],
+  'sight.armed': [
+    'Ready when you are — the app starts on your first note.',
+    '准备好了就开始，应用会在你第一个音时开始。',
+  ],
+  'sight.playing': ['Listening…', '正在聆听…'],
+  'sight.partNotes': ['Notes right', '音对了'],
+  'sight.partTuned': ['In tune', '音准'],
+  'sight.partPulse': ['Steady pulse', '节拍稳定'],
+  'sight.partStops': ['Stops', '停顿'],
+  'sight.tipMissed': [
+    '{n} of {total} notes did not come out — mark them and try that bar alone.',
+    '{total} 个音里有 {n} 个没拉出来，把那几处标出来，单独练一下那一小节。',
+  ],
+  'sight.tipAllNotes': ['Every note was there.', '每个音都拉出来了。'],
+  'sight.tipWrong': [
+    '{n} of {total} notes came out as a different pitch — slowly, bar by bar.',
+    '{total} 个音里有 {n} 个拉成了别的音，慢一点，一小节一小节来。',
+  ],
+  'sight.tipIntonation': ['{n} note(s) sat a little {dir}.', '有 {n} 个音稍微偏{dir}。'],
+  'sight.sharp': ['high', '高'],
+  'sight.flat': ['low', '低'],
+  'sight.tipPulse': [
+    'The pulse wandered in places — count eighths out loud and it settles.',
+    '节拍有些地方跑了，用八分音符数出声就会稳。',
+  ],
+  'sight.tipStops': [
+    '{n} stop(s). Read it a bar at a time, slowly, until it flows.',
+    '停顿了 {n} 次。一小节一小节慢慢读，直到顺下来。',
+  ],
+  'donate.button': ['Support me', '支持我'],
   'test.stops': ['{n} stops', '{n} 次停顿'],
   'test.stopOne': ['1 stop', '1 次停顿'],
   'test.sub.1-2': ['The three you chose — one octave each.', '你选的三条——每条一个八度。'],
@@ -541,8 +574,11 @@ export const STATIC = {
     '八小节没见过的乐谱，按你的级别写出来——调号、拍号、节奏、音域都照考纲。',
   'Eight bars, your level, drawn fresh each time. Study it, hear the tempo, then play.':
     '八小节，按你的级别，每次都不一样。先看谱，听一下速度，再开始拉。',
-  'Listening is not wired up yet — this is the passage generator, so you can read from it and see what the level table produces.':
-    '目前还不会听——这是乐谱生成器，可以先照着谱练，也能看看考纲出来的谱子是什么样。',
+  Finish: '完成',
+  'Try again': '再试一次',
+  'Support me': '♥ 支持我',
+  'sight.intro':
+    '先看一遍，听一下速度，然后开始拉——应用会等你第一个音。它只听音高和节拍；力度和弓法它判断不了，速度也比评委宽容。',
 
   /* the rest of the static sheet */
   'eyebrow.test': '模拟考试 · 三条音阶',
