@@ -91,6 +91,8 @@ reels — three distinct keys, no repeats — and then you play them one after a
 exactly as in the audition:
 
 * the microphone opens once and stays open, so there is no re-prompting between scales;
+* the **notation is hidden** — only the key name and range are shown, because the
+  Manual asks for the scales "from memory without any visual aid";
 * the live tuner is hidden (a judge gives nothing away);
 * no score appears until the third scale is finished;
 * the app waits for your first note each time, so you can breathe between scales;
@@ -104,21 +106,33 @@ coloured staff, all the tips.
 The draw is majors only, because that is what Levels 5–6 require, and it always
 uses the familiar spelling: **B**, **F♯**, **C♯** — never C♭, G♭ or D♭.
 
+### Matching the Manual
+
+The string requirement for Levels V–VI reads:
+
+> Fifteen (15) major scales from memory without any visual aid · all in two octaves ·
+> ascending and descending in quarter notes at a moderate speed.
+> Perform: three scales, all three chosen by the adjudicator.
+
+The app follows that shape: two octaves tonic to tonic, notation hidden in an
+audition, three scales drawn for you, and a tempo check that only nudges when a take
+is very slow (the Manual says "moderate", not "fast").
+
 ### Why not C♭?
 
-Because the Manual never actually names its fifteen scales. It says "fifteen major
-scales" and leaves the list to interpretation; the usual reading is C plus the seven
-sharp keys and the seven flat keys, which counts B/C♭, F♯/G♭ and C♯/D♭ as separate
-scales even though they are the same notes and the same fingerings.
+Because the Manual never names its fifteen scales. It only ever says "Fifteen (15)
+major scales", so the list is an inference: C plus the seven sharp keys and the seven
+flat keys. That counts B/C♭, F♯/G♭ and C♯/D♭ as separate scales even though they are
+the same notes with the same fingerings — which is why the count comes out as fifteen
+rather than twelve.
 
-A 2026 review of the violin section of the Manual ([CUNY Academic Works](https://academicworks.cuny.edu/cgi/viewcontent.cgi?article=1000&context=yc_pubs))
-points this out directly — *"the Manual requires Levels V-VI students prepare fifteen
-major scales although it does not indicate which fifteen"* — and argues for twelve,
-noting that we do not even have statistics on *how often a key like C♭ has ever been
-picked by an adjudicator*. Flesch and Galamian both use twelve. On the ground, the
-enharmonic pairs get taught as one scale: a Long Island studio's NYSSMA video series
-teaches D♭ for Level 5–6 and says outright that it *"is the same exact note as C
-sharp"*.
+The 2026 review ([CUNY Academic Works](https://academicworks.cuny.edu/cgi/viewcontent.cgi?article=1000&context=yc_pubs))
+points out that the Manual "does not indicate which fifteen", argues for twelve, and
+notes that we do not even have statistics on how often a key like C♭ has ever been
+picked by an adjudicator. Flesch and Galamian both use twelve. On the ground, the
+enharmonic pairs are taught as one scale: a Long Island studio's NYSSMA video series
+teaches D♭ for Levels 5–6 and says outright that it "is the same exact note as C
+sharp".
 
 So C♭ is here for completeness, but it is off by default. If you want to drill it,
 open the B / C♭ card on the practice screen and switch the spelling.

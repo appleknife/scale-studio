@@ -410,6 +410,17 @@ export function buildTips(result) {
     );
   }
 
+  if (stats.bpm && stats.bpm < 50 && components.steadiness > 0.8) {
+    push(
+      {
+        kind: 'tempo',
+        title: 'There is room to move a little',
+        text: `You played around ♩=${stats.bpm}. The Manual asks for “a moderate speed” — not fast, just flowing. Once the notes feel secure, nudge toward ♩=60–72; scales usually get easier there, not harder.`,
+      },
+      0.04,
+    );
+  }
+
   if (stats.stops >= 1) {
     const where = stats.stops === 1 ? 'once' : `${stats.stops} times`;
     push(

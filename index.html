@@ -155,12 +155,21 @@
               <h2 id="scaleTitle">C major</h2>
               <p id="scaleMeta" class="subtle">2 octaves · up and down · 29 notes</p>
             </div>
-            <div class="spelling" id="spellingRow" hidden></div>
+            <div class="head-tools">
+              <div class="spelling" id="spellingRow" hidden></div>
+              <button class="quiet-btn small" id="notationBtn" type="button">Hide notation</button>
+            </div>
           </div>
 
-          <div class="staff-card">
+          <div class="staff-card" id="staffCard">
             <div class="staff-scroll" id="staffHost"></div>
             <p class="staff-hint">Swipe the staff to see every note →</p>
+          </div>
+
+          <div class="memory-card" id="memoryCard" hidden>
+            <p class="memory-label">From memory</p>
+            <h3 id="memoryName">C major</h3>
+            <p class="subtle" id="memoryMeta">2 octaves · up and down · C4 – C6</p>
           </div>
 
           <div class="listen-card" id="listenCard">

@@ -23,7 +23,12 @@ const el = {
 
   scaleTitle: $('scaleTitle'),
   scaleMeta: $('scaleMeta'),
+  staffCard: $('staffCard'),
   staffHost: $('staffHost'),
+  memoryCard: $('memoryCard'),
+  memoryName: $('memoryName'),
+  memoryMeta: $('memoryMeta'),
+  notationBtn: $('notationBtn'),
   spellingRow: $('spellingRow'),
   backBtn: $('backBtn'),
 
@@ -105,6 +110,9 @@ const state = {
   // A mock audition: the three drawn scales, which one is being played, and
   // the result of each take. Null when practising a single scale.
   test: null,
+  // Practice shows the notation by default; the audition never does, because
+  // the Manual asks for the scales "from memory without any visual aid".
+  showNotation: true,
 };
 
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
@@ -466,7 +474,10 @@ function renderPractice() {
   el.scaleTitle.textContent = scale.title;
   el.scaleMeta.textContent = scale.meta;
   el.staffHost.innerHTML = renderStaff(scale.sequence, { fifths: scale.fifths });
+  el.memoryName.textContent = scale.title;
+  el.memoryMeta.textContent = `${scale.meta.replace(/ · \d+ notes$/, '')} · ${scale.rangeText}`;
   el.spellingRow.hidden = Boolean(state.test) || scale.spellings.length < 2;
+  applyNotationVisibility();
   if (scale.spellings.length > 1) {
     el.spellingRow.innerHTML = scale.spellings
       .map(
@@ -476,6 +487,15 @@ function renderPractice() {
       .join('');
   }
   resetListenUI();
+}
+
+function applyNotationVisibility() {
+  const hide = Boolean(state.test) || !state.showNotation;
+  el.staffCard.hidden = hide;
+  el.memoryCard.hidden = !hide;
+  el.notationBtn.hidden = Boolean(state.test);
+  el.notationBtn.textContent = state.showNotation ? 'Hide notation' : 'Show notation';
+  el.notationBtn.setAttribute('aria-pressed', String(!state.showNotation));
 }
 
 function resetListenUI() {
@@ -909,6 +929,11 @@ el.modeTabs.addEventListener('click', (event) => {
 el.formTabs.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-form]');
   if (btn) setForm(btn.dataset.form);
+});
+
+el.notationBtn.addEventListener('click', () => {
+  state.showNotation = !state.showNotation;
+  applyNotationVisibility();
 });
 
 el.spellingRow.addEventListener('click', (event) => {
