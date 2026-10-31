@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610310305';
-import { CLEF_PATH } from './clef.js?v=202610310305';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610310311';
+import { CLEF_PATH } from './clef.js?v=202610310311';
 
-import { beatLength } from './sightreading.js?v=202610310305';
+import { beatLength } from './sightreading.js?v=202610310311';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf } = STAFF_GEOM;
 
@@ -79,14 +79,16 @@ function restGlyph(x, y, dur, colour) {
       `fill="none" stroke="${colour}" stroke-width="2.9" stroke-linecap="round"/>`
     );
   }
-  // Eighth rest — the "7" every player knows: a bulb with a sickle blade
-  // leaning down and left to a sharp point. Drawn as a filled shape rather than
-  // a stroke, because a constant-width stroke reads as a slash with a dot on it.
+  // Eighth rest — a flat bulb with a slim tail hanging from its right, almost
+  // straight down. Measured off a printed rest: the bulb is about four fifths of
+  // a space wide, the tail drifts a quarter of a space over two spaces of drop,
+  // and the whole glyph stands two spaces. Earlier versions slanted the tail 25
+  // degrees and made it as wide as the glyph was tall, which read as a slash.
   return (
-    `<circle cx="${x + 2.4}" cy="${y - 10.6}" r="3.0" fill="${colour}"/>` +
-    `<path d="M${x + 1.8} ${y - 8.4} ` +
-    `C${x + 3.0} ${y - 2.0} ${x + 0.8} ${y + 3.6} ${x - 4.8} ${y + 6.8} ` +
-    `C${x - 3.0} ${y + 3.0} ${x - 2.2} ${y - 1.6} ${x - 1.2} ${y - 7.2} Z" ` +
+    `<ellipse cx="${x - 0.6}" cy="${y - 10.0}" rx="4.4" ry="3.2" fill="${colour}"/>` +
+    `<path d="M${x + 2.8} ${y - 8.4} ` +
+    `C${x + 3.6} ${y - 3.0} ${x + 2.2} ${y + 2.8} ${x - 1.4} ${y + 7.0} ` +
+    `C${x - 1.0} ${y + 2.2} ${x - 0.2} ${y - 3.4} ${x + 0.6} ${y - 8.8} Z" ` +
     `fill="${colour}"/>`
   );
 }
