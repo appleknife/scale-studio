@@ -117,16 +117,6 @@
           if (!spec.keys.includes(p.key.id)) problems.push(`${id}: key ${p.key.id} not in the level`);
           if (!spec.meters.includes(p.meter)) problems.push(`${id}: meter ${p.meter} not in the level`);
 
-          // 6/8 is a dotted-quarter metre at both levels that use it. The
-          // Manual's "eighth = 120" belongs to the simple metres; read into 6/8
-          // it would come out slower than any printed example.
-          if (p.meter === '6/8') {
-            const want = level === 5 ? 60 : 72;
-            if (p.tempo.unit !== 'qd' || p.tempo.bpm !== want) {
-              problems.push(`${id}: 6/8 marked ${p.tempo.unit}=${p.tempo.bpm}, not dotted-quarter=${want}`);
-            }
-          }
-
           // slurs pair up inside one bar: start, then end, never two at once
           for (const barEvents of p.bars) {
             let open = false;
@@ -163,6 +153,34 @@
       }
 
       log.push(`passages generated: ${checked}`);
+
+      // The tempo each level prints, as the Manual gives it. Three of these have
+      // been corrected from the printed page, so the table is pinned here: an
+      // accidental edit should fail the suite rather than ship.
+      const TEMPO = {
+        '1:*': ['q', 60],
+        '2:*': ['q', 72],
+        '3:*': ['q', 80],
+        '4:2/2': ['h', 76],
+        '4:*': ['q', 88],
+        '5:6/8': ['qd', 60],
+        '5:*': ['q', 60],
+        '6:6/8': ['qd', 72],
+        '6:4/4': ['q', 120],
+        '6:*': ['q', 72],
+      };
+      for (const level of SIGHT_LEVELS) {
+        for (let seed = 0; seed < 40; seed++) {
+          const p = generatePassage({ level, seed });
+          const want = TEMPO[`${level}:${p.meter}`] || TEMPO[`${level}:*`];
+          if (!want) continue;
+          if (p.tempo.unit !== want[0] || p.tempo.bpm !== want[1]) {
+            problems.push(
+              `L${level} ${p.meter}: marked ${p.tempo.unit}=${p.tempo.bpm}, expected ${want[0]}=${want[1]}`,
+            );
+          }
+        }
+      }
 
       // Level I should actually use all three note values, not just quarters.
       {

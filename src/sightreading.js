@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311618';
-import { STAFF_GEOM } from './staff.js?v=202610311618';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610311623';
+import { STAFF_GEOM } from './staff.js?v=202610311623';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -98,7 +98,7 @@ const LEVELS = {
       ],
     },
     slurs: 0.75,
-    tempo: { '*': { unit: 'q', bpm: 60 } },
+    tempo: { '*': { unit: 'q', bpm: 80 } },
     dynamics: ['f', 'ff'],
     marks: ['staccato'],
     rests: false,
