@@ -305,12 +305,22 @@ filling a 3/4 bar, or taking the first three beats of 4/4. Slurs start here and 
 commoner with the level: three quarters of level III passages have one, and every
 passage from level IV on.
 
-**Level III is where sixteenths arrive** — the Manual's first level that uses them,
-and its figure is the one a beat of four under a beam, the same group level VI
-leans on. They stay occasional here: a passage has one in about a third of draws,
-and once it has one the rest of the bars are usually plainer. From level V on the
-runs multiply; level VI, whose own printed example is built from them, gets them in
-almost every passage.
+**Level III is where silence arrives too** — one rest in most passages, two now
+and then. Which kind is the point: a **quarter rest** is the one a sight-reader
+meets constantly and it is placed most often; a **half rest** takes two beats of
+the bar and so turns up about half as often; an eighth rest fills in, and a
+sixteenth rest only appears inside a run of sixteenths, where it breaks the beam.
+A half rest is only written where there is a two-beat group to hold it — 3/4, 4/4
+and 2/2 — because in 2/4 it would be a whole-bar rest and in 6/8 the beat is a
+dotted quarter. Levels I and II have no rests at all, and `sightreading.test.html`
+counts them by kind so they cannot quietly disappear again.
+
+**Level III is also where sixteenths arrive** — the Manual's first level that uses
+them, and its figure is the one a beat of four under a beam, the same group level
+VI leans on. They stay occasional here: a passage has one in about a third of
+draws, and once it has one the rest of the bars are usually plainer. From level V
+on the runs multiply; level VI, whose own printed example is built from them, gets
+them in almost every passage.
 
 ### Drawing the notation
 
@@ -573,10 +583,11 @@ tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correc
                       side, every beam ending on a stem
 tests/notation.test.html  renders 360 passages and measures the ink: no rest, slur,
                       flag, dynamic, tempo mark or tuplet number may touch another
-                      glyph, and no flag may cross a note head. Two things are
-                      measured on the outline rather than the box: a flag against
-                      every head's ellipse, and a wide slanted path (a beam)
-                      against the text — boxes always overlap in both cases.
+                      glyph, no flag may cross a note head, and no two note heads
+                      may touch. Where a box would cry wolf it measures the
+                      drawing: a flag against each head's ellipse, a wide slanted
+                      path (a beam) against the text, and two heads against each
+                      other in the ellipse's own frame.
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format

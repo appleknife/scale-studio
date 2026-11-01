@@ -247,6 +247,38 @@
         if (withSixteenths > 80) problems.push(`level 3 has sixteenths in ${withSixteenths} of 120 passages — that is not occasional`);
       }
 
+      // Rests: which ones, and how often. Quarter rests were the thing missing —
+      // the chooser used to take the first short slot in a middle bar, which was
+      // almost always an eighth — so the kinds are counted, and both a quarter and
+      // a half rest have to turn up from level III on. A half rest is two beats of
+      // silence, so it should be the rarer of the two.
+      for (const level of SIGHT_LEVELS) {
+        const counts = { 1: 0, 2: 0, 4: 0, 8: 0 };
+        let resting = 0;
+        for (let seed = 0; seed < 120; seed++) {
+          const evs = flatten(generatePassage({ level, seed }));
+          let any = false;
+          for (const e of evs) {
+            if (e.rest) {
+              counts[e.dur] = (counts[e.dur] || 0) + 1;
+              any = true;
+            }
+          }
+          if (any) resting++;
+        }
+        log.push(
+          `L${level} rests: ${resting}/120 passages — ` +
+            `${counts[4]} quarter, ${counts[8]} half, ${counts[2]} eighth, ${counts[1]} sixteenth`,
+        );
+        if (level === 1 || level === 2) {
+          if (resting) problems.push(`L${level}: ${resting} passages with a rest, and rests start at III`);
+        } else {
+          if (counts[4] < 40) problems.push(`L${level}: only ${counts[4]} quarter rests in 120 passages`);
+          if (counts[8] < 6) problems.push(`L${level}: only ${counts[8]} half rests in 120 passages`);
+          if (counts[8] >= counts[4]) problems.push(`L${level}: as many half rests (${counts[8]}) as quarter rests (${counts[4]})`);
+        }
+      }
+
       // Where does the music actually sit? A passage can obey every rule and still
       // live on ledger lines, so this is reported per level rather than asserted.
       for (const level of SIGHT_LEVELS) {

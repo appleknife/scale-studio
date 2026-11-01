@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610312144';
-import { STAFF_GEOM } from './staff.js?v=202610312144';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610312212';
+import { STAFF_GEOM } from './staff.js?v=202610312212';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -107,7 +107,9 @@ const LEVELS = {
     tempo: { '*': { unit: 'q', bpm: 80 } },
     dynamics: ['f', 'ff'],
     marks: ['staccato'],
-    rests: false,
+    // Level III is also where silence arrives: a quarter rest first, a half rest
+    // now and then, and an eighth rest inside a beat.
+    rests: true,
     accidentals: 0,
   },
   4: {
@@ -438,39 +440,74 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     bars.push(events);
   }
 
-  // ── rests (level IV and up) — one bar, in the middle, on a weak slot ────
-  if (spec.rests && chance(rng, 0.55)) {
-    // A sixteenth rest needs a run of sixteenths to sit in, and leaving the
-    // choice to a random bar made it appear about once in twenty passages. So
-    // the bar is drawn from those that actually have a run, and only sometimes
-    // from the whole set.
-    const runSlot = (events) => {
-      for (let i = 1; i < events.length - 1; i++) {
-        if (
-          events[i].dur === 1 &&
-          events[i - 1].dur === 1 &&
-          events[i + 1].dur === 1
-        ) {
-          return i;
+  // ── rests (level III and up) ──────────────────────────────────────────
+  // One slot of one bar, sometimes two, is turned into silence. Which kind
+  // matters as much as how often: a quarter rest is the one a sight-reader meets
+  // constantly, a half rest takes two beats and is rarer, and a sixteenth rest
+  // only makes sense inside a run of sixteenths, where it breaks the beam. The
+  // old chooser took the first short slot it found in one middle bar, which was
+  // nearly always an eighth — quarter rests hardly ever appeared.
+  if (spec.rests && chance(rng, 0.6)) {
+    // A bar never opens a passage or closes it with a silence: the first note and
+    // the cadence have to sound. Any other slot may go quiet, including the first
+    // slot of a bar, which is where a half rest belongs.
+    const firstSlot = bars[0][0];
+    const lastBar = bars[bars.length - 1];
+    const lastSlot = lastBar[lastBar.length - 1];
+    const free = (e) => e !== firstSlot && e !== lastSlot;
+
+    const slotsOf = (test) => {
+      const out = [];
+      bars.forEach((events, b) =>
+        events.forEach((e, i) => {
+          if (free(e) && test(e, i, events)) out.push({ e, bar: b });
+        }),
+      );
+      return out;
+    };
+
+    const compound = meter === '6/8';
+    // A half rest needs a bar of two-beat groups to sit in: in 2/4 it would be a
+    // whole-bar rest (drawn as a whole rest, not this glyph), and in 6/8 the beat
+    // is a dotted quarter, so neither takes one.
+    const allowsHalf = meter === '3/4' || meter === '4/4' || meter === '2/2';
+    const table = compound
+      ? [[2, 1]] // an eighth rest; a quarter rest would cross 6/8's own beat
+      : [[4, 5], [2, 2], [8, allowsHalf ? 2 : 0], [1, 1]];
+
+    const options = table
+      .map(([dur, weight]) => ({
+        weight,
+        list: dur === 1
+          ? slotsOf((e, i, events) =>
+              e.dur === 1 && events[i - 1]?.dur === 1 && events[i + 1]?.dur === 1)
+          : slotsOf((e) => e.dur === dur),
+      }))
+      .filter((o) => o.weight > 0 && o.list.length);
+
+    const placeOne = (banned = -1) => {
+      const usable = options
+        .map((o) => ({ weight: o.weight, list: o.list.filter((s) => s.bar !== banned) }))
+        .filter((o) => o.list.length);
+      if (!usable.length) return -1;
+      const total = usable.reduce((a, o) => a + o.weight, 0);
+      let roll = rng() * total;
+      let chosen = usable[usable.length - 1];
+      for (const o of usable) {
+        roll -= o.weight;
+        if (roll <= 0) {
+          chosen = o;
+          break;
         }
       }
-      return -1;
+      const slot = chosen.list[Math.floor(rng() * chosen.list.length)];
+      slot.e.rest = true;
+      return slot.bar;
     };
-    const runners = bars.filter((events) => runSlot(events) > 0);
 
-    if (runners.length && chance(rng, 0.6)) {
-      // The fourteenth-sixteenth figure: a rest inside the run, which breaks the
-      // beam and leaves the notes on each side to beam among themselves.
-      const events = runners[Math.floor(rng() * runners.length)];
-      events[runSlot(events)].rest = true;
-    } else {
-      // Otherwise a beat or a half-beat rest, never the first or last event.
-      const events = bars[1 + Math.floor(rng() * 5)];
-      const slot = events.findIndex(
-        (e, i) => i > 0 && e.dur >= 2 && e.dur <= 4 && i < events.length - 1,
-      );
-      if (slot > 0) events[slot].rest = true;
-    }
+    const used = placeOne();
+    // Two rests in a passage is ordinary music; two in the same bar is a hole.
+    if (used >= 0 && chance(rng, 0.3)) placeOne(used);
   }
 
   // ── pitches ───────────────────────────────────────────────────────────

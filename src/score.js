@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312144';
-import { CLEF_PATH } from './clef.js?v=202610312144';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312212';
+import { CLEF_PATH } from './clef.js?v=202610312212';
 
-import { beatLength } from './sightreading.js?v=202610312144';
+import { beatLength } from './sightreading.js?v=202610312212';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -503,16 +503,27 @@ function drawSystem(
     // a long note.
     const lone =
       events.length === 1 && events[0].start === 0 && events[0].dur >= passage.perBar;
-    const at = (e) => (lone ? x0 + (barWidth - inset - 8) / 2 : x0 + (e.start / passage.perBar) * span);
 
-    let tightest = null;
-    for (const allowance of [22, 16, 11, 6, 0]) {
+    /**
+     * The bar set with its notes at `squash` of their time positions.
+     *
+     * Time alone is not enough for a crowded bar: three quarters and a beat of
+     * sixteenths take up a 4/4 bar by the clock, but four sixteenths need 48
+     * units between them and the clock gives them 46. The run then spent its
+     * floor budget and pushed the last note onto the barline — where the next
+     * bar's first note is — so two note heads ended up touching. Squashing the
+     * clock positions (not the floors) hands the room to the short notes: the
+     * long ones give up what they do not need.
+     */
+    const layout = (squash, allowance) => {
       const xs = new Map();
       let prev = null;
       let prevEvent = null;
       for (let i = 0; i < events.length; i++) {
         const e = events[i];
-        let x = at(e);
+        let x = lone
+          ? x0 + (barWidth - inset - 8) / 2
+          : x0 + (e.start / passage.perBar) * span * squash;
         // Measured, not guessed: a rest's glyph hangs 6 units to the left of the
         // position it is given, and a flagged sixteenth sweeps 17 to the right of
         // its own. Sixteen is enough for two noteheads, but between a flag and a
@@ -531,8 +542,18 @@ function drawSystem(
         prev = x;
         prevEvent = e;
       }
-      tightest = xs;
-      if (prev == null || prev <= limit) return xs;
+      return { xs, end: prev };
+    };
+
+    let tightest = null;
+    // The largest squash that fits is the one used; 0 is the last resort, where
+    // only the floors are left and every note sits at its neighbour's right.
+    for (const squash of [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0]) {
+      for (const allowance of [22, 16, 11, 6, 0]) {
+        const { xs, end } = layout(squash, allowance);
+        tightest = xs;
+        if (end == null || end <= limit) return xs;
+      }
     }
 
     // A bar too crowded even at the tightest spacing. Keep the tightest layout

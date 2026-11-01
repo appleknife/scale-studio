@@ -143,6 +143,7 @@
         let accidentals = 0;
         let flags = 0;
         let dynamics = 0;
+        const headHits = [];
         const restHits = [];
         const slurHits = [];
         const accidentalHits = [];
@@ -228,6 +229,41 @@
             }
           }
 
+          // ── heads on top of each other ---------------------------------
+          // Two note heads may never touch: the line is one voice, so a pair this
+          // close is either a spacing bug or a bar that overflowed onto the next
+          // one's first note. Every head is the same ellipse, so two heads
+          // overlap exactly when their centres are less than two radii apart in
+          // the ellipse's own frame — rotate and scale, and it is a circle test.
+          const headList = [...svg.querySelectorAll('ellipse')].map((n) => {
+            const t = n.getAttribute('transform') || '';
+            const m = t.match(/rotate\((-?[\d.]+)/);
+            return {
+              cx: Number(n.getAttribute('cx')),
+              cy: Number(n.getAttribute('cy')),
+              rx: Number(n.getAttribute('rx')),
+              ry: Number(n.getAttribute('ry')),
+              turn: m ? (-Number(m[1]) * Math.PI) / 180 : 0,
+            };
+          });
+          for (let i = 0; i < headList.length; i++) {
+            for (let j = i + 1; j < headList.length; j++) {
+              const a = headList[i];
+              const b = headList[j];
+              const dx = b.cx - a.cx;
+              const dy = b.cy - a.cy;
+              const ux = (dx * Math.cos(a.turn) + dy * Math.sin(a.turn)) / a.rx;
+              const uy = (-dx * Math.sin(a.turn) + dy * Math.cos(a.turn)) / a.ry;
+              if (Math.hypot(ux, uy) < 2) {
+                headHits.push(
+                  `L${level} seed ${seed}: heads at ${a.cx.toFixed(0)},${a.cy.toFixed(0)} and ${b.cx.toFixed(0)},${b.cy.toFixed(0)} overlap`,
+                );
+                break;
+              }
+            }
+            if (headHits.length) break;
+          }
+
           // ── dynamics ---------------------------------------------------
           // A dynamic letter sits under the bar and an articulation hangs below
           // its note, so a low note with an accent underneath it reaches down
@@ -298,9 +334,11 @@
             `slurs ${slurHits.length}/${SEEDS} broken (${slurs} drawn) · ` +
             `accidentals ${accidentalHits.length}/${SEEDS} broken (${accidentals} drawn) · ` +
             `flags ${flagHits.length}/${SEEDS} broken (${flags} drawn) · ` +
-            `dynamics ${dynamicHits.length}/${SEEDS} broken (${dynamics} drawn)`,
+            `dynamics ${dynamicHits.length}/${SEEDS} broken (${dynamics} drawn) · ` +
+            `heads ${headHits.length}/${SEEDS} collided`,
         );
         problems.push(
+          ...headHits.slice(0, 2),
           ...restHits.slice(0, 2),
           ...slurHits.slice(0, 2),
           ...accidentalHits.slice(0, 2),
