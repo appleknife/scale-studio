@@ -145,6 +145,7 @@
         let dynamics = 0;
         const headHits = [];
         const restHits = [];
+        const restShapeHits = [];
         const slurHits = [];
         const accidentalHits = [];
         const flagHits = [];
@@ -175,6 +176,37 @@
             const bad = ink.find((b) => overlap(r, b));
             if (bad) {
               restHits.push(`L${level} seed ${seed}: rest at ${r.x0.toFixed(0)} runs into ink at ${bad.x0.toFixed(0)}`);
+              break;
+            }
+          }
+
+          // A half rest and a whole rest are the same block; the line it touches
+          // is what tells them apart. A half rest sits on the middle line, a
+          // whole rest hangs from the fourth — drawn straddling the middle line,
+          // a half rest reads as either, which is exactly what it looked like.
+          const lineYs = [...svg.querySelectorAll('g[stroke="#c3b49d"] line')].map((n) =>
+            Number(n.getAttribute('y1')),
+          );
+          const staves = [];
+          for (let i = 0; i + 4 < lineYs.length; i += 5) {
+            staves.push({ middle: lineYs[i + 2], fourth: lineYs[i + 3] });
+          }
+          for (const g of svg.querySelectorAll('g.score-rest')) {
+            const dur = Number(g.dataset.dur);
+            const rect = g.querySelector('rect');
+            if (!rect || dur < 8) continue;
+            const top = Number(rect.getAttribute('y'));
+            const bottom = top + Number(rect.getAttribute('height'));
+            if (!staves.length) break;
+            const staff = staves.reduce((best, s) =>
+              Math.abs(s.middle - (top + bottom) / 2) < Math.abs(best.middle - (top + bottom) / 2) ? s : best,
+            );
+            const want = dur >= 16 ? staff.fourth : staff.middle;
+            const edge = dur >= 16 ? top : bottom;
+            if (Math.abs(edge - want) > 0.75) {
+              restShapeHits.push(
+                `L${level} seed ${seed}: ${dur >= 16 ? 'whole' : 'half'} rest edge at ${edge.toFixed(1)}, not ${want.toFixed(1)}`,
+              );
               break;
             }
           }
@@ -335,11 +367,13 @@
             `accidentals ${accidentalHits.length}/${SEEDS} broken (${accidentals} drawn) · ` +
             `flags ${flagHits.length}/${SEEDS} broken (${flags} drawn) · ` +
             `dynamics ${dynamicHits.length}/${SEEDS} broken (${dynamics} drawn) · ` +
-            `heads ${headHits.length}/${SEEDS} collided`,
+            `heads ${headHits.length}/${SEEDS} collided · ` +
+            `rest blocks ${restShapeHits.length}/${SEEDS} on the wrong line`,
         );
         problems.push(
           ...headHits.slice(0, 2),
           ...restHits.slice(0, 2),
+          ...restShapeHits.slice(0, 2),
           ...slurHits.slice(0, 2),
           ...accidentalHits.slice(0, 2),
           ...flagHits.slice(0, 2),

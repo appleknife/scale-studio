@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312212';
-import { CLEF_PATH } from './clef.js?v=202610312212';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312217';
+import { CLEF_PATH } from './clef.js?v=202610312217';
 
-import { beatLength } from './sightreading.js?v=202610312212';
+import { beatLength } from './sightreading.js?v=202610312217';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -281,13 +281,19 @@ function quarterRest(x, y, colour) {
 }
 
 function restGlyph(x, y, dur, colour) {
+  // `y` is the middle line of the staff. A half rest sits *on* that line and
+  // fills the space above it; a whole rest hangs from the fourth line into the
+  // space below. They are the same block, and which line it touches is the only
+  // thing that tells them apart — drawn straddling the middle line, a half rest
+  // reads as either. A space is LINE_GAP and the block is half of one, which is
+  // what a printed rest measures.
+  const BLOCK = 5.5;
+  const WIDTH = 14;
   if (dur >= 16) {
-    // whole rest — a block hanging under the fourth line
-    return `<rect x="${x - 6}" y="${y - LINE_GAP / 2 + 1}" width="12" height="5.5" fill="${colour}"/>`;
+    return `<rect x="${x - WIDTH / 2}" y="${y + LINE_GAP}" width="${WIDTH}" height="${BLOCK}" fill="${colour}"/>`;
   }
   if (dur >= 8) {
-    // half rest — a block sitting on the middle line
-    return `<rect x="${x - 6}" y="${y - 2}" width="12" height="5.5" fill="${colour}"/>`;
+    return `<rect x="${x - WIDTH / 2}" y="${y - BLOCK}" width="${WIDTH}" height="${BLOCK}" fill="${colour}"/>`;
   }
   if (dur >= 4) return quarterRest(x, y, colour);
   // Eighth rest — measured off a printed one, in fractions of the glyph's own
@@ -474,7 +480,9 @@ function drawSystem(
   function rights(events) {
     const beamable = (e) => e && !e.rest && e.dur <= 2;
     return events.map((e, i) => {
-      if (!e || e.rest || !e.note) return 6;
+      // A rest's ink is a block 14 wide, so it reaches 7 either side of the point
+      // it is set at — the same as a note head.
+      if (!e || e.rest || !e.note) return 7;
       if (e.dur === 3 || e.dur === 6 || e.dur === 12) return 12.9;
       if (e.dur <= 2) {
         const beamed = beamable(events[i - 1]) || beamable(events[i + 1]);

@@ -327,6 +327,11 @@ them in almost every passage.
 Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave
 trouble are the ones where a stroked line is not good enough:
 
+* **A half rest sits on a line; a whole rest hangs from one.** They are the same
+  block, and the line it touches is the only thing that tells them apart: the half
+  rest rests on the middle line and fills the space above it, the whole rest hangs
+  from the fourth line into the space below. Drawn straddling the middle line —
+  which is how both were placed at first — a half rest reads as either.
 * Rests and note flags are **filled outlines**, not strokes. A quarter rest is a
   `ribbon` — a centreline with a width at every point — because the printed glyph is
   calligraphic: hair-thin at the tick, swelling through the belly, pinched at the
@@ -583,11 +588,12 @@ tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correc
                       side, every beam ending on a stem
 tests/notation.test.html  renders 360 passages and measures the ink: no rest, slur,
                       flag, dynamic, tempo mark or tuplet number may touch another
-                      glyph, no flag may cross a note head, and no two note heads
-                      may touch. Where a box would cry wolf it measures the
-                      drawing: a flag against each head's ellipse, a wide slanted
-                      path (a beam) against the text, and two heads against each
-                      other in the ellipse's own frame.
+                      glyph, no flag may cross a note head, no two note heads may
+                      touch, and a half rest must sit on the middle line while a
+                      whole rest hangs from the fourth. Where a box would cry wolf
+                      it measures the drawing: a flag against each head's ellipse,
+                      a wide slanted path (a beam) against the text, and two heads
+                      against each other in the ellipse's own frame.
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format
