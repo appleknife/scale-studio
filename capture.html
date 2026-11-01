@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scale Studio — the playback voice</title>
+    <link rel="stylesheet" href="app.css?v=202611012000" />
+    <link rel="icon" href="icons/icon-192.png" />
+    <style>
+      /* A tool page, so it borrows the app's paper and ink and adds only what a
+         recording session needs: one big card at a time, and a progress rail. */
+      .capture-top {
+        padding: 34px 0 10px;
+      }
+      .eyebrow {
+        margin: 0 0 6px;
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .capture-top h1 {
+        margin: 0 0 10px;
+        font-family: var(--serif);
+        font-size: clamp(26px, 3.4vw, 34px);
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }
+      .lede {
+        margin: 0 0 18px;
+        max-width: 62ch;
+        color: var(--ink-soft);
+        line-height: 1.55;
+      }
+      .setup {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 22px;
+        align-items: flex-start;
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--surface);
+        box-shadow: var(--shadow-sm);
+      }
+      .setup ul {
+        margin: 0;
+        padding-left: 18px;
+        max-width: 58ch;
+        color: var(--ink-soft);
+        line-height: 1.6;
+        flex: 1 1 380px;
+      }
+      .setup li + li {
+        margin-top: 4px;
+      }
+      .setup strong {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .mic-side {
+        flex: 0 0 250px;
+        display: grid;
+        gap: 10px;
+      }
+      .meter {
+        height: 8px;
+        border-radius: 99px;
+        background: var(--line);
+        overflow: hidden;
+      }
+      .meter i {
+        display: block;
+        height: 100%;
+        width: 0%;
+        border-radius: 99px;
+        background: var(--accent);
+        transition: width 60ms linear;
+      }
+      .meter.is-hot i {
+        background: var(--rose);
+      }
+      .mic-note {
+        margin: 0;
+        font-size: 12.5px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .stages {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 26px 0 16px;
+      }
+      .stage-chip {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 9px 14px;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        background: var(--surface);
+        color: var(--ink-soft);
+        font: inherit;
+        font-size: 13.5px;
+        cursor: pointer;
+      }
+      .stage-chip b {
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .stage-chip small {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .stage-chip.is-on {
+        border-color: var(--accent);
+        background: var(--accent-wash);
+        color: var(--accent);
+      }
+      .stage-chip.is-done small {
+        color: var(--accent);
+      }
+
+      .take {
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.05fr);
+        gap: 26px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: var(--surface);
+        box-shadow: var(--shadow-sm);
+      }
+      .notation {
+        display: grid;
+        place-items: center;
+        padding: 10px 6px;
+        border-radius: 14px;
+        background: #fffdf8;
+        border: 1px solid var(--line);
+      }
+      .notation svg {
+        width: 100%;
+        height: auto;
+        max-height: 190px;
+      }
+      .take-side h2 {
+        margin: 2px 0 4px;
+        font-family: var(--serif);
+        font-size: 30px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }
+      .take-side .sub {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font-size: 13.5px;
+      }
+      .take-side .hint {
+        margin: 0 0 16px;
+        color: var(--ink-soft);
+        line-height: 1.55;
+        max-width: 46ch;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      .btn {
+        font: inherit;
+        font-size: 14px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        border: 1px solid var(--line-strong);
+        background: var(--surface);
+        color: var(--ink);
+        cursor: pointer;
+      }
+      .btn:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .btn:disabled {
+        opacity: 0.42;
+        cursor: default;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fdfbf6;
+      }
+      .btn.primary:hover:not(:disabled) {
+        background: var(--accent-2);
+        color: #fdfbf6;
+      }
+      .btn.rec.is-armed {
+        background: var(--rose);
+        border-color: var(--rose);
+        color: #fdf7f5;
+      }
+      .status {
+        margin: 14px 0 0;
+        min-height: 20px;
+        font-size: 13.5px;
+        color: var(--ink-soft);
+        font-variant-numeric: tabular-nums;
+      }
+      .status.is-good {
+        color: var(--accent);
+      }
+      .status.is-warn {
+        color: var(--rose);
+      }
+
+      .rail {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 18px 0 8px;
+      }
+      .dot {
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        border: 1px solid var(--line-strong);
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 10.5px;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        padding: 0;
+      }
+      .dot.is-done {
+        background: var(--accent-wash);
+        border-color: var(--accent-2);
+        color: var(--accent);
+      }
+      .dot.is-here {
+        outline: 2px solid var(--gold);
+        outline-offset: 1px;
+      }
+
+      .save-bar {
+        position: sticky;
+        bottom: 0;
+        margin-top: 26px;
+        padding: 14px 0 26px;
+        background: linear-gradient(to top, var(--paper) 55%, rgba(250, 247, 241, 0));
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+      }
+      .save-bar .count {
+        font-size: 13.5px;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .save-bar .spacer {
+        flex: 1;
+      }
+      @media (max-width: 760px) {
+        .take {
+          grid-template-columns: 1fr;
+        }
+        .mic-side {
+          flex-basis: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="capture-top">
+        <p class="eyebrow">Scale Studio · for the teacher</p>
+        <h1>The playback voice</h1>
+        <p class="lede">
+          The sight-reading section can play a passage back so a student hears it before trying it.
+          A synthesised tone would sound like a keyboard, so the app plays a real violin instead —
+          yours. This page records it: about fifty takes, one note each, and it hands them back as
+          one zip file.
+        </p>
+
+        <div class="setup">
+          <ul>
+            <li><strong>Room:</strong> dry and quiet. No reverb pedal, no hall — the app adds its own.</li>
+            <li><strong>Microphone:</strong> your RODE, about 30–40 cm from the instrument, slightly off the f-hole rather than over it.</li>
+            <li><strong>Level:</strong> play your loudest note first and set the gain so the meter peaks in the green. Never touch it again.</li>
+            <li><strong>Bow:</strong> same speed and contact point all the way through, so the takes match each other.</li>
+            <li><strong>Keys:</strong> <kbd>space</kbd> starts and stops a take, <kbd>enter</kbd> keeps it, <kbd>r</kbd> redoes it, <kbd>h</kbd> hears the pitch.</li>
+          </ul>
+          <div class="mic-side">
+            <button class="btn primary" id="micBtn">Open the microphone</button>
+            <div class="meter" id="meter"><i></i></div>
+            <p class="mic-note" id="micNote">Nothing is uploaded. The takes stay in this tab until you download them.</p>
+          </div>
+        </div>
+
+        <nav class="stages" id="stageNav" aria-label="Recording stages"></nav>
+
+        <section class="take" id="takeCard" hidden>
+          <div class="notation" id="notation"></div>
+          <div class="take-side">
+            <h2 id="takeTitle"></h2>
+            <p class="sub" id="takeSub"></p>
+            <p class="hint" id="takeHint"></p>
+            <div class="actions">
+              <button class="btn rec" id="recBtn" disabled>Record</button>
+              <button class="btn" id="hearBtn" disabled>Hear the pitch</button>
+              <button class="btn" id="playBtn" disabled>Play back</button>
+              <button class="btn" id="keepBtn" disabled>Keep &amp; next</button>
+              <button class="btn" id="skipBtn">Skip</button>
+            </div>
+            <p class="status" id="status"></p>
+          </div>
+        </section>
+
+        <div class="rail" id="rail" aria-label="Takes"></div>
+
+        <div class="save-bar">
+          <span class="count" id="count">No takes yet</span>
+          <span class="spacer"></span>
+          <button class="btn" id="resetBtn">Start over</button>
+          <button class="btn primary" id="zipBtn" disabled>Download the samples</button>
+        </div>
+      </header>
+    </div>
+
+    <script type="module">
+      import { renderBar } from './src/score.js?v=202611012000';
+      import {
+        STAGES,
+        buildTakes,
+        encodeWav,
+        trimTake,
+        makeZip,
+        openInput,
+      } from './src/capture.js?v=202611012000';
+
+      const takes = buildTakes();
+      const held = new Map(); // id → { wav, seconds, peak }
+      let at = 0;
+      let input = null;
+      let level = 0;
+      let recording = false;
+      let pending = null; // the take just recorded, waiting to be kept
+      let audioUrl = null;
+
+      const el = (id) => document.getElementById(id);
+      const card = el('takeCard');
+      const recBtn = el('recBtn');
+      const hearBtn = el('hearBtn');
+      const playBtn = el('playBtn');
+      const keepBtn = el('keepBtn');
+      const skipBtn = el('skipBtn');
+
+      const stageOf = (take) => STAGES.find((s) => s.id === take.stage);
+      const say = (text, tone = '') => {
+        el('status').textContent = text;
+        el('status').className = `status${tone ? ` is-${tone}` : ''}`;
+      };
+      const dB = (peak) => (peak > 0 ? 20 * Math.log10(peak) : -Infinity).toFixed(0);
+
+      /* ── The stage rail and the takes ───────────────────────────────── */
+
+      function renderStages() {
+        const nav = el('stageNav');
+        nav.innerHTML = '';
+        STAGES.forEach((stage, i) => {
+          const list = takes.filter((t) => t.stage === stage.id);
+          const done = list.filter((t) => held.has(t.id)).length;
+          const chip = document.createElement('button');
+          chip.className = 'stage-chip';
+          const here = takes[at].stage === stage.id;
+          if (here) chip.classList.add('is-on');
+          if (done === list.length) chip.classList.add('is-done');
+          chip.innerHTML = `<b>${i + 1}. ${stage.name}</b><small>${done}/${list.length}</small>`;
+          chip.onclick = () => {
+            const first = takes.findIndex((t) => t.stage === stage.id && !held.has(t.id));
+            const any = takes.findIndex((t) => t.stage === stage.id);
+            at = first >= 0 ? first : any;
+            render();
+          };
+          nav.append(chip);
+        });
+      }
+
+      function renderRail() {
+        // Only the stage being recorded: fifty-four buttons in a row is a wall,
+        // and the teacher is always working inside one pass.
+        const rail = el('rail');
+        rail.innerHTML = '';
+        const stage = takes[at].stage;
+        takes.forEach((take, i) => {
+          if (take.stage !== stage) return;
+          const dot = document.createElement('button');
+          dot.className = 'dot';
+          if (held.has(take.id)) dot.classList.add('is-done');
+          if (i === at) dot.classList.add('is-here');
+          dot.textContent = take.title.replace('→', '');
+          dot.title = `${take.title} · ${take.sub}`;
+          dot.onclick = () => {
+            at = i;
+            pending = null;
+            render();
+          };
+          rail.append(dot);
+        });
+      }
+
+      function renderCard() {
+        const take = takes[at];
+        const stage = stageOf(take);
+        el('notation').innerHTML = renderBar(take.events, {
+          meter: '4/4',
+          width: 470,
+          label: `${take.title}, ${take.sub}`,
+        });
+        el('takeTitle').textContent = take.title;
+        el('takeSub').textContent = `${take.sub} · ${stage.name.toLowerCase()}`;
+        el('takeHint').textContent = stage.hint;
+
+        const mine = held.get(take.id);
+        recBtn.textContent = recording ? 'Stop' : mine ? 'Record again' : 'Record';
+        recBtn.disabled = !input;
+        hearBtn.disabled = !input;
+        playBtn.disabled = !(pending || mine);
+        keepBtn.disabled = !pending;
+
+        if (pending) {
+          say(
+            `Recorded ${pending.seconds.toFixed(2)} s · peak ${dB(pending.peak)} dBFS` +
+              (pending.peak > 0.98 ? ' — that is clipping, ease off the bow' : pending.peak < 0.03 ? ' — very quiet' : ''),
+            pending.peak > 0.98 || pending.peak < 0.03 ? 'warn' : '',
+          );
+        } else if (mine) {
+          say(`Kept · ${mine.seconds.toFixed(2)} s`, 'good');
+        } else {
+          say(recording ? 'Listening…' : 'Ready when you are.');
+        }
+      }
+
+      function renderCount() {
+        const n = held.size;
+        el('count').textContent = n
+          ? `${n} of ${takes.length} takes recorded — download before you close the tab`
+          : 'No takes yet';
+        el('zipBtn').disabled = n === 0;
+      }
+
+      function render() {
+        renderStages();
+        renderRail();
+        renderCard();
+        renderCount();
+        card.hidden = !input;
+      }
+
+      /* ── Recording one take ─────────────────────────────────────────── */
+
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      async function record() {
+        if (!input) return;
+        if (recording) {
+          finish();
+          return;
+        }
+        pending = null;
+        const stage = stageOf(takes[at]);
+        // A short count-in, so the bow is already moving when the clock starts.
+        for (const word of ['3', '2', '1']) {
+          say(`Recording in ${word}…`);
+          input.playTone(takes[at].midi, 0.09);
+          await wait(560);
+        }
+        say('Listening…');
+        input.begin();
+        recording = true;
+        recBtn.classList.add('is-armed');
+        renderCard();
+
+        const started = performance.now();
+        let quiet = 0;
+        const minSeconds = stage.seconds * 0.45;
+        const watch = setInterval(() => {
+          const now = performance.now();
+          const elapsed = (now - started) / 1000;
+          quiet = level < 0.006 ? quiet + 0.03 : 0;
+          if (!recording) return clearInterval(watch);
+          if (elapsed > stage.seconds || (elapsed > minSeconds && quiet > stage.silence)) {
+            clearInterval(watch);
+            finish();
+          }
+        }, 30);
+      }
+
+      function finish() {
+        if (!recording) return;
+        recording = false;
+        recBtn.classList.remove('is-armed');
+        const raw = input.end();
+        const trimmed = trimTake(raw, input.sampleRate, {
+          tail: takes[at].style === 'staccato' ? 0.18 : 0.06,
+        });
+        if (trimmed.silent) {
+          pending = null;
+          say('Nothing came through — is the microphone switched on?', 'warn');
+          renderCard();
+          return;
+        }
+        pending = trimmed;
+        renderCard();
+      }
+
+      function keep() {
+        if (!pending) return;
+        const take = takes[at];
+        held.set(take.id, {
+          wav: encodeWav(pending.samples, input.sampleRate),
+          seconds: pending.seconds,
+          peak: pending.peak,
+        });
+        pending = null;
+        next();
+      }
+
+      function next() {
+        for (let step = 1; step <= takes.length; step++) {
+          const i = (at + step) % takes.length;
+          if (!held.has(takes[i].id)) {
+            at = i;
+            return render();
+          }
+        }
+        say('Every take is recorded. Download the samples.', 'good');
+        render();
+      }
+
+      function playPending() {
+        const take = takes[at];
+        const mine = held.get(take.id);
+        const wav = pending ? encodeWav(pending.samples, input.sampleRate) : mine && mine.wav;
+        if (!wav) return;
+        if (audioUrl) URL.revokeObjectURL(audioUrl);
+        audioUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
+        const audio = new Audio(audioUrl);
+        audio.play().catch(() => say('The browser would not play that back.', 'warn'));
+      }
+
+      /* ── The microphone ─────────────────────────────────────────────── */
+
+      el('micBtn').onclick = async () => {
+        el('micBtn').disabled = true;
+        try {
+          input = await openInput({
+            onLevel: (rms) => {
+              level = rms;
+              const pct = Math.min(100, (20 * Math.log10(Math.max(rms, 1e-6)) + 60) * 2.2);
+              el('meter').firstElementChild.style.width = `${pct}%`;
+              el('meter').classList.toggle('is-hot', rms > 0.95);
+            },
+          });
+          el('micBtn').textContent = `Microphone open · ${(input.sampleRate / 1000).toFixed(1)} kHz`;
+          el('micNote').textContent = 'Play your loudest note and set the gain on the interface so the bar peaks around three-quarters. Then leave it alone.';
+          render();
+        } catch (err) {
+          el('micBtn').disabled = false;
+          el('micNote').textContent =
+            err && err.name === 'NotAllowedError'
+              ? 'The microphone was blocked. Allow it for this page and try again.'
+              : 'No microphone available — open this page through the little server (localhost) or the published https link.';
+        }
+      };
+
+      recBtn.onclick = record;
+      hearBtn.onclick = () => input && input.playTone(takes[at].midi);
+      playBtn.onclick = playPending;
+      keepBtn.onclick = keep;
+      skipBtn.onclick = next;
+
+      document.addEventListener('keydown', (event) => {
+        if (event.target.matches('input, textarea')) return;
+        // A focused button already answers to space and enter; handling the key
+        // here as well would record and stop in the same press.
+        if (event.target.closest && event.target.closest('button') && (event.code === 'Space' || event.code === 'Enter')) return;
+        if (event.code === 'Space') {
+          event.preventDefault();
+          record();
+        } else if (event.code === 'Enter' && !keepBtn.disabled) {
+          event.preventDefault();
+          keep();
+        } else if (event.key === 'r' || event.key === 'R') {
+          record();
+        } else if (event.key === 'h' || event.key === 'H') {
+          input && input.playTone(takes[at].midi);
+        }
+      });
+
+      /* ── Giving it back ─────────────────────────────────────────────── */
+
+      el('zipBtn').onclick = () => {
+        const files = [];
+        const manifest = {
+          app: 'Scale Studio',
+          kind: 'sight-reading playback voice',
+          recordedAt: new Date().toISOString(),
+          sampleRate: input ? input.sampleRate : null,
+          takes: [],
+        };
+        for (const take of takes) {
+          const mine = held.get(take.id);
+          if (!mine) continue;
+          files.push({ name: take.file, bytes: mine.wav });
+          manifest.takes.push({
+            file: take.file,
+            style: take.style,
+            level: take.level,
+            midi: take.midi,
+            toMidi: take.toMidi ?? null,
+            seconds: Number(mine.seconds.toFixed(3)),
+            peak: Number(mine.peak.toFixed(4)),
+          });
+        }
+        files.push({
+          name: 'manifest.json',
+          bytes: new TextEncoder().encode(JSON.stringify(manifest, null, 2)),
+        });
+        const blob = makeZip(files);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'scale-studio-samples.zip';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        say(`Downloaded ${files.length - 1} samples and their manifest.`, 'good');
+      };
+
+      el('resetBtn').onclick = () => {
+        if (!held.size) return;
+        if (!confirm('Throw away every take recorded in this tab?')) return;
+        held.clear();
+        pending = null;
+        at = 0;
+        render();
+      };
+
+      render();
+    </script>
+  </body>
+</html>

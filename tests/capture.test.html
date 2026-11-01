@@ -1,0 +1,210 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>capture tests</title>
+    <style>
+      body {
+        font: 13px/1.5 ui-monospace, monospace;
+        margin: 16px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // The recording page is a tool, but a tool that hands the app its voice: if
+      // the take list misses a pitch, or a WAV header is one byte out, the failure
+      // is silent until someone tries to play a passage. So the parts that can be
+      // weighed are weighed here — the microphone is the teacher's job.
+      import {
+        RANGE,
+        STAGES,
+        buildTakes,
+        spell,
+        stringFor,
+        trimTake,
+        encodeWav,
+        makeZip,
+        crc32,
+      } from '../src/capture.js?v=202611012000';
+      import { renderBar } from '../src/score.js?v=202611012000';
+
+      const problems = [];
+      const log = [];
+      const check = (ok, message) => {
+        if (!ok) problems.push(message);
+        return ok;
+      };
+
+      /* ── the take list ─────────────────────────────────────────────── */
+
+      const takes = buildTakes();
+      const byId = new Set(takes.map((t) => t.id));
+      check(byId.size === takes.length, `take ids are not unique: ${takes.length} takes, ${byId.size} ids`);
+
+      const files = new Set(takes.map((t) => t.file));
+      check(files.size === takes.length, `two takes share a filename (${files.size} of ${takes.length})`);
+      const badName = takes.find((t) => !/^[A-Za-z0-9#-]+\.wav$/.test(t.file));
+      check(!badName, `a filename is not filesystem-safe: ${badName && badName.file}`);
+
+      // Every whole tone from the bottom of the range to the top, at both levels:
+      // a gap here is a passage that would have to stretch a sample two semitones.
+      const smooth = takes.filter((t) => t.style === 'smooth');
+      const pitches = (RANGE.to - RANGE.from) / RANGE.step + 1;
+      const missing = [];
+      for (let midi = RANGE.from; midi <= RANGE.to; midi += RANGE.step) {
+        for (const level of ['mf', 'f']) {
+          if (!smooth.some((t) => t.midi === midi && t.level === level)) missing.push(`${midi}/${level}`);
+        }
+      }
+      check(missing.length === 0, `smooth bow is missing ${missing.slice(0, 6).join(', ')}`);
+      check(smooth.length === pitches * 2, `expected ${pitches * 2} smooth takes, built ${smooth.length}`);
+      // Each pass must be the whole ladder on its own, in order, or the rail has
+      // two dots with the same name and the teacher cannot tell them apart.
+      for (const stage of ['smooth-mf', 'smooth-f']) {
+        const list = takes.filter((t) => t.stage === stage);
+        check(list.length === pitches, `${stage} has ${list.length} takes, wanted ${pitches}`);
+        check(
+          new Set(list.map((t) => t.midi)).size === list.length,
+          `${stage} repeats a pitch`,
+        );
+      }
+
+      for (const stage of STAGES) {
+        check(takes.some((t) => t.stage === stage.id), `stage ${stage.id} has no takes`);
+        check(Boolean(stage.hint && stage.seconds > 0), `stage ${stage.id} has no hint or length`);
+      }
+      check(
+        takes.filter((t) => t.stage === 'staccato').length >= 4 &&
+          takes.filter((t) => t.stage === 'accent').length >= 4,
+        'the short and accented takes are too few to cover the range',
+      );
+      check(
+        takes.filter((t) => t.stage === 'slur').every((t) => t.toMidi != null && t.toMidi !== t.midi),
+        'a slur take has no second note',
+      );
+
+      /* ── spelling ──────────────────────────────────────────────────── */
+
+      check(spell(55).name === 'G3', `spell(55) gave ${spell(55).name}`);
+      check(spell(61).name === 'C♯4', `spell(61) gave ${spell(61).name}`);
+      const roundTrip = [];
+      for (let midi = 0; midi <= 127; midi++) if (spell(midi).midi !== midi) roundTrip.push(midi);
+      check(roundTrip.length === 0, `spelling loses pitch: ${roundTrip.slice(0, 5).join(', ')}`);
+      check(stringFor(55) === 'G string' && stringFor(88) === 'E string, higher position', 'the string hint is wrong');
+
+      /* ── trimming ──────────────────────────────────────────────────── */
+
+      const rate = 8000;
+      const pad = new Float32Array(Math.round(0.2 * rate));
+      const tone = new Float32Array(Math.round(0.5 * rate));
+      for (let i = 0; i < tone.length; i++) tone[i] = Math.sin((i / rate) * 2 * Math.PI * 440) * 0.3;
+      const raw = new Float32Array(pad.length + tone.length + pad.length);
+      raw.set(pad, 0);
+      raw.set(tone, pad.length);
+      const cut = trimTake(raw, 0.5 / 0.5 === 1 ? rate : rate);
+      check(!cut.silent, 'a note with silence either side was read as silence');
+      check(Math.abs(cut.seconds - 0.58) < 0.03, `trimmed length ${cut.seconds.toFixed(3)} s, wanted about 0.58`);
+      check(Math.abs(cut.peak - 0.3) < 0.01, `peak read as ${cut.peak.toFixed(3)}, wanted 0.3`);
+      check(Math.abs(cut.samples[0]) < 0.001, 'the trimmed take does not start at zero — it will click');
+      check(
+        Math.abs(cut.samples[cut.samples.length - 1]) < 0.001,
+        'the trimmed take does not end at zero — it will click',
+      );
+      const quiet = trimTake(new Float32Array(rate), rate);
+      check(quiet.silent && quiet.samples.length === 0, 'a silent take was not reported as silent');
+
+      /* ── the WAV ───────────────────────────────────────────────────── */
+
+      const samples = new Float32Array([0, 0.5, -0.5, 1, -1]);
+      const wav = encodeWav(samples, 44100);
+      const view = new DataView(wav.buffer);
+      const word = (at, n) => String.fromCharCode(...wav.slice(at, at + n));
+      check(word(0, 4) === 'RIFF', 'WAV does not start with RIFF');
+      check(word(8, 4) === 'WAVE' && word(12, 4) === 'fmt ', 'WAV header chunks are wrong');
+      check(word(36, 4) === 'data', 'WAV has no data chunk');
+      check(wav.length === 44 + samples.length * 2, `WAV is ${wav.length} bytes, wanted ${44 + samples.length * 2}`);
+      check(view.getUint16(22, true) === 1, 'WAV is not mono');
+      check(view.getUint32(24, true) === 44100, 'WAV sample rate is wrong');
+      check(view.getUint16(34, true) === 16, 'WAV is not 16-bit');
+      check(view.getUint32(40, true) === samples.length * 2, 'WAV data length is wrong');
+      check(view.getInt16(44 + 2, true) === Math.round(0.5 * 0x7fff), 'WAV samples are not scaled right');
+      check(view.getInt16(44 + 6, true) === 0x7fff, 'WAV does not reach full scale');
+      check(view.getInt16(44 + 8, true) === -0x8000, 'WAV negative peak is not scaled right');
+
+      /* ── the zip ───────────────────────────────────────────────────── */
+
+      const bytes = (text) => new TextEncoder().encode(text);
+      const files2 = [
+        { name: 'a.txt', bytes: bytes('hello samples') },
+        { name: 'manifest.json', bytes: bytes('{"ok":true}') },
+      ];
+      const zip = await makeZip(files2, new Date(2026, 10, 1, 12, 0, 0)).arrayBuffer();
+      const z = new Uint8Array(zip);
+      const zview = new DataView(zip);
+      check(z[0] === 0x50 && z[1] === 0x4b && z[2] === 0x03 && z[3] === 0x04, 'zip does not start with a local header');
+      const eocd = z.length - 22;
+      check(zview.getUint32(eocd, true) === 0x06054b50, 'zip has no end-of-directory record');
+      check(zview.getUint16(eocd + 10, true) === files2.length, 'zip entry count is wrong');
+      const centralStart = zview.getUint32(eocd + 16, true);
+      check(zview.getUint32(centralStart, true) === 0x02014b50, 'the central directory is not where the record says');
+      // the first entry's stored CRC must match the bytes it carries
+      const crc = zview.getUint32(14, true);
+      check(crc === crc32(files2[0].bytes), 'the first zip entry carries the wrong CRC');
+      const nameLength = zview.getUint16(26, true);
+      const dataAt = 30 + nameLength;
+      const stored = z.slice(dataAt, dataAt + files2[0].bytes.length);
+      check(
+        String.fromCharCode(...stored) === 'hello samples',
+        'the first zip entry does not hold its own bytes',
+      );
+
+      /* ── the notation on the card ──────────────────────────────────── */
+
+      const smoothTake = takes.find((t) => t.style === 'smooth');
+      const smoothSvg = renderBar(smoothTake.events, { width: 470 });
+      check(smoothSvg.startsWith('<svg') && smoothSvg.endsWith('</svg>'), 'renderBar did not return one svg');
+      check((smoothSvg.match(/<ellipse/g) || []).length === 1, 'a one-note take drew more than one note head');
+      const slurTake = takes.find((t) => t.stage === 'slur');
+      const slurSvg = renderBar(slurTake.events, { width: 470 });
+      check((slurSvg.match(/<ellipse/g) || []).length === 2, 'a slur take did not draw two note heads');
+      check(slurSvg.includes('score-slur'), 'a slur take drew no slur');
+      const dotted = renderBar(takes.find((t) => t.stage === 'staccato').events, { width: 470 });
+      const accented = renderBar(takes.find((t) => t.stage === 'accent').events, { width: 470 });
+      check(
+        dotted.replace(/\d+\.?\d*/g, '').length !== accented.replace(/\d+\.?\d*/g, '').length,
+        'the staccato and accented cards are drawn identically',
+      );
+
+      /* ── report ────────────────────────────────────────────────────── */
+
+      const perStage = STAGES.map(
+        (s) => `${s.name} ${takes.filter((t) => t.stage === s.id).length}`,
+      ).join(' · ');
+      log.push(`${takes.length} takes: ${perStage}`);
+      log.push(`smooth bow covers ${RANGE.from}–${RANGE.to} MIDI every ${RANGE.step} semitones, two levels`);
+      log.push(`trim: ${cut.seconds.toFixed(2)} s of a 0.9 s take · peak ${cut.peak.toFixed(2)}`);
+      log.push(`wav ${wav.length} bytes for ${samples.length} samples · zip ${zip.byteLength} bytes for 2 files`);
+
+      document.getElementById('report').textContent = problems.length
+        ? `CAPTURE FAILED\n${problems.join('\n')}\n\n${log.join('\n')}`
+        : `CAPTURE OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'CAPTURE FAILED' : 'CAPTURE OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'capture', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

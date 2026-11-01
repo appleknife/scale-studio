@@ -586,6 +586,51 @@ down the stem — the flag edges the teacher approved, so a redrawn flag fails t
 suite instead of quietly shipping. It also checks that `mark.png` still shows the
 vector, so a stale header is caught too.
 
+## For the teacher: recording the playback voice
+
+The sight-reading screen is getting a *hear it* button: press it and the passage
+plays, so a student can hear what they are about to read. It will not synthesise a
+tone — an oscillator sounds like a keyboard even through a hall — it will play a
+real violin: the teacher's own, recorded once. `capture.html` records that voice;
+the playback itself is the next piece of work, and these are the files it needs.
+
+`capture.html` is the tool that records it (`http://localhost:8777/capture.html`
+locally, or the same path on the published site). It is **English only on purpose**:
+it is a setup screen for an adult with a microphone, not a student screen, and the
+long instructions are easier to keep honest in one language.
+
+Fifty-four takes, in five passes:
+
+| Pass | Takes | What |
+|---|---|---|
+| Smooth bow · medium | 18 | détaché, two seconds, even, at *mf* |
+| Smooth bow · loud | 18 | the same notes again at *f* — the loud layer |
+| Short notes | 5 | staccato: a quarter of a second, stopped on the string |
+| Accents | 5 | a hard attack, then let it ring |
+| Slurs | 8 | two notes in one bow, the second with no new attack |
+
+The smooth-bow ladder is **one sample every whole tone** from G3 (55) to F6 (89),
+the full range the passages use. Whole tones, not semitones: playback stretches a
+sample by at most a semitone, which is the point at which a stretched violin starts
+to sound pinched, so a sample per semitone would double the session for nothing.
+The two dynamic layers are two passes rather than two takes per note — a bow arm
+holds one level far better across eighteen notes than across thirty-six
+alternations.
+
+Each card prints the take with the app's own engraver (`renderBar()` in
+`src/score.js`), so what is recorded is exactly the shape the playback has to
+produce — the staccato card carries its dot, the accent its wedge, the slur pairs
+their curve. `space` starts and stops a take, `enter` keeps it, `h` hears the pitch.
+The page trims the silence, fades 6 ms at each end so no take clicks, and warns when
+a take clips or barely registers.
+
+Everything is held in the tab and handed back as one zip: 16-bit mono WAVs named
+`G3-smooth-mf.wav`, `A4-B4-slur.wav` and so on, plus a `manifest.json` carrying each
+take's pitch, style, level, length and peak. **Nothing is uploaded anywhere**, and
+closing the tab throws the takes away — download first. The build step converts the
+WAVs to a compressed format the app fetches lazily; the manifest is what tells it
+which file is which note.
+
 ## Languages
 
 The app is in English and Simplified Chinese. The switch is the pill in the top
@@ -607,6 +652,7 @@ read over by a native speaker before it goes to a parent — the terminology (�
 
 ```
 index.html            the three screens
+capture.html          for the teacher: records the playback voice (see below)
 app.css               visual design
 src/i18n.js           the English and Chinese text tables
 src/music.js          note spelling, key signatures, scale library
@@ -620,6 +666,7 @@ src/onsets.js         bow-change detection (built, not wired in yet)
 src/journal.js        practice-log rules: streak, rest days, ready scales, week sheet,
                       and the save/load copy format
 src/recorder.js       in-memory recording and the synthesised hall
+src/capture.js        the sample-recording tool: take list, trimming, WAV and zip
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
 tests/sightreading.test.html  720 generated passages against the level rules
@@ -646,6 +693,9 @@ tests/i18n.test.html  translation coverage: no visible English left on any scree
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format
 tests/recorder.test.html  measures the synthesised hall: it decays, and it is stereo
+tests/capture.test.html  the recording tool's arithmetic: every whole tone in the
+                      range at both levels, the WAV header and sample scaling, the
+                      zip's CRC and directory, and the notation each card prints
 tests/mark.test.html  the icon's note is whole, note-shaped, unclipped, and still the
                       flag the teacher approved — thirteen rows down the stem — and
                       mark.png still shows it

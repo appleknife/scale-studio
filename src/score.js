@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611011640';
-import { CLEF_PATH } from './clef.js?v=202611011640';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611012000';
+import { CLEF_PATH } from './clef.js?v=202611012000';
 
-import { beatLength } from './sightreading.js?v=202611011640';
+import { beatLength } from './sightreading.js?v=202611012000';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -1150,6 +1150,31 @@ function drawSystem(
   }
 
   return { markup: part.join(''), dynY: lastDynY, musicTop };
+}
+
+/**
+ * One bar on its own, for a tool rather than for the app: the sample-recording
+ * page prints each take with the same engraver the passages use, so what the
+ * teacher records is exactly the shape the playback has to produce.
+ */
+export function renderBar(
+  events,
+  { meter = '4/4', fifths = 0, width = 470, label = 'one bar' } = {},
+) {
+  const [count, unit] = meter.split('/').map(Number);
+  const system = drawSystem(
+    { key: { fifths }, meter, perBar: (count * 4) / unit, bars: [events], swell: null, dynamic: null },
+    0,
+    1,
+    TOP_PAD,
+    { width, timeSignature: true, tempoText: '', showTempo: false, final: true },
+  );
+  const height = Math.ceil(system.dynY + 18);
+  return (
+    `<svg class="score" viewBox="0 0 ${width} ${height}" role="img" aria-label="${label}">` +
+    system.markup +
+    `</svg>`
+  );
 }
 
 /**
