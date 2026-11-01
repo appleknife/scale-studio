@@ -137,7 +137,14 @@
         return w > 9 && w < 13 && h > 14 && h < 38;
       };
 
-      for (const level of SIGHT_LEVELS) {
+      // Both layouts. The page is printed four bars to a system on a computer and
+      // two on a phone, and they are not the same drawing: the systems sit 150
+      // units apart in one and 104 in the other, which leaves a different amount
+      // of room above the music. Checking only the wide one is how a slur that
+      // turned upside down on a phone got through.
+      for (const layout of [4, 2]) {
+        const seeds = layout === 4 ? SEEDS : Math.round(SEEDS / 2);
+        for (const level of SIGHT_LEVELS) {
         let rests = 0;
         let slurs = 0;
         let accidentals = 0;
@@ -151,9 +158,9 @@
         const flagHits = [];
         const dynamicHits = [];
 
-        for (let seed = 0; seed < SEEDS; seed++) {
+        for (let seed = 0; seed < seeds; seed++) {
           const p = generatePassage({ level, seed });
-          stage.innerHTML = renderScore(p, { tempoText: '\u2669 = 60' });
+          stage.innerHTML = renderScore(p, { tempoText: '\u2669 = 60', barsPerSystem: layout });
           const svg = stage.querySelector('svg');
 
           // ── rests ------------------------------------------------------
@@ -358,17 +365,33 @@
               slurHits.push(`L${level} seed ${seed}: slur passes through ink at ${bad.x.toFixed(0)},${bad.y.toFixed(0)}`);
               break;
             }
+
+            // A slur is a bow: both control points sit outside both of its ends,
+            // on one side. When the space above a phrase ran out, the curve was
+            // pushed down to clear the system above and the arc ended up *between*
+            // its own ends — a flat S, or an arch turned inside out, which is what
+            // a phone showed at level VI and a computer never did.
+            const n = (slur.getAttribute('d').match(/-?\d+(\.\d+)?/g) || []).map(Number);
+            const [, sy1, , cy1, , cy2, , sy2] = n;
+            const lo = Math.min(sy1, sy2);
+            const hi = Math.max(sy1, sy2);
+            if (!((cy1 < lo && cy2 < lo) || (cy1 > hi && cy2 > hi))) {
+              slurHits.push(
+                `L${level} seed ${seed} ${layout}/system: slur ends at ${sy1.toFixed(0)}/${sy2.toFixed(0)} but bows to ${cy1.toFixed(0)} — neither above nor below`,
+              );
+              break;
+            }
           }
         }
 
         log.push(
-          `L${level}: rests ${restHits.length}/${SEEDS} broken (${rests} drawn) · ` +
-            `slurs ${slurHits.length}/${SEEDS} broken (${slurs} drawn) · ` +
-            `accidentals ${accidentalHits.length}/${SEEDS} broken (${accidentals} drawn) · ` +
-            `flags ${flagHits.length}/${SEEDS} broken (${flags} drawn) · ` +
-            `dynamics ${dynamicHits.length}/${SEEDS} broken (${dynamics} drawn) · ` +
-            `heads ${headHits.length}/${SEEDS} collided · ` +
-            `rest blocks ${restShapeHits.length}/${SEEDS} on the wrong line`,
+          `L${level} ${layout}/system: rests ${restHits.length}/${seeds} broken (${rests} drawn) · ` +
+            `slurs ${slurHits.length}/${seeds} broken (${slurs} drawn) · ` +
+            `accidentals ${accidentalHits.length}/${seeds} broken (${accidentals} drawn) · ` +
+            `flags ${flagHits.length}/${seeds} broken (${flags} drawn) · ` +
+            `dynamics ${dynamicHits.length}/${seeds} broken (${dynamics} drawn) · ` +
+            `heads ${headHits.length}/${seeds} collided · ` +
+            `rest blocks ${restShapeHits.length}/${seeds} on the wrong line`,
         );
         problems.push(
           ...headHits.slice(0, 2),
@@ -379,6 +402,7 @@
           ...flagHits.slice(0, 2),
           ...dynamicHits.slice(0, 2),
         );
+        }
       }
 
       document.getElementById('report').textContent = problems.length

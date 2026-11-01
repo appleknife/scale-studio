@@ -394,12 +394,26 @@ hoped for:
   takes a contiguous slice of the bar and refuses any slice containing a rest.
 * **A slur neither begins nor ends beside a beamed group.** Its curve is drawn on the
   far side of its own stems, and a neighbouring group's beam lies across that path.
+* **A slur is a bow.** Both of its control points sit outside both of its ends, on
+  one side. The side is normally opposite the stems, but that is a preference, not
+  a rule: on a phone the systems are close together, and a phrase that sits high
+  leaves no room above it. The curve used to be pushed down to clear the system
+  above until the arc sat *between* its own ends — an upside-down slur — so the
+  side is now chosen: take whichever side can hold a real bow, and only fall back
+  to a shallow one when neither can. Beams are part of what a side has to clear,
+  or a slur pushed to the stems' side is drawn along a beam.
 * **An accidental never lands on the note before it.** Bar spacing used to allow a
   fixed 22 units for a sign, relaxed to nothing when a bar was crowded — which is
   how a sharp ended up inside the flag of the note before it. The spacing now has an
   ink floor: what the two glyphs actually occupy, flag sweep and dot included, and
   measured across the barline too. The floor may not be relaxed; the house spacing
   above it may.
+* **Systems are spaced by what they hold.** One fixed gap had to serve the worst
+  case of every level at once, and on a phone it was too small: the dynamic under
+  one system met the tall notes of the next, and a high phrase had no room for its
+  slur. `renderScore` now draws each system once to measure how far its music
+  reaches above the staff and how far its dynamics hang below, then sets each gap
+  to the sum — `NARROW_PITCH` and `SYSTEM_GAP` are only floors.
 
 If you change a glyph, compare it against a printed one at matched height before
 believing it. Cropping the printed glyph and the render, scaling both to the same
@@ -586,13 +600,16 @@ tests/rhythm-probe.html why repeated notes merge today
 tests/ui.test.html    click-through smoke test, including the mock-audition draw
 tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correct
                       side, every beam ending on a stem
-tests/notation.test.html  renders 360 passages and measures the ink: no rest, slur,
-                      flag, dynamic, tempo mark or tuplet number may touch another
-                      glyph, no flag may cross a note head, no two note heads may
-                      touch, and a half rest must sit on the middle line while a
-                      whole rest hangs from the fourth. Where a box would cry wolf
-                      it measures the drawing: a flag against each head's ellipse,
-                      a wide slanted path (a beam) against the text, and two heads
+tests/notation.test.html  renders 540 passages — 60 a level four bars to a system,
+                      30 a level two to a system, because a phone's page is a
+                      different drawing with less room in it — and measures the ink:
+                      no rest, slur, flag, dynamic, tempo mark or tuplet number may
+                      touch another glyph, no flag may cross a note head, no two
+                      note heads may touch, every slur must bow on one side of both
+                      its ends, and a half rest must sit on the middle line while a
+                      whole rest hangs from the fourth. Where a box would cry wolf it
+                      measures the drawing: a flag against each head's ellipse, a
+                      wide slanted path (a beam) against the text, and two heads
                       against each other in the ellipse's own frame.
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready

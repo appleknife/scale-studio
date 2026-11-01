@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312217';
-import { CLEF_PATH } from './clef.js?v=202610312217';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611011410';
+import { CLEF_PATH } from './clef.js?v=202611011410';
 
-import { beatLength } from './sightreading.js?v=202610312217';
+import { beatLength } from './sightreading.js?v=202611011410';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -18,6 +18,10 @@ const WIDTH = 1000;
 // the drawing is simply narrower: shown at the width of a phone card that makes
 // every note — and every flag — about twice the size it would be squeezed to.
 const NARROW_WIDTH = 520;
+// The closest two systems may sit. The gap has to hold two things at once — the
+// dynamic marking under one system and the tallest music of the one below it —
+// and how big those are is a property of the music, so renderScore measures each
+// system and widens the gap where it has to. This is the floor, for plain music.
 const NARROW_PITCH = 104;
 const LEFT = 16;
 const RIGHT = 16;
@@ -449,7 +453,9 @@ function drawSystem(
   const tempoX = cursor + 6; 
 
   // Where the last bar's dynamic marking went, so the system above can keep a
-  // rising slur clear of it.
+  // rising slur clear of it — and so does the system below, which has to stay out
+  // of the way of the *lowest* one, not the last bar's. A bar with a low note puts
+  // its dynamic marking much further down than a bar that sits in the staff.
   let lastDynY = bottom + 34;
 
   const musicLeft = cursor + 26;
@@ -631,7 +637,7 @@ function drawSystem(
       return up ? Math.max(low, y + markReach(e)) : low;
     }, 0);
     const dynY = Math.max(bottom + 34, lowest + 26, deepest + 26, marksLow + 20);
-    lastDynY = dynY;
+    lastDynY = Math.max(lastDynY, dynY);
     const firstWithDynamic = events.find((e) => e.dynamic);
     if (firstWithDynamic) {
       part.push(
@@ -643,6 +649,10 @@ function drawSystem(
         `<text class="score-dyn" x="${barX + barWidth * 0.35}" y="${dynY}" font-size="15" font-style="italic">cresc.</text>`,
       );
     }
+
+    // Where this bar's beams are, so a slur pushed to the stems' side can steer
+    // around them instead of being drawn along one.
+    const beamBoxes = [];
 
     groups.forEach((group) => {
       const beam = beamOf.get(group[0]);
@@ -673,6 +683,14 @@ function drawSystem(
         const sx2 = x2 - ox * inset;
         const sy2 = y2 - oy * inset;
         const f = (v) => v.toFixed(2);
+        const bx = [sx1, sx2, sx2 + ox * BEAM, sx1 + ox * BEAM];
+        const by = [sy1, sy2, sy2 + oy * BEAM, sy1 + oy * BEAM];
+        beamBoxes.push({
+          x0: Math.min(...bx) - 1,
+          x1: Math.max(...bx) + 1,
+          y0: Math.min(...by) - 1,
+          y1: Math.max(...by) + 1,
+        });
         return (
           `<path class="score-beam" d="M${f(sx1)} ${f(sy1)} L${f(sx2)} ${f(sy2)} ` +
           `L${f(sx2 + ox * BEAM)} ${f(sy2 + oy * BEAM)} ` +
@@ -848,12 +866,12 @@ function drawSystem(
       // An articulation mark sits opposite the stem — the same side the slur
       // takes — so it has to be cleared too, or the slur runs through the dot.
       // The measurement lives in markReach, which the dynamics use as well.
-      /** How far a note's own ink runs on the slur's side of its head. */
-      const edge = (ev) => {
+      /** How far a note's own ink runs on one side of its head: -1 above, +1 below. */
+      const edge = (ev, side) => {
         const ym = yForNote(ev.note.letter, ev.note.octave, bottom);
         const { up, reach } = stemInfo(ev);
         const mark = markReach(ev);
-        return dir > 0
+        return side > 0
           ? Math.max(up ? ym : ym + reach, up && mark ? ym + mark : ym)
           : Math.min(up ? ym - reach : ym, !up && mark ? ym - mark : ym);
       };
@@ -878,12 +896,7 @@ function drawSystem(
         below = Math.max(below, up ? ym : ym + reach, up && mark ? ym + mark : ym);
       }
 
-      const dir = ups > downs ? 1 : -1; // below the heads when the stems point up
       const lift = 6.5;
-      // Each end leaves its note on the slur's side of that note's own ink — the
-      // head when the stem points away, the stem tip or the articulation when it
-      // does not — so nothing pokes through the curve at the join.
-      const endY = (ev) => edge(ev);
       // Both control points sit at one height — clear of everything in the span
       // — so the slur is a symmetric bow. Giving each control point the height of
       // its own note made the curve swoop diagonally, which is what looked wrong
@@ -891,20 +904,17 @@ function drawSystem(
       // slowly than the span, so a long slur is a shallow bow rather than an arch.
       const span = Math.hypot(x2 - x1, y2 - y1);
       const rise = Math.min(13, 4 + span * 0.09);
-      const baseY = (dir > 0 ? below : above) + dir * lift;
       const f = (v) => v.toFixed(2);
       // The control points sit further in than a plain bow would put them, so the
       // curve holds its height across the run and dives only at the very ends.
       // Pulled out to a quarter span, it starts coming down early and clips the
       // head of the last note before the one it lands on.
       const grip = 0.18;
-      const startY = endY(a) + dir * lift;
-      const stopY = endY(b) + dir * lift;
 
       // Every glyph the slur passes, as a box it must stay out of. Modelling the
       // curve perfectly for every combination of heads, stems, beams and marks
       // is a losing game; drawing it and then pushing it clear is not.
-      const obstacles = [];
+      const obstacles = [...beamBoxes];
       for (let k = i; k <= last; k++) {
         const ev = events[k];
         if (!ev.note) continue;
@@ -919,33 +929,78 @@ function drawSystem(
           y1: Math.max(up ? ey + HEAD_RY : ey + reach, up && mark ? ey + mark : ey + HEAD_RY),
         });
       }
-      const curveY = (t, extra) => {
-        const u = 1 - t;
-        const cy = baseY + dir * (rise + extra);
-        return u * u * u * startY + 3 * u * u * t * cy + 3 * u * t * t * cy + t * t * t * stopY;
-      };
       const curveX = (t) => {
         const u = 1 - t;
         const c1x = x1 + (x2 - x1) * grip;
         const c2x = x2 - (x2 - x1) * grip;
         return u * u * u * x1 + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * x2;
       };
-      const clips = (extra) => {
-        for (let s = 1; s < 60; s++) {
-          const px = curveX(s / 60);
-          const py = curveY(s / 60, extra);
-          if (obstacles.some((o) => px > o.x0 && px < o.x1 && py > o.y0 && py < o.y1)) return true;
-        }
-        return false;
-      };
-      let extra = 0;
-      for (let pass = 0; pass < 10 && clips(extra); pass++) extra += 3;
 
-      let bulge = baseY + dir * (rise + extra);
-      // A slur that rises belongs in the gap between systems — and so does the
-      // dynamic marking of the system above it. The ceiling is that text's
-      // baseline, so the curve stays below it instead of running through "cresc.".
-      if (dir < 0 && ceiling != null) bulge = Math.max(bulge, ceiling);
+      /**
+       * The curve set wholly on one side of the notes: -1 above the heads, +1
+       * below. Each end leaves its note on that note's own edge — the head when
+       * the stem points away, the stem tip or the articulation when it does not —
+       * so nothing pokes through the curve at the join. `limit` is the height the
+       * bow may not cross: the system above's dynamic marking when it goes up,
+       * this bar's own when it goes down.
+       */
+      const place = (side, limit) => {
+        const base = (side > 0 ? below : above) + side * lift;
+        const startY = edge(a, side) + side * lift;
+        const stopY = edge(b, side) + side * lift;
+        const at = (t, extra) => {
+          const u = 1 - t;
+          const cy = base + side * (rise + extra);
+          return u * u * u * startY + 3 * u * u * t * cy + 3 * u * t * t * cy + t * t * t * stopY;
+        };
+        const clipping = (extra) => {
+          for (let s = 1; s < 60; s++) {
+            const px = curveX(s / 60);
+            const py = at(s / 60, extra);
+            if (obstacles.some((o) => px > o.x0 && px < o.x1 && py > o.y0 && py < o.y1)) return true;
+          }
+          return false;
+        };
+        let extra = 0;
+        for (let pass = 0; pass < 10 && clipping(extra); pass++) extra += 3;
+        // Still clipping after all that means the side itself is occupied — the
+        // curve has to leave its note through something, and no amount of bow
+        // fixes that. Such a side must never win on the strength of its size.
+        const blocked = clipping(extra);
+        let bulge = base + side * (rise + extra);
+        // Push the bow back inside its limit rather than through it: that shortens
+        // the arc, it never turns it over.
+        if (limit != null && side * (bulge - limit) > 0) bulge = limit + side * 1.5;
+        // Whatever the limit says, the bow stays on its own side of the notes. A
+        // shorter arc is a quiet slur; an arc that crosses its own ends is a
+        // mistake a student can see.
+        if (side * (bulge - base) < 2) bulge = base + side * 2;
+        // How far the bow stands off the notes on its own side: positive for an
+        // arc, negative when the limit has pushed it back past its own base.
+        return { startY, stopY, base, bulge, blocked, room: side * (bulge - base) };
+      };
+
+      // A slur normally sits opposite the stems, which is where engravers put it.
+      // On a phone the systems are sixty units apart, though, and a phrase that
+      // sits high leaves no room above it: forcing the bow down to the ceiling put
+      // the curve *below one of its own ends*, so the slur read as upside down.
+      // The side is therefore a choice — take the one that can hold a real bow.
+      const natural = ups > downs ? 1 : -1; // below the heads when the stems point up
+      const limitFor = (side) => (side < 0 ? ceiling : dynY - 2);
+      let dir = natural;
+      let arc = place(dir, limitFor(dir));
+      if (arc.blocked || arc.room < 4.5) {
+        const other = place(-dir, limitFor(-dir));
+        // The other side wins only if it is clear and genuinely roomier: a blocked
+        // side reports a big bow, and taking that at face value is what put slurs
+        // along the beams.
+        const wins = !other.blocked && (arc.blocked ? other.room > 2 : other.room > Math.max(4.5, arc.room + 2));
+        if (wins) {
+          dir = -dir;
+          arc = other;
+        }
+      }
+      const { startY, stopY, bulge } = arc;
       // A slur rising over the top of the staff is music too, and can be the
       // highest thing in the system.
       if (dir < 0) musicTop = Math.min(musicTop, bulge - 2);
@@ -1021,9 +1076,50 @@ export function renderScore(
   const per = narrow ? 2 : BARS_PER_SYSTEM;
   const systems = Math.ceil(8 / per);
   const width = narrow ? NARROW_WIDTH : WIDTH;
-  const pitch = narrow ? NARROW_PITCH : SYSTEM_GAP;
-  // Room under the last system for dynamics and a low slur.
-  const height = TOP_PAD + (systems - 1) * pitch + 4 * LINE_GAP + (narrow ? 40 : 78);
+  const staff = 4 * LINE_GAP;
+  const minPitch = narrow ? NARROW_PITCH : SYSTEM_GAP;
+
+  /**
+   * One system, drawn at `top`. Everything in it is positioned relative to that
+   * top, so drawing a system on its own says how far its music reaches above the
+   * staff and how far its dynamic marking hangs below — which is what the spacing
+   * between systems has to hold.
+   */
+  const draw = (s, top, ceiling) =>
+    drawSystem(passage, s * per, (s + 1) * per, top, {
+      width,
+      timeSignature: s === 0,
+      tempoText: s === 0 ? tempoText : '',
+      showTempo: s === 0 && Boolean(tempoText),
+      final: s === systems - 1,
+      ceiling,
+    });
+
+  // ── how far apart the systems go ────────────────────────────────────────
+  // A fixed pitch had to be set for the worst case in every level at once, and
+  // on a phone it was too small: the dynamic under one system met the tall notes
+  // of the next, and a slur over a high phrase had no room above it at all. So
+  // the systems are measured first — each drawn on its own, which costs nothing
+  // but a second pass — and then spaced by what they need.
+  const measured = [];
+  let measureCeiling = null;
+  for (let s = 0; s < systems; s++) {
+    const sys = draw(s, 0, measureCeiling);
+    measured.push(sys);
+    measureCeiling = sys.dynY + 6;
+  }
+
+  const tops = [TOP_PAD];
+  for (let s = 1; s < systems; s++) {
+    const below = measured[s - 1].dynY - staff; // the dynamic under the one above
+    const above = -measured[s].musicTop; // the tallest music of this one
+    tops.push(tops[s - 1] + Math.max(minPitch, staff + below + above + 10));
+  }
+
+  // Room under the last system for its dynamics and a low slur.
+  const bottomPad = (narrow ? 40 : 78);
+  const lastBelow = measured[systems - 1].dynY - staff;
+  const height = tops[systems - 1] + staff + Math.max(bottomPad, lastBelow + 20);
 
   const parts = [
     `<svg class="score" viewBox="0 0 ${width} ${height}" role="img" aria-label="${ariaLabel}">`,
@@ -1032,14 +1128,7 @@ export function renderScore(
   // a slur rising into the gap can stop short of it.
   let ceiling = null;
   for (let s = 0; s < systems; s++) {
-    const system = drawSystem(passage, s * per, (s + 1) * per, TOP_PAD + s * pitch, {
-      width,
-      timeSignature: s === 0,
-      tempoText: s === 0 ? tempoText : '',
-      showTempo: s === 0 && Boolean(tempoText),
-      final: s === systems - 1,
-      ceiling,
-    });
+    const system = draw(s, tops[s], ceiling);
     parts.push(system.markup);
     ceiling = system.dynY + 6;
   }
