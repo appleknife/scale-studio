@@ -118,6 +118,10 @@ export const S = {
   'btn.draw3': ['Draw three scales', '抽三条音阶'],
   'btn.drawAgain': ['Draw again', '重新抽'],
   'btn.chooseAgain': ['Choose again', '重新选'],
+  'test.pickHint': [
+    'A good first three: G, D and A. Each starts on an open string, and all three use the same finger pattern.',
+    '刚开始可以先选 G、D、A 三条：它们都从空弦开始，指法也一样。',
+  ],
   'test.praise.title': ['Nothing to fix', '没有需要改的'],
   'test.praise.text': [
     'All three scales landed, centred and unbroken. That is exactly the shape of an audition you can trust.',

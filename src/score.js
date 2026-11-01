@@ -6,14 +6,19 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312050';
-import { CLEF_PATH } from './clef.js?v=202610312050';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312102';
+import { CLEF_PATH } from './clef.js?v=202610312102';
 
-import { beatLength } from './sightreading.js?v=202610312050';
+import { beatLength } from './sightreading.js?v=202610312102';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
 const WIDTH = 1000;
+// Two bars to a system, for a phone. Same bar width as the four-bar layout, so
+// the drawing is simply narrower: shown at the width of a phone card that makes
+// every note — and every flag — about twice the size it would be squeezed to.
+const NARROW_WIDTH = 520;
+const NARROW_PITCH = 104;
 const LEFT = 16;
 const RIGHT = 16;
 const SYSTEM_GAP = 150;
@@ -274,7 +279,13 @@ function sixteenthRuns(group) {
 
 /* ── One system of four bars ───────────────────────────────────────────── */
 
-function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, showTempo, final = false }) {
+function drawSystem(
+  passage,
+  barFrom,
+  barTo,
+  top,
+  { timeSignature, tempoText, showTempo, final = false, width = WIDTH },
+) {
   const part = [];
   const bottom = top + 4 * LINE_GAP;
 
@@ -282,7 +293,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
   part.push(`<g stroke="#c3b49d" stroke-width="1.15" stroke-linecap="round">`);
   for (let i = 0; i < 5; i++) {
     const y = top + i * LINE_GAP;
-    part.push(`<line x1="${LEFT}" y1="${y}" x2="${WIDTH - RIGHT}" y2="${y}"/>`);
+    part.push(`<line x1="${LEFT}" y1="${y}" x2="${width - RIGHT}" y2="${y}"/>`);
   }
   part.push('</g>');
 
@@ -330,7 +341,7 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
   }
 
   const musicLeft = cursor + 26;
-  const musicWidth = WIDTH - RIGHT - musicLeft;
+  const musicWidth = width - RIGHT - musicLeft;
   const barWidth = musicWidth / (barTo - barFrom);
   const inset = 12;
 
@@ -738,8 +749,8 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
   // has stopped, which is the wrong thing to teach a sight-reader.
   if (final) {
     part.push(
-      `<line x1="${WIDTH - RIGHT - 6}" y1="${top}" x2="${WIDTH - RIGHT - 6}" y2="${bottom}" stroke="${INK}" stroke-width="1.2"/>`,
-      `<rect x="${WIDTH - RIGHT - 3}" y="${top}" width="3" height="${bottom - top}" fill="${INK}"/>`,
+      `<line x1="${width - RIGHT - 6}" y1="${top}" x2="${width - RIGHT - 6}" y2="${bottom}" stroke="${INK}" stroke-width="1.2"/>`,
+      `<rect x="${width - RIGHT - 3}" y="${top}" width="3" height="${bottom - top}" fill="${INK}"/>`,
     );
   } else {
     part.push(
@@ -780,22 +791,32 @@ export function noteMarkSvg({ height = 100, colour = INK } = {}) {
  * The whole passage: two systems of four bars.
  * `tempoText` is a localised string such as "♩ = 60"; pass '' to omit it.
  */
-export function renderScore(passage, { tempoText = '', ariaLabel = 'Sight-reading passage' } = {}) {
-  const height = TOP_PAD + 4 * LINE_GAP + SYSTEM_GAP + 4 * LINE_GAP + 34;
+export function renderScore(
+  passage,
+  { tempoText = '', ariaLabel = 'Sight-reading passage', barsPerSystem = BARS_PER_SYSTEM } = {},
+) {
+  const narrow = barsPerSystem === 2;
+  const per = narrow ? 2 : BARS_PER_SYSTEM;
+  const systems = Math.ceil(8 / per);
+  const width = narrow ? NARROW_WIDTH : WIDTH;
+  const pitch = narrow ? NARROW_PITCH : SYSTEM_GAP;
+  // Room under the last system for dynamics and a low slur.
+  const height = TOP_PAD + (systems - 1) * pitch + 4 * LINE_GAP + (narrow ? 40 : 78);
+
   const parts = [
-    `<svg class="score" viewBox="0 0 ${WIDTH} ${height}" role="img" aria-label="${ariaLabel}">`,
-    drawSystem(passage, 0, BARS_PER_SYSTEM, TOP_PAD, {
-      timeSignature: true,
-      tempoText,
-      showTempo: Boolean(tempoText),
-    }),
-    drawSystem(passage, BARS_PER_SYSTEM, BARS_PER_SYSTEM * 2, TOP_PAD + SYSTEM_GAP, {
-      timeSignature: false,
-      tempoText: '',
-      showTempo: false,
-      final: true,
-    }),
-    '</svg>',
+    `<svg class="score" viewBox="0 0 ${width} ${height}" role="img" aria-label="${ariaLabel}">`,
   ];
+  for (let s = 0; s < systems; s++) {
+    parts.push(
+      drawSystem(passage, s * per, (s + 1) * per, TOP_PAD + s * pitch, {
+        width,
+        timeSignature: s === 0,
+        tempoText: s === 0 ? tempoText : '',
+        showTempo: s === 0 && Boolean(tempoText),
+        final: s === systems - 1,
+      }),
+    );
+  }
+  parts.push('</svg>');
   return parts.join('');
 }

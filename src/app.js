@@ -1,14 +1,14 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610312050';
-import { renderStaff } from './staff.js?v=202610312050';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610312050';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610312050';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610312050';
-import { generatePassage } from './sightreading.js?v=202610312050';
-import { renderScore } from './score.js?v=202610312050';
-import * as Journal from './journal.js?v=202610312050';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202610312050';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610312102';
+import { renderStaff } from './staff.js?v=202610312102';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610312102';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610312102';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610312102';
+import { generatePassage } from './sightreading.js?v=202610312102';
+import { renderScore } from './score.js?v=202610312102';
+import * as Journal from './journal.js?v=202610312102';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202610312102';
 import {
   STRINGS,
   FIFTHS,
@@ -16,7 +16,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610312050';
+} from './tuner.js?v=202610312102';
 
 const LANG = initLang();
 
@@ -98,6 +98,9 @@ const el = {
   pickGrid: $('pickGrid'),
   pickTitle: $('pickTitle'),
   pickSub: $('pickSub'),
+  pickHint: $('pickHint'),
+  drawLevel: $('drawLevel'),
+  levelRow: $('levelRow'),
   pickCount: $('pickCount'),
   pickContinue: $('pickContinue'),
   pickClear: $('pickClear'),
@@ -279,11 +282,16 @@ function gridNoteText() {
   return t(`note.${state.level}`);
 }
 
+const LEVEL_MARK = { '1-2': 'I–II', '3-4': 'III–IV', '5-6': 'V–VI' };
+
 function updateLevelCopy() {
   el.gridNote.textContent = gridNoteText();
 
   const level = state.mode === 'minor' ? '5-6' : state.level;
   el.testBannerText.textContent = t(`banner.${level}`);
+  // Say which level the draw will use, right on the card, so the answer is on
+  // screen next to the button that acts on it.
+  if (el.drawLevel) el.drawLevel.textContent = LEVEL_MARK[level] || '';
   el.drawBtn.textContent =
     level === '1-2' ? t('btn.choose3') : level === '3-4' ? t('btn.choose7') : t('btn.draw3');
 }
@@ -303,7 +311,9 @@ function setMode(mode) {
     b.setAttribute('aria-selected', String(b.dataset.mode === mode)),
   );
   el.formTabs.hidden = mode !== 'minor';
-  el.levelTabs.hidden = mode === 'minor';
+  // Minor scales are only set at Level V–VI, so the level control goes with the
+  // tabs — the whole row, or it would leave a label standing on its own.
+  el.levelRow.hidden = mode === 'minor';
   if (mode === 'minor') state.practiceOctaves = 2;
   else state.practiceOctaves = LEVELS[state.level].octaves;
   renderGrid();
@@ -381,6 +391,9 @@ function canContinue() {
   return true;
 }
 
+/** The three that start on open strings and share one finger pattern. */
+const SUGGESTED_KEYS = ['G', 'D', 'A'];
+
 function renderPicker() {
   const level = LEVELS[state.level];
   const need = level.choose;
@@ -390,11 +403,20 @@ function renderPicker() {
   el.pickTitle.textContent = need === 3 ? t('test.pickTitle.3') : t('test.pickTitle.7');
   el.pickSub.textContent = need === 3 ? t('test.pickSub.3') : t('test.pickSub.7');
 
+  // At Level I–II the student chooses their own three. The Manual allows any, but
+  // G, D and A are the kind ones: each begins on an open string and all three use
+  // the same finger pattern, so they are suggested with a soft glow rather than
+  // picked for them.
+  const suggest = need === 3;
+  el.pickHint.hidden = !suggest;
+  if (suggest) el.pickHint.textContent = t('test.pickHint');
+
   el.pickGrid.innerHTML = MAJOR_KEYS.map((card) => {
     const scale = buildScale(card, 0, 'major', 'melodic', level.octaves);
     const on = picked.includes(card.id);
     const disabled = full && !on;
-    return `<button class="pick-chip" type="button" data-id="${card.id}"
+    const gentle = suggest && SUGGESTED_KEYS.includes(card.id) && !on;
+    return `<button class="pick-chip${gentle ? ' is-suggested' : ''}" type="button" data-id="${card.id}"
       aria-pressed="${on}" ${disabled ? 'disabled' : ''}>
       <span class="pc-name">${card.variants.map((v) => v.name).join(' / ')}</span>
       <span class="pc-sig" aria-hidden="true">${keyGlyphs(scale)}</span>
@@ -927,15 +949,33 @@ function renderSight() {
     getLang() === 'zh' ? `${passage.key.name}\u5927\u8c03` : `${passage.key.name} major`;
   const mark = tempoGlyph(passage.tempo.unit);
   el.sightMeta.textContent = `${keyName} \u00b7 ${passage.meter} \u00b7 ${mark} = ${passage.tempo.bpm}`;
+  // A phone cannot show eight bars of music without shrinking the notes below
+  // reading size, so under a comfortable width the passage is laid out two bars
+  // to a system. The bar width inside the drawing is unchanged — the page is
+  // simply narrower, so every note lands about twice as big.
+  const wide = (el.sightStaff.clientWidth || 0) >= NARROW_SCORE_BELOW;
+  sight.perSystem = wide ? 4 : 2;
   el.sightStaff.innerHTML = renderScore(passage, {
     tempoText: `${mark} = ${passage.tempo.bpm}`,
     ariaLabel: t('aria.score'),
+    barsPerSystem: sight.perSystem,
   });
 
   [...el.sightLevels.querySelectorAll('button')].forEach((b) =>
     b.setAttribute('aria-selected', String(Number(b.dataset.sightLevel) === sight.level)),
   );
 }
+
+/** Below this width the passage is drawn two bars to a system. */
+const NARROW_SCORE_BELOW = 560;
+
+// Rotating a phone or resizing a window can cross that line. Redraw only when the
+// choice actually changes, so a resize does not rebuild the passage.
+window.addEventListener('resize', () => {
+  if (!sight.passage || el.views.sight.hidden) return;
+  const want = (el.sightStaff.clientWidth || 0) >= NARROW_SCORE_BELOW ? 4 : 2;
+  if (want !== sight.perSystem) renderSight();
+});
 
 function newPassage(level = sight.level, seed = null) {
   sight.level = Math.min(6, Math.max(1, level));

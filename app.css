@@ -197,6 +197,23 @@ h3 {
   margin: 30px 0 20px;
 }
 
+/* The level sits on its own line above the cards, so a phone never has to scroll
+   past the mock-audition button to change it. */
+.level-row {
+  margin: 22px 0 4px;
+}
+
+.banner-level {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.banner-level:not(:empty)::before {
+  content: "· ";
+}
+
 .control-label {
   font-size: 10.5px;
   letter-spacing: 0.14em;
@@ -753,6 +770,34 @@ h3 {
   transform: translateY(-1px);
 }
 
+/* A nudge, not a hand on the shoulder: the three that start on an open string
+   breathe a little, and stop breathing the moment they are chosen. */
+.pick-chip.is-suggested {
+  border-color: #cfe0d6;
+  box-shadow: 0 0 0 3px rgba(47, 93, 78, 0.07), var(--shadow-sm);
+  animation: pick-glow 3.4s ease-in-out infinite;
+}
+
+.pick-chip.is-suggested .pc-name {
+  color: var(--accent);
+}
+
+@keyframes pick-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(47, 93, 78, 0.05), var(--shadow-sm);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(47, 93, 78, 0.11), var(--shadow-sm);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pick-chip.is-suggested {
+    animation: none;
+  }
+}
+
 .pick-chip[aria-pressed="true"] {
   border-color: var(--accent);
   background: var(--accent-wash);
@@ -779,6 +824,18 @@ h3 {
   font-size: 11px;
   letter-spacing: 1.5px;
   color: var(--gold);
+}
+
+.pick-hint {
+  margin: 10px 0 18px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  background: var(--accent-wash);
+  border: 1px solid #d3e2d8;
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 56ch;
 }
 
 .pick-count {

@@ -53,7 +53,7 @@
           log.push(`minor cards: ${d.querySelectorAll('#scaleGrid .key-card').length}`);
           if (d.querySelectorAll('#scaleGrid .key-card').length !== 12) problems.push('minor cards');
           if (d.getElementById('formTabs').hidden) problems.push('form tabs hidden on minor');
-          if (!d.getElementById('levelTabs').hidden) problems.push('level tabs shown on minor');
+          if (!d.getElementById('levelRow').hidden) problems.push('the level row is shown on minor');
 
           d.querySelector('#formTabs [data-form="harmonic"]').click();
           d.querySelector('#scaleGrid .key-card').click();

@@ -130,6 +130,12 @@ Practice follows the level as well — I–II opens scales in one octave, III–
 and the **1 oct / 2 oct** switch in the scale header overrides it for any single
 scale, which is handy when a student is ready to stretch one key upwards.
 
+The level sits **above** the three cards, not below them, because it decides what
+the mock audition draws as well as what the grid shows. On a phone that means the
+answer is on screen next to the button that acts on it, instead of a scroll away;
+the audition card also repeats the level beside its title so there is never a doubt
+about which one is loaded.
+
 ## Mock audition
 
 Every audition is three scales, played back to back, with one report at the end.
@@ -153,6 +159,12 @@ coloured staff, all the tips.
 
 The draw is majors only, because that is what Levels 5–6 require, and it always
 uses the familiar spelling: **B**, **F♯**, **C♯** — never C♭, G♭ or D♭.
+
+At Level I–II the Manual lets the student choose, and any three are legal — but the
+picker quietly suggests **G, D and A**: each begins on an open string and all three
+use the same finger pattern, which is why they are the usual first three. They carry
+a soft pulse and the three share one line of explanation; nothing is pre-selected,
+because choosing is part of the exercise.
 
 ### Matching the Manual
 
@@ -256,7 +268,11 @@ written to the level you pick (I–VI). Key, time signature, tempo, range, rhyth
 accidentals, rests, articulations and dynamics all come from the Manual's
 sight-reading table for that level.
 
-* **New passage** draws another one; each is eight bars on two systems.
+* **New passage** draws another one; each is eight bars on two systems — or four
+  systems of two bars on a phone. Eight bars squeezed into a phone's width put a
+  notehead at five pixels and turned every flag into a hairline; two bars to a line
+  doubles both. The drawing itself is unchanged — the same bar width, the same
+  flag — so the eighth note on a phone is the eighth note in the icon.
 * **Hear the tempo** clicks two bars at the printed speed, with a heavier downbeat.
 * Every passage has a **seed**, so `?sight=5&seed=4471` always gives the same eight
   bars. A teacher can put one passage on a projector, or send the link to a class.
