@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611011430';
-import { CLEF_PATH } from './clef.js?v=202611011430';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611011520';
+import { CLEF_PATH } from './clef.js?v=202611011520';
 
-import { beatLength } from './sightreading.js?v=202611011430';
+import { beatLength } from './sightreading.js?v=202611011520';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -279,7 +279,7 @@ function quarterRest(x, y, colour) {
 }
 
 /**
- * The eighth and sixteenth rests, traced off the printed ones.
+ * The eighth rest, traced off the printed one.
  *
  * Every number is a fraction of the glyph's own height H, measured from its top
  * left corner, so one table draws the glyph at any size. Four parts:
@@ -311,16 +311,11 @@ const HOOKED_REST = {
     [0.481, 0.263], [0.444, 0.273], [0.419, 0.288], [0.384, 0.303],
     [0.343, 0.318], [0.278, 0.333], [0.17, 0.28],
   ],
-  // The sixteenth rest is this glyph with a second hook and bulb. The printed one
-  // repeats the same wedge below the first — three quarters of it, because the
-  // stem has already leaned a third of the way across by the time the second one
-  // starts — with the second bulb under the first where that hook runs out.
-  sixteenth: { scale: 0.72, shift: [-0.077, 0.265], bulb: [0.2, 0.525, 0.145] },
 };
 
-function hookedRest(x, y, sixteenth, colour) {
-  // Both hooked rests stand just under two spaces tall, which is what a printed
-  // one measures. At 1.7 they read as small marks rather than rests.
+function hookedRest(x, y, colour) {
+  // An eighth rest stands just under two spaces tall, which is what a printed one
+  // measures. At 1.7 it read as a small mark rather than a rest.
   const H = 1.9 * LINE_GAP;
   const left = x - (HOOKED_REST.width * H) / 2;
   const top = y - H / 2;
@@ -347,24 +342,62 @@ function hookedRest(x, y, sixteenth, colour) {
   // Out along the hook's outer edge from the tip, back along its underside. The
   // underside ends inside the stem, so where the two cross is the notch — it is
   // never drawn, which is why it stays a hairline at every size.
-  const hook = (scale, shift) => {
-    const map = ([u, v]) =>
-      at([
-        stem.top[0] + (u - stem.top[0]) * scale + shift[0],
-        stem.top[1] + (v - stem.top[1]) * scale + shift[1],
-      ]);
-    return closedOutline(HOOKED_REST.hookOuter.map(map), HOOKED_REST.hookUnder.map(map).reverse());
-  };
+  const hook = closedOutline(
+    HOOKED_REST.hookOuter.map(at),
+    HOOKED_REST.hookUnder.map(at).reverse(),
+  );
 
-  const parts = [dot(bulb)];
-  parts.push(`<path d="${hook(1, [0, 0])}" fill="${colour}"/>`);
-  if (sixteenth) {
-    const { scale, shift, bulb: second } = HOOKED_REST.sixteenth;
-    parts.push(dot(second));
-    parts.push(`<path d="${hook(scale, shift)}" fill="${colour}"/>`);
-  }
-  parts.push(`<path d="${bar}" fill="${colour}"/>`);
-  return parts.join('');
+  return (
+    dot(bulb) + `<path d="${hook}" fill="${colour}"/>` + `<path d="${bar}" fill="${colour}"/>`
+  );
+}
+
+/**
+ * The sixteenth rest, traced edge for edge off the printed glyph the teacher
+ * sent, the same way the quarter rest is.
+ *
+ * It is not the eighth rest with a second hook bolted on, which is what it was
+ * drawn as until now: the printed one gives each of its two bulbs about a fifth
+ * of the height where the eighth rest spends a third on its one, runs its stem
+ * long and a little wider towards the foot, and hangs both hooks off that same
+ * leaning line. Points are in the reference's own pixels, a 278 by 612 box.
+ */
+const SIXTEENTH_REST = {
+  box: [278, 612],
+  outline: [
+    [0.4, 262], [3.1, 252.2], [12.1, 237.2], [18.2, 230.1],
+    [27.2, 223.1], [37.2, 218.1], [52.4, 214], [67.6, 214],
+    [76.6, 216], [89.8, 222.1], [101.9, 233.2], [107.9, 243.2],
+    [121.1, 288.8], [127.2, 294.9], [138.6, 298], [147.8, 293.9],
+    [164.9, 276.8], [177.9, 259.8], [187.9, 242.8], [227.9, 111.2],
+    [189.6, 123], [154.6, 129], [125.4, 128], [109.2, 122.9],
+    [94.2, 114.9], [78.1, 98.8], [70.1, 84.8], [67, 74.6],
+    [68, 42.4], [75.1, 28.2], [85.2, 16.1], [102.2, 5.1],
+    [121.4, 0], [140.6, 1], [155.8, 7.1], [170.9, 22.2],
+    [177, 35.4], [186.1, 71.8], [192.2, 79.9], [198.4, 83],
+    [208.6, 83], [216.8, 77.9], [231.9, 61.8], [258.2, 24.1],
+    [264.4, 22], [271.6, 23], [278, 29.4], [127, 595.6],
+    [122.8, 604.9], [108.6, 611], [97.4, 612], [84.2, 607.9],
+    [77.1, 602.8], [77, 600.4], [88, 568.6], [90, 558.4],
+    [100, 529.6], [162, 325.4], [158.4, 325], [120.6, 337],
+    [93.6, 342], [61.4, 342], [42.2, 336.9], [21.2, 323.9],
+    [8.1, 307.8], [3.1, 297.8], [0, 286.6],
+  ],
+};
+
+function sixteenthRest(x, y, colour) {
+  // 2.2 spaces: a printed sixteenth rest stands about a fifth taller than an
+  // eighth rest and is a shade narrower, which is what its own box says.
+  const H = 2.2 * LINE_GAP;
+  const [boxW, boxH] = SIXTEENTH_REST.box;
+  const W = (H * boxW) / boxH;
+  const left = x - W / 2;
+  const top = y - H / 2;
+  const pts = SIXTEENTH_REST.outline.map(([px, py]) => [
+    left + (px / boxW) * W,
+    top + (py / boxH) * H,
+  ]);
+  return `<path d="${trace(pts, false)} Z" fill="${colour}"/>`;
 }
 
 function restGlyph(x, y, dur, colour) {
@@ -383,7 +416,8 @@ function restGlyph(x, y, dur, colour) {
     return `<rect x="${x - WIDTH / 2}" y="${y - BLOCK}" width="${WIDTH}" height="${BLOCK}" fill="${colour}"/>`;
   }
   if (dur >= 4) return quarterRest(x, y, colour);
-  return hookedRest(x, y, dur < 2, colour);
+  if (dur < 2) return sixteenthRest(x, y, colour);
+  return hookedRest(x, y, colour);
 }
 
 /* ── Beams ─────────────────────────────────────────────────────────────── */

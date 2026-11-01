@@ -382,9 +382,14 @@ trouble are the ones where a stroked line is not good enough:
   stem is the whole glyph — close it and the rest becomes a comma on a stick, widen
   it and a 9 appears beside one. Both ends of the hook finish *inside* the bulb;
   a hook that stops on its edge leaves a sliver of tail under the ball that the eye
-  reads as a beak. The sixteenth rest is the same wedge at 0.72, slid down the stem
-  until its tip meets the stem at 0.30 of the height, with the second bulb under the
-  first where that hook's underside runs out.
+  reads as a beak.
+* The **sixteenth rest** is traced like the quarter rest, and deliberately is *not*
+  the eighth rest with a second hook bolted on — that is how it was drawn, and the
+  printed one is a different animal: each of its two bulbs takes about a fifth of
+  the height where the eighth rest spends a third on its one, the stem runs longer
+  and a little wider towards the foot, and both hooks hang off that same leaning
+  line. Its reference box is 278 × 612, and it is set 2.2 spaces tall — a fifth
+  taller than an eighth rest and a shade narrower, which is what the box says.
 * The **sharp** started as four stroked lines with measured proportions (uprights
   0.12 of a space wide, bars 0.38 thick, the two bars almost a whole space apart so
   a note head sits between them). It is now a single **traced path** in
