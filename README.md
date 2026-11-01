@@ -332,6 +332,15 @@ trouble are the ones where a stroked line is not good enough:
   `tests/mark.test.html` holds the shape still: it measures the rendered flag at
   thirteen rows down the stem and fails if any edge is more than 0.7 staff units
   from the approved profile.
+* A **down-stem flag stops short of the head**, and has to. Flags hang on the
+  right of their stem; on an up stem the head is on the left, so the hook can trail
+  almost to the head and still pass beside it — that is the approved drawing. On a
+  down stem the head is on the *right*, the flag's own side, and the full length
+  puts the tail on the head's edge: the gap between stem and flag closes and the
+  note reads as a knot. A lone sixteenth then puts its second flag straight through
+  the head. So a flag down a stem is drawn at the length that leaves half a head of
+  air below the head, which is 92 % of the hook for an eighth and about 55 % for a
+  sixteenth's second flag.
 * Beams are **filled quadrilaterals** built outward from `beam.at()`, which is where
   the stems end. A stroke's butt cap is cut square to the line, so slanted beams grew
   little wedges, and the second beam of a sixteenth run never sat parallel to the
@@ -554,14 +563,18 @@ tests/rhythm-probe.html why repeated notes merge today
 tests/ui.test.html    click-through smoke test, including the mock-audition draw
 tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correct
                       side, every beam ending on a stem
-tests/notation.test.html  renders 360 passages and measures the ink: no rest and
-                      no slur may come within two units of another glyph
+tests/notation.test.html  renders 360 passages and measures the ink: no rest, slur
+                      or flag may touch another glyph, and no flag may cross a note
+                      head (the flag's outline is walked against every head's
+                      ellipse, because bounding boxes always overlap here)
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format
 tests/recorder.test.html  measures the synthesised hall: it decays, and it is stereo
-tests/mark.test.html  the icon's note is whole, note-shaped and unclipped
-tests/icon-build.html renders that note at 1024 px for the icon build
+tests/mark.test.html  the icon's note is whole, note-shaped, unclipped, and still the
+                      flag the teacher approved — thirteen rows down the stem — and
+                      mark.png still shows it
+tests/icon-build.html builds every PNG in icons/ from the vector and POSTs them
 tests/lab-server.ps1  test server that collects results from a headless browser
 server.ps1            the local server used by Start Scale Studio.cmd
 ```

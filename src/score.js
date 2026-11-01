@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312127';
-import { CLEF_PATH } from './clef.js?v=202610312127';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312134';
+import { CLEF_PATH } from './clef.js?v=202610312134';
 
-import { beatLength } from './sightreading.js?v=202610312127';
+import { beatLength } from './sightreading.js?v=202610312134';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -83,6 +83,12 @@ const FLAG_OUTER = [
   [8.1, 34.2],
   [7.9, 34.9],
 ];
+// How far the tail of the hook is from the tip of the stem, and how far down a
+// down-stem note a flag may reach before it starts crowding the note head. The
+// reach is set from the head's ellipse: at 32.2 the tail keeps a clear half-head
+// of air below a head whose centre sits 38.5 down the stem.
+const FLAG_REACH = 34.9;
+const DOWN_ROOM = 32.2;
 const FLAG_INNER = [
   [0.4, 0.0],
   [0.4, 6.0],
@@ -214,7 +220,16 @@ function ribbon(pts, round = false) {
  * is how a sixteenth note gets its second flag.
  */
 function flagPath(stemX, stemEnd, toward, shift = 0) {
-  const at = ([x, t]) => [stemX + x, stemEnd + toward * (t + shift)];
+  // A flag always hangs to the right of its stem. On an up stem the note head is
+  // to the *left* of that stem, so the hook can trail most of the stem and still
+  // pass beside the head. On a down stem the head is on the right — the same side
+  // the flag hangs on — and the full length puts the tail almost exactly on the
+  // head's edge: the gap between stem and flag closes into a knot around the
+  // head, and a lone sixteenth lands its second flag squarely on it. So down a
+  // stem a flag stops where there is still air: its tail may not come closer to
+  // the head than DOWN_ROOM, which is measured against the head's own ellipse.
+  const length = toward > 0 ? 1 : Math.min(1, (DOWN_ROOM - shift) / FLAG_REACH);
+  const at = ([x, t]) => [stemX + x, stemEnd + toward * (t * length + shift)];
   // Out along the outer edge, back along the inner one — the inner edge is
   // written top-to-bottom like the outer, so it has to be walked backwards or
   // the outline crosses itself and the fill tears a hole in the flag.

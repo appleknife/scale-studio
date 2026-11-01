@@ -88,13 +88,28 @@
         return pts;
       }
 
+      // A note's own head: the ellipse it is drawn on. Both are measured, not
+      // guessed — the flag is the only path about 11 wide and 35 tall, and the
+      // heads are the only ellipses.
+      const isFlag = (n) => {
+        const b = box(n);
+        const w = b.x1 - b.x0;
+        const h = b.y1 - b.y0;
+        // The second flag of a lone sixteenth is drawn shorter, so the range
+        // has to reach down to it; nothing else on the page is this narrow and
+        // this tall (an accent is 11 × 8, a beam is far wider).
+        return w > 9 && w < 13 && h > 14 && h < 38;
+      };
+
       for (const level of SIGHT_LEVELS) {
         let rests = 0;
         let slurs = 0;
         let accidentals = 0;
+        let flags = 0;
         const restHits = [];
         const slurHits = [];
         const accidentalHits = [];
+        const flagHits = [];
 
         for (let seed = 0; seed < SEEDS; seed++) {
           const p = generatePassage({ level, seed });
@@ -121,6 +136,56 @@
             const bad = ink.find((b) => overlap(r, b));
             if (bad) {
               restHits.push(`L${level} seed ${seed}: rest at ${r.x0.toFixed(0)} runs into ink at ${bad.x0.toFixed(0)}`);
+              break;
+            }
+          }
+
+          // ── flags ------------------------------------------------------
+          // A flag hangs beside its stem, and on a down-stem note the head is on
+          // that same side. Mirrored naively, the tail lands on the notehead and
+          // the gap between stem and flag closes into a knot — which is exactly
+          // what happened. A flag must therefore touch no head at all.
+          const flagPaths = [...svg.querySelectorAll('path')].filter(
+            (n) =>
+              !n.closest('g.score-rest') &&
+              !n.classList.contains('score-slur') &&
+              !n.closest('g.score-acc') &&
+              isFlag(n),
+          );
+          flags += flagPaths.length;
+          // Measured on the drawing, not on bounding boxes: a flag's box nearly
+          // always grazes a head's box, because the hook is 11 units wide beside
+          // a head 13 wide. What matters is ink, so the flag's outline is walked
+          // and tested against each head's ellipse.
+          const heads = [...svg.querySelectorAll('ellipse')].map((n) => {
+            const t = n.getAttribute('transform') || '';
+            const m = t.match(/rotate\((-?[\d.]+)/);
+            return {
+              cx: Number(n.getAttribute('cx')),
+              cy: Number(n.getAttribute('cy')),
+              rx: Number(n.getAttribute('rx')),
+              ry: Number(n.getAttribute('ry')),
+              turn: m ? (-Number(m[1]) * Math.PI) / 180 : 0,
+            };
+          });
+          const inHead = (x, y) =>
+            heads.some((h) => {
+              const dx = x - h.cx;
+              const dy = y - h.cy;
+              const ux = dx * Math.cos(h.turn) + dy * Math.sin(h.turn);
+              const uy = -dx * Math.sin(h.turn) + dy * Math.cos(h.turn);
+              return (ux / h.rx) ** 2 + (uy / h.ry) ** 2 < 1;
+            });
+          for (const f of flagPaths) {
+            const len = f.getTotalLength();
+            let hit = false;
+            for (let i = 0; i <= 64 && !hit; i++) {
+              const pt = f.getPointAtLength((i / 64) * len);
+              hit = inHead(pt.x, pt.y);
+            }
+            if (hit) {
+              const b = box(f);
+              flagHits.push(`L${level} seed ${seed}: flag at ${b.x0.toFixed(0)},${b.y0.toFixed(0)} runs into a note head`);
               break;
             }
           }
@@ -173,12 +238,14 @@
         log.push(
           `L${level}: rests ${restHits.length}/${SEEDS} broken (${rests} drawn) · ` +
             `slurs ${slurHits.length}/${SEEDS} broken (${slurs} drawn) · ` +
-            `accidentals ${accidentalHits.length}/${SEEDS} broken (${accidentals} drawn)`,
+            `accidentals ${accidentalHits.length}/${SEEDS} broken (${accidentals} drawn) · ` +
+            `flags ${flagHits.length}/${SEEDS} broken (${flags} drawn)`,
         );
         problems.push(
           ...restHits.slice(0, 2),
           ...slurHits.slice(0, 2),
           ...accidentalHits.slice(0, 2),
+          ...flagHits.slice(0, 2),
         );
       }
 
