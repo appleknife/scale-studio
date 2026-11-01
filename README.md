@@ -332,10 +332,17 @@ trouble are the ones where a stroked line is not good enough:
   rest rests on the middle line and fills the space above it, the whole rest hangs
   from the fourth line into the space below. Drawn straddling the middle line —
   which is how both were placed at first — a half rest reads as either.
-* Rests and note flags are **filled outlines**, not strokes. A quarter rest is a
-  `ribbon` — a centreline with a width at every point — because the printed glyph is
-  calligraphic: hair-thin at the tick, swelling through the belly, pinched at the
-  waist. A single stroke width collapses it into a crescent.
+* Rests and note flags are **filled outlines**, not strokes. The **quarter rest**
+  is now a traced path too: the glyph the teacher sent was cut out of its image and
+  its outline walked at 59 × 178 pixels, simplified to 50 points and scaled into
+  staff spaces — 0.83 wide, 2.6 tall, so it reaches a third of a space into the top
+  space and hangs as far below the second line, where a printed one sits. Describing
+  it instead as a stroked curve with a width at every point (an earlier attempt)
+  flattened it into a wavy "S": the printed rest is a calligraphic zigzag whose
+  belly swings nearly the full width of its box, whose waist pinches to a fifth of
+  it, and whose foot runs out to a needle on the right before doubling back left and
+  curling down to a point. Straight segments, not a spline: every one of those
+  corners is a corner.
 * The **flag** is traced, not generated: `FLAG_OUTER` / `FLAG_INNER` in `src/score.js`
   are the two edges of the note the app has used as its mark since the first
   version, measured off it row by row in staff units. A centreline with a width
@@ -368,11 +375,16 @@ trouble are the ones where a stroked line is not good enough:
   the stems end. A stroke's butt cap is cut square to the line, so slanted beams grew
   little wedges, and the second beam of a sixteenth run never sat parallel to the
   first.
-* The eighth rest's measurements (bulb 0.30 of the glyph's height, stem 0.10, the
-  hairline gap between them) were taken off a printed rest pixel by pixel, the same
-  way the sharp in `src/staff.js` was. The sixteenth rest is that glyph with a
-  second hook 0.48 of the way down, a shade smaller and nudged left so the notch
-  between hook and stem survives.
+* The **eighth rest** is a table of fractions of its own height, measured off a
+  printed rest pixel by pixel the same way the sharp was: a bulb 0.34 of the height
+  across, a stem 0.063 thick that leans 15° from upright, and a hook sweeping from
+  the bulb's underside up into the stem's own tip. The white wedge between hook and
+  stem is the whole glyph — close it and the rest becomes a comma on a stick, widen
+  it and a 9 appears beside one. Both ends of the hook finish *inside* the bulb;
+  a hook that stops on its edge leaves a sliver of tail under the ball that the eye
+  reads as a beak. The sixteenth rest is the same wedge at 0.72, slid down the stem
+  until its tip meets the stem at 0.30 of the height, with the second bulb under the
+  first where that hook's underside runs out.
 * The **sharp** started as four stroked lines with measured proportions (uprights
   0.12 of a space wide, bars 0.38 thick, the two bars almost a whole space apart so
   a note head sits between them). It is now a single **traced path** in
@@ -606,11 +618,13 @@ tests/notation.test.html  renders 540 passages — 60 a level four bars to a sys
                       no rest, slur, flag, dynamic, tempo mark or tuplet number may
                       touch another glyph, no flag may cross a note head, no two
                       note heads may touch, every slur must bow on one side of both
-                      its ends, and a half rest must sit on the middle line while a
-                      whole rest hangs from the fourth. Where a box would cry wolf it
-                      measures the drawing: a flag against each head's ellipse, a
-                      wide slanted path (a beam) against the text, and two heads
-                      against each other in the ellipse's own frame.
+                      its ends, a half rest must sit on the middle line while a
+                      whole rest hangs from the fourth, and every rest's ink box
+                      must still match the table it was measured into. Where a box
+                      would cry wolf it measures the drawing: a flag against each
+                      head's ellipse, a wide slanted path (a beam) against the
+                      text, and two heads against each other in the ellipse's own
+                      frame.
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format

@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611011410';
-import { CLEF_PATH } from './clef.js?v=202611011410';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611011430';
+import { CLEF_PATH } from './clef.js?v=202611011430';
 
-import { beatLength } from './sightreading.js?v=202611011410';
+import { beatLength } from './sightreading.js?v=202611011430';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -142,7 +142,8 @@ const FLAG_INNER = [
 ];
 
 // The mark's ink in the same units: a little wider and taller than the shapes
-// strictly need, so the stroke caps and the ribbon's shoulders are not clipped.
+// strictly need, so the round ends of the stem and the flag's tail are not
+// clipped by the box the icon is scaled from.
 const MARK_BOX = { x: -7.3, y: -41.2, w: 25.4, h: 46.6 };
 
 
@@ -204,30 +205,6 @@ function closedOutline(edgeOut, edgeBack) {
 }
 
 /**
- * A filled ribbon: a centreline with a half-width at every point, offset along
- * the normal and closed into one outline. The printed quarter rest is a
- * calligraphic stroke — hair-thin at the tick, swelling through the belly,
- * pinched at the waist, heavy again through the foot — so a stroked path with a
- * single width collapses into a crescent, which is exactly what it looked like.
- */
-function ribbon(pts, round = false) {
-  const n = pts.length;
-  const normals = pts.map((p, i) => {
-    const a = pts[Math.max(0, i - 1)];
-    const b = pts[Math.min(n - 1, i + 1)];
-    const dx = b[0] - a[0];
-    const dy = b[1] - a[1];
-    const len = Math.hypot(dx, dy) || 1;
-    return [-dy / len, dx / len];
-  });
-  const left = pts.map((p, i) => [p[0] + normals[i][0] * p[2], p[1] + normals[i][1] * p[2]]);
-  const right = pts
-    .map((p, i) => [p[0] - normals[i][0] * p[2], p[1] - normals[i][1] * p[2]])
-    .reverse();
-  return closedOutline(left, right);
-}
-
-/**
  * The flag hanging off a stem that ends at (`stemX`, `stemEnd`). `toward` is +1
  * when the note head is below the tip and -1 when it is above, so a down-stem
  * note's flag turns upward; `shift` drops the shape further down the stem, which
@@ -251,37 +228,143 @@ function flagPath(stemX, stemEnd, toward, shift = 0) {
 }
 
 /**
- * The quarter rest, traced off a printed one. Coordinates are u/v inside the glyph
- * box with the stroke's half-width in staff units; the foot is a hairpin (the
- * descender runs out right, turns, and the tail comes back left before curling
- * down again) — without that turn the glyph sags into an S.
+ * The quarter rest, traced edge for edge off the printed glyph the teacher sent.
+ *
+ * The points are in that reference's own pixels — a 59 by 178 box — because that
+ * is how it was read off the image, row by row. Describing it instead as a
+ * stroked curve with one width at every point turned it into a wavy "S": the
+ * printed rest is a calligraphic zigzag whose belly swings nearly the full width
+ * of the box, whose waist pinches to a fifth of it, and whose foot runs out to a
+ * needle on the right before doubling back left and curling down to a point. The
+ * points below are the outline, walked clockwise, with the waist's inward notch
+ * and the gap under the foot's needle where the glyph has them.
  */
-const QUARTER_REST = [
-  [0.34, 0.01, 0.5],
-  [0.51, 0.08, 0.6],
-  [0.6, 0.13, 1.5],
-  [0.73, 0.25, 2.45],
-  [0.6, 0.33, 2.4],
-  [0.44, 0.42, 1.85],
-  [0.42, 0.49, 0.9],
-  [0.48, 0.56, 0.6],
-  [0.64, 0.63, 0.7],
-  [0.86, 0.7, 0.8],
-  [0.87, 0.76, 0.58],
-  [0.63, 0.79, 0.8],
-  [0.37, 0.81, 1.2],
-  [0.25, 0.86, 1.0],
-  [0.29, 0.92, 0.8],
-  [0.43, 0.98, 0.5],
-];
+const QUARTER_REST = {
+  box: [59, 178],
+  outline: [
+    [0.4, 135], [2, 127.2], [10.2, 118], [17.4, 115],
+    [27.6, 115], [32.3, 117], [35, 116.6], [2, 75.7],
+    [2.1, 74.2], [17.9, 57.8], [21, 51.8], [23, 42.6],
+    [22, 29.3], [19, 20.2], [11.9, 7.2], [8, 2.7],
+    [8.2, 1.1], [11.6, 0], [17.9, 7.2], [20.1, 11.8],
+    [25.9, 18.2], [39.1, 37.8], [41.9, 40.2], [49.1, 51.8],
+    [52, 54.2], [52, 56.8], [49.9, 59.8], [30.1, 81.2],
+    [28, 86.3], [28, 91.6], [33, 102.8], [39.1, 111.8],
+    [41.9, 114.2], [42.1, 115.8], [59, 137.6], [56.3, 138],
+    [46.6, 135], [32.4, 135], [25.2, 138], [22.1, 141.2],
+    [20, 147.3], [20, 152.7], [26, 167.8], [34, 176.2],
+    [32.8, 178], [30.4, 178], [20.2, 171.9], [8.1, 159.8],
+    [3, 151.8], [1, 145.7],
+  ],
+};
 
 function quarterRest(x, y, colour) {
-  const H = 2.15 * LINE_GAP;
-  const W = 0.375 * H;
+  // 2.6 spaces, centred on the middle line: the printed glyph reaches a third of
+  // a space into the top space and hangs as far below the second line. At 2.15
+  // it barely crossed the lines either side of the middle and read as a small
+  // mark rather than a rest.
+  const H = 2.6 * LINE_GAP;
+  const [boxW, boxH] = QUARTER_REST.box;
+  const W = (H * boxW) / boxH;
   const left = x - W / 2;
   const top = y - H / 2;
-  const pts = QUARTER_REST.map(([u, v, w]) => [left + u * W, top + v * H, w]);
-  return `<path d="${ribbon(pts)}" fill="${colour}"/>`;
+  const pts = QUARTER_REST.outline.map(([px, py]) => [
+    left + (px / boxW) * W,
+    top + (py / boxH) * H,
+  ]);
+  // Straight segments: every corner of this glyph is a real corner — the beak's
+  // point, the waist's notch, the foot's needle — and a spline through them
+  // rounds all three away.
+  return `<path d="${trace(pts, false)} Z" fill="${colour}"/>`;
+}
+
+/**
+ * The eighth and sixteenth rests, traced off the printed ones.
+ *
+ * Every number is a fraction of the glyph's own height H, measured from its top
+ * left corner, so one table draws the glyph at any size. Four parts:
+ *
+ *  · a round bulb at the top left;
+ *  · a stem that leans a good 15° from upright — far more than the upright bar
+ *    this used to be, and half of why it read as a 9 rather than a rest;
+ *  · a hook: a thin wedge that leaves the bulb's underside, sweeps up to the
+ *    right and runs clean into the stem's own tip;
+ *  · and the sliver of white between that hook and the stem, which is the whole
+ *    glyph. Close it and the bulb becomes a comma on a stick; open it wider and
+ *    a 9 appears beside a stick.
+ */
+const HOOKED_REST = {
+  // Ink width in H, from the bulb's left edge to the top of the stem.
+  width: 0.601,
+  bulb: [0.1705, 0.1717, 0.1717],
+  stem: { top: [0.5707, 0.0429], foot: [0.3081, 0.9899], half: 0.0315 },
+  // The hook's outer edge, from its tip at the stem down and left into the bulb…
+  hookOuter: [
+    [0.545, 0.035], [0.515, 0.091], [0.495, 0.121], [0.475, 0.152],
+    [0.449, 0.182], [0.419, 0.212], [0.364, 0.242], [0.313, 0.263],
+    [0.255, 0.31], [0.17, 0.28],
+  ],
+  // …and its underside, from the stem's edge back down into the bulb. Both ends
+  // finish *inside* the bulb — a hook that stops on its edge leaves a sliver of
+  // tail sticking out under the ball, and the eye reads it as a beak.
+  hookUnder: [
+    [0.481, 0.263], [0.444, 0.273], [0.419, 0.288], [0.384, 0.303],
+    [0.343, 0.318], [0.278, 0.333], [0.17, 0.28],
+  ],
+  // The sixteenth rest is this glyph with a second hook and bulb. The printed one
+  // repeats the same wedge below the first — three quarters of it, because the
+  // stem has already leaned a third of the way across by the time the second one
+  // starts — with the second bulb under the first where that hook runs out.
+  sixteenth: { scale: 0.72, shift: [-0.077, 0.265], bulb: [0.2, 0.525, 0.145] },
+};
+
+function hookedRest(x, y, sixteenth, colour) {
+  // Both hooked rests stand just under two spaces tall, which is what a printed
+  // one measures. At 1.7 they read as small marks rather than rests.
+  const H = 1.9 * LINE_GAP;
+  const left = x - (HOOKED_REST.width * H) / 2;
+  const top = y - H / 2;
+  const at = ([u, v]) => [left + u * H, top + v * H];
+  const { bulb, stem } = HOOKED_REST;
+
+  const dot = ([cx, cy, r]) => {
+    const [px, py] = at([cx, cy]);
+    return `<circle cx="${fmt(px)}" cy="${fmt(py)}" r="${fmt(r * H)}" fill="${colour}"/>`;
+  };
+
+  // The stem is a bar of one width between its two ends, both cut square to its
+  // own direction — a cut square to the staff instead leaves a slivery point at
+  // the top where the hook runs into it.
+  const [tx, ty] = at(stem.top);
+  const [fx, fy] = at(stem.foot);
+  const len = Math.hypot(fx - tx, fy - ty);
+  const nx = ((ty - fy) / len) * stem.half * H;
+  const ny = ((fx - tx) / len) * stem.half * H;
+  const bar =
+    `M${fmt(tx + nx)} ${fmt(ty + ny)} L${fmt(fx + nx)} ${fmt(fy + ny)} ` +
+    `L${fmt(fx - nx)} ${fmt(fy - ny)} L${fmt(tx - nx)} ${fmt(ty - ny)} Z`;
+
+  // Out along the hook's outer edge from the tip, back along its underside. The
+  // underside ends inside the stem, so where the two cross is the notch — it is
+  // never drawn, which is why it stays a hairline at every size.
+  const hook = (scale, shift) => {
+    const map = ([u, v]) =>
+      at([
+        stem.top[0] + (u - stem.top[0]) * scale + shift[0],
+        stem.top[1] + (v - stem.top[1]) * scale + shift[1],
+      ]);
+    return closedOutline(HOOKED_REST.hookOuter.map(map), HOOKED_REST.hookUnder.map(map).reverse());
+  };
+
+  const parts = [dot(bulb)];
+  parts.push(`<path d="${hook(1, [0, 0])}" fill="${colour}"/>`);
+  if (sixteenth) {
+    const { scale, shift, bulb: second } = HOOKED_REST.sixteenth;
+    parts.push(dot(second));
+    parts.push(`<path d="${hook(scale, shift)}" fill="${colour}"/>`);
+  }
+  parts.push(`<path d="${bar}" fill="${colour}"/>`);
+  return parts.join('');
 }
 
 function restGlyph(x, y, dur, colour) {
@@ -300,44 +383,7 @@ function restGlyph(x, y, dur, colour) {
     return `<rect x="${x - WIDTH / 2}" y="${y - BLOCK}" width="${WIDTH}" height="${BLOCK}" fill="${colour}"/>`;
   }
   if (dur >= 4) return quarterRest(x, y, colour);
-  // Eighth rest — measured off a printed one, in fractions of the glyph's own
-  // height H: the bulb is 0.23 H across, the stem is a parallel-sided bar one
-  // bulb-width to its right, drifting about 0.11 H to the left on the way down,
-  // with both ends cut square to the stem's own direction. The hairline gap
-  // between bulb and stem is the whole trick — close it and the glyph turns into
-  // a comma, widen it and it turns into a 9 next to a stick.
-  // Both hooked rests stand just under two spaces tall, which is what a printed
-  // eighth rest measures. At 1.7 they read as small marks rather than rests.
-  const H = 1.9 * LINE_GAP;
-  const top = y - H / 2;
-  const bottom = y + H / 2;
-  const w = 0.095 * H;
-  const bulbX = x + 0.5 - 0.17 * H;
-  const bulbY = top + 0.17 * H;
-  const stemX = x + 0.5;
-  const footX = stemX - 0.11 * H;
-  // offset perpendicular to the stem, so the cut ends lean with the glyph
-  const nx = -(H / Math.hypot(footX - stemX, H)) * (w / 2);
-  const ny = ((footX - stemX) / Math.hypot(footX - stemX, H)) * (w / 2);
-  const bulb = (cy, r, dx = 0) =>
-    `<circle cx="${(bulbX + dx).toFixed(2)}" cy="${cy.toFixed(2)}" r="${(r * H).toFixed(2)}" fill="${colour}"/>`;
-  const stem =
-    `<path d="M${(stemX + nx).toFixed(2)} ${(top + ny).toFixed(2)} ` +
-    `L${(footX + nx).toFixed(2)} ${(bottom + ny).toFixed(2)} ` +
-    `L${(footX - nx).toFixed(2)} ${(bottom - ny).toFixed(2)} ` +
-    `L${(stemX - nx).toFixed(2)} ${(top - ny).toFixed(2)} Z" fill="${colour}"/>`;
-  // Sixteenth rest: the eighth rest with a second hook. The printed glyph is
-  // exactly that — the same bulb repeated at 0.47 of the height, a shade smaller
-  // — and at that spacing the two bulbs stay apart while the stem still runs
-  // clear of them down to the staff line.
-  if (dur < 2) {
-    // The lower hook sits a touch further left: the stem has already drifted
-    // that way by the time it gets there, and without the nudge the two hooks and
-    // the stem merge into one dark peanut instead of reading as two hooks with
-    // the hairline notch an engraved rest has.
-    return bulb(top + 0.17 * H, 0.15) + bulb(top + 0.48 * H, 0.135, -0.035 * H) + stem;
-  }
-  return bulb(top + 0.17 * H, 0.155) + stem;
+  return hookedRest(x, y, dur < 2, colour);
 }
 
 /* ── Beams ─────────────────────────────────────────────────────────────── */

@@ -51,6 +51,19 @@
       // Ink that comes within two units counts: at reading size, glyphs a unit
       // apart look like one mark, and that is exactly what a student misreads.
       const AIR = 2;
+      /**
+       * The rest glyphs' ink boxes in staff units — the shapes the teacher signed
+       * off on after four rounds of "the rests look wrong". A glyph is a table of
+       * measured points, and a table can be edited into something that still
+       * renders but no longer looks like a printed rest: a hook that collapses
+       * into its bulb, a quarter rest back to an "S". Every part of these glyphs
+       * reaches the box, so the box is a coarse but honest witness.
+       */
+      const REST_BOX = {
+        '1': [12.6, 20.9], // sixteenth
+        '2': [12.6, 20.9], // eighth
+        '4': [9.5, 28.6], // quarter
+      };
 
       const box = (node) => {
         const b = node.getBBox();
@@ -153,6 +166,7 @@
         const headHits = [];
         const restHits = [];
         const restShapeHits = [];
+        const restGlyphHits = [];
         const slurHits = [];
         const accidentalHits = [];
         const flagHits = [];
@@ -166,6 +180,20 @@
           // ── rests ------------------------------------------------------
           const restBoxes = [...svg.querySelectorAll('g.score-rest')].map((n) => box(n));
           rests += restBoxes.length;
+
+          for (const g of svg.querySelectorAll('g.score-rest')) {
+            const want = REST_BOX[g.dataset.dur];
+            if (!want) continue;
+            const b = box(g);
+            const w = b.x1 - b.x0;
+            const h = b.y1 - b.y0;
+            if (Math.abs(w - want[0]) > 0.8 || Math.abs(h - want[1]) > 0.8) {
+              restGlyphHits.push(
+                `L${level} seed ${seed}: a ${g.dataset.dur} rest is ${w.toFixed(1)}x${h.toFixed(1)}, not ${want[0]}x${want[1]}`,
+              );
+              break;
+            }
+          }
 
           const inkNodes = [
             ...svg.querySelectorAll('ellipse'),
@@ -391,12 +419,14 @@
             `flags ${flagHits.length}/${seeds} broken (${flags} drawn) · ` +
             `dynamics ${dynamicHits.length}/${seeds} broken (${dynamics} drawn) · ` +
             `heads ${headHits.length}/${seeds} collided · ` +
-            `rest blocks ${restShapeHits.length}/${seeds} on the wrong line`,
+            `rest blocks ${restShapeHits.length}/${seeds} on the wrong line · ` +
+            `rest shapes ${restGlyphHits.length}/${seeds} off their table`,
         );
         problems.push(
           ...headHits.slice(0, 2),
           ...restHits.slice(0, 2),
           ...restShapeHits.slice(0, 2),
+          ...restGlyphHits.slice(0, 2),
           ...slurHits.slice(0, 2),
           ...accidentalHits.slice(0, 2),
           ...flagHits.slice(0, 2),
