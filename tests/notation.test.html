@@ -41,7 +41,7 @@
       // this kept happening: a rest pushed into the flag of the note before it,
       // and a slur cutting through a stem it passes over. Both are measured here
       // rather than eyeballed, because a spot fix is how they come back.
-      import { generatePassage, SIGHT_LEVELS } from '../src/sightreading.js';
+      import { generatePassage, SIGHT_LEVELS, beatLength } from '../src/sightreading.js';
       import { renderScore } from '../src/score.js';
 
       const stage = document.getElementById('stage');
@@ -64,6 +64,13 @@
         '2': [12.6, 20.9], // eighth
         '4': [9.5, 28.6], // quarter
       };
+      /**
+       * Every "gap after a sixteenth group ÷ gap inside it" measured, so the
+       * spacing curve can be judged as a whole at the end. Proportional spacing
+       * gave 1.0 for all of them — the complaint was exactly that; the curve
+       * gives about 1.3, and a reviewer should not have to notice it twice.
+       */
+      const groupRatios = [];
 
       const box = (node) => {
         const b = node.getBBox();
@@ -394,6 +401,26 @@
               break;
             }
 
+            // ── spacing --------------------------------------------------
+            // The i-th drawn note head is the i-th note in the passage: systems
+            // and bars are drawn in order, and only rests are left out. That is
+            // enough to measure how a beat of sixteenths is set — a sixteenth, a
+            // sixteenth, then something longer that lands on a beat.
+            const heads = [...svg.querySelectorAll('ellipse')].map((n) => Number(n.getAttribute('cx')));
+            let head = 0;
+            const beat = beatLength(p.meter);
+            for (const bar of p.bars) {
+              const xs = bar.map((e) => (e.rest ? null : heads[head++]));
+              for (let i = 1; i + 1 < bar.length; i++) {
+                if (bar[i - 1].dur > 1 || bar[i].dur > 1 || bar[i + 1].dur <= 1) continue;
+                const onBeat =
+                  Math.abs(bar[i + 1].start / beat - Math.round(bar[i + 1].start / beat)) < 1e-6;
+                if (!onBeat || xs[i - 1] == null || xs[i] == null || xs[i + 1] == null) continue;
+                const inside = xs[i] - xs[i - 1];
+                if (inside > 0) groupRatios.push((xs[i + 1] - xs[i]) / inside);
+              }
+            }
+
             // A slur is a bow: both control points sit outside both of its ends,
             // on one side. When the space above a phrase ran out, the curve was
             // pushed down to clear the system above and the arc ended up *between*
@@ -433,6 +460,18 @@
           ...dynamicHits.slice(0, 2),
         );
         }
+      }
+
+      groupRatios.sort((a, b) => a - b);
+      const medianRatio = groupRatios[groupRatios.length >> 1] ?? 0;
+      log.push(
+        `group gap: ${medianRatio.toFixed(2)}× the sixteenth spacing inside the group ` +
+          `(${groupRatios.length} measured, ${groupRatios.filter((r) => r >= 1.2).length} of them at 1.2× or more)`,
+      );
+      if (groupRatios.length > 50 && medianRatio < 1.2) {
+        problems.push(
+          `sixteenth groups are not spaced as groups: the gap after one is only ${medianRatio.toFixed(2)}× the gaps inside it (want 1.2 or more)`,
+        );
       }
 
       document.getElementById('report').textContent = problems.length

@@ -425,6 +425,17 @@ hoped for:
   ink floor: what the two glyphs actually occupy, flag sweep and dot included, and
   measured across the barline too. The floor may not be relaxed; the house spacing
   above it may.
+* **A beat of sixteenths is spaced as a group, not by the clock.** Space used to be
+  proportional to time, which gave a quarter four times the room of a sixteenth: a
+  run of sixteenths came out as a dark clump with the quarter after it a whole beat
+  away, and neither read at sight. Each event now takes `4 + 30·d^0.6` of room (d
+  in quarter notes) — the classic engraver's curve, where short notes get more than
+  their time is worth because their heads, beams and flags are what the eye is
+  picking apart, and long notes give some back — plus five units of air at a beat
+  boundary, which is what separates one group from the next. Measured on a beat of
+  four sixteenths followed by a quarter: the sixteenths go from 24 to 30 units
+  apart and the gap after the group from 24 to 39, so the bar reads as
+  `sixteenths — breath — quarter` instead of a clump and a hole.
 * **Systems are spaced by what they hold.** One fixed gap had to serve the worst
   case of every level at once, and on a phone it was too small: the dynamic under
   one system met the tall notes of the next, and a high phrase had no room for its
@@ -624,12 +635,13 @@ tests/notation.test.html  renders 540 passages — 60 a level four bars to a sys
                       touch another glyph, no flag may cross a note head, no two
                       note heads may touch, every slur must bow on one side of both
                       its ends, a half rest must sit on the middle line while a
-                      whole rest hangs from the fourth, and every rest's ink box
-                      must still match the table it was measured into. Where a box
-                      would cry wolf it measures the drawing: a flag against each
-                      head's ellipse, a wide slanted path (a beam) against the
-                      text, and two heads against each other in the ellipse's own
-                      frame.
+                      whole rest hangs from the fourth, every rest's ink box must
+                      still match the table it was measured into, and the gap after
+                      a beat of sixteenths must be at least 1.2× the gap inside it.
+                      Where a box would cry wolf it measures the drawing: a flag
+                      against each head's ellipse, a wide slanted path (a beam)
+                      against the text, and two heads against each other in the
+                      ellipse's own frame.
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format

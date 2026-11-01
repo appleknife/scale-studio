@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611011520';
-import { CLEF_PATH } from './clef.js?v=202611011520';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611011640';
+import { CLEF_PATH } from './clef.js?v=202611011640';
 
-import { beatLength } from './sightreading.js?v=202611011520';
+import { beatLength } from './sightreading.js?v=202611011640';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -556,6 +556,11 @@ function drawSystem(
   const ACCIDENTAL_HALF = 5.5;
   const leftOf = (e) => (e.accidental ? 22 + ACCIDENTAL_HALF : HEAD_RX);
 
+  // The extra room a beat boundary gets, on top of the spacing curve — see
+  // `layout`. Five is about a third of a sixteenth's own room: enough to read as
+  // a break between groups, not enough to look like a missing beat.
+  const GROUP_AIR = 5;
+
   /**
    * How far each event's ink runs right of the point it is drawn at. A lone
    * eighth or sixteenth has a flag sweeping a whole space past its stem; a
@@ -599,25 +604,51 @@ function drawSystem(
       events.length === 1 && events[0].start === 0 && events[0].dur >= passage.perBar;
 
     /**
-     * The bar set with its notes at `squash` of their time positions.
+     * The bar set with its notes at `squash` of their spaced positions.
      *
      * Time alone is not enough for a crowded bar: three quarters and a beat of
      * sixteenths take up a 4/4 bar by the clock, but four sixteenths need 48
      * units between them and the clock gives them 46. The run then spent its
      * floor budget and pushed the last note onto the barline — where the next
      * bar's first note is — so two note heads ended up touching. Squashing the
-     * clock positions (not the floors) hands the room to the short notes: the
+     * spaced positions (not the floors) hands the room to the short notes: the
      * long ones give up what they do not need.
      */
     const layout = (squash, allowance) => {
+      // How much room each event takes, in units that are scaled onto the bar
+      // afterwards. The clock is the wrong ruler: it gives a quarter four times
+      // the room of a sixteenth, so a beat of sixteenths comes out as a dark
+      // clump with the quarter after it a whole beat away — which is the part of
+      // a written passage that is hard to read at sight. Engravers space by a
+      // curve instead, `a + b·d^c` with c below 1: short notes get more than
+      // their time is worth, because their heads, beams and flags are what the
+      // eye is picking apart, and long notes give some of theirs back.
+      //
+      // The constant `a` is the "as a group" part: it is the same for every
+      // event, so it swells the tightest spacing most. `GROUP_AIR` lands only
+      // where one beat ends and the next begins, which is the gap a player needs
+      // to see where a run of short notes stops.
+      const room = (quarters) => 4 + 30 * Math.pow(quarters, 0.6);
+      const weights = events.map((e, i) => {
+        const next = events[i + 1];
+        // Only a *following* note can need air in front of it; the bar's last
+        // event has the barline after it, and giving it air too would pull it
+        // away from the end of the bar.
+        const endsBeat = next && Math.abs(next.start / beat - Math.round(next.start / beat)) < 1e-6;
+        return room(e.dur / 4) + (endsBeat ? GROUP_AIR : 0);
+      });
+      const totalRoom = weights.reduce((a, b) => a + b, 0) || 1;
+
       const xs = new Map();
+      let cum = 0;
       let prev = null;
       let prevEvent = null;
       for (let i = 0; i < events.length; i++) {
         const e = events[i];
         let x = lone
           ? x0 + (barWidth - inset - 8) / 2
-          : x0 + (e.start / passage.perBar) * span * squash;
+          : x0 + (cum / totalRoom) * span * squash;
+        cum += weights[i];
         // Measured, not guessed: a rest's glyph hangs 6 units to the left of the
         // position it is given, and a flagged sixteenth sweeps 17 to the right of
         // its own. Sixteen is enough for two noteheads, but between a flag and a
