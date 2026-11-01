@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312102';
-import { CLEF_PATH } from './clef.js?v=202610312102';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312113';
+import { CLEF_PATH } from './clef.js?v=202610312113';
 
-import { beatLength } from './sightreading.js?v=202610312102';
+import { beatLength } from './sightreading.js?v=202610312113';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -284,7 +284,7 @@ function drawSystem(
   barFrom,
   barTo,
   top,
-  { timeSignature, tempoText, showTempo, final = false, width = WIDTH },
+  { timeSignature, tempoText, showTempo, final = false, width = WIDTH, ceiling = null },
 ) {
   const part = [];
   const bottom = top + 4 * LINE_GAP;
@@ -340,6 +340,10 @@ function drawSystem(
     );
   }
 
+  // Where the last bar's dynamic marking went, so the system above can keep a
+  // rising slur clear of it.
+  let lastDynY = bottom + 34;
+
   const musicLeft = cursor + 26;
   const musicWidth = width - RIGHT - musicLeft;
   const barWidth = musicWidth / (barTo - barFrom);
@@ -355,23 +359,57 @@ function drawSystem(
    * step by step rather than scaling the finished bar back — scaling re-creates
    * the very collision the floor was there to prevent.
    */
+  const ACCIDENTAL_HALF = 5.5;
+  const leftOf = (e) => (e.accidental ? 22 + ACCIDENTAL_HALF : HEAD_RX);
+
+  /**
+   * How far each event's ink runs right of the point it is drawn at. A lone
+   * eighth or sixteenth has a flag sweeping a whole space past its stem; a
+   * *beamed* one has no flag at all — the beam runs to its neighbour — and
+   * treating the two alike pushed every sixteenth group clean out of its bar.
+   * A dotted note reaches out too: the dot sits a step to the right.
+   */
+  function rights(events) {
+    const beamable = (e) => e && !e.rest && e.dur <= 2;
+    return events.map((e, i) => {
+      if (!e || e.rest || !e.note) return 6;
+      if (e.dur === 3 || e.dur === 6 || e.dur === 12) return 12.9;
+      if (e.dur <= 2) {
+        const beamed = beamable(events[i - 1]) || beamable(events[i + 1]);
+        if (beamed) return HEAD_RX;
+        const up = STAFF_GEOM.stemUp(e.note.letter, e.note.octave);
+        return up ? 5.2 + 11.7 : HEAD_RX;
+      }
+      return HEAD_RX;
+    });
+  }
+
   function positions(events, barX) {
-    const x0 = barX + inset;
-    const span = barWidth - inset - 8;
-    const limit = barX + barWidth - 9;
+    // The bar's usable width has to account for what actually sticks out of its
+    // first and last event: an accidental hangs a long way left of its note, and
+    // a flag a long way right of its stem. Without this, a flag at the end of a
+    // bar reached into the next bar and met the sharp in front of its first note.
+    const right = rights(events);
+    const firstLeft = leftOf(events[0]);
+    const lastRight = right[right.length - 1];
+    const x0 = barX + Math.max(inset, firstLeft + 2);
+    const limit = barX + barWidth - Math.max(8, lastRight + 2);
+    const span = Math.max(24, limit - x0);
     // A note that fills a whole bar — a whole note, a dotted half in 3/4 — is set
     // in the middle of it, the way an engraver sets one. Measured from its beat
     // it sits hard against the barline, which reads as a mistake rather than as
     // a long note.
     const lone =
       events.length === 1 && events[0].start === 0 && events[0].dur >= passage.perBar;
-    const at = (e) => (lone ? x0 + span / 2 : x0 + (e.start / passage.perBar) * span);
+    const at = (e) => (lone ? x0 + (barWidth - inset - 8) / 2 : x0 + (e.start / passage.perBar) * span);
 
+    let tightest = null;
     for (const allowance of [22, 16, 11, 6, 0]) {
       const xs = new Map();
       let prev = null;
       let prevEvent = null;
-      for (const e of events) {
+      for (let i = 0; i < events.length; i++) {
+        const e = events[i];
         let x = at(e);
         // Measured, not guessed: a rest's glyph hangs 6 units to the left of the
         // position it is given, and a flagged sixteenth sweeps 17 to the right of
@@ -380,19 +418,25 @@ function drawSystem(
         // gets pushed into a note it does not belong to. 29 is those two reaches
         // plus half a space of air.
         const tucked = e.rest && prevEvent && !prevEvent.rest && prevEvent.dur <= 2;
-        const gap = (tucked ? 29 : 16) + (e.accidental ? allowance : 0);
+        // Two floors, whichever is stricter: the house spacing, and what these
+        // two glyphs actually need so neither can be drawn on top of the other.
+        // The allowance may relax when a bar is crowded; the ink floor may not —
+        // relaxing it is exactly how a sharp ended up inside a flag.
+        const inkFloor = i > 0 ? right[i - 1] + leftOf(e) + 4 : 0;
+        const gap = Math.max(inkFloor, (tucked ? 29 : 16) + (e.accidental ? allowance : 0));
         if (prev != null && x - prev < gap) x = prev + gap;
         xs.set(e, x);
         prev = x;
         prevEvent = e;
       }
+      tightest = xs;
       if (prev == null || prev <= limit) return xs;
     }
 
-    // pathological bar: plain time positions, which at least stay inside the bar
-    const xs = new Map();
-    for (const e of events) xs.set(e, at(e));
-    return xs;
+    // A bar too crowded even at the tightest spacing. Keep the tightest layout
+    // rather than falling back to plain beat positions: a note a few units past
+    // the barline is a blemish, but a sharp drawn through a flag is a misreading.
+    return tightest;
   }
 
   for (let bar = barFrom; bar < barTo; bar++) {
@@ -444,6 +488,7 @@ function drawSystem(
       ...events.map((e) => (e.note ? yForNote(e.note.letter, e.note.octave, bottom) : 0)),
     );
     const dynY = Math.max(bottom + 34, lowest + 26, deepest + 26);
+    lastDynY = dynY;
     const firstWithDynamic = events.find((e) => e.dynamic);
     if (firstWithDynamic) {
       part.push(
@@ -551,7 +596,11 @@ function drawSystem(
       part.push(ledgerLines(event.note.letter, event.note.octave, x, bottom));
 
       if (event.accidental) {
-        part.push(accidentalAt(event.note.alter, x - 2 * LINE_GAP, y));
+        // Grouped so a test can find it: the glyph is a pair of paths that look
+        // much like a flag by bounding box alone.
+        part.push(
+          `<g class="score-acc">${accidentalAt(event.note.alter, x - 2 * LINE_GAP, y)}</g>`,
+        );
       }
 
       const stemX = up ? x + 5.2 : x - 5.2;
@@ -733,7 +782,11 @@ function drawSystem(
       let extra = 0;
       for (let pass = 0; pass < 10 && clips(extra); pass++) extra += 3;
 
-      const bulge = baseY + dir * (rise + extra);
+      let bulge = baseY + dir * (rise + extra);
+      // A slur that rises belongs in the gap between systems — and so does the
+      // dynamic marking of the system above it. The ceiling is that text's
+      // baseline, so the curve stays below it instead of running through "cresc.".
+      if (dir < 0 && ceiling != null) bulge = Math.max(bulge, ceiling);
       part.push(
         `<path class="score-slur" d="M${f(x1)} ${f(startY)} ` +
           `C${f(x1 + (x2 - x1) * grip)} ${f(bulge)} ` +
@@ -754,11 +807,11 @@ function drawSystem(
     );
   } else {
     part.push(
-      `<line x1="${WIDTH - RIGHT}" y1="${top}" x2="${WIDTH - RIGHT}" y2="${bottom}" stroke="${INK}" stroke-width="1.3"/>`,
+      `<line x1="${width - RIGHT}" y1="${top}" x2="${width - RIGHT}" y2="${bottom}" stroke="${INK}" stroke-width="1.3"/>`,
     );
   }
 
-  return part.join('');
+  return { markup: part.join(''), dynY: lastDynY };
 }
 
 /**
@@ -806,16 +859,20 @@ export function renderScore(
   const parts = [
     `<svg class="score" viewBox="0 0 ${width} ${height}" role="img" aria-label="${ariaLabel}">`,
   ];
+  // Each system is drawn knowing where the one above put its dynamic marking, so
+  // a slur rising into the gap can stop short of it.
+  let ceiling = null;
   for (let s = 0; s < systems; s++) {
-    parts.push(
-      drawSystem(passage, s * per, (s + 1) * per, TOP_PAD + s * pitch, {
-        width,
-        timeSignature: s === 0,
-        tempoText: s === 0 ? tempoText : '',
-        showTempo: s === 0 && Boolean(tempoText),
-        final: s === systems - 1,
-      }),
-    );
+    const system = drawSystem(passage, s * per, (s + 1) * per, TOP_PAD + s * pitch, {
+      width,
+      timeSignature: s === 0,
+      tempoText: s === 0 ? tempoText : '',
+      showTempo: s === 0 && Boolean(tempoText),
+      final: s === systems - 1,
+      ceiling,
+    });
+    parts.push(system.markup);
+    ceiling = system.dynY + 6;
   }
   parts.push('</svg>');
   return parts.join('');

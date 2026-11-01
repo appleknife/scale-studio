@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610312102';
-import { STAFF_GEOM } from './staff.js?v=202610312102';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610312113';
+import { STAFF_GEOM } from './staff.js?v=202610312113';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -830,12 +830,24 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       // between two stems, and one of them always ends up poking through it —
       // so try a few bars before giving up on this slur.
       for (let attempt = 0; attempt < 8; attempt++) {
-        const barEvents = bars[Math.floor(rng() * (BAR_COUNT - 1))].filter((e) => !e.rest);
+        const barEvents = bars[Math.floor(rng() * (BAR_COUNT - 1))];
         if (barEvents.length < 2) continue;
         const len = Math.min(barEvents.length, 2 + Math.floor(rng() * 3));
         const start = Math.floor(rng() * (barEvents.length - len + 1));
+        // A contiguous run of the bar, rests and all: a slur is one stroke of the
+        // bow, so a rest anywhere under it is a contradiction — the bow has to
+        // stop, which is precisely what a slur says not to do. Filtering the
+        // rests out first did exactly that, drawing a curve over a silence.
         const run = barEvents.slice(start, start + len);
+        if (run.some((e) => e.rest || !e.note)) continue;
         if (run.some((e) => e.slurStart || e.slurEnd)) continue;
+        // A slur may not begin or end right beside a beamed group. Its curve is
+        // drawn on the far side of its own stems, and a neighbouring group's beam
+        // lies exactly across that path — the curve then threads the beam, which
+        // is what a slur over the top of a sixteenth run looked like. Musically a
+        // slur that cuts a figure in half is wrong too.
+        const beamable = (e) => e && !e.rest && e.dur <= 2;
+        if (beamable(barEvents[start - 1]) || beamable(barEvents[start + len])) continue;
         const points = new Set(run.map((e) => STAFF_GEOM.stemUp(e.note.letter, e.note.octave)));
         if (points.size > 1) continue;
 

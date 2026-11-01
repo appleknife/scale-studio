@@ -120,11 +120,17 @@
           // slurs pair up inside one bar: start, then end, never two at once
           for (const barEvents of p.bars) {
             let open = false;
+            let under = 0; // events passed since the slur began
             for (const e of barEvents) {
               if (e.slurStart) {
                 if (open) problems.push(`${id}: two slurs open at once`);
                 open = true;
+                under = 0;
+              } else if (open) {
+                under += 1;
               }
+              // A slur is one stroke of the bow, so the bow cannot stop under it.
+              if (open && under > 0 && e.rest) problems.push(`${id}: a slur runs over a rest`);
               if (e.slurEnd) {
                 if (!open) problems.push(`${id}: a slur ends without starting`);
                 open = false;

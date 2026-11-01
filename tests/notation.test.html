@@ -91,8 +91,10 @@
       for (const level of SIGHT_LEVELS) {
         let rests = 0;
         let slurs = 0;
+        let accidentals = 0;
         const restHits = [];
         const slurHits = [];
+        const accidentalHits = [];
 
         for (let seed = 0; seed < SEEDS; seed++) {
           const p = generatePassage({ level, seed });
@@ -103,18 +105,39 @@
           const restBoxes = [...svg.querySelectorAll('g.score-rest')].map((n) => box(n));
           rests += restBoxes.length;
 
-          const ink = [
+          const inkNodes = [
             ...svg.querySelectorAll('ellipse'),
             ...[...svg.querySelectorAll('path')].filter(
-              (n) => !n.closest('g.score-rest') && !n.classList.contains('score-slur'),
+              (n) =>
+                !n.closest('g.score-rest') &&
+                !n.classList.contains('score-slur') &&
+                !n.closest('g.score-acc'),
             ),
             ...[...svg.querySelectorAll('circle')].filter((n) => !n.closest('g.score-rest')),
-          ].map((n) => box(n));
+          ];
+          const ink = inkNodes.map((n) => box(n));
 
           for (const r of restBoxes) {
             const bad = ink.find((b) => overlap(r, b));
             if (bad) {
               restHits.push(`L${level} seed ${seed}: rest at ${r.x0.toFixed(0)} runs into ink at ${bad.x0.toFixed(0)}`);
+              break;
+            }
+          }
+
+          // ── accidentals ------------------------------------------------
+          // A sharp in front of a note has to clear whatever the note before it
+          // puts there — a flag sweeps a whole space right of its stem, and a dot
+          // sits a step right of its head. A sign drawn through a flag is the bug
+          // this measures.
+          const accBoxes = [...svg.querySelectorAll('g.score-acc')].map((n) => box(n));
+          accidentals += accBoxes.length;
+          for (const a of accBoxes) {
+            const bad = ink.find((b) => overlap(a, b));
+            if (bad) {
+              accidentalHits.push(
+                `L${level} seed ${seed}: accidental at ${a.x0.toFixed(0)},${a.y0.toFixed(0)} runs into ink at ${bad.x0.toFixed(0)},${bad.y0.toFixed(0)}`,
+              );
               break;
             }
           }
@@ -149,9 +172,14 @@
 
         log.push(
           `L${level}: rests ${restHits.length}/${SEEDS} broken (${rests} drawn) · ` +
-            `slurs ${slurHits.length}/${SEEDS} broken (${slurs} drawn)`,
+            `slurs ${slurHits.length}/${SEEDS} broken (${slurs} drawn) · ` +
+            `accidentals ${accidentalHits.length}/${SEEDS} broken (${accidentals} drawn)`,
         );
-        problems.push(...restHits.slice(0, 2), ...slurHits.slice(0, 2));
+        problems.push(
+          ...restHits.slice(0, 2),
+          ...slurHits.slice(0, 2),
+          ...accidentalHits.slice(0, 2),
+        );
       }
 
       document.getElementById('report').textContent = problems.length

@@ -335,6 +335,22 @@ trouble are the ones where a stroked line is not good enough:
   bar ends sheared by a butt cap. A traced path also stays crisp at any size, which
   an embedded bitmap would not.
 
+Three rules fall out of the engraved look, and each is now measured rather than
+hoped for:
+
+* **A slur never passes over a rest.** A slur is one stroke of the bow, so a rest
+  under it is a contradiction. The generator used to filter the rests out *before*
+  choosing the run, which is exactly how a curve ended up over a silence; it now
+  takes a contiguous slice of the bar and refuses any slice containing a rest.
+* **A slur neither begins nor ends beside a beamed group.** Its curve is drawn on the
+  far side of its own stems, and a neighbouring group's beam lies across that path.
+* **An accidental never lands on the note before it.** Bar spacing used to allow a
+  fixed 22 units for a sign, relaxed to nothing when a bar was crowded — which is
+  how a sharp ended up inside the flag of the note before it. The spacing now has an
+  ink floor: what the two glyphs actually occupy, flag sweep and dot included, and
+  measured across the barline too. The floor may not be relaxed; the house spacing
+  above it may.
+
 If you change a glyph, compare it against a printed one at matched height before
 believing it. Cropping the printed glyph and the render, scaling both to the same
 height and putting them side by side settled every argument about these shapes;
