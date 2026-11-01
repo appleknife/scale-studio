@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312134';
-import { CLEF_PATH } from './clef.js?v=202610312134';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312144';
+import { CLEF_PATH } from './clef.js?v=202610312144';
 
-import { beatLength } from './sightreading.js?v=202610312134';
+import { beatLength } from './sightreading.js?v=202610312144';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -38,6 +38,16 @@ const HEAD_RY = 4.55;
 const HEAD_ANGLE = -24;
 const STEM = 3.5 * LINE_GAP;
 const BEAM = 0.48 * LINE_GAP;
+
+/**
+ * How far an articulation runs past the note head, on the side away from the
+ * stem — which is the side the slur and the dynamic marking live on. An accent
+ * is a wedge whose point sits nine units out and four more wide; a staccato dot
+ * is seven out with a 2.2 radius. The slur, the dynamics and the drawing all ask
+ * this one function, or one of them gets drawn through another.
+ */
+const markReach = (event) =>
+  event.mark === 'accent' ? HEAD_RY + 13 : event.mark === 'staccato' ? HEAD_RY + 9.5 : 0;
 
 // The eighth note's flag, traced off the mark the app has used since its first
 // version — the note in the header and on the home screen. Drawn as two edges
@@ -379,6 +389,10 @@ function drawSystem(
 ) {
   const part = [];
   const bottom = top + 4 * LINE_GAP;
+  // The highest point any *music* reaches in this system — heads, stems, beams,
+  // flags, marks, slurs. The tempo mark is printed over the first bar, and a bar
+  // that opens high would otherwise be drawn through it.
+  let musicTop = top;
 
   // staff lines
   part.push(`<g stroke="#c3b49d" stroke-width="1.15" stroke-linecap="round">`);
@@ -424,12 +438,9 @@ function drawSystem(
     cursor += 30;
   }
 
-  // tempo mark
-  if (showTempo && tempoText) {
-    part.push(
-      `<text class="score-tempo" x="${cursor + 6}" y="${top - 18}" font-size="17">${tempoText}</text>`,
-    );
-  }
+  // The tempo mark is emitted after the bars — see the end of this function —
+  // because where it may sit depends on how high the music reaches.
+  const tempoX = cursor + 6; 
 
   // Where the last bar's dynamic marking went, so the system above can keep a
   // rising slur clear of it.
@@ -570,6 +581,7 @@ function drawSystem(
       const at = (event) => anchor + slope * (xOf(event) - xs[0]);
 
       deepest = Math.max(deepest, ...group.map((e) => at(e)));
+      if (up) musicTop = Math.min(musicTop, ...group.map((e) => at(e) - BEAM));
       group.forEach((e) => beamOf.set(e, { at, up }));
     }
 
@@ -578,7 +590,18 @@ function drawSystem(
       bottom,
       ...events.map((e) => (e.note ? yForNote(e.note.letter, e.note.octave, bottom) : 0)),
     );
-    const dynY = Math.max(bottom + 34, lowest + 26, deepest + 26);
+    // An accent hangs below the head of an up-stem note, and on a low note it
+    // reaches further down than the head does — far enough to meet the dynamic
+    // marking, which is what put a wedge through an "f". So the marks are
+    // measured too, not just the heads and the beams.
+    const marksLow = events.reduce((low, e) => {
+      if (!e.note || !e.mark) return low;
+      const beam = beamOf.get(e);
+      const up = beam ? beam.up : stemUp(e.note.letter, e.note.octave);
+      const y = yForNote(e.note.letter, e.note.octave, bottom);
+      return up ? Math.max(low, y + markReach(e)) : low;
+    }, 0);
+    const dynY = Math.max(bottom + 34, lowest + 26, deepest + 26, marksLow + 20);
     lastDynY = dynY;
     const firstWithDynamic = events.find((e) => e.dynamic);
     if (firstWithDynamic) {
@@ -656,7 +679,13 @@ function drawSystem(
         // exactly how a triplet with down stems looked off-centre.
         const x1 = stemX(first);
         const x2 = stemX(last);
-        const by = beam.at(first) + (beam.up ? -12 : 12);
+        // The beam is a line, so its height under the numeral is the average of
+        // its height at the two ends. Taking the height at the *first* note put
+        // the 3 on top of a slanted beam — the numeral sat where the beam began
+        // rather than where the number is.
+        const under = (beam.at(first) + beam.at(last)) / 2;
+        const by = under + (beam.up ? -12 : 12);
+        musicTop = Math.min(musicTop, by - (beam.up ? 11 : 0));
         part.push(
           `<text class="score-tuplet" x="${(x1 + x2) / 2}" y="${by + (beam.up ? 0 : 10)}" ` +
             `font-size="15" font-style="italic" text-anchor="middle">3</text>`,
@@ -676,6 +705,10 @@ function drawSystem(
       if (!event.note) continue;
 
       const y = yForNote(event.note.letter, event.note.octave, bottom);
+      // Everything this note puts on the page, measured as it is drawn: the head,
+      // its stem, and the dot or articulation that sits above it when the stem
+      // points down.
+      musicTop = Math.min(musicTop, y - HEAD_RY);
       const beam = beamOf.get(event);
       // Inside a beamed group the *group's* direction wins for everything — stem
       // side, articulations and all. A note whose own direction disagreed was
@@ -696,6 +729,7 @@ function drawSystem(
 
       const stemX = up ? x + 5.2 : x - 5.2;
       const stemEnd = beam ? beam.at(event) : up ? y - STEM : y + STEM;
+      musicTop = Math.min(musicTop, stemEnd);
       // a stem is drawn for everything but a whole note and a beamed eighth
       if (!(event.dur >= 16)) {
         part.push(
@@ -716,12 +750,18 @@ function drawSystem(
 
       part.push(head(x, y, { hollow }));
 
+      // ledger lines, above the staff, reach higher than the note that needs them
+      if (indexOf(event.note.letter, event.note.octave) > E4 + 8) {
+        musicTop = Math.min(musicTop, bottom - (indexOf(event.note.letter, event.note.octave) - E4) * STEPS);
+      }
+
       // dot
       if (event.dur === 6 || event.dur === 12 || event.dur === 3) {
         // The dot belongs in the middle of the space beside the head; a note
         // sitting on a line takes its dot one step away, or it reads as a smudge
         // on the line.
         const onLine = indexOf(event.note.letter, event.note.octave) % 2 === 0;
+        musicTop = Math.min(musicTop, y - (onLine ? STEPS : 0) - 2.05);
         part.push(
           `<circle cx="${x + 10.8}" cy="${y - (onLine ? STEPS : 0)}" r="2.05" fill="${INK}"/>`,
         );
@@ -729,11 +769,13 @@ function drawSystem(
 
       // articulations
       if (event.mark === 'staccato') {
+        if (!up) musicTop = Math.min(musicTop, y - markReach(event));
         part.push(`<circle cx="${x}" cy="${up ? y + HEAD_RY + 7 : y - HEAD_RY - 7}" r="2.2" fill="${INK}"/>`);
       } else if (event.mark === 'accent') {
         // A wedge, not a triangle: an accent points along the note, and drawing it
         // as a triangle (then turning it over for down-stems) read as a ▽.
         const ay = up ? y + HEAD_RY + 9 : y - HEAD_RY - 9;
+        if (!up) musicTop = Math.min(musicTop, y - markReach(event));
         part.push(
           `<path d="M${x - 5.5} ${ay - 4} L${x + 5.5} ${ay} L${x - 5.5} ${ay + 4}" ` +
             `fill="none" stroke="${INK}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>`,
@@ -776,8 +818,7 @@ function drawSystem(
       };
       // An articulation mark sits opposite the stem — the same side the slur
       // takes — so it has to be cleared too, or the slur runs through the dot.
-      const markReach = (ev) =>
-        ev.mark === 'accent' ? HEAD_RY + 13 : ev.mark === 'staccato' ? HEAD_RY + 9.5 : 0;
+      // The measurement lives in markReach, which the dynamics use as well.
       /** How far a note's own ink runs on the slur's side of its head. */
       const edge = (ev) => {
         const ym = yForNote(ev.note.letter, ev.note.octave, bottom);
@@ -876,6 +917,9 @@ function drawSystem(
       // dynamic marking of the system above it. The ceiling is that text's
       // baseline, so the curve stays below it instead of running through "cresc.".
       if (dir < 0 && ceiling != null) bulge = Math.max(bulge, ceiling);
+      // A slur rising over the top of the staff is music too, and can be the
+      // highest thing in the system.
+      if (dir < 0) musicTop = Math.min(musicTop, bulge - 2);
       part.push(
         `<path class="score-slur" d="M${f(x1)} ${f(startY)} ` +
           `C${f(x1 + (x2 - x1) * grip)} ${f(bulge)} ` +
@@ -900,7 +944,17 @@ function drawSystem(
     );
   }
 
-  return { markup: part.join(''), dynY: lastDynY };
+  // The tempo mark, now that the bars have said how high they reach. It is
+  // printed over the first bar, so it goes above the music rather than through
+  // it; TOP_PAD leaves room for the usual case and this moves it the rest of the
+  // way. Never higher than twenty units from the top of the drawing, or it would
+  // be clipped by the viewBox.
+  if (showTempo && tempoText) {
+    const y = Math.max(20, Math.min(top - 18, musicTop - 16));
+    part.push(`<text class="score-tempo" x="${tempoX}" y="${y}" font-size="17">${tempoText}</text>`);
+  }
+
+  return { markup: part.join(''), dynY: lastDynY, musicTop };
 }
 
 /**

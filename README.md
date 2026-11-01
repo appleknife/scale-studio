@@ -332,6 +332,14 @@ trouble are the ones where a stroked line is not good enough:
   `tests/mark.test.html` holds the shape still: it measures the rendered flag at
   thirteen rows down the stem and fails if any edge is more than 0.7 staff units
   from the approved profile.
+* A **dynamic marking goes under everything**, including articulations. It is
+  placed below the deepest beam and the lowest head, and — the piece that was
+  missing — below any accent or staccato dot, which hang off the *bottom* of an
+  up-stem note and reach further down than the head does. A low note with an
+  accent under it used to put the wedge through the "f".
+* The **tempo mark** is printed over the first bar, so it is placed last: the
+  system records how high its music reaches and the mark goes above that, rather
+  than through a beam that opens the passage high.
 * A **down-stem flag stops short of the head**, and has to. Flags hang on the
   right of their stem; on an up stem the head is on the left, so the hook can trail
   almost to the head and still pass beside it — that is the approved drawing. On a
@@ -563,10 +571,12 @@ tests/rhythm-probe.html why repeated notes merge today
 tests/ui.test.html    click-through smoke test, including the mock-audition draw
 tests/stem-audit.html  reads the drawn SVG back: every stem on its head's correct
                       side, every beam ending on a stem
-tests/notation.test.html  renders 360 passages and measures the ink: no rest, slur
-                      or flag may touch another glyph, and no flag may cross a note
-                      head (the flag's outline is walked against every head's
-                      ellipse, because bounding boxes always overlap here)
+tests/notation.test.html  renders 360 passages and measures the ink: no rest, slur,
+                      flag, dynamic, tempo mark or tuplet number may touch another
+                      glyph, and no flag may cross a note head. Two things are
+                      measured on the outline rather than the box: a flag against
+                      every head's ellipse, and a wide slanted path (a beam)
+                      against the text — boxes always overlap in both cases.
 tests/i18n.test.html  translation coverage: no visible English left on any screen
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format

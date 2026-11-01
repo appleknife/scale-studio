@@ -56,6 +56,42 @@
         const b = node.getBBox();
         return { x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height };
       };
+      /**
+       * Where a dynamic's letters actually are. `getBBox` on a `<text>` reports the
+       * whole em box — 21 units for 19 px type, while "mf" occupies about 13 — and
+       * compared with the note head it sits under that reports a collision in a
+       * third of all passages. The letters of a dynamic run from about 0.74 of the
+       * type size above the baseline to a little below it ('p' in "mp" is the only
+       * descender), so that band is what is measured. `getExtentOfChar` is no help:
+       * Chrome returns the em box for it too.
+       */
+      const dynBox = (node) => {
+        const b = box(node);
+        const baseline = Number(node.getAttribute('y'));
+        const size = Number(node.getAttribute('font-size')) || 19;
+        return { x0: b.x0, x1: b.x1, y0: baseline - size * 0.74, y1: baseline + size * 0.16 };
+      };
+
+      /**
+       * Does `node`'s ink reach into `rect`? A small glyph is measured by its
+       * box; a wide one — which on this page means a beam — by walking its
+       * outline, because a slanted beam's box is a tall rectangle and a mark
+       * printed below the beam is inside that rectangle without being anywhere
+       * near the ink.
+       */
+      const touches = (node, rect) => {
+        const b = box(node);
+        if (!overlap(rect, b, 0)) return false; // cheap, and true of almost every glyph
+        if (b.x1 - b.x0 <= 20) return true;
+        const len = node.getTotalLength ? node.getTotalLength() : 0;
+        if (!len) return overlap(rect, b, 0);
+        for (let i = 0; i <= 48; i++) {
+          const pt = node.getPointAtLength((i / 48) * len);
+          if (pt.x > rect.x0 && pt.x < rect.x1 && pt.y > rect.y0 && pt.y < rect.y1) return true;
+        }
+        return false;
+      };
+
       /** True when `b` is inside `air` of `a`, on both axes. */
       const overlap = (a, b, air = AIR) =>
         Math.min(a.x1 + air, b.x1) - Math.max(a.x0 - air, b.x0) > 0 &&
@@ -106,10 +142,12 @@
         let slurs = 0;
         let accidentals = 0;
         let flags = 0;
+        let dynamics = 0;
         const restHits = [];
         const slurHits = [];
         const accidentalHits = [];
         const flagHits = [];
+        const dynamicHits = [];
 
         for (let seed = 0; seed < SEEDS; seed++) {
           const p = generatePassage({ level, seed });
@@ -190,6 +228,26 @@
             }
           }
 
+          // ── dynamics ---------------------------------------------------
+          // A dynamic letter sits under the bar and an articulation hangs below
+          // its note, so a low note with an accent underneath it reaches down
+          // into the "f" — which is exactly what happened, once, in a passage a
+          // student was given. Nothing may come within two units of either.
+          const textNodes = [...svg.querySelectorAll('text.score-dyn, text.score-tempo, text.score-tuplet')];
+          dynamics += textNodes.length;
+          for (const node of textNodes) {
+            const d = dynBox(node);
+            const pad = { x0: d.x0 - AIR, y0: d.y0 - AIR, x1: d.x1 + AIR, y1: d.y1 + AIR };
+            const bad = inkNodes.find((n) => touches(n, pad));
+            if (bad) {
+              const b = box(bad);
+              dynamicHits.push(
+                `L${level} seed ${seed}: ${node.getAttribute('class')} at ${d.x0.toFixed(0)},${d.y0.toFixed(0)} runs into ink at ${b.x0.toFixed(0)},${b.y0.toFixed(0)}`,
+              );
+              break;
+            }
+          }
+
           // ── accidentals ------------------------------------------------
           // A sharp in front of a note has to clear whatever the note before it
           // puts there — a flag sweeps a whole space right of its stem, and a dot
@@ -239,13 +297,15 @@
           `L${level}: rests ${restHits.length}/${SEEDS} broken (${rests} drawn) · ` +
             `slurs ${slurHits.length}/${SEEDS} broken (${slurs} drawn) · ` +
             `accidentals ${accidentalHits.length}/${SEEDS} broken (${accidentals} drawn) · ` +
-            `flags ${flagHits.length}/${SEEDS} broken (${flags} drawn)`,
+            `flags ${flagHits.length}/${SEEDS} broken (${flags} drawn) · ` +
+            `dynamics ${dynamicHits.length}/${SEEDS} broken (${dynamics} drawn)`,
         );
         problems.push(
           ...restHits.slice(0, 2),
           ...slurHits.slice(0, 2),
           ...accidentalHits.slice(0, 2),
           ...flagHits.slice(0, 2),
+          ...dynamicHits.slice(0, 2),
         );
       }
 
