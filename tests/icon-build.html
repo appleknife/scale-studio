@@ -2,31 +2,173 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>icon master</title>
+    <title>icon build</title>
     <style>
       html,
       body {
         margin: 0;
         padding: 0;
-        background: transparent;
+        background: #faf7f1;
+        font: 13px/1.5 ui-monospace, monospace;
+        color: #221e19;
       }
-      #stage svg {
+      #stage {
+        display: flex;
+        gap: 18px;
+        align-items: flex-end;
+        padding: 18px;
+        flex-wrap: wrap;
+      }
+      #stage figure {
+        margin: 0;
+        text-align: center;
+      }
+      #stage img {
         display: block;
+        image-rendering: auto;
+      }
+      #stage figcaption {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #6b5c48;
+      }
+      #report {
+        padding: 0 18px 18px;
+        white-space: pre-wrap;
       }
     </style>
   </head>
   <body>
+    <!--
+      The icon build. Everything the app ships as a picture of itself is drawn
+      here from the one vector in score.js: the home-screen icons, the maskable
+      icon, the Apple touch icon, and the 160 px mark the header uses.
+
+      Open it through tests/lab-server.ps1 and it POSTs the finished PNGs, as
+      base64, to /result — that is how the files in icons/ were made. Nothing is
+      hand-placed: the note is rendered, cropped to its ink, and centred, so the
+      header cannot end up showing a different note than the score.
+    -->
     <div id="stage"></div>
+    <div id="report">building…</div>
     <script type="module">
-      // Renders the mark alone, 1024 tall, on a transparent background, so the
-      // icon master is a vector render rather than a 160 px raster blown up.
-      // Screenshot this page, then composite it onto the accent green.
       import { noteMarkSvg } from '../src/score.js';
-      document.getElementById('stage').innerHTML = noteMarkSvg({
-        height: 1024,
-        colour: '#fefaf0',
-      });
+
+      const INK = '#fefaf0';
+      const GREEN = '#2f5d4e';
+      // A 1024 master, cropped to ink, is what every size is sampled from.
+      const MASTER = 1024;
+
+      const load = (src) =>
+        new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = src;
+        });
+
+      const markup = noteMarkSvg({ height: MASTER, colour: INK });
+      const master = await load(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`);
+
+      // ── crop the master to its ink ────────────────────────────────────
+      const drawMaster = () => {
+        const c = document.createElement('canvas');
+        c.width = Math.ceil(Number(markup.match(/width="([\d.]+)"/)[1]));
+        c.height = MASTER;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(master, 0, 0, c.width, c.height);
+        return { c, ctx };
+      };
+      const { c: masterCanvas, ctx: masterCtx } = drawMaster();
+      const data = masterCtx.getImageData(0, 0, masterCanvas.width, masterCanvas.height).data;
+
+      let x0 = masterCanvas.width;
+      let y0 = masterCanvas.height;
+      let x1 = -1;
+      let y1 = -1;
+      for (let y = 0; y < masterCanvas.height; y++) {
+        for (let x = 0; x < masterCanvas.width; x++) {
+          if (data[(y * masterCanvas.width + x) * 4 + 3] > 8) {
+            if (x < x0) x0 = x;
+            if (y < y0) y0 = y;
+            if (x > x1) x1 = x;
+            if (y > y1) y1 = y;
+          }
+        }
+      }
+      const ink = {
+        w: x1 - x0 + 1,
+        h: y1 - y0 + 1,
+        canvas: document.createElement('canvas'),
+      };
+      ink.canvas.width = ink.w;
+      ink.canvas.height = ink.h;
+      ink.canvas.getContext('2d').drawImage(masterCanvas, x0, y0, ink.w, ink.h, 0, 0, ink.w, ink.h);
+
+      // ── the pieces ────────────────────────────────────────────────────
+      /** An opaque green tile with the note centred at `fraction` of its height. */
+      const tile = (size, fraction) => {
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = GREEN;
+        ctx.fillRect(0, 0, size, size);
+        const h = size * fraction;
+        const w = (ink.w / ink.h) * h;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(ink.canvas, (size - w) / 2, (size - h) / 2, w, h);
+        return c;
+      };
+
+      /** The mark alone: ink on nothing, cropped flush, as the header uses it. */
+      const bareMark = (height) => {
+        const c = document.createElement('canvas');
+        c.height = height;
+        c.width = Math.round((ink.w / ink.h) * height);
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(ink.canvas, 0, 0, c.width, c.height);
+        return c;
+      };
+
+      const files = [
+        { name: 'mark.png', canvas: bareMark(160) },
+        { name: 'icon-192.png', canvas: tile(192, 0.70) },
+        { name: 'icon-512.png', canvas: tile(512, 0.70) },
+        // Android's maskable icon keeps the note inside the safe circle.
+        { name: 'icon-maskable-512.png', canvas: tile(512, 0.56) },
+        { name: 'apple-touch-icon.png', canvas: tile(180, 0.70) },
+      ];
+
+      const stage = document.getElementById('stage');
+      for (const f of files) {
+        const fig = document.createElement('figure');
+        const img = document.createElement('img');
+        img.src = f.canvas.toDataURL('image/png');
+        img.width = Math.min(180, f.canvas.width);
+        img.height = (img.width / f.canvas.width) * f.canvas.height;
+        if (f.name === 'mark.png') {
+          img.style.background = GREEN;
+          img.style.padding = '6px';
+        }
+        const cap = document.createElement('figcaption');
+        cap.textContent = `${f.name} — ${f.canvas.width}×${f.canvas.height}`;
+        fig.append(img, cap);
+        stage.append(fig);
+      }
+
+      const payload = {
+        stage: 'icon-build',
+        ink: { w: ink.w, h: ink.h },
+        files: files.map((f) => ({ name: f.name, png: f.canvas.toDataURL('image/png').split(',')[1] })),
+      };
+      document.getElementById('report').textContent =
+        `note ink ${ink.w}×${ink.h} at ${MASTER} px\n` +
+        files.map((f) => `${f.name} ${f.canvas.width}×${f.canvas.height}`).join('\n') +
+        '\n\nPOSTed the PNGs to /result — see README, "The icon".';
       document.title = 'ready';
+      fetch('/result', { method: 'POST', body: JSON.stringify(payload) });
     </script>
   </body>
 </html>

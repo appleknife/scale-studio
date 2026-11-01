@@ -225,6 +225,28 @@
         if (dotted < 5) problems.push(`level 2 used a dotted half in only ${dotted} of 80 passages`);
       }
 
+      // Level III is where sixteenths enter the Manual's ladder, as one beat of
+      // four under a beam. "Occasional" is the whole point at that level, so the
+      // rate is checked from both sides: never is a missing feature, and most
+      // passages is a level that has stopped being level III.
+      {
+        const hasRunOfFour = (bar) => {
+          let run = 0;
+          for (const e of bar) {
+            run = e.dur === 1 ? run + 1 : 0;
+            if (run >= 4) return true;
+          }
+          return false;
+        };
+        let withSixteenths = 0;
+        for (let seed = 0; seed < 120; seed++) {
+          if (generatePassage({ level: 3, seed }).bars.some(hasRunOfFour)) withSixteenths++;
+        }
+        log.push(`L3: a beat of sixteenths in ${withSixteenths}/120 passages`);
+        if (withSixteenths < 15) problems.push(`level 3 met sixteenths in only ${withSixteenths} of 120 passages`);
+        if (withSixteenths > 80) problems.push(`level 3 has sixteenths in ${withSixteenths} of 120 passages — that is not occasional`);
+      }
+
       // Where does the music actually sit? A passage can obey every rule and still
       // live on ledger lines, so this is reported per level rather than asserted.
       for (const level of SIGHT_LEVELS) {

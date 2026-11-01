@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312113';
-import { CLEF_PATH } from './clef.js?v=202610312113';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312127';
+import { CLEF_PATH } from './clef.js?v=202610312127';
 
-import { beatLength } from './sightreading.js?v=202610312113';
+import { beatLength } from './sightreading.js?v=202610312127';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -38,35 +38,87 @@ const HEAD_RY = 4.55;
 const HEAD_ANGLE = -24;
 const STEM = 3.5 * LINE_GAP;
 const BEAM = 0.48 * LINE_GAP;
-const FLAG = 22;
 
-// The shape of an eighth note's hook, as [across, down, half-width] measured
-// from the tip of the stem. Two rules make it look like a flag rather than a
-// fin:
+// The eighth note's flag, traced off the mark the app has used since its first
+// version — the note in the header and on the home screen. Drawn as two edges
+// rather than as a stroke of changing width, because the edges are not parallel:
+// the flag leaves the tip of the stem as a wedge welded to it, bows out to its
+// widest about two spaces down, turns, and then narrows to a fine point that
+// trails almost to the note head. A centreline with a width cannot make that
+// shape — it made a fin, thick at the tip and blunt at the end, while the
+// engraved flag has its weight in the middle of the curve and a hairline tail.
 //
-// 1. It is heaviest where it joins the stem and only ever thins from there.
-//    Bulging in the middle gave thin → thick → thin, a bandage wrapped round
-//    the stem. The base is wider than the stem itself, so the join is one solid
-//    block of ink.
-// 2. It is long. A flag that stops a third of the way down reads as a tick; this
-//    one sweeps almost to the note head, the way an engraved and a display-weight
-//    flag both do, and the last of the curve turns back toward the stem so the
-//    point trails off instead of stopping.
-//
-// The numbers are sampled proportions: 9.2 across, 36 along at an 11 px space
-// (~0.85 × 3.3 staff spaces), about 3 px of ink at the join and barely 1 px a
-// third of the way down. The shoulder is kept, because that is where the flag
-// and the stem become one piece.
-const FLAG_SHAPE = [
-  [1.6, 0.0, 1.9],
-  [4.4, 2.6, 1.7],
-  [7.0, 6.0, 1.45],
-  [9.0, 10.5, 1.2],
-  [10.4, 16.0, 0.95],
-  [11.0, 21.5, 0.7],
-  [10.8, 27.0, 0.45],
-  [10.0, 32.0, 0.2],
-  [9.0, 35.0, 0.03],
+// Points are [across, down] in staff units, measured from the middle of the stem
+// and the tip of the stem: the outer edge on the way down, the inner edge on the
+// way back. The inner edge starts under the stem, so the join is one solid piece
+// of ink rather than a sliver beside it.
+const FLAG_OUTER = [
+  [0.55, 0.0],
+  [0.75, 1.6],
+  [0.95, 3.0],
+  [1.2, 4.2],
+  [1.6, 5.4],
+  [2.2, 6.6],
+  [3.0, 7.7],
+  [3.95, 8.7],
+  [5.0, 10.2],
+  [6.3, 11.4],
+  [7.3, 12.6],
+  [8.3, 14.0],
+  [9.2, 15.1],
+  [10.05, 16.6],
+  [10.75, 18.2],
+  [11.3, 19.6],
+  [11.5, 20.8],
+  [11.5, 24.5],
+  [11.35, 25.4],
+  [11.1, 26.5],
+  [10.8, 27.5],
+  [10.45, 28.5],
+  [10.05, 29.8],
+  [9.6, 30.8],
+  [9.2, 31.7],
+  [8.8, 32.6],
+  [8.45, 33.4],
+  [8.1, 34.2],
+  [7.9, 34.9],
+];
+const FLAG_INNER = [
+  [0.4, 0.0],
+  [0.4, 6.0],
+  [0.4, 12.4],
+  [2.0, 12.9],
+  [3.3, 13.4],
+  [4.5, 14.0],
+  [5.4, 14.6],
+  [6.1, 15.0],
+  [6.6, 15.4],
+  [7.15, 15.8],
+  [7.45, 16.1],
+  [7.75, 16.6],
+  [8.05, 16.9],
+  [8.3, 17.2],
+  [8.6, 17.5],
+  [8.9, 18.1],
+  [9.2, 18.7],
+  [9.5, 19.2],
+  [9.75, 20.1],
+  [10.0, 21.0],
+  [10.3, 22.4],
+  [10.55, 24.2],
+  [10.6, 25.2],
+  [10.4, 26.0],
+  [10.35, 27.0],
+  [10.05, 27.9],
+  [10.0, 28.6],
+  [9.75, 29.1],
+  [9.5, 29.8],
+  [9.2, 30.5],
+  [8.9, 31.6],
+  [8.6, 32.3],
+  [8.4, 33.0],
+  [8.1, 33.6],
+  [7.9, 34.9],
 ];
 
 // The mark's ink in the same units: a little wider and taller than the shapes
@@ -102,6 +154,35 @@ function head(x, y, { hollow = false, colour = INK } = {}) {
 
 /* ── Rests ─────────────────────────────────────────────────────────────── */
 
+const fmt = (v) => v.toFixed(2);
+
+/**
+ * A path fragment through `list`: a Catmull-Rom spline (one cubic per span) so
+ * a hand-placed handful of points reads as a curve, or straight segments for a
+ * glyph whose corners are sharp by nature — a rest's beak and foot.
+ */
+function trace(list, round = true) {
+  if (!round) return list.map((p, i) => `${i ? 'L' : 'M'}${fmt(p[0])} ${fmt(p[1])}`).join(' ');
+  const at = (i) => list[Math.min(list.length - 1, Math.max(0, i))];
+  let d = `M${fmt(list[0][0])} ${fmt(list[0][1])}`;
+  for (let i = 0; i < list.length - 1; i++) {
+    const p0 = at(i - 1);
+    const p1 = at(i);
+    const p2 = at(i + 1);
+    const p3 = at(i + 2);
+    d +=
+      ` C${fmt(p1[0] + (p2[0] - p0[0]) / 6)} ${fmt(p1[1] + (p2[1] - p0[1]) / 6)}` +
+      ` ${fmt(p2[0] - (p3[0] - p1[0]) / 6)} ${fmt(p2[1] - (p3[1] - p1[1]) / 6)}` +
+      ` ${fmt(p2[0])} ${fmt(p2[1])}`;
+  }
+  return d;
+}
+
+/** Two edges closed into one filled shape: out along the first, back along the second. */
+function closedOutline(edgeOut, edgeBack) {
+  return `${trace(edgeOut)} ${trace(edgeBack).replace('M', 'L')} Z`;
+}
+
 /**
  * A filled ribbon: a centreline with a half-width at every point, offset along
  * the normal and closed into one outline. The printed quarter rest is a
@@ -123,26 +204,21 @@ function ribbon(pts, round = false) {
   const right = pts
     .map((p, i) => [p[0] - normals[i][0] * p[2], p[1] - normals[i][1] * p[2]])
     .reverse();
-  const f = (v) => v.toFixed(2);
-  // Catmull-Rom through the offset points: a flag is a curve, while the quarter
-  // rest keeps its corners (its beak and its foot are sharp by nature).
-  const trace = (list) => {
-    if (!round) return list.map((p, i) => `${i ? 'L' : 'M'}${f(p[0])} ${f(p[1])}`).join(' ');
-    const at = (i) => list[Math.min(list.length - 1, Math.max(0, i))];
-    let d = `M${f(list[0][0])} ${f(list[0][1])}`;
-    for (let i = 0; i < list.length - 1; i++) {
-      const p0 = at(i - 1);
-      const p1 = at(i);
-      const p2 = at(i + 1);
-      const p3 = at(i + 2);
-      d +=
-        ` C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)}` +
-        ` ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)}` +
-        ` ${f(p2[0])} ${f(p2[1])}`;
-    }
-    return d;
-  };
-  return `${trace(left)} ${trace(right).replace('M', 'L')} Z`;
+  return closedOutline(left, right);
+}
+
+/**
+ * The flag hanging off a stem that ends at (`stemX`, `stemEnd`). `toward` is +1
+ * when the note head is below the tip and -1 when it is above, so a down-stem
+ * note's flag turns upward; `shift` drops the shape further down the stem, which
+ * is how a sixteenth note gets its second flag.
+ */
+function flagPath(stemX, stemEnd, toward, shift = 0) {
+  const at = ([x, t]) => [stemX + x, stemEnd + toward * (t + shift)];
+  // Out along the outer edge, back along the inner one — the inner edge is
+  // written top-to-bottom like the outer, so it has to be walked backwards or
+  // the outline crosses itself and the fill tears a hole in the flag.
+  return closedOutline(FLAG_OUTER.map(at), FLAG_INNER.map(at).reverse());
 }
 
 /**
@@ -612,17 +688,15 @@ function drawSystem(
         );
       }
       if (event.dur <= 2 && !beam) {
-        // A lone eighth or sixteenth gets a flag: a calligraphic hook leaving the
-        // stem tip and sweeping back toward the head. Drawn as a ribbon — a
-        // centreline with a width — because a hairline curl turns into a detached
-        // crescent as soon as the page is drawn at phone size.
+        // A lone eighth or sixteenth gets a flag: the hook traced in FLAG_OUTER /
+        // FLAG_INNER, the same outline the header and the app icons are drawn
+        // from, so the notation and the logo are one glyph rather than two
+        // drawings that resemble each other.
         const toward = up ? 1 : -1; // which way the head lies from the stem tip
-        const flag = (shift) => {
-          const pts = FLAG_SHAPE.map(([x, t, w]) => [stemX + x, stemEnd + toward * (t + shift), w]);
-          return `<path d="${ribbon(pts, true)}" fill="${INK}"/>`;
-        };
-        part.push(flag(0));
-        if (event.dur === 1) part.push(flag(13));
+        part.push(`<path d="${flagPath(stemX, stemEnd, toward)}" fill="${INK}"/>`);
+        // The sixteenth's second flag starts a little over a space down the stem,
+        // which is where engravers put it.
+        if (event.dur === 1) part.push(`<path d="${flagPath(stemX, stemEnd, toward, 13)}" fill="${INK}"/>`);
       }
 
       part.push(head(x, y, { hollow }));
@@ -824,10 +898,7 @@ export function noteMarkSvg({ height = 100, colour = INK } = {}) {
   const width = (height * MARK_BOX.w) / MARK_BOX.h;
   const stemX = 5.2;
   const stemEnd = -STEM;
-  const hook = ribbon(
-    FLAG_SHAPE.map(([x, t, w]) => [stemX + x, stemEnd + t, w]),
-    true,
-  );
+  const hook = flagPath(stemX, stemEnd, 1);
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MARK_BOX.x} ${MARK_BOX.y} ${MARK_BOX.w} ${MARK_BOX.h}" ` +
     `width="${width.toFixed(2)}" height="${height}">` +

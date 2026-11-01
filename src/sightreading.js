@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610312113';
-import { STAFF_GEOM } from './staff.js?v=202610312113';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202610312127';
+import { STAFF_GEOM } from './staff.js?v=202610312127';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -87,16 +87,22 @@ const LEVELS = {
     steps: [1, 2, 3, 4, 5],
     maxSemis: 7,
     rhythms: {
-      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2]],
-      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8], [2, 2, 2, 2, 4]],
+      // Level III owns the first sixteenths in the Manual's ladder, and they
+      // arrive as one beat of four under a beam — the same figure level VI
+      // leans on, met here only now and then. `sixteenths` below sets how
+      // often: see the rhythm draw.
+      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2], [1, 1, 1, 1, 4]],
+      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8], [2, 2, 2, 2, 4], [1, 1, 1, 1, 4, 4]],
       '4/4': [
         [4, 4, 4, 4],
         [4, 2, 2, 4, 4],
         [8, 4, 4],
         [4, 4, 2, 2, 4],
         [2, 2, 2, 2, 4, 4],
+        [4, 4, 4, 1, 1, 1, 1],
       ],
     },
+    sixteenths: 0.35,
     slurs: 0.75,
     tempo: { '*': { unit: 'q', bpm: 80 } },
     dynamics: ['f', 'ff'],
@@ -388,8 +394,15 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     // lock.
     const runs = base.filter(hasRunOfFour);
     const plain = base.filter((p) => !hasRunOfFour(p));
+    // How hard this level leans on the figure. Level VI leans hard, because the
+    // Manual's own example is built from it. Level III meets it now and then:
+    // there the pattern is in the draw for a bar about a third of the time and
+    // out of it otherwise, so most passages have none and the rest have one.
+    const lean = spec.sixteenths ?? 1;
     let pool_;
-    if (runBars === 0) {
+    if (runBars === 0 && runs.length && lean < 1) {
+      pool_ = lean > 0 && chance(rng, lean) ? base : plain;
+    } else if (runBars === 0) {
       pool_ = base.concat(runs, runs, runs, runs);
     } else if (plain.length && chance(rng, 0.85)) {
       pool_ = plain;

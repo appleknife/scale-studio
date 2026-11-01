@@ -29,18 +29,25 @@
     <pre id="report">running…</pre>
 
     <script type="module">
-      // The home-screen icons and the header both come from the note in score.js.
-      // This checks that the vector really is the glyph the app has been using —
-      // the 160 px mark.png — so regenerating the icons cannot quietly introduce
-      // a different note. Overlap is measured on the alpha of both, scaled to the
-      // same height.
+      // The note is drawn once, in score.js, and everything that shows it — the
+      // header, the home-screen icons, every eighth note on a staff — comes from
+      // that one drawing. Two things have to stay true for that to mean anything:
+      //
+      // 1. The flag is still the shape the teacher approved: slender at the stem
+      //    tip, heaviest through the turn, tapering to a hairline that trails
+      //    almost to the head. FLAG_PROFILE below is that shape, measured off the
+      //    drawing when it was approved and stored here as the expectation. It is
+      //    deliberately a table rather than a picture: a picture of the mark is
+      //    produced by the same code it would be testing.
+      // 2. icons/mark.png is that same drawing, so the header cannot drift away
+      //    from the score even if nobody re-runs the icon build.
       import { noteMarkSvg } from '../src/score.js';
 
       const problems = [];
       const log = [];
+      const HEIGHT = 480;
       const stage = document.getElementById('vector');
 
-      const HEIGHT = 480;
       const markup = noteMarkSvg({ height: HEIGHT, colour: '#fefaf0' });
       stage.innerHTML = markup;
 
@@ -49,35 +56,39 @@
       log.push(`rendered ${inline.getAttribute('width')} × ${HEIGHT}, ink ${box.width.toFixed(1)} × ${box.height.toFixed(1)}`);
       log.push(`aspect ${(box.width / box.height).toFixed(3)}`);
 
-      // Canvas will not take an inline <svg>; it takes an image, so go through a
-      // data URL — which is also how the icon build rasterises it.
+      // Canvas will not take an inline <svg>; it takes an image, so go through
+      // a data URL — which is also how the icon build rasterises it.
       const pixelUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
-      const vector = new Image();
-      vector.src = pixelUrl;
-      await vector.decode();
+      const load = (src) =>
+        new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = src;
+        });
 
-      const raster = document.getElementById('raster');
-      await raster.decode();
+      const [vector, raster] = await Promise.all([
+        load(pixelUrl),
+        document.getElementById('raster').decode().then(() => document.getElementById('raster')),
+      ]);
 
-      // Both are drawn to the same height, in their own frames, then compared
-      // ink-to-ink by aligning their bounding boxes — comparing a 261-wide
-      // drawing with a 480-wide one pixel for pixel would measure the stretch,
-      // not the glyph.
-      const render = (img) => {
+      /** Ink mask and ink box of an image, drawn at HEIGHT. */
+      const render = (img, inkOf) => {
         const scale = HEIGHT / img.naturalHeight;
         const canvas = document.createElement('canvas');
-        canvas.width = Math.ceil(img.naturalWidth * scale);
-        canvas.height = Math.ceil(img.naturalHeight * scale);
+        canvas.width = Math.max(1, Math.ceil(img.naturalWidth * scale));
+        canvas.height = HEIGHT;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-        let x0 = canvas.width;
-        let y0 = canvas.height;
+        const w = canvas.width;
+        let x0 = w;
+        let y0 = HEIGHT;
         let x1 = -1;
         let y1 = -1;
-        for (let y = 0; y < canvas.height; y++) {
-          for (let x = 0; x < canvas.width; x++) {
-            if (data[(y * canvas.width + x) * 4 + 3] > 96) {
+        for (let y = 0; y < HEIGHT; y++) {
+          for (let x = 0; x < w; x++) {
+            if (inkOf(data, (y * w + x) * 4)) {
               if (x < x0) x0 = x;
               if (y < y0) y0 = y;
               if (x > x1) x1 = x;
@@ -85,39 +96,124 @@
             }
           }
         }
-        return { data, w: canvas.width, h: canvas.height, x0, y0, x1, y1 };
+        return { data, w, x0, y0, x1, y1 };
       };
 
-      const A = render(vector);
-      const B = render(raster);
-      log.push(`ink ${A.x1 - A.x0 + 1} × ${A.y1 - A.y0 + 1} vs ${B.x1 - B.x0 + 1} × ${B.y1 - B.y0 + 1}`);
+      const CUT = (d, i) => d[i + 3] > 96;
+      const A = render(vector, CUT);
+      const B = render(raster, CUT);
+      log.push(
+        `ink ${A.x1 - A.x0 + 1} × ${A.y1 - A.y0 + 1} · mark.png ${B.x1 - B.x0 + 1} × ${B.y1 - B.y0 + 1}`,
+      );
 
-      let both = 0;
-      let either = 0;
-      const wx = Math.max(A.x1 - A.x0, B.x1 - B.x0) + 1;
-      const wy = Math.max(A.y1 - A.y0, B.y1 - B.y0) + 1;
-      for (let y = 0; y < wy; y++) {
-        for (let x = 0; x < wx; x++) {
-          const ax = A.x0 + x;
-          const ay = A.y0 + y;
-          const bx = B.x0 + x;
-          const by = B.y0 + y;
-          const on =
-            ax <= A.x1 && ay <= A.y1 && A.data[(ay * A.w + ax) * 4 + 3] > 96;
-          const off =
-            bx <= B.x1 && by <= B.y1 && B.data[(by * B.w + bx) * 4 + 3] > 96;
-          if (on && off) both += 1;
-          if (on || off) either += 1;
+      // ── ink overlap, on a grid both glyphs are stretched onto ─────────────
+      // Comparing pixel for pixel across two crops would measure the stretch,
+      // not the drawing: one is the whole viewBox, the other is trimmed to ink,
+      // and their ink boxes differ by the antialiasing fringe. So both are
+      // resampled over their own ink boxes onto the same grid.
+      const GRID = { w: 160, h: 300 };
+      const gridOf = (m) => {
+        const sx = (m.x1 - m.x0 + 1) / GRID.w;
+        const sy = (m.y1 - m.y0 + 1) / GRID.h;
+        const cells = new Uint8Array(GRID.w * GRID.h);
+        for (let gy = 0; gy < GRID.h; gy++) {
+          for (let gx = 0; gx < GRID.w; gx++) {
+            let on = 0;
+            for (let oy = 0; oy < 2; oy++) {
+              for (let ox = 0; ox < 2; ox++) {
+                const x = Math.min(m.x1, Math.round(m.x0 + (gx + (ox + 0.5) / 2) * sx));
+                const y = Math.min(m.y1, Math.round(m.y0 + (gy + (oy + 0.5) / 2) * sy));
+                if (m.data[(y * m.w + x) * 4 + 3] > 96) on += 1;
+              }
+            }
+            cells[gy * GRID.w + gx] = on >= 2 ? 1 : 0;
+          }
         }
-      }
-      const iou = either ? both / either : 0;
-      log.push(`ink overlap with the 160 px crop: ${(iou * 100).toFixed(1)}%`);
+        return cells;
+      };
+      const iou = (p, q) => {
+        let both = 0;
+        let either = 0;
+        for (let i = 0; i < p.length; i++) {
+          if (p[i] && q[i]) both += 1;
+          if (p[i] || q[i]) either += 1;
+        }
+        return either ? both / either : 0;
+      };
 
-      // mark.png is a *cropped* 160 px render — its stem and flag run off the
-      // edges — so pixel overlap with it can only ever be approximate, and it is
-      // printed rather than asserted. What must hold is that the mark is whole
-      // and note-shaped: nothing clipped by its own viewBox, and ink that fills
-      // the box instead of floating in it.
+      const vsMark = iou(gridOf(A), gridOf(B));
+      log.push(`overlap with icons/mark.png: ${(vsMark * 100).toFixed(1)}%`);
+      // Not 100 %: mark.png is a 160 px render, so every edge in it is soft, and
+      // the grid sharpens both. 93 % is the same drawing; 80 % is not.
+      if (vsMark < 0.9) {
+        problems.push(`mark.png does not show the score's note (${(vsMark * 100).toFixed(0)}% overlap) — re-run tests/icon-build.html`);
+      }
+
+      // ── the flag's silhouette, against the approved shape ─────────────────
+      // Rows down the stem, and where the flag's ink starts and ends on that row,
+      // in staff units from the middle of the stem. Measured from the drawing the
+      // teacher approved. `null` means the flag is still welded to the stem on
+      // that row, which is how the top of the hook is drawn.
+      const FLAG_PROFILE = [
+        [5, null, 1.6],
+        [9, null, 3.93],
+        [13, 2.77, 7.72],
+        [15, 6.26, 9.17],
+        [17, 8.3, 10.34],
+        [19, 9.47, 11.21],
+        [21, 10.05, 11.5],
+        [23, 10.34, 11.5],
+        [25, 10.63, 11.21],
+        [27, 10.34, 10.92],
+        [29, 9.47, 10.34],
+        [31, 8.88, 9.47],
+        [33, 8.01, 8.59],
+      ];
+
+      // Where the stem is, read from the drawing rather than assumed: the mark is
+      // one <line> for the stem, one path for the flag, one ellipse for the head.
+      const vb = inline.getAttribute('viewBox').split(/\s+/).map(Number);
+      const stemLine = inline.querySelector('line');
+      const stemX = Number(stemLine.getAttribute('x1'));
+      const stemTip = Number(stemLine.getAttribute('y2'));
+      const unitPx = HEIGHT / vb[3];
+      const stemPx = (stemX - vb[0]) * unitPx;
+      const tipPx = (stemTip - vb[1]) * unitPx;
+
+      const rowRuns = (m, y) => {
+        const runs = [];
+        let start = -1;
+        for (let x = 0; x <= m.w; x++) {
+          const on = x < m.w && m.data[(y * m.w + x) * 4 + 3] > 96;
+          if (on && start < 0) start = x;
+          if (!on && start >= 0) { runs.push([start, x - 1]); start = -1; }
+        }
+        return runs;
+      };
+
+      let worst = 0;
+      for (const [u, inner, outer] of FLAG_PROFILE) {
+        const y = Math.round(tipPx + u * unitPx);
+        // Where the flag has not yet parted from the stem the ink is one run,
+        // starting at the stem's far edge, so the run is the whole thing.
+        const runs = rowRuns(A, y).filter(([s]) => inner === null || s > stemPx - unitPx * 0.2);
+        const far = runs.length ? (runs[runs.length - 1][1] - stemPx) / unitPx : null;
+        const near = runs.length ? (runs[0][0] - stemPx) / unitPx : null;
+        if (far === null) {
+          problems.push(`no flag ink ${u} units down the stem`);
+          continue;
+        }
+        const dOuter = Math.abs(far - outer);
+        const dInner = inner === null || near === null ? 0 : Math.abs(near - inner);
+        worst = Math.max(worst, dOuter, dInner);
+        if (dOuter > 0.7) problems.push(`flag edge ${u} units down is at ${far.toFixed(1)}, not ${outer}`);
+        if (dInner > 0.7) problems.push(`flag edge ${u} units down starts at ${near.toFixed(1)}, not ${inner}`);
+      }
+      log.push(`flag silhouette: worst edge ${worst.toFixed(2)} staff units from the approved shape`);
+
+      // What must hold beyond resemblance: the mark is whole and note-shaped —
+      // nothing clipped by its own viewBox, ink filling the box rather than
+      // floating in it, and the proportions of a single eighth note.
       let onEdge = 0;
       for (let i = 0; i < A.data.length; i += 4) {
         if (A.data[i + 3] <= 8) continue;
@@ -128,7 +224,7 @@
       }
       if (onEdge > 8) problems.push(`the mark is clipped (${onEdge} ink pixels at the edge)`);
 
-      const inkFraction = ((A.x1 - A.x0 + 1) * (A.y1 - A.y0 + 1)) / (A.w * A.h);
+      const inkFraction = ((A.x1 - A.x0 + 1) * (A.y1 - A.y0 + 1)) / (A.w * HEIGHT);
       log.push(`ink fills ${(inkFraction * 100).toFixed(0)}% of its box`);
       // The box keeps a hair of margin for the stroke caps, so the ink fills
       // close to — not exactly — every pixel.

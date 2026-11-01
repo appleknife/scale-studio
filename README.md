@@ -305,6 +305,13 @@ filling a 3/4 bar, or taking the first three beats of 4/4. Slurs start here and 
 commoner with the level: three quarters of level III passages have one, and every
 passage from level IV on.
 
+**Level III is where sixteenths arrive** — the Manual's first level that uses them,
+and its figure is the one a beat of four under a beam, the same group level VI
+leans on. They stay occasional here: a passage has one in about a third of draws,
+and once it has one the rest of the bars are usually plainer. From level V on the
+runs multiply; level VI, whose own printed example is built from them, gets them in
+almost every passage.
+
 ### Drawing the notation
 
 Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave
@@ -314,6 +321,17 @@ trouble are the ones where a stroked line is not good enough:
   `ribbon` — a centreline with a width at every point — because the printed glyph is
   calligraphic: hair-thin at the tick, swelling through the belly, pinched at the
   waist. A single stroke width collapses it into a crescent.
+* The **flag** is traced, not generated: `FLAG_OUTER` / `FLAG_INNER` in `src/score.js`
+  are the two edges of the note the app has used as its mark since the first
+  version, measured off it row by row in staff units. A centreline with a width
+  could not make that shape — it produced a fin, thick where it met the stem and
+  blunt where it stopped, while the approved flag is slender at the stem tip, at
+  its heaviest through the turn, and trails to a hairline almost at the note head.
+  The same outline draws every flag on every staff and the note in the header and
+  the home-screen icons, so the logo and the notation are one glyph.
+  `tests/mark.test.html` holds the shape still: it measures the rendered flag at
+  thirteen rows down the stem and fails if any edge is more than 0.7 staff units
+  from the approved profile.
 * Beams are **filled quadrilaterals** built outward from `beam.at()`, which is where
   the stems end. A stroke's butt cap is cut square to the line, so slanted beams grew
   little wedges, and the second beam of a sixteenth run never sat parallel to the
@@ -465,9 +483,12 @@ student carries a log between the practice room and the lesson.
 
 ## The icon
 
-The home-screen icon is the same eighth note the score is drawn with: `noteMarkSvg()`
-in `src/score.js` is the one source, and `tests/icon-build.html` renders it at 1024 px
-for the icon build. There is no separate drawing that could drift away from it.
+The home-screen icon, the Apple touch icon and the 160 px note in the header are all
+the same eighth note the score is drawn with: `noteMarkSvg()` in `src/score.js` is
+the one source, and `tests/icon-build.html` builds every PNG in `icons/` from it.
+There is no separate drawing that could drift away from it — the header mark used
+to be one, a 160 px raster kept alongside the vector, and it drifted: its flag was
+a different curve from the one on the staff.
 
 Two rules here, both learned the hard way:
 
@@ -477,15 +498,19 @@ Two rules here, both learned the hard way:
   through as dark notches — which is what made the home-screen icon look wrong.
   Every icon is now an opaque square of `#2f5d4e` with the note centred, and the
   platform does the rounding.
-* **The note is a vector.** The header mark was a 160 px PNG; blown up to 512 it went
-  soft. The icons are rendered from the SVG at 1024 and downsampled, so the 512 and
-  the 180 are both crisp.
+* **The note is a vector.** Every PNG is rendered from the SVG at 1024 and
+  downsampled, so the 512 and the 180 are both crisp, and the header's 160 px mark is
+  the same render rather than a drawing of its own.
 
-To rebuild after changing the note: screenshot `tests/icon-build.html` with
-`--default-background-color=00000000` at height 1024, crop to the ink, scale it to
-70 % of a 1024 square (56 % for the maskable one, which keeps it inside Android's
-safe circle) and centre it on the green. `tests/mark.test.html` guards the shape:
-whole, note-shaped, and filling its box rather than floating in it.
+To rebuild after changing the note, run `tests/icon-build.html` through
+`tests/lab-server.ps1` and save what it POSTs: it renders the note at 1024, crops
+to the ink, and writes `mark.png` (the crop at 160 px) plus the tiles at 70 % of
+1024, 512 and 180 (56 % for the maskable one, which keeps it inside Android's safe
+circle) — centring each on the green. Then run `tests/mark.test.html`, which guards
+the shape three ways: whole and unclipped, note-shaped by aspect, and — row by row
+down the stem — the flag edges the teacher approved, so a redrawn flag fails the
+suite instead of quietly shipping. It also checks that `mark.png` still shows the
+vector, so a stale header is caught too.
 
 ## Languages
 
