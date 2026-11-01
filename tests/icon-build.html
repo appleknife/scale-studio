@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>icon master</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+      }
+      #stage svg {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script type="module">
+      // Renders the mark alone, 1024 tall, on a transparent background, so the
+      // icon master is a vector render rather than a 160 px raster blown up.
+      // Screenshot this page, then composite it onto the accent green.
+      import { noteMarkSvg } from '../src/score.js';
+      document.getElementById('stage').innerHTML = noteMarkSvg({
+        height: 1024,
+        colour: '#fefaf0',
+      });
+      document.title = 'ready';
+    </script>
+  </body>
+</html>

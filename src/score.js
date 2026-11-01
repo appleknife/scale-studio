@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312040';
-import { CLEF_PATH } from './clef.js?v=202610312040';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202610312050';
+import { CLEF_PATH } from './clef.js?v=202610312050';
 
-import { beatLength } from './sightreading.js?v=202610312040';
+import { beatLength } from './sightreading.js?v=202610312050';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -34,6 +34,39 @@ const HEAD_ANGLE = -24;
 const STEM = 3.5 * LINE_GAP;
 const BEAM = 0.48 * LINE_GAP;
 const FLAG = 22;
+
+// The shape of an eighth note's hook, as [across, down, half-width] measured
+// from the tip of the stem. Two rules make it look like a flag rather than a
+// fin:
+//
+// 1. It is heaviest where it joins the stem and only ever thins from there.
+//    Bulging in the middle gave thin → thick → thin, a bandage wrapped round
+//    the stem. The base is wider than the stem itself, so the join is one solid
+//    block of ink.
+// 2. It is long. A flag that stops a third of the way down reads as a tick; this
+//    one sweeps almost to the note head, the way an engraved and a display-weight
+//    flag both do, and the last of the curve turns back toward the stem so the
+//    point trails off instead of stopping.
+//
+// The numbers are sampled proportions: 9.2 across, 36 along at an 11 px space
+// (~0.85 × 3.3 staff spaces), about 3 px of ink at the join and barely 1 px a
+// third of the way down. The shoulder is kept, because that is where the flag
+// and the stem become one piece.
+const FLAG_SHAPE = [
+  [1.6, 0.0, 1.9],
+  [4.4, 2.6, 1.7],
+  [7.0, 6.0, 1.45],
+  [9.0, 10.5, 1.2],
+  [10.4, 16.0, 0.95],
+  [11.0, 21.5, 0.7],
+  [10.8, 27.0, 0.45],
+  [10.0, 32.0, 0.2],
+  [9.0, 35.0, 0.03],
+];
+
+// The mark's ink in the same units: a little wider and taller than the shapes
+// strictly need, so the stroke caps and the ribbon's shoulders are not clipped.
+const MARK_BOX = { x: -7.3, y: -41.2, w: 25.4, h: 46.6 };
 
 
 
@@ -524,38 +557,6 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
         // centreline with a width — because a hairline curl turns into a detached
         // crescent as soon as the page is drawn at phone size.
         const toward = up ? 1 : -1; // which way the head lies from the stem tip
-        // The shape of the hook, as [across, down, half-width] from the stem tip.
-        // Two rules make it look like a flag rather than a fin:
-        //
-        // 1. It is heaviest where it joins the stem and only ever thins from
-        //    there. Bulging in the middle gave thin → thick → thin, a bandage
-        //    wrapped round the stem. The base is wider than the stem itself, so
-        //    the join is one solid block of ink.
-        // 2. It is long. A flag that stops a third of the way down reads as a
-        //    tick; this one sweeps almost to the note head, the way an engraved
-        //    and a display-weight flag both do, and the last of the curve turns
-        //    back toward the stem so the point trails off instead of stopping.
-        //
-        // The numbers are the sampled proportions: 9.2 across, 36 along at an
-        // 11 px space (~0.85 × 3.3 staff spaces).
-        // Widths were taken off the sample too: about 3 px of ink at the join
-        // (1.6 of half-width) and barely 1 px a third of the way down, so the
-        // body is a slender band, not a banana. The shoulder is kept, because
-        // that is where the flag and the stem become one piece.
-        // A long, even sweep: out to 11 px, then a gentle turn back so the tail
-        // trails off above the note head instead of stopping mid-stem. The width
-        // only ever falls from the 4 px shoulder at the join to nothing.
-        const FLAG_SHAPE = [
-          [1.6, 0.0, 1.9],
-          [4.4, 2.6, 1.7],
-          [7.0, 6.0, 1.45],
-          [9.0, 10.5, 1.2],
-          [10.4, 16.0, 0.95],
-          [11.0, 21.5, 0.7],
-          [10.8, 27.0, 0.45],
-          [10.0, 32.0, 0.2],
-          [9.0, 35.0, 0.03],
-        ];
         const flag = (shift) => {
           const pts = FLAG_SHAPE.map(([x, t, w]) => [stemX + x, stemEnd + toward * (t + shift), w]);
           return `<path d="${ribbon(pts, true)}" fill="${INK}"/>`;
@@ -747,6 +748,32 @@ function drawSystem(passage, barFrom, barTo, top, { timeSignature, tempoText, sh
   }
 
   return part.join('');
+}
+
+/**
+ * The mark: one eighth note on its own, as an SVG — the glyph the app is built
+ * around. The header and the home-screen icons are this function, so the note on
+ * a phone's home screen is the same note as the one in the score, and it stays
+ * vector at any size instead of being a 160-pixel raster blown up.
+ */
+export function noteMarkSvg({ height = 100, colour = INK } = {}) {
+  const width = (height * MARK_BOX.w) / MARK_BOX.h;
+  const stemX = 5.2;
+  const stemEnd = -STEM;
+  const hook = ribbon(
+    FLAG_SHAPE.map(([x, t, w]) => [stemX + x, stemEnd + t, w]),
+    true,
+  );
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${MARK_BOX.x} ${MARK_BOX.y} ${MARK_BOX.w} ${MARK_BOX.h}" ` +
+    `width="${width.toFixed(2)}" height="${height}">` +
+    `<path d="${hook}" fill="${colour}"/>` +
+    `<line x1="${stemX}" y1="0" x2="${stemX}" y2="${stemEnd}" stroke="${colour}" ` +
+    `stroke-width="1.42" stroke-linecap="round"/>` +
+    `<ellipse cx="0" cy="0" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="${colour}" ` +
+    `transform="rotate(${HEAD_ANGLE} 0 0)"/>` +
+    `</svg>`
+  );
 }
 
 /**

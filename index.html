@@ -14,11 +14,13 @@
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f5d4e'/%3E%3Ccircle cx='13' cy='22' r='4' fill='%23faf7f1'/%3E%3Crect x='15.4' y='8' width='1.8' height='14' fill='%23faf7f1'/%3E%3Cpath d='M17.2 8c3.4.6 5.4 2.4 5.4 5.2' stroke='%23faf7f1' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"
     />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <!-- Full-bleed, no transparency and no rounded corners of its own: iOS masks
+         the icon itself, and a pre-rounded one double-rounds into dark notches. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610312040" />
+    <link rel="stylesheet" href="app.css?v=202610312050" />
   </head>
   <body>
     <div class="shell">
@@ -820,7 +822,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610312040"></script>
+    <script type="module" src="src/app.js?v=202610312050"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

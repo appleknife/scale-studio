@@ -431,6 +431,30 @@ So the log can be **saved to a file and loaded back**:
 That is the whole backup story: one file, no account, no server. It is also how a
 student carries a log between the practice room and the lesson.
 
+## The icon
+
+The home-screen icon is the same eighth note the score is drawn with: `noteMarkSvg()`
+in `src/score.js` is the one source, and `tests/icon-build.html` renders it at 1024 px
+for the icon build. There is no separate drawing that could drift away from it.
+
+Two rules here, both learned the hard way:
+
+* **Full bleed, no transparency.** iOS applies its own rounded-rectangle mask to
+  whatever it is given. The first icons shipped with rounded corners and transparent
+  outside them, so iOS rounded an already-rounded square and the corners showed
+  through as dark notches — which is what made the home-screen icon look wrong.
+  Every icon is now an opaque square of `#2f5d4e` with the note centred, and the
+  platform does the rounding.
+* **The note is a vector.** The header mark was a 160 px PNG; blown up to 512 it went
+  soft. The icons are rendered from the SVG at 1024 and downsampled, so the 512 and
+  the 180 are both crisp.
+
+To rebuild after changing the note: screenshot `tests/icon-build.html` with
+`--default-background-color=00000000` at height 1024, crop to the ink, scale it to
+70 % of a 1024 square (56 % for the maskable one, which keeps it inside Android's
+safe circle) and centre it on the green. `tests/mark.test.html` guards the shape:
+whole, note-shaped, and filling its box rather than floating in it.
+
 ## Languages
 
 The app is in English and Simplified Chinese. The switch is the pill in the top
@@ -479,6 +503,8 @@ tests/i18n.test.html  translation coverage: no visible English left on any scree
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format
 tests/recorder.test.html  measures the synthesised hall: it decays, and it is stereo
+tests/mark.test.html  the icon's note is whole, note-shaped and unclipped
+tests/icon-build.html renders that note at 1024 px for the icon build
 tests/lab-server.ps1  test server that collects results from a headless browser
 server.ps1            the local server used by Start Scale Studio.cmd
 ```

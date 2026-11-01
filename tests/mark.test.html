@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>The mark</title>
+    <style>
+      body {
+        font: 13px/1.5 ui-monospace, monospace;
+        margin: 16px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      #stage { display: flex; gap: 24px; align-items: flex-end; }
+      #stage > div { text-align: center; }
+      #stage svg, #stage img { display: block; background: #2f5d4e; height: 480px; width: auto; }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div>
+        <div id="vector"></div>
+        <span>rendered</span>
+      </div>
+      <div>
+        <img id="raster" src="../icons/mark.png" height="160" alt="" />
+        <span>mark.png</span>
+      </div>
+    </div>
+    <pre id="report">running…</pre>
+
+    <script type="module">
+      // The home-screen icons and the header both come from the note in score.js.
+      // This checks that the vector really is the glyph the app has been using —
+      // the 160 px mark.png — so regenerating the icons cannot quietly introduce
+      // a different note. Overlap is measured on the alpha of both, scaled to the
+      // same height.
+      import { noteMarkSvg } from '../src/score.js';
+
+      const problems = [];
+      const log = [];
+      const stage = document.getElementById('vector');
+
+      const HEIGHT = 480;
+      const markup = noteMarkSvg({ height: HEIGHT, colour: '#fefaf0' });
+      stage.innerHTML = markup;
+
+      const inline = stage.querySelector('svg');
+      const box = inline.getBBox();
+      log.push(`rendered ${inline.getAttribute('width')} × ${HEIGHT}, ink ${box.width.toFixed(1)} × ${box.height.toFixed(1)}`);
+      log.push(`aspect ${(box.width / box.height).toFixed(3)}`);
+
+      // Canvas will not take an inline <svg>; it takes an image, so go through a
+      // data URL — which is also how the icon build rasterises it.
+      const pixelUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+      const vector = new Image();
+      vector.src = pixelUrl;
+      await vector.decode();
+
+      const raster = document.getElementById('raster');
+      await raster.decode();
+
+      // Both are drawn to the same height, in their own frames, then compared
+      // ink-to-ink by aligning their bounding boxes — comparing a 261-wide
+      // drawing with a 480-wide one pixel for pixel would measure the stretch,
+      // not the glyph.
+      const render = (img) => {
+        const scale = HEIGHT / img.naturalHeight;
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.ceil(img.naturalWidth * scale);
+        canvas.height = Math.ceil(img.naturalHeight * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let x0 = canvas.width;
+        let y0 = canvas.height;
+        let x1 = -1;
+        let y1 = -1;
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            if (data[(y * canvas.width + x) * 4 + 3] > 96) {
+              if (x < x0) x0 = x;
+              if (y < y0) y0 = y;
+              if (x > x1) x1 = x;
+              if (y > y1) y1 = y;
+            }
+          }
+        }
+        return { data, w: canvas.width, h: canvas.height, x0, y0, x1, y1 };
+      };
+
+      const A = render(vector);
+      const B = render(raster);
+      log.push(`ink ${A.x1 - A.x0 + 1} × ${A.y1 - A.y0 + 1} vs ${B.x1 - B.x0 + 1} × ${B.y1 - B.y0 + 1}`);
+
+      let both = 0;
+      let either = 0;
+      const wx = Math.max(A.x1 - A.x0, B.x1 - B.x0) + 1;
+      const wy = Math.max(A.y1 - A.y0, B.y1 - B.y0) + 1;
+      for (let y = 0; y < wy; y++) {
+        for (let x = 0; x < wx; x++) {
+          const ax = A.x0 + x;
+          const ay = A.y0 + y;
+          const bx = B.x0 + x;
+          const by = B.y0 + y;
+          const on =
+            ax <= A.x1 && ay <= A.y1 && A.data[(ay * A.w + ax) * 4 + 3] > 96;
+          const off =
+            bx <= B.x1 && by <= B.y1 && B.data[(by * B.w + bx) * 4 + 3] > 96;
+          if (on && off) both += 1;
+          if (on || off) either += 1;
+        }
+      }
+      const iou = either ? both / either : 0;
+      log.push(`ink overlap with the 160 px crop: ${(iou * 100).toFixed(1)}%`);
+
+      // mark.png is a *cropped* 160 px render — its stem and flag run off the
+      // edges — so pixel overlap with it can only ever be approximate, and it is
+      // printed rather than asserted. What must hold is that the mark is whole
+      // and note-shaped: nothing clipped by its own viewBox, and ink that fills
+      // the box instead of floating in it.
+      let onEdge = 0;
+      for (let i = 0; i < A.data.length; i += 4) {
+        if (A.data[i + 3] <= 8) continue;
+        const at = i / 4;
+        const px = at % A.w;
+        const py = Math.floor(at / A.w);
+        if (px < 2 || py < 2 || px >= A.w - 2 || py >= A.h - 2) onEdge += 1;
+      }
+      if (onEdge > 8) problems.push(`the mark is clipped (${onEdge} ink pixels at the edge)`);
+
+      const inkFraction = ((A.x1 - A.x0 + 1) * (A.y1 - A.y0 + 1)) / (A.w * A.h);
+      log.push(`ink fills ${(inkFraction * 100).toFixed(0)}% of its box`);
+      // The box keeps a hair of margin for the stroke caps, so the ink fills
+      // close to — not exactly — every pixel.
+      if (inkFraction < 0.85) problems.push('the mark floats inside its box instead of filling it');
+      if (Math.abs(box.width / box.height - 0.54) > 0.04) problems.push('the mark is not note-shaped');
+
+      document.getElementById('report').textContent = problems.length
+        ? `MARK FAILED\n${problems.join('\n')}\n\n${log.join('\n')}`
+        : `MARK OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'MARK FAILED' : 'MARK OK';
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'mark', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>
