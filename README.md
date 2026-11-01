@@ -355,6 +355,31 @@ Takes log themselves: finishing a scale in the trainer, or a sight-reading attem
 adds a take to today without anything to type. A day with only "what was hard"
 tapped does not count as practice, so a stray tap cannot keep a streak alive.
 
+### More than one child on one device
+
+A family with three children sharing a tablet gets one row of names at the top of
+the log, each with its own streak, its own "what was hard", its own ready
+checklist and its own week sheet. A shared streak would be worse than none: the
+youngest's two days would hold the oldest's run together.
+
+* **A name is a log.** Tapping a name switches logs; the count, the grid and the
+  sheet all follow. The name is also the first line of the copied lesson sheet, so
+  a teacher reading three of them knows whose is whose.
+* **The first name takes over the empty log** every device starts with, rather
+  than leaving a "Me" nobody owns beside three children. Once that log has a day
+  in it, the next name gets a new log of its own.
+* **Typing a name that already exists switches to it** instead of making a twin,
+  and names are trimmed and capped at 24 characters. Eight names per device.
+* **A copy carries its name.** Loading Maya's file while Jonah is on screen is
+  refused with "that copy belongs to Maya — switch to that name first", because on
+  a shared tablet that is exactly how one child's term quietly becomes another's.
+  Files saved before names existed have no name and are taken at face value.
+* **Start over** empties the log on screen and keeps the name and the other
+  children's work untouched. Removing a name (in *Rename or remove a name*) is the
+  only thing that deletes a log, and it asks first.
+* A device from before names keeps its data: the old single log migrates to the
+  first profile on load, with nothing lost.
+
 ### Hearing yourself back
 
 The record button keeps the take in memory as a blob and plays it back through a
@@ -377,7 +402,8 @@ Three honest limits, all of them said on the screen:
 
 ### Keeping it
 
-The log is held in `localStorage` under `scale-studio.journal.v1` and is per device
+The logs are held in `localStorage` under `scale-studio.journal.v2` (one entry per
+name, plus which one is on screen) and are per device
 and per browser, so a student's log on the school iPad and the one at home are two
 different logs. That also means four things can take it away:
 

@@ -24,6 +24,10 @@ export const READY_SCORE = 90;
 export const RESTS_PER_WEEK = 2;
 
 const KEY = 'scale-studio.journal.v1';
+const STORE_KEY = 'scale-studio.journal.v2';
+
+/** How many names one device holds. A family is three; eight is generous. */
+export const MAX_PROFILES = 8;
 
 export function emptyState() {
   return { v: 1, days: {}, rests: [], plan: '', scales: {} };
@@ -220,8 +224,143 @@ export function save(state, storage = globalThis.localStorage) {
 export function clear(storage = globalThis.localStorage) {
   try {
     storage.removeItem(KEY);
+    storage.removeItem(STORE_KEY);
   } catch {
     /* ignore */
+  }
+}
+
+/* ── More than one person on the same device ───────────────────────────── */
+//
+// Three children can share one tablet, and one shared streak would be worse than
+// none: the youngest's two days would hold the oldest's run together. So the
+// store holds a list of named logs and a pointer to the one on screen. Everything
+// else in this file is unchanged — the rules never knew whose log they were
+// applying.
+
+export function emptyStore() {
+  return { v: 2, current: null, profiles: [] };
+}
+
+let seq = 0;
+
+export function makeProfile(name = '', state = emptyState()) {
+  seq += 1;
+  return {
+    id: `p${Date.now().toString(36)}${seq}`,
+    name: String(name || '').trim().slice(0, 24),
+    state,
+  };
+}
+
+/** The log on screen: the current one, or the first, so a call never returns null. */
+export function active(store) {
+  if (!store || !Array.isArray(store.profiles) || !store.profiles.length) return null;
+  return store.profiles.find((p) => p.id === store.current) || store.profiles[0];
+}
+
+function isBlank(state) {
+  if (!state) return true;
+  return (
+    !Object.keys(state.days || {}).length &&
+    !(state.rests || []).length &&
+    !Object.keys(state.scales || {}).length
+  );
+}
+
+/**
+ * Adds a name, or switches to it if it is already there. The nameless log every
+ * device starts with is taken over by the first real name while it is still
+ * empty, so a family does not end up with "Me" plus three children.
+ */
+export function addProfile(store, name) {
+  const clean = String(name || '').trim().slice(0, 24);
+  if (!clean) return null;
+
+  const same = store.profiles.find((p) => p.name.toLowerCase() === clean.toLowerCase());
+  if (same) {
+    store.current = same.id;
+    return same;
+  }
+
+  const only = store.profiles.length === 1 ? store.profiles[0] : null;
+  if (only && !only.name && isBlank(only.state)) {
+    only.name = clean;
+    store.current = only.id;
+    return only;
+  }
+
+  if (store.profiles.length >= MAX_PROFILES) return null;
+
+  const profile = makeProfile(clean);
+  store.profiles.push(profile);
+  store.current = profile.id;
+  return profile;
+}
+
+export function renameProfile(store, id, name) {
+  const clean = String(name || '').trim().slice(0, 24);
+  const profile = store.profiles.find((p) => p.id === id);
+  if (!profile || !clean) return false;
+  if (store.profiles.some((p) => p.id !== id && p.name.toLowerCase() === clean.toLowerCase())) {
+    return false;
+  }
+  profile.name = clean;
+  return true;
+}
+
+/** Removing the last name leaves a fresh nameless log rather than an empty page. */
+export function removeProfile(store, id) {
+  const at = store.profiles.findIndex((p) => p.id === id);
+  if (at < 0) return false;
+  store.profiles.splice(at, 1);
+  if (!store.profiles.length) {
+    const fresh = makeProfile('');
+    store.profiles.push(fresh);
+    store.current = fresh.id;
+    return true;
+  }
+  if (store.current === id) {
+    store.current = store.profiles[Math.min(at, store.profiles.length - 1)].id;
+  }
+  return true;
+}
+
+export function loadStore(storage = globalThis.localStorage) {
+  try {
+    const raw = storage.getItem(STORE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Array.isArray(parsed.profiles) && parsed.profiles.length) {
+        return {
+          v: 2,
+          current: parsed.current,
+          profiles: parsed.profiles.map((p) => ({
+            id: p.id || makeProfile().id,
+            name: String(p.name || '').slice(0, 24),
+            state: { ...emptyState(), ...(p.state || {}) },
+          })),
+        };
+      }
+    }
+  } catch {
+    /* fall through to migration */
+  }
+
+  // A device from before names: its one log becomes the first log, not a loss.
+  const store = emptyStore();
+  const first = makeProfile('', load(storage));
+  store.profiles.push(first);
+  store.current = first.id;
+  return store;
+}
+
+export function saveStore(store, storage = globalThis.localStorage) {
+  try {
+    storage.setItem(STORE_KEY, JSON.stringify(store));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -232,15 +371,19 @@ export function clear(storage = globalThis.localStorage) {
  * in a small envelope so a file can be recognised before it is trusted, and
  * dated so two copies in a downloads folder can be told apart.
  */
-export function serialise(state, date = new Date()) {
+export function serialise(state, date = new Date(), profile = '') {
   return JSON.stringify(
-    { app: 'scale-studio', kind: 'practice-log', v: 1, saved: dayKey(date), state },
+    { app: 'scale-studio', kind: 'practice-log', v: 1, saved: dayKey(date), profile, state },
     null,
     2,
   );
 }
 
-/** The log inside a file, or null if the text is not one. */
+/**
+ * The log inside a file, or null if the text is not one. `profile` is the name it
+ * was saved under — null for a file written before names existed, which is taken
+ * at face value by whoever loads it.
+ */
 export function parse(text) {
   try {
     const data = JSON.parse(text);
@@ -251,7 +394,7 @@ export function parse(text) {
     const state = { ...emptyState(), ...data.state };
     if (!state.days || typeof state.days !== 'object') return null;
     if (!Array.isArray(state.rests) || !state.scales || typeof state.scales !== 'object') return null;
-    return state;
+    return { profile: typeof data.profile === 'string' ? data.profile : null, state };
   } catch {
     return null;
   }

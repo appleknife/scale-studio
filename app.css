@@ -2212,6 +2212,80 @@ dialog .primary-btn {
 
 /* ── Practice log ──────────────────────────────────────────────────────── */
 
+/* Who is practising: the first question on a shared tablet, so it sits above
+   the cards rather than buried in the footer. */
+.who-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.who-label {
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.who-row .chip-row {
+  margin: 0;
+}
+
+.chip.add-chip {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.chip.add-chip:hover {
+  color: var(--ink-soft);
+}
+
+.name-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.name-form input {
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 7px 11px;
+  min-width: 180px;
+}
+
+.name-form input:focus {
+  outline: 2px solid var(--accent-wash);
+  outline-offset: 1px;
+  border-color: var(--accent-2);
+}
+
+.name-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.name-list .rec-item {
+  gap: 10px;
+}
+
+.name-list .name-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
 .track-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);

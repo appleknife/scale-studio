@@ -209,6 +209,39 @@
           log.push(`load a copy opens the picker: ${opened}`);
           if (!opened) problems.push('load a copy does not open the file picker');
           if (!picker.accept.includes('json')) problems.push('the picker does not ask for json');
+
+          /* ── three children, one tablet ─────────────────────────── */
+          // Give the first log a day, so the next name has to become a second log
+          // instead of taking over an empty one.
+          d.querySelector('#todayChips [data-tag="scales"]').click();
+          await wait(120);
+          const namesOf = () => [...d.querySelectorAll('#whoChips [data-who]')];
+          log.push(`names: ${namesOf().map((c) => c.textContent).join(', ')}`);
+          if (namesOf().length !== 1) problems.push('a fresh device should hold one log');
+          if (d.getElementById('streakNum').textContent !== '1') problems.push('today was not logged');
+
+          d.querySelector('#whoChips [data-who-add]').click();
+          if (d.getElementById('nameForm').hidden) problems.push('add a name did not open the form');
+          d.getElementById('nameInput').value = 'Maya';
+          d.getElementById('nameForm').dispatchEvent(
+            new w.Event('submit', { bubbles: true, cancelable: true }),
+          );
+          await wait(150);
+          log.push(`names: ${namesOf().map((c) => c.textContent).join(', ')}`);
+          if (namesOf().length !== 2) problems.push('a second name did not make a second log');
+          if (!d.getElementById('nameForm').hidden) problems.push('the name form stayed open');
+          if (d.getElementById('streakNum').textContent !== '0')
+            problems.push('a new name inherited the first log');
+          if (!d.getElementById('lessonSheet').textContent.includes('Maya'))
+            problems.push('the lesson sheet does not say whose week it is');
+
+          // And back: the first log still has its day.
+          namesOf()[0].click();
+          await wait(150);
+          if (d.getElementById('streakNum').textContent !== '1')
+            problems.push('switching back lost the first log');
+          if (d.getElementById('lessonSheet').textContent.includes('Maya'))
+            problems.push('the lesson sheet still says Maya after switching away');
         } catch (err) {
           problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
         }

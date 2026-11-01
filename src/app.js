@@ -1,14 +1,14 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610311930';
-import { renderStaff } from './staff.js?v=202610311930';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202610311930';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610311930';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610311930';
-import { generatePassage } from './sightreading.js?v=202610311930';
-import { renderScore } from './score.js?v=202610311930';
-import * as Journal from './journal.js?v=202610311930';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202610311930';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202610312040';
+import { renderStaff } from './staff.js?v=202610312040';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202610312040';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202610312040';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202610312040';
+import { generatePassage } from './sightreading.js?v=202610312040';
+import { renderScore } from './score.js?v=202610312040';
+import * as Journal from './journal.js?v=202610312040';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202610312040';
 import {
   STRINGS,
   FIFTHS,
@@ -16,7 +16,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202610311930';
+} from './tuner.js?v=202610312040';
 
 const LANG = initLang();
 
@@ -69,6 +69,12 @@ const el = {
   recStatus: $('recStatus'),
   logWarn: $('logWarn'),
   logStatus: $('logStatus'),
+  whoChips: $('whoChips'),
+  nameForm: $('nameForm'),
+  nameInput: $('nameInput'),
+  nameSave: $('nameSave'),
+  nameCancel: $('nameCancel'),
+  nameList: $('nameList'),
   exportLog: $('exportLog'),
   importLog: $('importLog'),
   importFile: $('importFile'),
@@ -1232,11 +1238,28 @@ el.sightLevels.addEventListener('click', (event) => {
 
 /* ── Practice log ─────────────────────────────────────────────────────── */
 
-const journal = Journal.load();
+// Three children can share one tablet. The store holds a list of named logs and
+// the one on screen; everything below reads `journal`, which is only ever the
+// active log, so none of the rules had to learn about names.
+const journalStore = Journal.loadStore();
+let activeProfile = Journal.active(journalStore);
+let journal = activeProfile.state;
 const recorder = { live: null, takes: [], playing: null };
 // Set when the browser refuses to write. The screen says so rather than letting
 // a whole term's log disappear at the next reload without a word.
 let storageBlocked = false;
+let nameMode = { kind: 'add' };
+
+const esc = (text) =>
+  String(text).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+  );
+
+/** The name as the reader should see it — an empty name is "Me". */
+function displayName(profile) {
+  return profile && profile.name ? profile.name : t('log.me');
+}
 
 function todayKey() {
   return Journal.dayKey();
@@ -1248,7 +1271,7 @@ function keyName(id) {
 }
 
 function saveJournal() {
-  storageBlocked = !Journal.save(journal);
+  storageBlocked = !Journal.saveStore(journalStore);
   if (el.logWarn) el.logWarn.hidden = !storageBlocked;
   renderLogBanner();
 }
@@ -1259,9 +1282,14 @@ function renderLogBanner() {
   const today = todayKey();
   const days = Journal.streak(journal, today);
   const sheet = Journal.weekSheet(journal, today, []);
-  el.logBannerText.textContent = days
-    ? t('log.banner.streak', { n: days, days: sheet.days })
-    : t('log.banner.empty');
+  // On a shared device the name belongs in the one-line summary, or the home
+  // screen is quietly about nobody in particular.
+  const who = journalStore.profiles.length > 1 ? displayName(activeProfile) : '';
+  el.logBannerText.textContent = !days
+    ? t('log.banner.empty')
+    : who
+      ? t('log.banner.named', { name: who, n: days, days: sheet.days })
+      : t('log.banner.streak', { n: days, days: sheet.days });
 }
 
 function chips(container, items, dataKey, isOn, label) {
@@ -1284,7 +1312,13 @@ function sheetText() {
     month: 'short',
     day: 'numeric',
   });
-  const lines = [t('log.sheet.week', { date: when })];
+  // The sheet is copied out of the browser and onto a lesson page, so on a shared
+  // device it has to say whose week it is.
+  const headed =
+    journalStore.profiles.length > 1
+      ? `${displayName(activeProfile)} · ${t('log.sheet.week', { date: when })}`
+      : t('log.sheet.week', { date: when });
+  const lines = [headed];
   lines.push(t('log.sheet.days', { n: s.days, rests: s.rests }));
   if (s.takes) lines.push(t('log.sheet.takes', { n: s.takes }));
   const tags = Object.entries(s.tags)
@@ -1312,10 +1346,48 @@ function renderRecList() {
     .join('');
 }
 
+/** The names row and the manage list — one source, so they cannot disagree. */
+function renderWho() {
+  const full = journalStore.profiles.length >= Journal.MAX_PROFILES;
+  el.whoChips.innerHTML =
+    journalStore.profiles
+      .map(
+        (profile) =>
+          `<button class="chip" type="button" data-who="${esc(profile.id)}" ` +
+          `aria-pressed="${profile.id === activeProfile.id}">${esc(displayName(profile))}</button>`,
+      )
+      .join('') +
+    (full
+      ? ''
+      : `<button class="chip add-chip" type="button" data-who-add="1">${t('log.addName')}</button>`);
+
+  const alone = journalStore.profiles.length < 2;
+  el.nameList.innerHTML = journalStore.profiles
+    .map(
+      (profile) => `<li class="rec-item">
+        <span class="rec-name">${esc(displayName(profile))}</span>
+        <span class="name-actions">
+          <button class="quiet-btn small" type="button" data-rename="${esc(profile.id)}">${t(
+            'log.rename',
+          )}</button>
+          ${
+            alone
+              ? ''
+              : `<button class="quiet-btn small" type="button" data-remove="${esc(
+                  profile.id,
+                )}">${t('log.remove')}</button>`
+          }
+        </span>
+      </li>`,
+    )
+    .join('');
+}
+
 function renderLog() {
   const today = todayKey();
   const days = Journal.streak(journal, today);
   el.streakNum.textContent = String(days);
+  renderWho();
 
   // The plan line repeats whatever the menu says, in the reader's language,
   // rather than keeping a second copy of the four phrases to drift out of step.
@@ -1396,6 +1468,96 @@ function noteTake(tag, cardId = null, score = 0) {
 el.openLogBtn.addEventListener('click', openTrack);
 el.trackBack.addEventListener('click', goHome);
 
+/* ── Whose log is on screen ───────────────────────────────────────────── */
+
+function closeNameForm() {
+  el.nameForm.hidden = true;
+  el.nameInput.value = '';
+}
+
+function openNameForm(mode) {
+  nameMode = mode;
+  const profile =
+    mode.kind === 'rename' ? journalStore.profiles.find((p) => p.id === mode.id) : null;
+  el.nameInput.value = profile ? profile.name : '';
+  el.nameSave.textContent = mode.kind === 'rename' ? t('log.saveName') : t('log.add');
+  el.nameInput.placeholder = t('log.namePlaceholder');
+  el.nameForm.hidden = false;
+  el.nameInput.focus();
+  el.nameInput.select();
+}
+
+function switchProfile(id) {
+  const next = journalStore.profiles.find((p) => p.id === id);
+  if (!next || next.id === activeProfile.id) return;
+  Journal.saveStore(journalStore);
+  journalStore.current = next.id;
+  activeProfile = next;
+  journal = next.state;
+  closeNameForm();
+  el.logStatus.textContent = '';
+  renderLog();
+  renderLogBanner();
+}
+
+el.whoChips.addEventListener('click', (event) => {
+  if (event.target.closest('[data-who-add]')) {
+    openNameForm({ kind: 'add' });
+    return;
+  }
+  const button = event.target.closest('[data-who]');
+  if (button) switchProfile(button.dataset.who);
+});
+
+el.nameForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const value = el.nameInput.value.trim();
+  if (!value) {
+    el.nameInput.focus();
+    return;
+  }
+
+  if (nameMode.kind === 'rename') {
+    if (!Journal.renameProfile(journalStore, nameMode.id, value)) {
+      el.logStatus.textContent = t('log.nameTaken');
+      return;
+    }
+    saveJournal();
+  } else {
+    const profile = Journal.addProfile(journalStore, value);
+    if (!profile) {
+      el.logStatus.textContent = t('log.nameTaken');
+      return;
+    }
+    activeProfile = profile;
+    journal = profile.state;
+    saveJournal();
+  }
+  closeNameForm();
+  el.logStatus.textContent = '';
+  renderLog();
+});
+
+el.nameCancel.addEventListener('click', closeNameForm);
+
+el.nameList.addEventListener('click', (event) => {
+  const rename = event.target.closest('[data-rename]');
+  if (rename) {
+    openNameForm({ kind: 'rename', id: rename.dataset.rename });
+    return;
+  }
+  const remove = event.target.closest('[data-remove]');
+  if (!remove) return;
+  const profile = journalStore.profiles.find((p) => p.id === remove.dataset.remove);
+  if (!profile) return;
+  if (!window.confirm(t('log.confirmRemoveName', { name: displayName(profile) }))) return;
+  Journal.removeProfile(journalStore, profile.id);
+  activeProfile = Journal.active(journalStore);
+  journal = activeProfile.state;
+  saveJournal();
+  renderLog();
+});
+
 el.todayChips.addEventListener('click', (event) => {
   const chip = event.target.closest('button[data-tag]');
   if (!chip) return;
@@ -1443,8 +1605,9 @@ el.copySheet.addEventListener('click', async () => {
 
 el.clearLog.addEventListener('click', () => {
   if (!window.confirm(t('log.confirmClear'))) return;
-  Journal.clear();
+  // Only this log: the name stays, and the other children's logs are untouched.
   Object.assign(journal, Journal.emptyState());
+  saveJournal();
   if (el.logStatus) el.logStatus.textContent = '';
   renderLog();
   renderLogBanner();
@@ -1453,7 +1616,7 @@ el.clearLog.addEventListener('click', () => {
 /* ── A copy the student keeps ─────────────────────────────────────────── */
 
 function exportLog() {
-  const text = Journal.serialise(journal);
+  const text = Journal.serialise(journal, new Date(), activeProfile.name);
   const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -1475,13 +1638,23 @@ async function importLog(file) {
     el.logStatus.textContent = t('log.loadFailed');
     return;
   }
-  const other = Journal.parse(text);
-  if (!other) {
+  const copy = Journal.parse(text);
+  if (!copy) {
     el.logStatus.textContent = t('log.loadBad');
     return;
   }
+  // A copy made under another name is not merged into this one: on a shared
+  // tablet that is how one child's term quietly becomes another's. The message
+  // says which name to switch to. Files from before names carry no name and are
+  // taken at face value.
+  if (copy.profile !== null && copy.profile.toLowerCase() !== activeProfile.name.toLowerCase()) {
+    el.logStatus.textContent = t('log.loadOther', {
+      name: copy.profile ? copy.profile : t('log.me'),
+    });
+    return;
+  }
   const before = Journal.totalDays(journal);
-  Object.assign(journal, Journal.merge(journal, other));
+  Object.assign(journal, Journal.merge(journal, copy.state));
   saveJournal();
   renderLog();
   const added = Journal.totalDays(journal) - before;

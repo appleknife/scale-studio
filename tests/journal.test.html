@@ -206,14 +206,23 @@
         J.noteScale(a, 'G', '2026-03-09', 94);
         a.plan = 'afterDinner';
 
-        const text = J.serialise(a, new Date(2026, 2, 11));
+        const text = J.serialise(a, new Date(2026, 2, 11), 'Maya');
         eq('a copy names the app', JSON.parse(text).app, 'scale-studio');
         eq('a copy is dated', JSON.parse(text).saved, '2026-03-11');
+        eq('a copy remembers whose it is', JSON.parse(text).profile, 'Maya');
         const back = J.parse(text);
         // A rest day is not a practised day, so it lives in `rests` and not in `days`.
-        eq('a copy survives the round trip', J.totalDays(back), 1);
-        eq('with its takes', back.days['2026-03-09'].takes, 2);
-        eq('and its rest day', back.rests, ['2026-03-10']);
+        eq('a copy survives the round trip', J.totalDays(back.state), 1);
+        eq('with its takes', back.state.days['2026-03-09'].takes, 2);
+        eq('and its rest day', back.state.rests, ['2026-03-10']);
+        eq('and it says whose it is', back.profile, 'Maya');
+
+        // A copy from before names existed has no profile field at all, which is
+        // different from one saved under the nameless default log.
+        const old = JSON.parse(text);
+        delete old.profile;
+        eq('an old copy has no name', J.parse(JSON.stringify(old)).profile, null);
+        eq('a nameless copy is still a name', J.parse(J.serialise(a, new Date(2026, 2, 11), '')).profile, '');
 
         eq('junk is refused', J.parse('not json at all'), null);
         eq('someone else\'s json is refused', J.parse('{"app":"other"}'), null);
@@ -224,8 +233,8 @@
         // clicks twice ends up with a week twice as busy as it was.
         const into = J.emptyState();
         J.logTake(into, '2026-03-11', 'piece');
-        const once = J.merge(into, back);
-        const twice = J.merge(once, back);
+        const once = J.merge(into, back.state);
+        const twice = J.merge(once, back.state);
         eq('merge keeps the day it already had', once.days['2026-03-11'].tags, ['piece']);
         eq('merge adds the other days', J.totalDays(once), 2);
         eq('merge keeps takes apart', once.days['2026-03-09'].takes, 2);
@@ -233,14 +242,78 @@
           J.serialise(once, new Date(2026, 2, 11)));
         eq('takes are the larger, never the sum', twice.days['2026-03-09'].takes, 2);
         eq('the plan comes across when there is none here', once.plan, 'afterDinner');
-        eq('and is not overwritten when there is one', J.merge({ ...into, plan: 'afterSchool' }, back).plan, 'afterSchool');
-        eq('scale days are joined', J.merge(once, back).scales.G.days.length, 1);
-        eq('a better score wins', J.merge(once, back).scales.G.best, 94);
+        eq('and is not overwritten when there is one', J.merge({ ...into, plan: 'afterSchool' }, back.state).plan, 'afterSchool');
+        eq('scale days are joined', J.merge(once, back.state).scales.G.days.length, 1);
+        eq('a better score wins', J.merge(once, back.state).scales.G.best, 94);
         eq('the whole state has a day count', J.totalDays(once), 2);
 
         // A copy taken before the log existed merges into an empty log cleanly.
-        const fresh = J.merge(J.emptyState(), back);
+        const fresh = J.merge(J.emptyState(), back.state);
         eq('an empty target takes the whole copy', J.totalDays(fresh), 1);
+      }
+
+      /* ── more than one name ───────────────────────────────────────── */
+      {
+        const store = J.emptyStore();
+        const first = J.makeProfile('');
+        store.profiles.push(first);
+        store.current = first.id;
+
+        // A device nobody has named yet: the first real name takes the empty log
+        // over, rather than sitting beside a "Me" nobody owns.
+        const maya = J.addProfile(store, 'Maya');
+        eq('the first name takes the empty log', store.profiles.length, 1);
+        eq('and is the one on screen', J.active(store).name, 'Maya');
+        eq('it kept its identity', maya.id, first.id);
+
+        J.logTake(J.active(store).state, '2026-03-09', 'scales');
+        const jonah = J.addProfile(store, '  Jonah  ');
+        eq('a second name is a second log', store.profiles.length, 2);
+        eq('the name is trimmed', jonah.name, 'Jonah');
+        eq('the new one is empty', J.totalDays(J.active(store).state), 0);
+        eq('Maya still has her day', J.totalDays(store.profiles[0].state), 1);
+
+        // Typing a name that is already there is a switch, not a duplicate.
+        const again = J.addProfile(store, 'maya');
+        eq('the same name is not added twice', store.profiles.length, 2);
+        eq('it switches instead', J.active(store).name, 'Maya');
+        eq('the id is Maya\'s', again.id, maya.id);
+
+        eq('a name cannot be stolen', J.renameProfile(store, jonah.id, 'Maya'), false);
+        eq('renaming works', J.renameProfile(store, jonah.id, 'Jonah P.'), true);
+        eq('and sticks', J.active(store).name, 'Maya');
+
+        const store2 = new Map();
+        const fake = {
+          getItem: (k) => (store2.has(k) ? store2.get(k) : null),
+          setItem: (k, v) => store2.set(k, String(v)),
+          removeItem: (k) => store2.delete(k),
+        };
+        eq('the store saves', J.saveStore(store, fake), true);
+        const loaded = J.loadStore(fake);
+        eq('two names come back', loaded.profiles.length, 2);
+        eq('with their own days', J.totalDays(loaded.profiles[0].state), 1);
+        eq('and the empty one still empty', J.totalDays(loaded.profiles[1].state), 0);
+
+        // A device from before names: one log, which must become a log and not a
+        // loss.
+        const old = new Map();
+        const oldStore = {
+          getItem: (k) => (old.has(k) ? old.get(k) : null),
+          setItem: (k, v) => old.set(k, String(v)),
+          removeItem: (k) => old.delete(k),
+        };
+        const before = J.emptyState();
+        J.logTake(before, '2026-03-09', 'scales');
+        J.save(before, oldStore);
+        const migrated = J.loadStore(oldStore);
+        eq('an old log migrates to one name', migrated.profiles.length, 1);
+        eq('with nothing lost', J.totalDays(J.active(migrated).state), 1);
+        eq('and no name invented', J.active(migrated).name, '');
+
+        eq('removing a name leaves the rest', J.removeProfile(store, jonah.id) && store.profiles.length, 1);
+        eq('removing the last leaves a fresh nameless log', J.removeProfile(store, maya.id) && J.active(store).name, '');
+        eq('the fresh log is empty', J.totalDays(J.active(store).state), 0);
       }
 
       document.getElementById('report').textContent = problems.length

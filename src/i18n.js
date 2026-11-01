@@ -508,8 +508,34 @@ export const S = {
   'log.sheet.ready': ['Scales ready: {n} of {total}', '就绪的音阶：{n}/{total}'],
   'log.copy': ['Copy the week', '复制这一周'],
   'log.copied': ['Copied', '已复制'],
+  'log.me': ['Me', '我'],
+  'log.addName': ['+ Add a name', '+ 加一个名字'],
+  'log.rename': ['Rename', '改名'],
+  'log.remove': ['Remove', '删除'],
+  'log.add': ['Add', '添加'],
+  'log.saveName': ['Save', '保存'],
+  'log.namePlaceholder': ['Your name', '你的名字'],
+  'log.nameTaken': [
+    'That name is already here, or the list is full.',
+    '这个名字已经有了，或者名字已经满了。',
+  ],
+  'log.confirmRemoveName': [
+    'Remove {name} and their whole log? This cannot be undone.',
+    '删除 {name} 和 TA 的全部记录？删了就找不回来了。',
+  ],
+  'log.loadOther': [
+    'That copy belongs to {name}. Switch to that name first — or add it.',
+    '这份副本是 {name} 的。先切换到那个名字，或者先把名字加上。',
+  ],
+  'log.banner.named': [
+    '{name} · {n} days in a row · {days} this week',
+    '{name} · {n} 天连续 · 本周 {days} 天',
+  ],
   'log.copyFailed': ['Could not copy', '复制不了'],
-  'log.confirmClear': ['Clear the whole log? This cannot be undone.', '清空整份记录？不能恢复。'],
+  'log.confirmClear': [
+    'Clear this log? The name stays and the other names are untouched, but the days cannot come back.',
+    '清空这份记录？名字和其他人的记录都会保留，但日子找不回来了。',
+  ],
 };
 
 /* ── Static text that lives in index.html ─────────────────────────────── */
@@ -661,6 +687,9 @@ export const STATIC = {
   'Everything here lives on this device. Nothing is uploaded, and a recording lasts only as long as this tab is open.':
     '这些只存在这台设备上。不会上传；录音也只在这个标签页开着的时候存在。',
   'days in a row': '天连续',
+  "Who's practising?": '谁在练习？',
+  'Rename or remove a name': '改名或删除名字',
+  'Your name': '你的名字',
   'Two rest days a week are yours to take. A day off you planned is not a broken streak.':
     '每周有两天可以安排休息。计划好的休息，不算中断。',
   'I practice': '我练习的时间',

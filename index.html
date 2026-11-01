@@ -18,7 +18,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202610311930" />
+    <link rel="stylesheet" href="app.css?v=202610312040" />
   </head>
   <body>
     <div class="shell">
@@ -436,6 +436,18 @@
             </div>
           </div>
 
+          <div class="who-row">
+            <span class="who-label">Who's practising?</span>
+            <div class="chip-row" id="whoChips"></div>
+          </div>
+
+          <form class="name-form" id="nameForm" hidden>
+            <input id="nameInput" type="text" maxlength="24" autocomplete="off"
+              spellcheck="false" placeholder="Your name" />
+            <button class="quiet-btn small" id="nameSave" type="submit">Add</button>
+            <button class="quiet-btn small" id="nameCancel" type="button">Cancel</button>
+          </form>
+
           <div class="track-grid">
             <div class="track-card streak-card">
               <div class="streak-line">
@@ -520,6 +532,11 @@
             <button class="quiet-btn" id="clearLog" type="button">Start over</button>
           </div>
           <p class="rec-status" id="logStatus" role="status" aria-live="polite"></p>
+
+          <details class="safety-note">
+            <summary>Rename or remove a name</summary>
+            <ul class="name-list" id="nameList"></ul>
+          </details>
 
           <details class="safety-note">
             <summary>What can lose it</summary>
@@ -803,7 +820,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202610311930"></script>
+    <script type="module" src="src/app.js?v=202610312040"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.
