@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021615';
-import { STAFF_GEOM } from './staff.js?v=202611021615';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021745';
+import { STAFF_GEOM } from './staff.js?v=202611021745';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -231,15 +231,19 @@ const LEVELS = {
         [3, 1, 4, 4, 4],
         [4, 4, 3, 1, 4],
       ],
+      // Cut time stops at eighths: what level VI adds in this metre over V is
+      // eighth motion and its own triplet, not sixteenths. A beat of four
+      // sixteenths and a dotted-eighth-and-sixteenth belong to the simple metres
+      // above, and the filter in generatePassage drops them here even if typed in.
       '2/2': [
         [4, 4, 4, 4],
         [8, 4, 4],
         [6, 2, 4, 4],
         [8, 6, 2],
-        [4, 4, 4, 1, 1, 2],
-        [8, 4, 1, 1, 2],
+        [4, 4, 4, 2, 2],
+        [8, 4, 2, 2],
+        [4, 2, 2, 4, 4],
         [4 / 3, 4 / 3, 4 / 3, 4, 8],
-        [4, 4, 3, 1, 4],
       ],
       '6/8': [
         [2, 2, 2, 6],
@@ -396,7 +400,18 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   const beat = beatLength(meter);
 
   // ── rhythm: one pattern per bar, the last bar landing on a longer note ──
-  const patterns = spec.rhythms[meter];
+  //
+  // Cut time is felt two to the bar, so a sixteenth is not a fast note there but
+  // a blur: the half-note pulse is 76, which already puts the quarter at 152, and
+  // a beat of four sixteenths would go by at 608 a minute. The Manual's cut-time
+  // figures stop at eighths, and its triplets are the eighth-note kind. The rule
+  // is enforced here rather than trusted to each level's table, so no level can
+  // drift back into sixteenths in 2/2 by adding a pattern.
+  const cutTime = meter === '2/2';
+  const eighthTriplet = (d) => Math.abs(d - 4 / 3) < 0.01;
+  const patterns = spec.rhythms[meter].filter(
+    (p) => !cutTime || p.every((d) => d >= 2 || eighthTriplet(d)),
+  );
 
   // A beat of four sixteenths is the figure the Manual's own level VI example
   // leans on, so patterns containing one go into the draw twice. Left unweighted

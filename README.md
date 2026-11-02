@@ -369,6 +369,17 @@ an eighth. The stub also has to follow the beam's **slope**: drawn level beside 
 slanted beam it met the beam at one end and drifted away at the other, which on a
 leaping figure is the difference between a second beam and a stray dash.
 
+**Cut time is felt two to the bar, so its shortest note is an eighth.** In 2/2 a
+sixteenth is not a fast note but a blur — the half-note pulse is 76, which already
+puts the quarter at 152 — so level VI's beat of four sixteenths and its
+dotted-eighth-and-sixteenth were wrong there even though both belong in 4/4 at the
+same level. The metre is filtered at the source now: anything shorter than an
+eighth is dropped from every 2/2 pattern, at every level, so no table can put one
+back. Triplets stay, in the eighth-note kind only. Level VI's cut-time table gained
+eighth motion in their place (4+4+4+2+2, 8+4+2+2, 4+2+2+4+4) and keeps its
+triplet, and `sightreading.test.html` walks every 2/2 passage it can draw to check
+both directions: nothing shorter than an eighth, and the triplet still there.
+
 ### Drawing the notation
 
 Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave

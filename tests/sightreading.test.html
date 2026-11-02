@@ -346,6 +346,34 @@
         }
       }
 
+      // Cut time is felt two to the bar, so its shortest note is an eighth: a
+      // sixteenth there is not fast, it is a blur. Its triplets are the
+      // eighth-note kind — sixteenth triplets, which would be a blur squared, are
+      // not in the ladder at all. Every 2/2 passage is checked at every level that
+      // has the metre, and the eighth triplet still has to turn up.
+      let cutSeen = 0;
+      let cutTriplets = 0;
+      for (const level of SIGHT_LEVELS) {
+        for (let seed = 0; seed < 160; seed++) {
+          const p = generatePassage({ level, seed });
+          if (p.meter !== '2/2') continue;
+          cutSeen++;
+          const evs = flatten(p);
+          for (const e of evs) {
+            if (e.dur < 2 && Math.abs(e.dur - 4 / 3) > 0.01) {
+              problems.push(`L${level} seed ${seed}: a ${DUR[e.dur] || e.dur} in cut time`);
+            }
+            if (Math.abs(e.dur - 2 / 3) < 0.01) {
+              problems.push(`L${level} seed ${seed}: a sixteenth triplet in cut time`);
+            }
+          }
+          if (evs.some((e) => Math.abs(e.dur - 4 / 3) < 0.01)) cutTriplets++;
+        }
+      }
+      log.push(`2/2: ${cutSeen} passages checked, ${cutTriplets} with an eighth triplet`);
+      if (!cutSeen) problems.push('no 2/2 passage was drawn in 160 seeds a level');
+      if (cutTriplets < 3) problems.push(`only ${cutTriplets} cut-time passages with a triplet`);
+
       // Rests: which ones, and how often. Quarter rests were the thing missing —
       // the chooser used to take the first short slot in a middle bar, which was
       // almost always an eighth — so the kinds are counted, and both a quarter and
