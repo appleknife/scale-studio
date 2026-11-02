@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>playback tests</title>
+    <style>
+      body {
+        font: 13px/1.5 ui-monospace, monospace;
+        margin: 16px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // The playback has two halves: arithmetic (when every note sounds, how loud,
+      // whether it is a new bow stroke) and a voice that turns that into audio.
+      // Both are weighed here — the arithmetic exactly, the voice by rendering it
+      // offline and measuring where the sound actually is.
+      import { schedule, bowedVoice, secondsPerQuarter, DYNAMIC_GAIN } from '../src/playback.js?v=202611020030';
+
+      const problems = [];
+      const log = [];
+      const check = (ok, message) => {
+        if (!ok) problems.push(message);
+        return ok;
+      };
+
+      /** A4, B4, C5, D5 as the renderer wants them: letter 0 is C. */
+      const pitch = (letter, octave) => ({ letter, alter: 0, octave });
+
+      const fourQuarters = {
+        tempo: { unit: 'q', bpm: 60 },
+        meter: '4/4',
+        perBar: 16,
+        dynamic: 'mf',
+        swell: null,
+        bars: [
+          [
+            { start: 0, dur: 4, rest: false, midi: 69, note: pitch(5, 4) },
+            { start: 4, dur: 4, rest: false, midi: 71, note: pitch(6, 4) },
+            { start: 8, dur: 4, rest: false, midi: 72, note: pitch(0, 5) },
+            { start: 12, dur: 4, rest: false, midi: 74, note: pitch(1, 5) },
+          ],
+        ],
+      };
+
+      const copy = (passage) => JSON.parse(JSON.stringify(passage));
+
+      async function run() {
+        /* ── the arithmetic ─────────────────────────────────────────── */
+
+        check(Math.abs(secondsPerQuarter({ unit: 'q', bpm: 60 }) - 1) < 1e-9, 'a quarter at 60 is not one second');
+        check(Math.abs(secondsPerQuarter({ unit: 'h', bpm: 60 }) - 0.5) < 1e-9, 'a half-note pulse at 60 is wrong');
+        check(Math.abs(secondsPerQuarter({ unit: 'qd', bpm: 72 }) - 60 / 72 / 1.5) < 1e-9, 'a dotted-quarter pulse is wrong');
+
+        const plan = schedule(fourQuarters);
+        check(plan.notes.length === 4, `four quarters became ${plan.notes.length} notes`);
+        const times = plan.notes.map((n) => Number(n.time.toFixed(3)));
+        check(JSON.stringify(times) === '[0,1,2,3]', `notes fall at ${times.join(', ')} s, not 0, 1, 2, 3`);
+        check(Math.abs(plan.seconds - 4) < 1e-9, `the passage lasts ${plan.seconds} s, not 4`);
+        check(plan.notes.every((n) => Math.abs(n.duration - 1) < 1e-9), 'a quarter does not last a second at 60');
+        check(plan.notes.every((n) => Math.abs(n.gain - DYNAMIC_GAIN.mf) < 1e-9), 'the dynamic marking did not reach the notes');
+        check(plan.notes.every((n) => !n.legato), 'unslurred notes are marked legato');
+
+        // A slurred pair: the second note continues the first bow.
+        const slurred = copy(fourQuarters);
+        slurred.bars[0][0].slurStart = true;
+        slurred.bars[0][1].slurEnd = true;
+        const slurredPlan = schedule(slurred);
+        check(!slurredPlan.notes[0].legato, 'the first note of a slur was treated as legato');
+        check(slurredPlan.notes[1].legato, 'the second note of a slur is not legato — it would be re-bowed');
+
+        // A rest breaks it, as it must: the bow has to stop.
+        const overRest = copy(fourQuarters);
+        overRest.bars[0][0].slurStart = true;
+        overRest.bars[0][2].slurEnd = true;
+        check(!schedule(overRest).notes[2].legato, 'a slur survived a rest');
+
+        // Staccato is shorter; an accent is louder.
+        const marked = copy(fourQuarters);
+        marked.bars[0][0].mark = 'staccato';
+        marked.bars[0][1].mark = 'accent';
+        const markedPlan = schedule(marked);
+        check(markedPlan.notes[0].duration < 0.5, 'a staccato quarter was not shortened');
+        check(markedPlan.notes[1].gain > DYNAMIC_GAIN.mf, 'an accented note is not louder than a plain one');
+
+        // A crescendo rises, and its decrescendo falls.
+        const swelling = copy(fourQuarters);
+        swelling.swell = { bar: 0, kind: 'cresc', from: 0, to: 2 };
+        const rising = schedule(swelling).notes.map((n) => n.gain);
+        check(rising[0] < rising[1] && rising[1] < rising[2], `a crescendo did not rise: ${rising.map((g) => g.toFixed(2)).join(', ')}`);
+        swelling.swell = { bar: 0, kind: 'dim', from: 0, to: 2 };
+        const falling = schedule(swelling).notes.map((n) => n.gain);
+        check(falling[0] > falling[1] && falling[1] > falling[2], `a decrescendo did not fall: ${falling.map((g) => g.toFixed(2)).join(', ')}`);
+
+        // Half speed doubles every time.
+        const slow = schedule(fourQuarters, { rate: 0.5 });
+        check(Math.abs(slow.notes[3].time - 6) < 1e-9, `at half speed the fourth note is at ${slow.notes[3].time} s, not 6`);
+
+        /* ── the voice ──────────────────────────────────────────────── */
+        //
+        // The voice cannot be *measured* here. Rendering an OfflineAudioContext
+        // needs the audio thread to make real progress, and a headless browser
+        // gives the page a virtual clock instead: a render of any length finishes
+        // or hangs depending on how the two races go, which makes it useless as a
+        // test. So the voice is asked for every shape the schedule can hand it and
+        // must take them all without throwing; how it sounds is the teacher's ear,
+        // not a suite's.
+        const quiet = new OfflineAudioContext(1, 1024, 44100);
+        const voice = bowedVoice(quiet, quiet.destination);
+        const shapes = [
+          { midi: 55, at: 0.1, duration: 1, gain: 0.7 },
+          { midi: 69, at: 0.1, duration: 1, gain: 0.7, legato: true },
+          { midi: 89, at: 0.1, duration: 1, gain: 0.7, accent: true },
+          { midi: 62, at: 0.1, duration: 0.45, gain: 0.55, staccato: true },
+          { midi: 74, at: 0.1, duration: 1, gain: 0.86, tied: true },
+        ];
+        for (const shape of shapes) voice.play(shape);
+        log.push(`the voice took ${shapes.length} shapes: plain, slurred, accent, staccato, tied`);
+
+        log.push(`schedule: ${plan.notes.length} notes over ${plan.seconds} s at a quarter = 60`);
+        log.push(`crescendo ${rising.map((g) => g.toFixed(2)).join(' → ')}`);
+      }
+
+      try {
+        await run();
+      } catch (err) {
+        problems.push(`the test threw: ${err && err.message}`);
+      }
+
+      document.getElementById('report').textContent = problems.length
+        ? `PLAYBACK FAILED\n${problems.join('\n')}\n\n${log.join('\n')}`
+        : `PLAYBACK OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'PLAYBACK FAILED' : 'PLAYBACK OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'playback', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

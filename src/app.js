@@ -1,14 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611012230';
-import { renderStaff } from './staff.js?v=202611012230';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611012230';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611012230';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611012230';
-import { generatePassage } from './sightreading.js?v=202611012230';
-import { renderScore } from './score.js?v=202611012230';
-import * as Journal from './journal.js?v=202611012230';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611012230';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611020030';
+import { renderStaff } from './staff.js?v=202611020030';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611020030';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611020030';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611020030';
+import { generatePassage } from './sightreading.js?v=202611020030';
+import { createPlayer } from './playback.js?v=202611020030';
+import { renderScore } from './score.js?v=202611020030';
+import * as Journal from './journal.js?v=202611020030';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611020030';
 import {
   STRINGS,
   FIFTHS,
@@ -16,7 +17,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611012230';
+} from './tuner.js?v=202611020030';
 
 const LANG = initLang();
 
@@ -37,6 +38,7 @@ const el = {
   openSightBtn: $('openSightBtn'),
   sightBack: $('sightBack'),
   sightNewBtn: $('sightNewBtn'),
+  sightHearBtn: $('sightHearBtn'),
   sightTempoBtn: $('sightTempoBtn'),
   sightLevels: $('sightLevels'),
   sightMeta: $('sightMeta'),
@@ -929,7 +931,138 @@ const sight = {
   // waiting for the first note; nothing is scored until the student starts.
   phase: 'idle',
   take: null,
+  // True while the passage is sounding through the playback voice, so the
+  // screen can show a playhead and the button can turn into Stop.
+  hearing: false,
+  anchors: null,
 };
+
+/* ── Hearing the passage ─────────────────────────────────────────────── */
+
+const player = createPlayer();
+
+/**
+ * Where each of the passage's events sits in the drawing, and which staff it
+ * belongs to. The notes are drawn in order — barlines, beams and slurs first,
+ * then the events one by one — so the n-th note head (or rest) in the document is
+ * the n-th event of the passage. That is what lets a playhead follow the music
+ * without the renderer having to report its own geometry.
+ */
+function sightAnchors(passage, svg) {
+  const nodes = [...svg.querySelectorAll('ellipse, g.score-rest')];
+  const lines = [...svg.querySelectorAll('g[stroke="#c3b49d"] line')].map((n) =>
+    Number(n.getAttribute('y1')),
+  );
+  const staves = [];
+  for (let i = 0; i + 4 < lines.length; i += 5) {
+    staves.push({ top: lines[i], bottom: lines[i + 4] });
+  }
+
+  const anchors = [];
+  let index = 0;
+  for (let b = 0; b < passage.bars.length; b++) {
+    for (const event of passage.bars[b]) {
+      const node = nodes[index++];
+      if (!node) continue;
+      const box = node.getBBox();
+      const y = box.y + box.height / 2;
+      const staff = staves.reduce(
+        (best, s) => (Math.abs((s.top + s.bottom) / 2 - y) < Math.abs((best.top + best.bottom) / 2 - y) ? s : best),
+        staves[0] || { top: y - 22, bottom: y + 22 },
+      );
+      anchors.push({
+        x: box.x + box.width / 2,
+        y,
+        top: staff.top,
+        bottom: staff.bottom,
+        start: b * passage.perBar + event.start,
+        dur: event.dur,
+      });
+    }
+  }
+  return anchors;
+}
+
+let playhead = null;
+
+/** Adds the playhead to the drawing, hidden, and returns its handle. */
+function ensurePlayhead() {
+  const svg = el.sightStaff.querySelector('svg');
+  if (!svg) return null;
+  if (playhead && playhead.svg === svg) return playhead;
+  const ns = 'http://www.w3.org/2000/svg';
+  const group = document.createElementNS(ns, 'g');
+  group.setAttribute('class', 'sight-playhead');
+  group.setAttribute('aria-hidden', 'true');
+  const line = document.createElementNS(ns, 'line');
+  line.setAttribute('stroke', '#2f5d4e');
+  line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-linecap', 'round');
+  const dot = document.createElementNS(ns, 'circle');
+  dot.setAttribute('r', '3.2');
+  dot.setAttribute('fill', '#2f5d4e');
+  group.append(line, dot);
+  svg.append(group);
+  playhead = { svg, group, line, dot, visible: false };
+  return playhead;
+}
+
+function hidePlayhead() {
+  if (playhead) playhead.group.style.opacity = '0';
+}
+
+/**
+ * Puts the playhead at `at` sixteenths into the passage. It glides between the
+ * notes rather than jumping, unless the reader has asked for less motion — then
+ * it steps from note to note, which is just as easy to follow.
+ */
+function movePlayhead(sight, at) {
+  const anchors = sight.anchors;
+  if (!anchors || !anchors.length || !playhead) return;
+  const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let i = 0;
+  while (i + 1 < anchors.length && anchors[i + 1].start <= at) i += 1;
+  const here = anchors[i];
+  const next = anchors[i + 1];
+  const through = Math.min(1, Math.max(0, (at - here.start) / Math.max(0.001, here.dur)));
+  const x = calm || !next ? here.x : here.x + (next.x - here.x) * through;
+  const top = Math.min(here.top, here.bottom) - 12;
+  const bottom = Math.max(here.top, here.bottom) + 12;
+  playhead.line.setAttribute('x1', String(x));
+  playhead.line.setAttribute('x2', String(x));
+  playhead.line.setAttribute('y1', String(top));
+  playhead.line.setAttribute('y2', String(bottom));
+  playhead.dot.setAttribute('cx', String(x));
+  playhead.dot.setAttribute('cy', String(here.y));
+  playhead.group.style.opacity = '0.85';
+}
+
+function stopHearing() {
+  player.stop();
+  sight.hearing = false;
+  el.sightHearBtn.textContent = t('sight.hear');
+  el.sightHearBtn.classList.remove('is-on');
+  hidePlayhead();
+}
+
+function hearPassage() {
+  if (player.playing) {
+    stopHearing();
+    return;
+  }
+  const passage = sight.passage;
+  if (!passage) return;
+  ensurePlayhead();
+  sight.anchors = sightAnchors(passage, el.sightStaff.querySelector('svg'));
+  sight.hearing = true;
+  el.sightHearBtn.textContent = t('sight.stopHearing');
+  el.sightHearBtn.classList.add('is-on');
+  let plan = null;
+  plan = player.play(passage, {
+    onTick: (seconds) => movePlayhead(sight, (seconds / plan.secondsPerQuarter) * 4),
+    onEnd: () => stopHearing(),
+  });
+}
 
 /** The note glyph printed next to a tempo mark. */
 function tempoGlyph(unit) {
@@ -979,7 +1112,10 @@ window.addEventListener('resize', () => {
 
 function newPassage(level = sight.level, seed = null) {
   sight.level = Math.min(6, Math.max(1, level));
+  stopHearing();
   sight.passage = generatePassage({ level: sight.level, seed });
+  sight.anchors = null;    // the drawing is about to be replaced
+  playhead = null;
   stopSightTake(false);
   el.sightResult.hidden = true;
   el.sightStatus.textContent = '';
@@ -999,6 +1135,9 @@ function openSight(level = sight.level, seed = null) {
 
 async function startSightTake(options = {}) {
   if (!sight.passage || sight.phase !== 'idle') return;
+  // The example stops the moment the student starts: hearing it underneath a
+  // take would follow them into the microphone.
+  stopHearing();
   el.sightStart.disabled = true;
   el.sightStatus.textContent = t('sight.waitingMic');
   el.sightResult.hidden = true;
@@ -1267,6 +1406,7 @@ el.sightAgain.addEventListener('click', () => {
   startSightTake();
 });
 el.sightNext.addEventListener('click', () => newPassage(sight.level));
+el.sightHearBtn.addEventListener('click', hearPassage);
 el.sightTempoBtn.addEventListener('click', () => {
   if (sight.passage) playTempo(sight.passage);
 });

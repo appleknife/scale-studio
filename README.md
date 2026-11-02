@@ -273,6 +273,14 @@ sight-reading table for that level.
   notehead at five pixels and turned every flag into a hairline; two bars to a line
   doubles both. The drawing itself is unchanged — the same bar width, the same
   flag — so the eighth note on a phone is the eighth note in the icon.
+* **Hear the passage** plays it back, with a green playhead that follows the music
+  through the staff. It is the same reading a student is about to do — the slurs are
+  bowed in one stroke, the staccato notes are short, an accent has an edge, and the
+  hairpin is actually performed rather than just printed. The voice is a bowed
+  string made of oscillators for now; it is a placeholder that shows the rhythm and
+  the shaping, and the teacher's own recorded violin takes its place (see *recording
+  the playback voice*). The playhead is driven by the audio clock, not by a timer, so
+  it cannot drift away from what is being heard.
 * **Hear the tempo** clicks two bars at the printed speed, with a heavier downbeat.
 * Every passage has a **seed**, so `?sight=5&seed=4471` always gives the same eight
   bars. A teacher can put one passage on a projector, or send the link to a class.
@@ -677,6 +685,8 @@ src/journal.js        practice-log rules: streak, rest days, ready scales, week 
                       and the save/load copy format
 src/recorder.js       in-memory recording and the synthesised hall
 src/capture.js        the sample-recording tool: take list, trimming, WAV and zip
+src/playback.js       hearing the passage: the schedule, the placeholder voice, the
+                      player that drives the playhead
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
 tests/sightreading.test.html  720 generated passages against the level rules
@@ -705,6 +715,9 @@ tests/i18n.test.html  translation coverage: no visible English left on any scree
 tests/journal.test.html   the log's arithmetic — streaks, two rests a week, ready
                       scales — and its save/load copy format
 tests/recorder.test.html  measures the synthesised hall: it decays, and it is stereo
+tests/playback.test.html  the playback's arithmetic — when every note sounds, how
+                      loud, whether a slur continues the bow, where a hairpin ramps
+                      — and that the voice takes every shape without throwing
 tests/capture.test.html  the recording tool's arithmetic: every whole tone in the
                       range at both levels, the WAV header and sample scaling, the
                       zip's CRC and directory, and the notation each card prints

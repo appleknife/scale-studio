@@ -265,6 +265,23 @@
               );
               break;
             }
+            // Nothing may be drawn through it either: a triplet's numeral hangs
+            // in this same lane, and a hairpin ran straight through the 3.
+            const left = Math.min(one.x1, one.x2);
+            const right = Math.max(one.x1, one.x2);
+            const top = Math.min(one.y1, one.y2, two.y2);
+            const low = Math.max(one.y1, one.y2, two.y2);
+            const clash = [...svg.querySelectorAll('text.score-tuplet, text.score-dyn')].find((n) => {
+              const b = dynBox(n);
+              return b.x1 > left - 2 && b.x0 < right + 2 && b.y1 > top - 2 && b.y0 < low + 2;
+            });
+            if (clash) {
+              hairpinHits.push(
+                `L${level} seed ${seed}: the hairpin runs through a "${clash.textContent.trim()}"`,
+              );
+              break;
+            }
+
             const high = Math.min(one.y1, one.y2, two.y2);
             const staff = staves.reduce((best, s) =>
               Math.abs(s.bottom - high) < Math.abs(best.bottom - high) ? s : best,

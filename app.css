@@ -712,6 +712,23 @@ h3 {
   fill: var(--ink-soft);
 }
 
+/* The playhead that follows the example while it sounds: a slim green line
+   through the staff with a dot on the note it is playing. It fades in and out
+   rather than appearing, and it is moved by the audio clock, not by CSS. */
+.score-staff .sight-playhead {
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+}
+
+/* A button that is currently doing something — "Hear the passage" while the
+   example is playing, and "Stop the example" to end it. */
+.ghost-btn.is-on {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
 .score-staff .score-dyn {
   font-style: italic;
 }

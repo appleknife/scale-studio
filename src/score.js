@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611012230';
-import { CLEF_PATH } from './clef.js?v=202611012230';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611020030';
+import { CLEF_PATH } from './clef.js?v=202611020030';
 
-import { beatLength } from './sightreading.js?v=202611012230';
+import { beatLength } from './sightreading.js?v=202611020030';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -707,6 +707,7 @@ function drawSystem(
     const groups = beamGroups(events, beat);
     const beamOf = new Map();
     let deepest = bottom;
+    let tupletLow = 0;
 
     for (const group of groups) {
       const ups = group.map((e) => stemUp(e.note.letter, e.note.octave));
@@ -729,6 +730,17 @@ function drawSystem(
       deepest = Math.max(deepest, ...group.map((e) => at(e)));
       if (up) musicTop = Math.min(musicTop, ...group.map((e) => at(e) - BEAM));
       group.forEach((e) => beamOf.set(e, { at, up }));
+
+      // A triplet's numeral hangs below a down-stem beam — further down than the
+      // beam itself — and a hairpin drawn in the dynamic lane ran straight
+      // through it. So the numeral is measured here, before the lane is chosen.
+      if (isTriplet(group)) {
+        const first = group[0];
+        const last = group[group.length - 1];
+        const under = (at(first) + at(last)) / 2;
+        const by = under + (up ? -12 : 12);
+        tupletLow = Math.max(tupletLow, by + (up ? 0 : 10) + 4);
+      }
     }
 
     // dynamics: below everything else in the bar
@@ -747,7 +759,10 @@ function drawSystem(
       const y = yForNote(e.note.letter, e.note.octave, bottom);
       return up ? Math.max(low, y + markReach(e)) : low;
     }, 0);
-    const dynY = Math.max(bottom + 34, lowest + 26, deepest + 26, marksLow + 20);
+    // The hairpin stands up to eighteen units above its baseline (see below), so a
+    // triplet's numeral needs that much clearance plus air — a hairpin drawn
+    // through a "3" was the first complaint about the ramps.
+    const dynY = Math.max(bottom + 34, lowest + 26, deepest + 26, marksLow + 20, tupletLow + 22);
     lastDynY = Math.max(lastDynY, dynY);
     const firstWithDynamic = events.find((e) => e.dynamic);
     if (firstWithDynamic) {

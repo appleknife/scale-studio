@@ -248,6 +248,10 @@ export const S = {
   ],
   'test.noStops': ['no stops', '没有停顿'],
 
+  // ── Sight reading: hearing it first ──
+  'sight.hear': ['Hear the passage', '听一遍谱子'],
+  'sight.stopHearing': ['Stop the example', '停止试听'],
+
   // ── Sight reading: listening ──
   'sight.waitingMic': ['Asking for the microphone…', '正在请求麦克风…'],
   'sight.armed': [
@@ -654,6 +658,7 @@ export const STATIC = {
 
   /* sight reading */
   'Sight reading': '视奏',
+  'Hear the passage': '听一遍谱子',
   'Open sight reading': '开始视奏',
   'Hear the tempo': '听一下速度',
   'New passage': '换一段',

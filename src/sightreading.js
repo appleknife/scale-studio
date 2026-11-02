@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611012230';
-import { STAFF_GEOM } from './staff.js?v=202611012230';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611020030';
+import { STAFF_GEOM } from './staff.js?v=202611020030';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -939,15 +939,37 @@ export function generatePassage({ level = 5, seed = null } = {}) {
         if (e.note && (!peak || e.midi > peak.midi)) peak = { bar: b, index: i, midi: e.midi };
       }),
     );
+    // The ramp is measured in **beats**, not in notes. Counting notes put its ends
+    // in the middle of things — under two of a triplet's three notes, or starting
+    // on the second of an eighth pair — because a hairpin that stops halfway
+    // through a group says the crescendo happens inside that group, which is not
+    // what it means. A beat is the smallest span that is always a whole group.
     const wanted = level >= 5 && chance(rng, 0.5) ? 'dim' : 'cresc';
+    const beatOf = (e) => Math.floor(e.start / beat + 1e-6);
+    const onBeat = (s) => Math.abs(s / beat - Math.round(s / beat)) < 1e-6;
+    const beatsPerBar = Math.round(perBar / beat);
     for (const kind of [wanted, wanted === 'cresc' ? 'dim' : 'cresc']) {
       if (!peak) break;
       const list = bars[peak.bar];
-      const [from, to] =
-        kind === 'cresc'
-          ? [Math.max(0, peak.index - 2), peak.index]
-          : [peak.index, Math.min(list.length - 1, peak.index + 2)];
-      if (to - from < 1) continue;
+      const firstOf = (b) => list.findIndex((e) => beatOf(e) === b);
+      const peakBeat = beatOf(list[peak.index]);
+      let lastBeat = kind === 'cresc' ? peakBeat : peakBeat + 1;
+      let firstBeat = kind === 'cresc' ? peakBeat - 1 : peakBeat;
+      if (lastBeat >= beatsPerBar) continue;
+      // The ramp has to *begin* on a beat. A beat whose first note is already off
+      // the beat — syncopation, an eighth moving early — cannot open a hairpin:
+      // the ramp would start half-way through a group. In that case it starts a
+      // beat earlier instead, which is what a player would be told anyway.
+      while (firstBeat > 0) {
+        const candidate = firstOf(firstBeat);
+        if (candidate >= 0 && onBeat(list[candidate].start)) break;
+        firstBeat -= 1;
+      }
+      const from = firstOf(firstBeat);
+      if (from < 0 || !onBeat(list[from].start)) continue;
+      const after = firstOf(lastBeat + 1);
+      const to = after < 0 ? list.length - 1 : after - 1;
+      if (to <= from) continue;
       // No rest under a hairpin: a ramp is one bow that keeps moving, and a rest
       // in the middle of one is the same contradiction as a slur over silence.
       if (list.slice(from, to + 1).some((e) => !e.note)) continue;

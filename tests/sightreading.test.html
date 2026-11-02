@@ -139,6 +139,26 @@
             if (open) problems.push(`${id}: a slur never closes`);
           }
 
+          // ── hairpin placement ───────────────────────────────────────
+          // A ramp is measured in whole beats, so that it can never begin or end
+          // in the middle of a group: half a triplet, or the second of an eighth
+          // pair, is a crescendo that happens *inside* the group. Its first note
+          // therefore starts on a beat, and so does whatever follows its last.
+          if (p.swell) {
+            const bar = p.bars[p.swell.bar];
+            const first = bar[p.swell.from];
+            const after = bar[p.swell.to + 1];
+            const onBeat = (start) => Math.abs(start / p.beat - Math.round(start / p.beat)) < 1e-6;
+            if (!first || !onBeat(first.start)) {
+              problems.push(`${id}: the hairpin starts mid-beat at ${first ? first.start : '?'}`);
+            }
+            if (after && !onBeat(after.start)) {
+              problems.push(`${id}: the hairpin ends mid-beat, before ${after.start}`);
+            }
+            if (p.swell.to <= p.swell.from) problems.push(`${id}: the hairpin covers ${p.swell.to - p.swell.from} notes`);
+            if (level < 4) problems.push(`${id}: a hairpin at level ${level}`);
+          }
+
           // Level I is D major, one octave, quarter notes and slower, no rests —
           // the Manual's page for level I has nothing else on it.
           if (level === 1) {
