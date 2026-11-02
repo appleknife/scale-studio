@@ -151,6 +151,65 @@ export async function loadBank(ctx, base = 'samples/', bank = emptyBank()) {
 /* ── How long a note sounds ──────────────────────────────────────────── */
 
 /**
+ * How a note longer than its take is stitched together.
+ *
+ * The obvious way is `source.loop`, and it is what the voice used do — but a
+ * hard loop is audible on a held note for two reasons that have nothing to do
+ * with clicks. The first is the seam: even joining zero crossing to zero
+ * crossing, the *envelope* either side of the join does not match, so every pass
+ * is a small step in loudness. The second is worse on a sustained violin: the
+ * take has vibrato, and a hard loop repeats one cycle of it exactly, so the note
+ * acquires a pulse that no player would produce. On a level I whole note that is
+ * four seconds of audible machinery.
+ *
+ * So the note is played as a chain of passes through the middle of the take,
+ * each starting before the previous one ends, with an **equal-power crossfade**
+ * between them. There is no seam to hear: the two copies are different parts of
+ * the vibrato, and they cross while both are sounding. Each pass is a separate
+ * buffer source, so this costs nothing but a few nodes.
+ *
+ * Returns the passes as plain numbers — start time, where in the take, how long,
+ * and the two fades — so the arithmetic can be tested without any audio.
+ */
+export function loopPasses({ at, want, offset, rate, loopStart, loopEnd, attack = 0.004, release = 0.1 }) {
+  const passes = [];
+  const passLen = Math.max(0.05, (loopEnd - loopStart) / rate);
+  const firstLen = Math.max(0.05, (loopEnd - offset) / rate);
+  // Long enough that the two copies are never in phase, short enough to hide in
+  // the note; never longer than a third of the pass, or the note would be more
+  // crossfade than take.
+  const cross = Math.min(0.18, passLen * 0.33);
+  const endsAt = at + want;
+
+  let start = at;
+  let from = offset;
+  let span = firstLen;
+  let first = true;
+
+  for (let guard = 0; guard < 64; guard++) {
+    const length = Math.min(span, endsAt - start);
+    if (!(length > 0.01)) break;
+    const more = start + length < endsAt - 0.01;
+    passes.push({
+      from,
+      start,
+      length,
+      fadeIn: first ? Math.min(attack, length * 0.5) : Math.min(cross, length * 0.5),
+      fadeOut: more ? Math.min(cross, length * 0.5) : Math.min(release, length * 0.5),
+      first,
+    });
+    if (!more) break;
+    // The next pass begins one crossfade before this one ends, so the two are
+    // always sounding together across the join.
+    start = start + length - passes[passes.length - 1].fadeOut;
+    from = loopStart;
+    span = passLen;
+    first = false;
+  }
+  return passes;
+}
+
+/**
  * The envelope for one note: where to start in the take, how long to let it
  * sound, and how long the fades are.
  *
@@ -206,31 +265,28 @@ export function sampleVoice(ctx, destination, bank) {
       const tilt = recorded ? { gain: 1 } : LEVEL_TILT[level] || LEVEL_TILT.mf;
       const rate = rateFor(sample, midi);
 
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.playbackRate.value = rate;
-
-      // The tilt: one filter, or two when the layer wants both ends shaped.
-      let tail = source;
-      if (tilt.lowpass) {
-        const low = ctx.createBiquadFilter();
-        low.type = 'lowpass';
-        low.frequency.value = tilt.lowpass;
-        low.Q.value = tilt.lowpassQ || 0.7;
-        tail.connect(low);
-        tail = low;
-      }
+      // The tilt: one filter, or two when the layer wants both ends shaped. It
+      // sits between every pass and the note's own gain, so all the copies of a
+      // held note are shaped once.
+      const amp = ctx.createGain();
+      let head = amp;
       if (tilt.highShelf) {
         const shelf = ctx.createBiquadFilter();
         shelf.type = 'highshelf';
         shelf.frequency.value = tilt.highShelfAt || 1500;
         shelf.gain.value = tilt.highShelf;
-        tail.connect(shelf);
-        tail = shelf;
+        shelf.connect(head);
+        head = shelf;
       }
-
-      const amp = ctx.createGain();
-      tail.connect(amp).connect(destination);
+      if (tilt.lowpass) {
+        const low = ctx.createBiquadFilter();
+        low.type = 'lowpass';
+        low.frequency.value = tilt.lowpass;
+        low.Q.value = tilt.lowpassQ || 0.7;
+        low.connect(head);
+        head = low;
+      }
+      amp.connect(destination);
 
       // A short note lets its staccato take ring out (see noteShape), an accent is
       // only louder, and a slur landing starts a little way into the take so it
@@ -251,25 +307,57 @@ export function sampleVoice(ctx, destination, bank) {
       const level_ = (ramp == null ? 1 : ramp) * tilt.gain;
       const peak = level_ * (sample.gain || 1) * BANK_GAIN;
 
-      // A held note outlasts its take; the loop runs between two points an
-      // integer number of periods apart, so the join lands on a zero crossing.
-      // A short take is never looped: it is already as long as it is, and the
-      // whole point is to let it end by itself.
+      // One pass is the whole note for everything except a held note that outlasts
+      // its take. Those are stitched from several passes with crossfades (see
+      // loopPasses) instead of a hard loop, because a hard loop repeats the
+      // take's vibrato exactly and that is audible on a four-second note.
       const span = (buffer.duration - offset) / rate;
-      if (!shortTake && sample.loopEnd && want > span - 0.06) {
-        source.loop = true;
-        source.loopStart = sample.loopStart;
-        source.loopEnd = sample.loopEnd;
+      const held = !shortTake && sample.loopEnd && want > span - 0.03;
+      const passes = held
+        ? loopPasses({
+            at,
+            want,
+            offset,
+            rate,
+            loopStart: sample.loopStart,
+            loopEnd: sample.loopEnd,
+            attack,
+            release,
+          })
+        : [{ from: offset, start: at, length: want, fadeIn: attack, fadeOut: release, first: true }];
+
+      for (const pass of passes) {
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = rate;
+        const gain = ctx.createGain();
+        source.connect(gain).connect(head);
+
+        // Equal power, not linear: two copies of the same note fading past each
+        // other at half volume each would sum to a dip, which is exactly the
+        // pulse this is here to remove. sin/cos keeps the sum constant.
+        const t0 = pass.start;
+        const t1 = t0 + pass.fadeIn;
+        const t3 = t0 + pass.length;
+        const t2 = Math.max(t1, t3 - pass.fadeOut);
+        const curve = (up, steps = 24) => {
+          const out = new Float32Array(steps);
+          for (let i = 0; i < steps; i++) {
+            const x = i / (steps - 1);
+            out[i] = peak * (up ? Math.sin((x * Math.PI) / 2) : Math.cos((x * Math.PI) / 2));
+          }
+          return out;
+        };
+
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.setValueCurveAtTime(curve(true), t0, Math.max(0.001, pass.fadeIn));
+        gain.gain.setValueAtTime(peak, t1);
+        if (t2 > t1) gain.gain.setValueAtTime(peak, t2);
+        gain.gain.setValueCurveAtTime(curve(false), t2, Math.max(0.001, t3 - t2));
+
+        source.start(t0, pass.from);
+        source.stop(t3 + 0.02);
       }
-
-      const hold = Math.max(attack + 0.01, want - release);
-      amp.gain.setValueAtTime(0, at);
-      amp.gain.linearRampToValueAtTime(peak, at + attack);
-      amp.gain.setValueAtTime(peak, at + hold);
-      amp.gain.linearRampToValueAtTime(0, at + want);
-
-      source.start(at, offset);
-      source.stop(at + want + 0.06);
       return true;
     },
   };

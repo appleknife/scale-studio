@@ -20,10 +20,11 @@
         pickSample,
         rateFor,
         noteShape,
+        loopPasses,
         LEVEL_GAIN,
         LEVEL_TILT,
         BANK_GAIN,
-      } from '../src/sampler.js?v=202611023700';
+      } from '../src/sampler.js?v=202611023800';
 
       const problems = [];
       const log = [];
@@ -84,8 +85,12 @@
           }
           const length = s.loopEnd - s.loopStart;
           if (s.loopEnd <= s.loopStart) problems.push(`${s.id}: loop runs backwards`);
-          if (length < 0.3 || length > 1.3) problems.push(`${s.id}: loop is ${length.toFixed(2)} s`);
-          if (s.loopEnd > s.seconds) problems.push(`${s.id}: loop ends past the take`);
+          // Long is good: the longer the region, the less often the take comes
+          // round again on a held note.
+          if (length < 0.8 || length > 1.5) problems.push(`${s.id}: loop is ${length.toFixed(2)} s`);
+          // …but it must not start at the attack, or every pass would re-bow.
+          if (s.loopStart < 0.2) problems.push(`${s.id}: loop starts at ${s.loopStart} s, on the attack`);
+          if (s.loopEnd > s.seconds - 0.02) problems.push(`${s.id}: loop ends past the take`);
         }
 
         /* ── tuning: the reason the set is playable ─────────────────── */
@@ -207,6 +212,56 @@
           check(cut.want < 0.1, 'a short note on a sustained take is not being cut');
           check(Math.abs(held.want - 0.5) < 1e-9, 'a plain note is not its written length');
           check(dotted.fade < 0.06, 'the ring is being faded out rather than left to decay');
+        }
+
+        /* ── how a held note is stitched ────────────────────────────── */
+        //
+        // A whole note at level I is four seconds and the takes are under two, so
+        // the note is a chain of passes through the take with crossfades between
+        // them. What must hold: the chain covers the whole note, consecutive
+        // passes overlap (never a gap), and no pass after the first starts at the
+        // attack — that would be a re-bow in the middle of a held note.
+        {
+          const long = loopPasses({
+            at: 1.0,
+            want: 4.0,
+            offset: 0.016,
+            rate: 1,
+            loopStart: 0.34,
+            loopEnd: 1.66,
+            attack: 0.004,
+            release: 0.12,
+          });
+          const last = long[long.length - 1];
+          log.push(
+            `a 4 s note: ${long.length} passes · first ${long[0].from}s → ${(long[0].length).toFixed(2)} s · ` +
+              `ends at ${(last.start + last.length - 1).toFixed(3)} s of the note`,
+          );
+          check(long.length >= 3, `a four-second note is only ${long.length} pass(es)`);
+          check(Math.abs(last.start + last.length - 5.0) < 0.02, 'the chain does not end with the note');
+          for (let i = 1; i < long.length; i++) {
+            const prev = long[i - 1];
+            const here = long[i];
+            check(
+              here.start < prev.start + prev.length - 0.001,
+              `pass ${i} starts after the one before it ended — that is a gap, not a crossfade`,
+            );
+            check(here.start > prev.start + 0.2, `pass ${i} does not advance`);
+            check(here.from > 0.2, 'a later pass starts at the attack of the take');
+            // The incoming fade may be shorter than the outgoing one (a short final
+            // pass), but never longer: that would leave the note thin at the join.
+            check(here.fadeIn <= prev.fadeOut + 1e-9, 'the crossfade into a pass is longer than out of it');
+          }
+          check(long[0].fadeIn <= 0.005, 'the first pass lost its attack');
+
+          // A note that fits inside its take is a single pass, unchanged.
+          const one = loopPasses({ at: 0, want: 0.5, offset: 0, rate: 1, loopStart: 0.34, loopEnd: 1.66 });
+          check(one.length === 1, `a short note was split into ${one.length} passes`);
+
+          // A take played a little slower needs a touch more chain, not a gap.
+          const slow = loopPasses({ at: 0, want: 4, offset: 0, rate: 0.94, loopStart: 0.34, loopEnd: 1.66 });
+          const slowLast = slow[slow.length - 1];
+          check(Math.abs(slowLast.start + slowLast.length - 4) < 0.02, 'a slowed take does not reach the end');
         }
 
         /* ── the derived loud and soft layers ───────────────────────── */

@@ -838,10 +838,26 @@ that covers the whole range), an accented note uses an accent take, and a slur's
 second note uses the **landing half** of a recorded slur — the second note split out
 of the pair, with no attack of its own, which is precisely what "one bow" means.
 
-**Long notes loop.** A whole note at level I is four seconds; the takes are under
-two. Each sustained take carries loop points measured as two positive-going zero
-crossings an integer number of periods apart, so the join lands where the waveform
-is silent and the loop cannot click.
+**Long notes are stitched, not looped.** A whole note at level I is four seconds;
+the takes are under two. The first version used `source.loop` with the join placed
+on a zero crossing, which avoids a click but not the two things you can actually
+hear on a sustained note: the envelope either side of the join does not match, so
+every pass is a small step in loudness; and the take has *vibrato*, so a hard loop
+repeats one cycle of it exactly and the note acquires a pulse no player would
+produce. The teacher heard it on level I.
+
+So a held note is now a chain of passes through the middle of the take, each
+starting before the previous one ends, joined by an **equal-power crossfade**
+(`loopPasses()` in `src/sampler.js`). The two copies are different parts of the
+vibrato and they cross while both are sounding, so there is no seam to find.
+Measured on the gain envelope, a four-second note is flat to **0.00 dB** through
+its middle — no dip at the joins and no bump either. The loop region was also
+stretched from 0.8 s to 1.32 s, so the take comes round half as often.
+
+`sampler.test.html` holds the arithmetic without any audio: the chain covers the
+whole note, consecutive passes overlap rather than leaving a gap, no pass after
+the first starts at the attack (which would be a re-bow in the middle of a held
+note), and a note that fits inside its take is still a single pass.
 
 **The files** are 44.1 kHz mono AAC at 96 kbps — 22 kB a take, 800 kB for the set,
 which is fetched once while the student is reading the page. AAC rather than Opus
