@@ -671,6 +671,69 @@ h3 {
   white-space: nowrap;
 }
 
+/* ── The menu ────────────────────────────────────────────────────────── */
+
+/* Five doors: one wide one for scales, because that is what most visits are
+   for, and four smaller ones beside and below it. */
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 26px 0 10px;
+}
+
+.menu-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  font: inherit;
+  padding: 18px 20px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.menu-tile:hover {
+  transform: translateY(-1px);
+  border-color: #cdbfa6;
+  box-shadow: 0 12px 26px -20px rgba(36, 31, 26, 0.5);
+}
+
+.menu-tile.is-primary {
+  grid-column: 1 / -1;
+  background: linear-gradient(180deg, #f8fbf8 0%, var(--surface) 100%);
+  border-color: #d9e4dc;
+  padding: 22px 24px 24px;
+}
+
+.menu-title {
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.menu-tile.is-primary .menu-title {
+  font-size: 27px;
+}
+
+.menu-sub {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+  max-width: 46ch;
+}
+
+@media (max-width: 560px) {
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Your stats ──────────────────────────────────────────────────────── */
 
 /* The summary: five numbers about practice as a whole, above the two tabs. */

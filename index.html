@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611024400" />
+    <link rel="stylesheet" href="app.css?v=202611024530" />
   </head>
   <body>
     <div class="shell">
@@ -57,17 +57,67 @@
           </p>
         </div>
 
-        <!-- ── Choose a scale ─────────────────────────────────────────── -->
+        <!-- ── The menu ────────────────────────────────────────────────────
+             Five things to do, one tap apart. The scale grid used to sit under four
+             banners; every feature that arrived pushed the thing a student opens the
+             app for further down the page. Now the menu is the menu, and the grid has
+             the whole screen to itself. -->
         <section class="view" id="view-choose">
           <!-- On a shared tablet, whose log is open is a question that should be
-               answered *before* the app shows anything personal. It used to be
-               answered inside the practice log, which meant a sibling had to walk
-               through someone else's week to find their own. Shown only when there
-               is more than one name. -->
+               answered *before* the app shows anything personal. -->
           <div class="who-row home-who" id="homeWho" hidden>
             <span class="who-label">Who's practicing?</span>
             <div class="chip-row" id="homeWhoChips"></div>
           </div>
+
+          <div class="intro">
+            <h1>What are we doing today?</h1>
+            <p>
+              Choose a space. Scales is where most days start — pick a key, press
+              start, and the app listens to the whole scale.
+            </p>
+          </div>
+
+          <div class="menu-grid">
+            <button class="menu-tile is-primary" id="openScalesBtn" type="button">
+              <span class="menu-title">Scales</span>
+              <span class="menu-sub" id="menuScalesSub">
+                Twelve majors and the minor forms, levels I–VI. Play one and the app
+                listens.
+              </span>
+            </button>
+            <button class="menu-tile" id="drawBtn" type="button">
+              <span class="menu-title">Mock audition <span class="banner-level" id="drawLevel"></span></span>
+              <span class="menu-sub" id="testBannerText">
+                Three scales drawn the way a judge does — no feedback until the end.
+              </span>
+            </button>
+            <button class="menu-tile" id="openSightBtn" type="button">
+              <span class="menu-title">Sight reading</span>
+              <span class="menu-sub">
+                Eight bars you have never seen, written to your level.
+              </span>
+            </button>
+            <button class="menu-tile" id="openLogBtn" type="button">
+              <span class="menu-title">Practice log</span>
+              <span class="menu-sub" id="logBannerText">
+                What you played, what was hard, and how close the scales are to ready.
+              </span>
+            </button>
+            <button class="menu-tile" id="openStatsBtn" type="button">
+              <span class="menu-title">Your stats</span>
+              <span class="menu-sub">
+                Your own records: best scores, what is improving, days played.
+              </span>
+            </button>
+          </div>
+        </section>
+
+        <!-- ── Scales ──────────────────────────────────────────────────── -->
+        <section class="view" id="view-scales" hidden>
+          <button class="back-btn" id="scalesBack" type="button">
+            <span aria-hidden="true">←</span> Menu
+          </button>
 
           <div class="intro">
             <h1>Which scale today?</h1>
@@ -87,49 +137,6 @@
               <button type="button" role="tab" data-level="3-4" aria-selected="false">III–IV</button>
               <button type="button" role="tab" data-level="5-6" aria-selected="true">V–VI</button>
             </div>
-          </div>
-
-          <div class="test-banner">
-            <div class="test-banner-copy">
-              <h3>Mock audition <span class="banner-level" id="drawLevel"></span></h3>
-              <p id="testBannerText">
-                The app draws three scales at random — the way a judge does. Play them
-                one after another, no feedback until the end.
-              </p>
-            </div>
-            <button class="primary-btn" id="drawBtn" type="button">Draw three scales</button>
-          </div>
-
-          <div class="test-banner sight-banner">
-            <div class="test-banner-copy">
-              <h3>Sight reading</h3>
-              <p>
-                Eight bars you have never seen, written to your level — key, time
-                signature, rhythms and range all from the Manual.
-              </p>
-            </div>
-            <button class="primary-btn" id="openSightBtn" type="button">Open sight reading</button>
-          </div>
-
-          <div class="test-banner log-banner">
-            <div class="test-banner-copy">
-              <h3>Practice log</h3>
-              <p id="logBannerText">
-                What you played, what was hard, and how close the scales are to ready.
-              </p>
-            </div>
-            <button class="primary-btn" id="openLogBtn" type="button">Open the log</button>
-          </div>
-
-          <div class="test-banner stats-banner">
-            <div class="test-banner-copy">
-              <h3>Your stats</h3>
-              <p id="statsBannerText">
-                Every take, every scale, your own records — best scores, what is improving,
-                and the days you actually played.
-              </p>
-            </div>
-            <button class="primary-btn" id="openStatsBtn" type="button">Open the stats</button>
           </div>
 
           <div class="mode-row">
@@ -958,7 +965,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611024400"></script>
+    <script type="module" src="src/app.js?v=202611024530"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

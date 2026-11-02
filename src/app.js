@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611024400';
-import { renderStaff } from './staff.js?v=202611024400';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611024400';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611024400';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611024400';
-import { generatePassage } from './sightreading.js?v=202611024400';
-import { createPlayer } from './playback.js?v=202611024400';
-import { renderScore } from './score.js?v=202611024400';
-import * as Journal from './journal.js?v=202611024400';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611024400';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611024400';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611024530';
+import { renderStaff } from './staff.js?v=202611024530';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611024530';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611024530';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611024530';
+import { generatePassage } from './sightreading.js?v=202611024530';
+import { createPlayer } from './playback.js?v=202611024530';
+import { renderScore } from './score.js?v=202611024530';
+import * as Journal from './journal.js?v=202611024530';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611024530';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611024530';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611024400';
+} from './tuner.js?v=202611024530';
 
 const LANG = initLang();
 
@@ -27,6 +27,7 @@ const $ = (id) => document.getElementById(id);
 const el = {
   views: {
     choose: $('view-choose'),
+    scales: $('view-scales'),
     practice: $('view-practice'),
     stats: $('view-stats'),
     result: $('view-result'),
@@ -58,6 +59,8 @@ const el = {
   sightAgain: $('sightAgain'),
   sightNext: $('sightNext'),
   openLogBtn: $('openLogBtn'),
+  openScalesBtn: $('openScalesBtn'),
+  scalesBack: $('scalesBack'),
   openStatsBtn: $('openStatsBtn'),
   statsBack: $('statsBack'),
   statsSub: $('statsSub'),
@@ -334,12 +337,11 @@ function updateLevelCopy() {
   el.gridNote.textContent = gridNoteText();
 
   const level = state.mode === 'minor' ? '5-6' : state.level;
-  el.testBannerText.textContent = t(`banner.${level}`);
-  // Say which level the draw will use, right on the card, so the answer is on
-  // screen next to the button that acts on it.
+  // The tile carries the same line the old banner did: what the draw will do, in
+  // this level's terms. Its title stays put — the tile is a door, not a button
+  // whose label changes.
+  if (el.testBannerText) el.testBannerText.textContent = t(`banner.${level}`);
   if (el.drawLevel) el.drawLevel.textContent = LEVEL_MARK[level] || '';
-  el.drawBtn.textContent =
-    level === '1-2' ? t('btn.choose3') : level === '3-4' ? t('btn.choose7') : t('btn.draw3');
 }
 
 function setLevel(level) {
@@ -2633,6 +2635,12 @@ function goHome() {
   showView('choose');
 }
 
+/** The grid's own screen: reached from the menu, and where a take goes back to. */
+function openScales() {
+  cancelListening();
+  showView('scales');
+}
+
 function renderPractice() {
   const scale = state.scale;
   el.scaleTitle.textContent = scale.title;
@@ -3254,10 +3262,13 @@ el.spellingRow.addEventListener('click', (event) => {
   renderPractice();
 });
 
-el.backBtn.addEventListener('click', goHome);
+// A scale take goes back to the grid it came from; the menu is one step above it.
+el.backBtn.addEventListener('click', openScales);
 el.brandHome.addEventListener('click', goHome);
-el.resultBack.addEventListener('click', goHome);
-el.anotherBtn.addEventListener('click', goHome);
+el.resultBack.addEventListener('click', openScales);
+el.anotherBtn.addEventListener('click', openScales);
+el.openScalesBtn.addEventListener('click', openScales);
+el.scalesBack.addEventListener('click', goHome);
 
 el.drawBtn.addEventListener('click', () => {
   if (LEVELS[state.level].choose) openPicker();

@@ -969,6 +969,16 @@ export const STATIC = {
   'Practice log': '练习记录',
   'Your stats': '我的数据',
   'Open the stats': '打开数据页',
+  'What are we doing today?': '今天想做什么？',
+  'Choose a space. Scales is where most days start — pick a key, press start, and the app listens to the whole scale.':
+    '选一个空间。大多数时候都是先练音阶——挑一个调，点开始，应用会听完整条音阶。',
+  'Menu': '菜单',
+  'Twelve majors and the minor forms, levels I–VI. Play one and the app listens.':
+    '十二个大调加上小调的各种形式，一至六级。拉一条，应用就听着。',
+  'Eight bars you have never seen, written to your level.':
+    '八小节你没见过的谱子，按你的级别写。',
+  'Your own records: best scores, what is improving, days played.':
+    '你自己的记录：最好成绩、在进步的地方、练过的天数。',
   'Every take, every scale, your own records — best scores, what is improving, and the days you actually played.':
     '每一次录音、每一条音阶，都是你自己的记录——最好成绩、在进步的地方，还有真正练过的日子。',
   'Keeping it safe': '留住这份记录',
