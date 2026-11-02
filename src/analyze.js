@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611023200';
-import { getLang, t } from './i18n.js?v=202611023200';
+import { median } from './pitch.js?v=202611023400';
+import { getLang, t } from './i18n.js?v=202611023400';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -24,6 +24,76 @@ export const DEFAULTS = {
 };
 
 const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * What a take says about the player, as opposed to what it scores.
+ *
+ * The score answers "how did that go"; this answers "what should I work on",
+ * which is the question a teacher answers from the same evidence. Everything
+ * here is measured, nothing is inferred: a pitch class is only named when at
+ * least two of its notes were played and they agree with each other, and a
+ * drift is only reported when the middle of the take and its end disagree by
+ * enough to hear.
+ *
+ * Returned in plain numbers — the screens do the language.
+ *
+ * @param {Array} results per-note results: {status, cents, event:{midi}}
+ * @param {Array} ratios seconds-per-written-unit, one per consecutive pair
+ */
+export function listenNotes(results = [], ratios = []) {
+  const tuned = results.filter((r) => r.status === 'exact' && Number.isFinite(r.cents));
+
+  // A systematic error by pitch class: the same finger, the same habit.
+  const byClass = new Map();
+  for (const r of tuned) {
+    // Two analysers, two shapes: a scale take carries the written note on the
+    // result itself, a sight-reading take carries the whole event. Both are read.
+    const note = (r.event && r.event.note) || r.note || null;
+    const midi = note && note.midi != null ? note.midi : r.event && r.event.midi;
+    if (midi == null) continue;
+    const pc = ((midi % 12) + 12) % 12;
+    const cell = byClass.get(pc) || {
+      pc,
+      midi,
+      sum: 0,
+      n: 0,
+      // The name as the page spells it — E♭ stays E♭ even though its pitch class
+      // is also D♯, because the student is reading the page, not a keyboard.
+      name: (note && note.name) || null,
+    };
+    cell.sum += r.cents;
+    cell.n += 1;
+    byClass.set(pc, cell);
+  }
+  const bias = [...byClass.values()]
+    .filter((c) => c.n >= 2)
+    .map((c) => ({ pc: c.pc, midi: c.midi, cents: c.sum / c.n, n: c.n, name: c.name }))
+    .sort((a, b) => Math.abs(b.cents) - Math.abs(a.cents));
+
+  // The whole take leaning one way: worth saying once, gently.
+  const mean = tuned.length ? tuned.reduce((a, r) => a + r.cents, 0) / tuned.length : 0;
+
+  // Speeding up or slowing down: the middle against the end, so a wobble at the
+  // start or one late note cannot tilt it.
+  let drift = null;
+  if (ratios.length >= 6) {
+    const middle = median(ratios.slice(0, Math.ceil(ratios.length / 2)));
+    const end = median(ratios.slice(Math.floor(ratios.length / 2)));
+    if (middle > 0) {
+      const factor = end / middle;
+      if (Math.abs(factor - 1) >= 0.12) drift = { factor, faster: factor < 1 };
+    }
+  }
+
+  return {
+    mean,
+    // Only one pitch class is ever named: a list of five would be a diagnosis,
+    // and this is a suggestion.
+    bias: bias.length && Math.abs(bias[0].cents) >= 15 ? bias[0] : null,
+    drift,
+    tuned: tuned.length,
+  };
+}
 
 function percentile(sorted, p) {
   if (!sorted.length) return 0;
@@ -270,6 +340,7 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     intonation = clamp(sum / tuned.length);
   }
 
+
   // --- Steadiness ---------------------------------------------------------
   const iois = [];
   for (let k = 1; k < pairs.length; k++) {
@@ -326,6 +397,8 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     },
     detected: notes,
   };
+  // What this take says about the player, as opposed to how it scored.
+  result.habits = listenNotes(noteResults, iois);
   result.tips = buildTips(result);
   return result;
 }
@@ -406,6 +479,38 @@ export function buildTips(result) {
         Math.min(0.12, Math.abs(avg) / 200),
       );
     }
+  }
+
+  // A single pitch that sits off across the whole take: the same finger, or the
+  // same string. Named only when at least two of its notes agree, so it cannot
+  // be one unlucky entry being blamed on a habit.
+  const habit = result.habits;
+  if (habit && habit.bias) {
+    push(
+      {
+        kind: 'intonation',
+        title: t('tip.bias.title', { note: habit.bias.name || '' }),
+        text: t(habit.bias.cents > 0 ? 'tip.bias.high' : 'tip.bias.low', {
+          note: habit.bias.name || '',
+          cents: Math.abs(habit.bias.cents).toFixed(0),
+          n: habit.bias.n,
+        }),
+      },
+      0.16,
+    );
+  }
+
+  if (habit && habit.drift) {
+    push(
+      {
+        kind: 'rhythm',
+        title: t(habit.drift.faster ? 'tip.drift.faster.title' : 'tip.drift.slower.title'),
+        text: t(habit.drift.faster ? 'tip.drift.faster.text' : 'tip.drift.slower.text', {
+          pct: Math.abs((habit.drift.factor - 1) * 100).toFixed(0),
+        }),
+      },
+      0.12,
+    );
   }
 
   if (components.steadiness < 0.92) {
@@ -564,6 +669,8 @@ export function analyzeSightTake(frames, passage, options = {}) {
     ratios.push((notes[pairs[k].d].t0 - notes[pairs[k - 1].d].t0) / units);
   }
   const unit = ratios.length ? median(ratios) : 0;
+  // What this take says about the player, beyond what it scores.
+  const habits = listenNotes(results, ratios);
   let rhythm = 0.6;
   let stops = 0;
   if (ratios.length >= 4 && unit > 0) {
@@ -609,6 +716,7 @@ export function analyzeSightTake(frames, passage, options = {}) {
     exact,
     octaveErrors,
     wrong,
+    habits,
     duration: frames.length ? frames[frames.length - 1].t : 0,
   };
 }

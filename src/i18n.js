@@ -299,7 +299,7 @@ export const S = {
   ],
   'sight.tipAllNotes': ['Every note was there.', '每个音都拉出来了。'],
   'sight.tipRepeat': [
-    '{n} notes came out that the page does not ask for — a bar played again, or a slip. Fine while you practise; in an audition, carry on from where you stopped.',
+    '{n} notes came out that the page does not ask for — a bar played again, or a slip. Fine while you practice; in an audition, carry on from where you stopped.',
     '有 {n} 个多出来的音，谱子上没有——可能是重来了一小节，也可能多拉了音。练习时没关系，考试时从停下的地方接着往下拉就好。',
   ],
   'sight.tipWrong': [
@@ -316,6 +316,26 @@ export const S = {
   'sight.tipStops': [
     '{n} stop(s). Read it a bar at a time, slowly, until it flows.',
     '停顿了 {n} 次。一小节一小节慢慢读，直到顺下来。',
+  ],
+  // What the listening noticed, as opposed to what it scored.
+  'tip.bias.title': ['The {note} kept sitting off', '{note} 总是偏一点'],
+  'tip.bias.high': [
+    '{n} of them sat {cents} cents high — the same finger, or the same string.',
+    '这些音里有 {n} 个偏高了 {cents} 音分——可能是同一个手指，或者同一根弦。',
+  ],
+  'tip.bias.low': [
+    '{n} of them sat {cents} cents low — the same finger, or the same string.',
+    '这些音里有 {n} 个偏低了 {cents} 音分——可能是同一个手指，或者同一根弦。',
+  ],
+  'tip.drift.faster.title': ['It sped up towards the end', '后半段越拉越快'],
+  'tip.drift.faster.text': [
+    'About {pct}% quicker by the end. Set the metronome a notch slower and keep the last four notes at the speed you started.',
+    '到后面快了大约 {pct}%。把节拍器降一格，最后四个音保持开头那个速度。',
+  ],
+  'tip.drift.slower.title': ['It settled slower', '后半段慢下来了'],
+  'tip.drift.slower.text': [
+    'About {pct}% slower by the end. Start at the speed you finished — the music is not asking for a ritardando.',
+    '到后面慢了大约 {pct}%。用结尾那个速度起头——谱子上并没有渐慢。',
   ],
   'test.stops': ['{n} stops', '{n} 次停顿'],
   'test.stopOne': ['1 stop', '1 次停顿'],
@@ -359,7 +379,7 @@ export const S = {
   ],
   'boot.title': ['This page needs its little server', '这个页面需要本地小服务'],
   'boot.body': [
-    'Double-click <strong>Start Scale Studio.cmd</strong> in the app folder and use the page it opens (<code>http://localhost:8777/</code>). Leave the black window open while you practise — closing it stops the app.',
+    'Double-click <strong>Start Scale Studio.cmd</strong> in the app folder and use the page it opens (<code>http://localhost:8777/</code>). Leave the black window open while you practice — closing it stops the app.',
     '双击文件夹里的 <strong>Start Scale Studio.cmd</strong>，用它打开的页面（<code>http://localhost:8777/</code>）。练习时那个黑窗口要一直开着——关掉它，应用就停了。',
   ],
   'boot.detail': [
@@ -513,7 +533,7 @@ export const S = {
   'log.chip.days': ['{n} days', '{n} 天'],
   'log.chip.scale1': ['1 scale', '1 条音阶'],
   'log.chip.scales': ['{n} scales', '{n} 条音阶'],
-  'log.win.daysLabel': ['Days practised', '练习天数'],
+  'log.win.daysLabel': ['Days practiced', '练习天数'],
   'log.win.day1': ['1 day', '1 天'],
   'log.win.daysN': ['{n} days', '{n} 天'],
   'log.win.more': ['{n} more than last week', '比上周多 {n}'],
@@ -581,6 +601,17 @@ export const S = {
   'log.sheet.did': ['Did: {list}', '练了：{list}'],
   'log.sheet.hard': ['Hard this week: {list}', '这周觉得难的地方：{list}'],
   'log.sheet.ready': ['Scales ready: {n} of {total}', '就绪的音阶：{n}/{total}'],
+  // ── This take against the last few ──
+  'compare.first': [
+    'First time on this one, so there is nothing to beat yet.',
+    '这是第一次练它，暂时还没有可比较的。',
+  ],
+  'compare.best': ['{n} points above your best.', '比你的最好成绩高 {n} 分。'],
+  'compare.equalled': ['Level with your best of {n}.', '和你的最好成绩 {n} 分持平。'],
+  'compare.close': ['Your best is {n} — close behind it.', '你的最好成绩是 {n} 分，很接近了。'],
+  'compare.below': ['Your best is {n}; this one sat a little below it.', '你的最好成绩是 {n} 分，这次稍微低一点。'],
+  'log.share': ['Share the week', '分享这周'],
+  'log.shareTitle': ['My practice week', '我这周的练习'],
   'log.copy': ['Copy the week', '复制这一周'],
   'log.copied': ['Copied', '已复制'],
   'log.me': ['Me', '我'],
@@ -772,7 +803,7 @@ export const STATIC = {
   'Everything here lives on this device. Nothing is uploaded, and a recording lasts only as long as this tab is open.':
     '这些只存在这台设备上。不会上传；录音也只在这个标签页开着的时候存在。',
   'days in a row': '天连续',
-  "Who's practising?": '谁在练习？',
+  "Who's practicing?": '谁在练习？',
   'Rename or remove a name': '改名或删除名字',
   'Your name': '你的名字',
   'Two rest days a week are yours to take. A day off you planned is not a broken streak.':

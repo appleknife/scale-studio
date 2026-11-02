@@ -68,7 +68,7 @@
       }
 
       {
-        // Not practising yet today shows yesterday's run rather than zero: a good
+        // Not practicing yet today shows yesterday's run rather than zero: a good
         // habit should not look lost before breakfast.
         const s = J.emptyState();
         J.log(s, J.addDays(TODAY, -1), 'scales');
@@ -110,7 +110,7 @@
         eq('today is marked', weeks[4][2].today, true);
         eq('the future is future', weeks[4][3].future, true);
         eq('the past is not', weeks[0][0].future, false);
-        eq('today is filled', weeks[4][2].practised, true);
+        eq('today is filled', weeks[4][2].practiced, true);
       }
 
       /* ── scales ready ──────────────────────────────────────────────── */
@@ -150,7 +150,7 @@
         eq('week start', sheet.start, '2026-03-09');
         // Marking what was hard is not itself practice — the day needs a tag or a
         // take, or a stray tap would keep the streak alive on its own.
-        eq('days practised', sheet.days, 2);
+        eq('days practiced', sheet.days, 2);
         eq('takes', sheet.takes, 2);
         eq('scales tagged', sheet.tags.scales, 1);
         eq('sight tagged', sheet.tags.sight, 1);
@@ -166,9 +166,9 @@
         eq('tag off again', (J.toggleHard(s, TODAY, 'tone'), J.hardThatDay(s, TODAY)), ['tone']);
         J.toggleHard(s, TODAY, 'tone');
         eq('empty after two taps', J.hardThatDay(s, TODAY), []);
-        eq('a day with no tags is not practice', J.practised(s, TODAY), false);
+        eq('a day with no tags is not practice', J.practiced(s, TODAY), false);
         J.log(s, TODAY, 'tuner');
-        eq('logging a tag makes it practice', J.practised(s, TODAY), true);
+        eq('logging a tag makes it practice', J.practiced(s, TODAY), true);
       }
 
       /* ── storage round trip ────────────────────────────────────────── */
@@ -183,7 +183,7 @@
         eq('empty store gives an empty log', s.days, {});
         J.log(s, TODAY, 'scales');
         J.save(s, fake);
-        eq('it survives the round trip', J.practised(J.load(fake), TODAY), true);
+        eq('it survives the round trip', J.practiced(J.load(fake), TODAY), true);
         J.clear(fake);
         eq('and clears', J.load(fake).days, {});
         // A store that throws must not take the app down with it.
@@ -211,7 +211,7 @@
         eq('a copy is dated', JSON.parse(text).saved, '2026-03-11');
         eq('a copy remembers whose it is', JSON.parse(text).profile, 'Maya');
         const back = J.parse(text);
-        // A rest day is not a practised day, so it lives in `rests` and not in `days`.
+        // A rest day is not a practiced day, so it lives in `rests` and not in `days`.
         eq('a copy survives the round trip', J.totalDays(back.state), 1);
         eq('with its takes', back.state.days['2026-03-09'].takes, 2);
         eq('and its rest day', back.state.rests, ['2026-03-10']);

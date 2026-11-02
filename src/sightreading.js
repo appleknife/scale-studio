@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611023200';
-import { STAFF_GEOM } from './staff.js?v=202611023200';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611023400';
+import { STAFF_GEOM } from './staff.js?v=202611023400';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -439,7 +439,7 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // A level that *meets* sixteenths meets them every time. Left to the draw,
   // level III produced the figure in about a third of its passages, which for a
   // student is the same as never: the page they are given is the page they
-  // practise. So the bar that carries the run is chosen up front — never the
+  // practice. So the bar that carries the run is chosen up front — never the
   // fourth (which ends on a note to breathe on) and never the last — and the
   // pattern there is forced. A second run is still possible, at the same lean.
   const lean = spec.sixteenths ?? 1;

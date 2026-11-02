@@ -216,6 +216,44 @@
       if (short.stats.expected !== 15) problems.push(`one-octave scale has ${short.stats.expected} notes`);
       if (short.score < 90) problems.push(`one-octave take scored only ${short.score}`);
 
+      // I. the same pitch sitting off all the way through: the one thing a
+      // take can say that a score cannot — which finger to look at.
+      {
+        // Every E in the scale half a semitone-ish sharp, nothing else touched.
+        const biased = [];
+        cMajor.sequence.forEach((n, i) => {
+          if (n.name && n.name.startsWith('E')) biased[i] = 24;
+        });
+        const bent = run('one pitch sitting high', cMajor, { vibrato: 0.1, detune: biased });
+        const habit = bent.habits;
+        if (!habit || !habit.bias) {
+          problems.push('a pitch that sat off all the way through was not noticed');
+        } else {
+          if (!habit.bias.name || !habit.bias.name.startsWith('E')) {
+            problems.push(`the wrong pitch was blamed (${habit.bias.name})`);
+          }
+          if (!(habit.bias.cents > 10)) problems.push(`bias strength looks wrong (${habit.bias.cents})`);
+          if (!bent.tips.some((tip) => tip.kind === 'intonation' && /E/.test(tip.title))) {
+            problems.push('no tip named the pitch that sat off');
+          }
+        }
+      }
+
+      // J. speeding up through the take: late notes come quicker than early ones.
+      {
+        const n = cMajor.sequence.length;
+        const speeding = cMajor.sequence.map((_, i) => 0.9 - (0.45 * i) / (n - 1));
+        const rush = run('speeding up', cMajor, { durations: speeding, vibrato: 0.1 });
+        if (!rush.habits || !rush.habits.drift) {
+          problems.push('a take that sped up through it was not noticed');
+        } else {
+          if (!rush.habits.drift.faster) problems.push('the speed-up was read as a slow-down');
+          if (!rush.tips.some((tip) => tip.kind === 'rhythm')) problems.push('no tip about the rush');
+        }
+        // A steady take must not be accused of either.
+        if (clean.habits && clean.habits.drift) problems.push('a steady take was called uneven');
+      }
+
       // H. minor scale, raised 7th spelled correctly
       const aMinor = buildScale(MINOR_KEYS.find((k) => k.id === 'Am'), 0, 'minor', 'harmonic');
       const aMinorNotes = aMinor.sequence.map((n) => n.name).join(' ');

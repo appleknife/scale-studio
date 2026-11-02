@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023200';
-import { renderStaff } from './staff.js?v=202611023200';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611023200';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023200';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023200';
-import { generatePassage } from './sightreading.js?v=202611023200';
-import { createPlayer } from './playback.js?v=202611023200';
-import { renderScore } from './score.js?v=202611023200';
-import * as Journal from './journal.js?v=202611023200';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023200';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023200';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023400';
+import { renderStaff } from './staff.js?v=202611023400';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611023400';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023400';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023400';
+import { generatePassage } from './sightreading.js?v=202611023400';
+import { createPlayer } from './playback.js?v=202611023400';
+import { renderScore } from './score.js?v=202611023400';
+import * as Journal from './journal.js?v=202611023400';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023400';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023400';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611023200';
+} from './tuner.js?v=202611023400';
 
 const LANG = initLang();
 
@@ -92,6 +92,7 @@ const el = {
   reverbToggle: $('reverbToggle'),
   lessonSheet: $('lessonSheet'),
   copySheet: $('copySheet'),
+  shareSheet: $('shareSheet'),
   clearLog: $('clearLog'),
   sightVolume: $('sightVolume'),
   sightLive: $('sightLive'),
@@ -224,7 +225,7 @@ const state = {
   take: null,
   mic: null,
   // A mock audition: the three drawn scales, which one is being played, and
-  // the result of each take. Null when practising a single scale.
+  // the result of each take. Null when practicing a single scale.
   test: null,
   // Practice shows the notation by default; the audition never does, because
   // the Manual asks for the scales "from memory without any visual aid".
@@ -1357,8 +1358,11 @@ function stopSightTake(analyse = true) {
   // Nothing stale left behind: a reading only exists while a take is running.
   resetSightLive();
   if (analyse && take && take.started) {
-    renderSightResult(analyzeSightTake(take.frames, sight.passage));
-    noteTake('sight');
+    const result = analyzeSightTake(take.frames, sight.passage);
+    // Compared against earlier readings at this level, before this one is filed.
+    result.compared = Journal.compareTake(Journal.sightEntry(journal, sight.level), result.score);
+    renderSightResult(result);
+    noteTake('sight', null, result.score);
   } else {
     el.sightStatus.textContent = '';
   }
@@ -1384,7 +1388,8 @@ function renderSightResult(result) {
   const grade = gradeFor(result.score);
   el.sightPct.textContent = `${result.score}%`;
   el.sightGrade.textContent = grade.label;
-  el.sightLine.textContent = grade.note;
+  const compared = result.compared ? compareLine(result.compared) : '';
+  el.sightLine.textContent = compared ? `${grade.note} ${compared}` : grade.note;
 
   const pct = (v) => `${Math.round(v * 100)}%`;
   const rows = [
@@ -1430,6 +1435,24 @@ function renderSightResult(result) {
   }
   if (result.rhythm < 0.75) tips.push(t('sight.tipPulse'));
   if (result.stops > 0) tips.push(t('sight.tipStops', { n: result.stops }));
+  // What the listening noticed rather than what it scored: a pitch that keeps
+  // sitting off, or a take that sped up. Specific enough to act on tonight.
+  if (result.habits && result.habits.bias) {
+    const bias = result.habits.bias;
+    tips.push(
+      t(bias.cents > 0 ? 'tip.bias.high' : 'tip.bias.low', {
+        n: bias.n,
+        cents: Math.abs(bias.cents).toFixed(0),
+      }),
+    );
+  }
+  if (result.habits && result.habits.drift) {
+    tips.push(
+      t(result.habits.drift.faster ? 'tip.drift.faster.text' : 'tip.drift.slower.text', {
+        pct: Math.abs((result.habits.drift.factor - 1) * 100).toFixed(0),
+      }),
+    );
+  }
 
   el.sightTips.innerHTML = tips.slice(0, 3).map((text) => `<li>${text}</li>`).join('');
 }
@@ -1748,7 +1771,7 @@ function renderLog() {
   el.weekGrid.innerHTML = Journal.weeks(journal, today, 5)
     .flat()
     .map((day) => {
-      const cls = day.future ? 'day future' : day.practised ? 'day on' : day.rest ? 'day rest' : 'day';
+      const cls = day.future ? 'day future' : day.practiced ? 'day on' : day.rest ? 'day rest' : 'day';
       return `<span class="${cls}${day.today ? ' today' : ''}" title="${day.key}"></span>`;
     })
     .join('');
@@ -1792,6 +1815,7 @@ function renderLog() {
 
   el.lessonSheet.textContent = sheetText();
   el.copySheet.textContent = t('log.copy');
+  if (!el.shareSheet.hidden) el.shareSheet.textContent = t('log.share');
   if (!recorder.live) el.recBtn.textContent = t('log.record');
   renderRecList();
 }
@@ -1902,6 +1926,9 @@ function noteTake(tag, cardId = null, score = 0) {
   const today = todayKey();
   Journal.logTake(journal, today, tag);
   if (cardId) Journal.noteScale(journal, cardId, today, score);
+  // Sight reading is filed per level, not per passage: a level VI page is a
+  // level VI page whatever it happens to be in.
+  if (tag === 'sight') Journal.noteSight(journal, sight.level, today, score);
   saveJournal();
   if (!el.views.track.hidden) renderLog();
 }
@@ -2030,6 +2057,23 @@ el.planSelect.addEventListener('change', () => {
   journal.plan = el.planSelect.value;
   saveJournal();
   renderLog();
+});
+
+// Sharing is the "reported to someone" half of progress monitoring: the effect of
+// monitoring is larger when the result reaches another person. Phones and tablets
+// have a share sheet, so the week can go to a teacher or a parent in one tap; a
+// desktop copies it instead, which is the same thing done by hand.
+if (typeof navigator !== 'undefined' && navigator.share) {
+  el.shareSheet.hidden = false;
+  el.shareSheet.textContent = t('log.share');
+}
+
+el.shareSheet.addEventListener('click', async () => {
+  try {
+    await navigator.share({ title: t('log.shareTitle'), text: el.lessonSheet.textContent });
+  } catch {
+    /* the share sheet was closed — that is an answer, not an error */
+  }
 });
 
 el.copySheet.addEventListener('click', async () => {
@@ -2533,6 +2577,8 @@ function finishTake() {
   el.levelBar.hidden = true;
 
   const result = analyzeTake(take.frames, state.scale);
+  // Before the take is logged: the comparison is against what came before it.
+  result.compared = Journal.compareTake(Journal.scaleEntry(journal, state.cardId), result.score);
   noteTake('scales', state.cardId, result.score);
 
   // In a mock audition the microphone stays open, the score stays hidden, and
@@ -2605,6 +2651,22 @@ function noteColour(entry) {
   return '#a4534a';
 }
 
+/**
+ * One sentence comparing this take with the ones before it.
+ *
+ * The rules, in order: a first take is a first take; beating your best is said
+ * plainly; matching it is worth as much as beating it; and a take below your
+ * best names the best rather than the shortfall alone, so the sentence still
+ * contains something you did.
+ */
+function compareLine(compared) {
+  if (compared.first) return t('compare.first');
+  if (compared.isBest && compared.delta > 0) return t('compare.best', { n: compared.delta });
+  if (compared.delta === 0) return t('compare.equalled', { n: compared.best });
+  if (compared.delta >= -3) return t('compare.close', { n: compared.best });
+  return t('compare.below', { n: compared.best });
+}
+
 function renderResult(result) {
   const scale = result.scale;
   showView('result');
@@ -2629,7 +2691,7 @@ function renderResult(result) {
   el.scoreNumber.textContent = String(result.score);
 
   const s = result.stats;
-  el.resultSub.textContent = s.bpm
+  const sub = s.bpm
     ? t('result.sub', {
         exact: s.exact,
         expected: s.expected,
@@ -2638,6 +2700,12 @@ function renderResult(result) {
         dur: s.duration.toFixed(0),
       })
     : t('result.subSimple', { exact: s.exact, expected: s.expected, heard: s.heard });
+  // This time against the last few times. Specific and comparative, which is the
+  // kind of feedback that raises self-efficacy — but never a scolding: being
+  // below your best is stated as a fact and the best is named so it is still a
+  // thing you have done.
+  const compared = result.compared ? compareLine(result.compared) : '';
+  el.resultSub.textContent = compared ? `${sub} · ${compared}` : sub;
 
   const ringColour =
     result.score >= 90 ? '#2f5d4e' : result.score >= 75 ? '#44796a' : result.score >= 60 ? '#b0843f' : '#a4534a';

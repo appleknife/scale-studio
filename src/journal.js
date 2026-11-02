@@ -11,7 +11,7 @@
 //   * two planned rest days a week, because a goal with skips survives a miss;
 //   * nothing is ever marked as a failure — a missed day is simply blank;
 //   * "what was hard" is one tap, because reflection is the step that turns
-//     playing into practising, and it is what the teacher can use next lesson.
+//     playing into practicing, and it is what the teacher can use next lesson.
 
 export const TAGS = ['scales', 'sight', 'tuner', 'piece', 'recording', 'other'];
 export const HARD = ['intonation', 'rhythm', 'shifts', 'reading', 'tone'];
@@ -36,7 +36,7 @@ export function emptyState() {
 /**
  * The weekly goals a student can pick from. A short menu rather than a free-text
  * box: the evidence on goal setting favours specific, close-at-hand goals, and
- * "practise more" is neither. The student still chooses, which is the autonomy
+ * "practice more" is neither. The student still chooses, which is the autonomy
  * part — the app only offers shapes that can be counted honestly.
  */
 export const GOALS = [
@@ -87,7 +87,7 @@ export function weekStart(key) {
 
 /* ── Reading the log ───────────────────────────────────────────────────── */
 
-export function practised(state, key) {
+export function practiced(state, key) {
   const day = state.days[key];
   return Boolean(day && (day.tags.length > 0 || day.takes > 0));
 }
@@ -143,7 +143,55 @@ export function noteScale(state, id, key, score) {
   const entry = state.scales[id] || (state.scales[id] = { days: [], best: 0 });
   if (score >= READY_SCORE && !entry.days.includes(key)) entry.days.push(key);
   entry.best = Math.max(entry.best, score);
+  remember(entry, key, score);
   return entry;
+}
+
+/** How many takes of one scale are kept. A dozen is enough to know whether this
+ *  week beats last, and small enough that a log cannot grow without bound. */
+export const HISTORY = 12;
+
+function remember(entry, key, score) {
+  if (!Array.isArray(entry.history)) entry.history = [];
+  entry.history.push({ key, score });
+  if (entry.history.length > HISTORY) entry.history.splice(0, entry.history.length - HISTORY);
+  return entry.history;
+}
+
+/**
+ * How this take compares with the ones before it.
+ *
+ * Strict in what it counts — a "best" is only a best among takes recorded on
+ * this device — and gentle in what it says: the first take of a scale is told
+ * so rather than being called an improvement on nothing, and the number quoted
+ * is the previous best, because "the furthest you have got" is the useful
+ * sentence.
+ */
+export function compareTake(entry, score) {
+  const history = (entry && entry.history) || [];
+  if (!history.length) return { first: true, delta: 0, best: score, isBest: true, takes: 0 };
+  const best = history.reduce((m, h) => Math.max(m, h.score), 0);
+  return { first: false, delta: score - best, best, isBest: score > best, takes: history.length };
+}
+
+/**
+ * Sight reading is counted per level rather than per key: a level VI page is a
+ * level VI page whatever it happens to be in.
+ */
+export function noteSight(state, level, key, score) {
+  if (!state.sight) state.sight = {};
+  const entry = state.sight[level] || (state.sight[level] = { best: 0, history: [] });
+  entry.best = Math.max(entry.best, score);
+  remember(entry, key, score);
+  return entry;
+}
+
+export function sightEntry(state, level) {
+  return (state.sight && state.sight[level]) || { best: 0, history: [] };
+}
+
+export function scaleEntry(state, id) {
+  return state.scales[id] || null;
 }
 
 /* ── Reading it back ───────────────────────────────────────────────────── */
@@ -155,10 +203,10 @@ export function noteScale(state, id, key, score) {
  */
 export function streak(state, today) {
   let key = today;
-  if (!practised(state, key) && !isRest(state, key)) key = addDays(key, -1);
+  if (!practiced(state, key) && !isRest(state, key)) key = addDays(key, -1);
   let count = 0;
   for (let guard = 0; guard < 800; guard++) {
-    if (practised(state, key)) count += 1;
+    if (practiced(state, key)) count += 1;
     else if (!isRest(state, key)) break;
     key = addDays(key, -1);
   }
@@ -175,7 +223,7 @@ export function weeks(state, today, count = 5) {
       const key = addDays(thisWeek, -w * 7 + d);
       row.push({
         key,
-        practised: practised(state, key),
+        practiced: practiced(state, key),
         rest: isRest(state, key),
         today: key === today,
         future: key > today,
@@ -207,7 +255,7 @@ export function weekSheet(state, today, ids) {
   for (let d = 0; d < 7; d++) {
     const key = addDays(start, d);
     if (key > today) break;
-    if (practised(state, key)) days += 1;
+    if (practiced(state, key)) days += 1;
     if (isRest(state, key)) rests += 1;
     const day = state.days[key];
     if (!day) continue;
@@ -280,7 +328,7 @@ export function smallWins(state, today, ids = []) {
     for (let d = 0; d < 7; d++) {
       const key = addDays(monday, d);
       if (key > today) break;
-      if (practised(state, key)) days += 1;
+      if (practiced(state, key)) days += 1;
       const day = state.days[key];
       if (day) takes += day.takes || 0;
     }

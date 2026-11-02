@@ -23,7 +23,7 @@ the app needs to be opened through the little server that ships with it rather
 than by double-clicking `index.html`.
 
 **Windows:** double-click **`Start Scale Studio.cmd`**. A console window opens,
-your browser opens the app, and you leave the console open while practising.
+your browser opens the app, and you leave the console open while practicing.
 
 That little server is not an installation — it only hands the folder's files to the
 browser over `http://localhost`. Opening `index.html` by double-clicking cannot work:
@@ -920,6 +920,29 @@ supports. So the classroom instruction is: add it to the home screen, and it sta
 The practice log lives in `localStorage` rather than the cache and is unaffected;
 the log's download/load-a-copy file remains the way to move a log between devices,
 because offline is not sync.
+
+### What else the listening notices
+
+Scoring a take and *reading* a take are different jobs, and the second is where the
+teacher lives. `listenNotes()` in `src/analyze.js` returns what a take says about
+the player rather than how it scored, and both result screens turn it into a line:
+
+* **A pitch that keeps sitting off.** Notes are grouped by pitch class; if two or
+  more of them agree on a direction and average more than 15 cents out, the app
+  names it: *"The E4 kept sitting off — 3 of them sat 24 cents high — the same
+  finger, or the same string."* The name comes from the score's own spelling, so in
+  E♭ major it says E♭ and not D♯. Grouping by class rather than by note is what
+  makes it a habit instead of a slip, and it is the one thing a take can say that a
+  score cannot.
+* **Speeding up or settling back.** The first half of the take is compared with its
+  second (a median of each, so one late entry cannot tilt it); a change of 12% or
+  more is reported, with advice — a notch slower on the metronome, or start at the
+  speed you finished at.
+
+The thresholds are deliberately conservative: a pitch is named only when at least
+two of its notes agree, and a drift only when it is big enough to hear. Saying
+nothing is better than diagnosing a wobble, and `dsp.test.html` holds both the
+detection and the restraint — a steady take must not be accused of drifting.
 
 ### The week: a goal of the student's own, and what actually happened
 
