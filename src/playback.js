@@ -16,7 +16,7 @@
 // `capture.html` and will replace the voice without touching anything else: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611022400';
+import { makeHallIR } from './recorder.js?v=202611022500';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };

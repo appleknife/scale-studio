@@ -221,6 +221,86 @@
         }
       }
 
+      /* ── 6. Going *back* to pick it up ─────────────────────────────── */
+      //
+      // The other half of the same question: a student freezes at bar 5 and then
+      // starts again from bar 3. Nothing can be "matched back in", because the
+      // notes that follow run backwards through the page — so the alignment reads
+      // the replay as *extra* notes (the written ones all sounded at least once)
+      // and the jump shows up in the pulse as a stop. What it must not do is mark
+      // the whole passage wrong, and what it must not do either is call it clean.
+      {
+        const { analyzeSightTake } = await import('../src/analyze.js');
+        const { generatePassage, flatten } = await import('../src/sightreading.js');
+
+        const passage = generatePassage({ level: 5, seed: 4471 });
+        const perBar = passage.perBar;
+        const events = flatten(passage)
+          .filter((e) => !e.rest && e.note)
+          .map((e) => ({ ...e, abs: (e.bar - 1) * perBar + e.start }));
+
+        const spq = 60 / 58;
+        const frames = [];
+        let t = 0;
+        const play = (event, gapBefore) => {
+          t += gapBefore;
+          const end = t + (event.dur / 4) * spq * 0.85;
+          for (let s = t; s < end; s += 0.03) {
+            frames.push({
+              t: s,
+              freq: 440 * Math.pow(2, (event.midi - 69) / 12),
+              clarity: 0.96,
+              rms: 0.06,
+            });
+          }
+          t = end;
+        };
+        // Bars 1–4, then a three-second freeze, then the run from bar 3 again.
+        const firstPass = events.filter((e) => e.abs < 4 * perBar);
+        const replay = events.filter((e) => e.abs >= 2 * perBar);
+        firstPass.forEach((e, i) => play(e, i === 0 ? 0 : 0.02));
+        t += 3.0;
+        replay.forEach((e) => play(e, 0.02));
+
+        const result = analyzeSightTake(frames, passage);
+        const clean = analyzeSightTake(
+          (() => {
+            const f = [];
+            let s = 0;
+            for (const e of events) {
+              const end = s + (e.dur / 4) * spq * 0.85;
+              for (let k = s; k < end; k += 0.03) {
+                f.push({ t: k, freq: 440 * Math.pow(2, (e.midi - 69) / 12), clarity: 0.96, rms: 0.06 });
+              }
+              s = end + 0.02;
+            }
+            return f;
+          })(),
+          passage,
+        );
+        log.push(
+          `rewind: score ${result.score}% (clean ${clean.score}%) · ${result.missed.length} missed · ` +
+            `${result.extras.length} extra · ${result.stops} stops · every written note heard ${result.exact === result.expected}`,
+        );
+        if (result.exact !== result.expected) {
+          problems.push(
+            `a replayed passage lost ${result.expected - result.exact} written notes — going back must not mark the page wrong`,
+          );
+        }
+        if (result.extras.length < 5) {
+          problems.push(`the replay was not counted as extra notes (${result.extras.length})`);
+        }
+        if (result.stops < 1) {
+          problems.push('the jump back was not counted as a stop');
+        }
+        if (result.score >= clean.score) {
+          problems.push(`a replayed passage scored ${result.score}%, no worse than a clean read`);
+        }
+        if (result.score < 80) {
+          problems.push(`a replayed passage scored ${result.score}% — harsher than a judge`);
+        }
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;

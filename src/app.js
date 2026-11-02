@@ -1,15 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611022400';
-import { renderStaff } from './staff.js?v=202611022400';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611022400';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611022400';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611022400';
-import { generatePassage } from './sightreading.js?v=202611022400';
-import { createPlayer } from './playback.js?v=202611022400';
-import { renderScore } from './score.js?v=202611022400';
-import * as Journal from './journal.js?v=202611022400';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611022400';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611022500';
+import { renderStaff } from './staff.js?v=202611022500';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611022500';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611022500';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611022500';
+import { generatePassage } from './sightreading.js?v=202611022500';
+import { createPlayer } from './playback.js?v=202611022500';
+import { renderScore } from './score.js?v=202611022500';
+import * as Journal from './journal.js?v=202611022500';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611022500';
 import {
   STRINGS,
   FIFTHS,
@@ -17,7 +17,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611022400';
+} from './tuner.js?v=202611022500';
 
 const LANG = initLang();
 
@@ -1377,6 +1377,12 @@ function renderSightResult(result) {
     tips.push(
       t('sight.tipWrong', { n: result.wrong + result.octaveErrors, total: result.expected }),
     );
+  } else if (result.extras.length >= 3) {
+    // Nothing was missing and nothing was wrong — the passage simply went round
+    // part of itself. A student who has gone back to pick the piece up again
+    // deserves to be told that is what the app heard, rather than "every note
+    // was there", which is true and quietly misleading.
+    tips.push(t('sight.tipRepeat', { n: result.extras.length }));
   } else {
     tips.push(t('sight.tipAllNotes'));
   }

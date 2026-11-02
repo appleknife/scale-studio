@@ -321,6 +321,18 @@ sight-reading table for that level.
   of 100 %. And because a stumble is not a finish, a take that is still far from
   complete is given 4.5 s of silence before it closes instead of 2.2 s, so a
   student working out where to come back in is not cut off mid-thought.
+* **Going *back* to pick it up is read differently, and deliberately.** A student
+  who freezes in bar 5 and starts again from bar 3 is running *backwards* through
+  the page, and no monotonic alignment can follow that. So the replay is heard as
+  extra notes — nothing is marked wrong or missing, because every written note did
+  sound — the jump back appears in the pulse as a stop, and the take comes out a
+  few points below a clean read. Measured: 0 missed, 9 extra notes, 2 stops, 91 %
+  against 100 % for the same passage played straight through. The matcher also
+  credits the attempt that was right: in a take where the first pass of bar 3 went
+  a semitone wrong and the replay was clean, that note scored *exact* and the wrong
+  attempt was filed as an extra note. That is kinder than any audition, where the
+  first attempt is the one the judge heard — which is worth saying out loud to a
+  student who has learned to restart as a habit.
 * **The needle** under the buttons is the same readout the scale take shows: the
   note you are sounding and how many cents off centre it sits. It is a rehearsal
   aid, so it only appears while a take is running; a mock audition will arm the

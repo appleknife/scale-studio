@@ -270,6 +270,10 @@ export const S = {
     '{total} 个音里有 {n} 个没拉出来，把那几处标出来，单独练一下那一小节。',
   ],
   'sight.tipAllNotes': ['Every note was there.', '每个音都拉出来了。'],
+  'sight.tipRepeat': [
+    '{n} notes came out that the page does not ask for — a bar played again, or a slip. Fine while you practise; in an audition, carry on from where you stopped.',
+    '有 {n} 个多出来的音，谱子上没有——可能是重来了一小节，也可能多拉了音。练习时没关系，考试时从停下的地方接着往下拉就好。',
+  ],
   'sight.tipWrong': [
     '{n} of {total} notes came out as a different pitch — slowly, bar by bar.',
     '{total} 个音里有 {n} 个拉成了别的音，慢一点，一小节一小节来。',
