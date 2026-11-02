@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611012000';
-import { STAFF_GEOM } from './staff.js?v=202611012000';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611012230';
+import { STAFF_GEOM } from './staff.js?v=202611012230';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -920,14 +920,40 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     }
   }
 
-  // ── dynamics: one at the start, a swell before the climax ─────────────
+  // ── dynamics: one at the start, and a hairpin around the climax ─────────
+  //
+  // A crescendo or decrescendo is printed as a hairpin — two lines opening, or
+  // closing, across the beats it applies to — and it belongs at the climax,
+  // because that is the only place a ramp means anything: drawn over a phrase
+  // that never goes anywhere it teaches the wrong thing. So the peak is found
+  // first, and the ramp is put on the side of it that the level asks for.
   const dynamic = pick(rng, spec.dynamics);
   const first = bars[0][0];
   if (!first.rest) first.dynamic = dynamic;
+
   let swell = null;
-  if (level >= 4 && chance(rng, 0.5)) {
-    const b = Math.floor(BAR_COUNT * 0.45);
-    swell = { bar: b, kind: level >= 5 ? 'cresc' : 'cresc' };
+  if (level >= 4 && chance(rng, 0.6)) {
+    let peak = null;
+    bars.forEach((list, b) =>
+      list.forEach((e, i) => {
+        if (e.note && (!peak || e.midi > peak.midi)) peak = { bar: b, index: i, midi: e.midi };
+      }),
+    );
+    const wanted = level >= 5 && chance(rng, 0.5) ? 'dim' : 'cresc';
+    for (const kind of [wanted, wanted === 'cresc' ? 'dim' : 'cresc']) {
+      if (!peak) break;
+      const list = bars[peak.bar];
+      const [from, to] =
+        kind === 'cresc'
+          ? [Math.max(0, peak.index - 2), peak.index]
+          : [peak.index, Math.min(list.length - 1, peak.index + 2)];
+      if (to - from < 1) continue;
+      // No rest under a hairpin: a ramp is one bow that keeps moving, and a rest
+      // in the middle of one is the same contradiction as a slur over silence.
+      if (list.slice(from, to + 1).some((e) => !e.note)) continue;
+      swell = { bar: peak.bar, kind, from, to };
+      break;
+    }
   }
 
   const tempo = spec.tempo[meter] || spec.tempo['*'];

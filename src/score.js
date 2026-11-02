@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611012000';
-import { CLEF_PATH } from './clef.js?v=202611012000';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611012230';
+import { CLEF_PATH } from './clef.js?v=202611012230';
 
-import { beatLength } from './sightreading.js?v=202611012000';
+import { beatLength } from './sightreading.js?v=202611012230';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -755,10 +755,44 @@ function drawSystem(
         `<text class="score-dyn" x="${xOf(firstWithDynamic)}" y="${dynY}" font-size="19" text-anchor="middle">${firstWithDynamic.dynamic}</text>`,
       );
     }
+    // A crescendo or decrescendo is a hairpin: two lines from a point to an open
+    // end, spanning the beats it applies to. It takes the same lane as the
+    // dynamic marking, which is already clear of every note and beam.
     if (passage.swell && passage.swell.bar === bar) {
-      part.push(
-        `<text class="score-dyn" x="${barX + barWidth * 0.35}" y="${dynY}" font-size="15" font-style="italic">cresc.</text>`,
-      );
+      const { kind, from, to } = passage.swell;
+      const a = events[from];
+      const b = events[to];
+      // A word needs its own air: a hairpin starting under the letters of an "mf"
+      // reads as part of the letters.
+      const clear = firstWithDynamic ? xOf(firstWithDynamic) + 24 : 0;
+      const near = Math.max(a ? xOf(a) : 0, clear);
+      const far = b ? xOf(b) : 0;
+      const span = far - near;
+      // Under three spaces of span a hairpin is a smudge; a printed score writes
+      // the word instead, and so does this.
+      if (span >= 34) {
+        // The mouth opens with the length, and stops opening at two spaces: a
+        // hairpin is read by its angle, and drawing every one of them about a
+        // space tall turned the long ones into a sliver that looks like a staff
+        // line rather than a crescendo.
+        const half = Math.max(4.5, Math.min(12, span * 0.09));
+        const y = dynY - 6;
+        const tip = kind === 'dim' ? far : near;
+        const mouth = kind === 'dim' ? near : far;
+        part.push(
+          `<g class="score-hairpin" data-kind="${kind}">` +
+            `<line x1="${fmt(tip)}" y1="${fmt(y)}" x2="${fmt(mouth)}" y2="${fmt(y - half)}" ` +
+            `stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>` +
+            `<line x1="${fmt(tip)}" y1="${fmt(y)}" x2="${fmt(mouth)}" y2="${fmt(y + half)}" ` +
+            `stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>` +
+            `</g>`,
+        );
+      } else {
+        part.push(
+          `<text class="score-dyn" x="${fmt((near + far) / 2)}" y="${dynY}" font-size="15" ` +
+            `font-style="italic" text-anchor="middle">${kind === 'dim' ? 'dim.' : 'cresc.'}</text>`,
+        );
+      }
     }
 
     // Where this bar's beams are, so a slur pushed to the stems' side can steer

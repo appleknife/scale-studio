@@ -359,6 +359,16 @@ trouble are the ones where a stroked line is not good enough:
   missing — below any accent or staccato dot, which hang off the *bottom* of an
   up-stem note and reach further down than the head does. A low note with an
   accent under it used to put the wedge through the "f".
+* **A crescendo is a hairpin, not the word.** A ramp is two lines from a point to
+  an open end, spanning the beats it applies to, and it is placed at the climax —
+  the highest note — because that is where a ramp means anything: drawn over a
+  phrase that never goes anywhere it teaches the wrong thing. Crescendos go on the
+  beats *before* the peak, decrescendos on the beats after, from level IV (and
+  decrescendos from V). The mouth opens with the length of the hairpin and stops at
+  two spaces, because a hairpin is read by its angle: a fixed one-space opening on a
+  four-beat ramp came out as a sliver that looked like a staff line. Under three
+  spaces of span there is no room for a wedge at all, and the printed word —
+  *cresc.*, *dim.* — is written instead, which is what an engraver does too.
 * The **tempo mark** is printed over the first bar, so it is placed last: the
   system records how high its music reaches and the mark goes above that, rather
   than through a beam that opens the passage high.
@@ -683,8 +693,10 @@ tests/notation.test.html  renders 540 passages — 60 a level four bars to a sys
                       note heads may touch, every slur must bow on one side of both
                       its ends, a half rest must sit on the middle line while a
                       whole rest hangs from the fourth, every rest's ink box must
-                      still match the table it was measured into, and the gap after
-                      a beat of sixteenths must be at least 1.2× the gap inside it.
+                      still match the table it was measured into, the gap after a
+                      beat of sixteenths must be at least 1.2× the gap inside it,
+                      and every hairpin must be two lines that meet at a point, open
+                      the way its name says, and sit in the dynamic lane.
                       Where a box would cry wolf it measures the drawing: a flag
                       against each head's ellipse, a wide slanted path (a beam)
                       against the text, and two heads against each other in the

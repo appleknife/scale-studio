@@ -174,6 +174,8 @@
         const restHits = [];
         const restShapeHits = [];
         const restGlyphHits = [];
+        const hairpinHits = [];
+        let hairpins = 0;
         const slurHits = [];
         const accidentalHits = [];
         const flagHits = [];
@@ -231,7 +233,49 @@
           );
           const staves = [];
           for (let i = 0; i + 4 < lineYs.length; i += 5) {
-            staves.push({ middle: lineYs[i + 2], fourth: lineYs[i + 3] });
+            staves.push({ top: lineYs[i], middle: lineYs[i + 2], fourth: lineYs[i + 3], bottom: lineYs[i + 4] });
+          }
+
+          // ── hairpins ──────────────────────────────────────────────────
+          // A crescendo is two lines from a point to an open end, and it lives in
+          // the dynamic lane: below the staff, and opening the way its name says.
+          // Drawn as text, none of that could be checked; drawn as lines it can.
+          for (const hairpin of svg.querySelectorAll('g.score-hairpin')) {
+            const lines = [...hairpin.querySelectorAll('line')].map((n) => ({
+              x1: Number(n.getAttribute('x1')),
+              y1: Number(n.getAttribute('y1')),
+              x2: Number(n.getAttribute('x2')),
+              y2: Number(n.getAttribute('y2')),
+            }));
+            if (lines.length !== 2) {
+              hairpinHits.push(`L${level} seed ${seed}: a hairpin is drawn with ${lines.length} lines`);
+              break;
+            }
+            const [one, two] = lines;
+            const tipMeet = Math.abs(one.x1 - two.x1) < 0.01 && Math.abs(one.y1 - two.y1) < 0.01;
+            const mouthOpen = Math.abs(one.x2 - two.x2) < 0.01 && Math.abs(one.y2 - two.y2) > 1;
+            if (!tipMeet || !mouthOpen) {
+              hairpinHits.push(`L${level} seed ${seed}: the two lines do not meet at a point`);
+              break;
+            }
+            const opensRight = one.x2 > one.x1;
+            if ((hairpin.dataset.kind === 'cresc') !== opensRight) {
+              hairpinHits.push(
+                `L${level} seed ${seed}: a ${hairpin.dataset.kind} hairpin opens the wrong way`,
+              );
+              break;
+            }
+            const high = Math.min(one.y1, one.y2, two.y2);
+            const staff = staves.reduce((best, s) =>
+              Math.abs(s.bottom - high) < Math.abs(best.bottom - high) ? s : best,
+            );
+            if (!staff || high - staff.bottom < 10 || high - staff.bottom > 70) {
+              hairpinHits.push(
+                `L${level} seed ${seed}: the hairpin sits ${staff ? (high - staff.bottom).toFixed(0) : '?'} below the staff, not in the dynamic lane`,
+              );
+              break;
+            }
+            hairpins += 1;
           }
           for (const g of svg.querySelectorAll('g.score-rest')) {
             const dur = Number(g.dataset.dur);
@@ -447,13 +491,15 @@
             `dynamics ${dynamicHits.length}/${seeds} broken (${dynamics} drawn) · ` +
             `heads ${headHits.length}/${seeds} collided · ` +
             `rest blocks ${restShapeHits.length}/${seeds} on the wrong line · ` +
-            `rest shapes ${restGlyphHits.length}/${seeds} off their table`,
+            `rest shapes ${restGlyphHits.length}/${seeds} off their table · ` +
+            `hairpins ${hairpinHits.length}/${seeds} broken (${hairpins} drawn)`,
         );
         problems.push(
           ...headHits.slice(0, 2),
           ...restHits.slice(0, 2),
           ...restShapeHits.slice(0, 2),
           ...restGlyphHits.slice(0, 2),
+          ...hairpinHits.slice(0, 2),
           ...slurHits.slice(0, 2),
           ...accidentalHits.slice(0, 2),
           ...flagHits.slice(0, 2),
