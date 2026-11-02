@@ -352,6 +352,31 @@
         }
       }
 
+      /* ── 8. An assisted run ─────────────────────────────────────────── */
+      //
+      // The count-in has to appear, clear itself, and then the take has to run
+      // and score like any other — and the whole thing has to end on its own.
+      // The teacher's report was a run that appeared to freeze and clicks that
+      // carried on after leaving; this walks the normal assisted path.
+      {
+        const frame = await load('../index.html?sightplay=5&seed=7&assist');
+        const d = frame.contentDocument;
+        await wait(1200);
+        const counted = !d.getElementById('countIn').hidden;
+        await until(() => d.getElementById('countIn').hidden, 6000);
+        const cleared = d.getElementById('countIn').hidden;
+        const finished = await until(() => !d.getElementById('sightResult').hidden, 20000);
+        const pct = d.getElementById('sightPct').textContent.trim();
+        log.push(`assisted: count-in ${counted ? 'shown' : 'missing'} · cleared ${cleared} · scored ${pct}`);
+
+        if (!counted) problems.push('an assisted run showed no count-in');
+        if (!cleared) problems.push('the count-in never cleared');
+        if (!finished) problems.push('an assisted run never finished and scored');
+        if (!/^\d+%$/.test(pct)) problems.push(`an assisted run scored "${pct}"`);
+        if (d.getElementById('sightStart').hidden) problems.push('the start button did not come back');
+        frame.remove();
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;

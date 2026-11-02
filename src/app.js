@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025130';
-import { renderStaff } from './staff.js?v=202611025130';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611025130';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025130';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025130';
-import { generatePassage } from './sightreading.js?v=202611025130';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025130';
-import { renderScore } from './score.js?v=202611025130';
-import * as Journal from './journal.js?v=202611025130';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025130';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025130';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025300';
+import { renderStaff } from './staff.js?v=202611025300';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611025300';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025300';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025300';
+import { generatePassage } from './sightreading.js?v=202611025300';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025300';
+import { renderScore } from './score.js?v=202611025300';
+import * as Journal from './journal.js?v=202611025300';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025300';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025300';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611025130';
+} from './tuner.js?v=202611025300';
 
 const LANG = initLang();
 
@@ -1332,7 +1332,36 @@ function startAssistedRun() {
     el.sightStatus.textContent = t('sight.playing');
     runClickTrack(ctx, passage, plan);
     runAssistPlayhead(take, passage);
+    // A watchdog: if no frame ever arrives — the microphone is open but silent,
+    // or the browser has stopped feeding it — the take must still end rather
+    // than leave the screen listening for ever.
+    setTimeout(() => {
+      if (sight.take === take && !take.started) finishSightTake();
+    }, 8000);
   }, (plan.seconds + 0.15) * 1000);
+}
+
+/**
+ * The clicks scheduled by an assisted run, so they can be stopped.
+ *
+ * Web Audio has no "cancel everything after now": a node that has been asked to
+ * start in four seconds will start in four seconds whatever the app thinks. So
+ * every click an assisted run creates is kept here and told to stop when the run
+ * ends, or when the student leaves the screen.
+ */
+let assistClicks = [];
+
+function stopAssistAudio() {
+  for (const node of assistClicks) {
+    try {
+      node.stop();
+      node.disconnect();
+    } catch {
+      /* already finished — nothing to stop */
+    }
+  }
+  assistClicks = [];
+  if (el.countIn) el.countIn.hidden = true;
 }
 
 /** One click, at a time on the audio clock, sharing the player's volume. */
@@ -1347,6 +1376,9 @@ function clickAt(ctx, when, strength = 0.6) {
   osc.connect(gain).connect(player.output);
   osc.start(when);
   osc.stop(when + 0.09);
+  assistClicks.push(osc);
+  // A long session should not accumulate stopped nodes in this list.
+  if (assistClicks.length > 200) assistClicks = assistClicks.slice(-40);
 }
 
 /** The clicks under the passage, at the printed tempo, one bar at a time. */
@@ -1492,7 +1524,15 @@ function ingestSightFrame(frame) {
   // of the notes have been heard, the shorter wait returns.
   const quiet = elapsed - take.lastVoiced;
   const unfinished = take.expected > 0 && take.onsets < take.expected * 0.8;
-  if (take.frames.length > 40 && quiet > (unfinished ? 4.5 : 2.2)) finishSightTake();
+  // An assisted run that has heard nothing at all is over: the student pressed
+  // start, listened to the count-in, and did not play. Without this it would sit
+  // there running the click track to the end of the passage, which reads as a
+  // frozen app. A student who *has* played is never cut off by this — it only
+  // fires while nothing has sounded.
+  const neverStarted = take.assisted && take.onsets === 0 && elapsed > 6;
+  if ((take.frames.length > 40 && quiet > (unfinished ? 4.5 : 2.2)) || neverStarted) {
+    finishSightTake();
+  }
 }
 
 function stopSightTake(analyse = true) {
@@ -1503,6 +1543,12 @@ function stopSightTake(analyse = true) {
   el.sightStop.hidden = true;
   el.sightStart.hidden = false;
   el.sightLive.hidden = true;
+  // An assisted run schedules its whole click track ahead on the audio clock, so
+  // the clicks have to be told to stop — otherwise they play on after the take,
+  // and after the student has left the screen. The count-in box and the line go
+  // with them; a line left standing on the staff looks like a frozen app.
+  stopAssistAudio();
+  hidePlayhead();
   // Nothing stale left behind: a reading only exists while a take is running.
   resetSightLive();
   if (analyse && take && take.started) {
@@ -3613,8 +3659,13 @@ if (params.has('sightplay')) {
   // ?sightplay=5&hold=1400         stop early, needle left on screen
   // ?sightplay=5&detune            every note 42 cents sharp
   // ?sightplay=5&live=0            arm with the needle switched off
+  // ?sightplay=5&assist           the same, with the count-in and the clicks
   openSight(Number(params.get('sightplay')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
   armSightTake({ live: params.get('live') !== '0' });
+  if (params.has('assist')) {
+    el.sightAssist.checked = true;
+    startAssistedRun();
+  }
   const offsets = params.has('detune')
     ? Object.fromEntries([...Array(64).keys()].map((k) => [k, 42]))
     : {};
