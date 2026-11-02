@@ -1,15 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611020130';
-import { renderStaff } from './staff.js?v=202611020130';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611020130';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611020130';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611020130';
-import { generatePassage } from './sightreading.js?v=202611020130';
-import { createPlayer } from './playback.js?v=202611020130';
-import { renderScore } from './score.js?v=202611020130';
-import * as Journal from './journal.js?v=202611020130';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611020130';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611020250';
+import { renderStaff } from './staff.js?v=202611020250';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611020250';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611020250';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611020250';
+import { generatePassage } from './sightreading.js?v=202611020250';
+import { createPlayer } from './playback.js?v=202611020250';
+import { renderScore } from './score.js?v=202611020250';
+import * as Journal from './journal.js?v=202611020250';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611020250';
 import {
   STRINGS,
   FIFTHS,
@@ -17,7 +17,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611020130';
+} from './tuner.js?v=202611020250';
 
 const LANG = initLang();
 
@@ -1026,7 +1026,13 @@ function movePlayhead(sight, at) {
   const here = anchors[i];
   const next = anchors[i + 1];
   const through = Math.min(1, Math.max(0, (at - here.start) / Math.max(0.001, here.dur)));
-  const x = calm || !next ? here.x : here.x + (next.x - here.x) * through;
+  // The last note of a system must not be joined to the first note of the next
+  // one: the line would slide all the way back to the left edge of the page and
+  // then jump down a row. The glide only makes sense between notes on the same
+  // staff, so across a system break the playhead waits at the note that is
+  // sounding and lands on the next row's first note when it starts.
+  const sameRow = Boolean(next) && Math.abs(next.top - here.top) < 1;
+  const x = calm || !sameRow ? here.x : here.x + (next.x - here.x) * through;
   const top = Math.min(here.top, here.bottom) - 12;
   const bottom = Math.max(here.top, here.bottom) + 12;
   playhead.line.setAttribute('x1', String(x));

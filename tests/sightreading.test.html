@@ -62,6 +62,8 @@
       let checked = 0;
       for (const level of SIGHT_LEVELS) {
         const spec = levelSpec(level);
+        let boundaryLeaps = 0;
+        let spanTotal = 0;
         for (let seed = 0; seed < 120; seed++) {
           const p = generatePassage({ level, seed });
           checked++;
@@ -159,6 +161,22 @@
             if (level < 4) problems.push(`${id}: a hairpin at level ${level}`);
           }
 
+          // ── shape ────────────────────────────────────────────────
+          // A line that only ever steps stays in one register for eight bars.
+          // The phrases are meant to contrast: a leap into a new register at a
+          // phrase boundary, and a passage that actually covers its range.
+          const notes = flatten(p).filter((e) => !e.rest);
+          const midis = notes.map((e) => e.midi);
+          spanTotal += Math.max(...midis) - Math.min(...midis);
+          if (
+            [3, 5, 7].some((bar) => {
+              const at = notes.findIndex((e) => e.bar === bar);
+              return at > 0 && Math.abs(notes[at].midi - notes[at - 1].midi) >= 5;
+            })
+          ) {
+            boundaryLeaps++;
+          }
+
           // Level I is D major, one octave, quarter notes and slower, no rests —
           // the Manual's page for level I has nothing else on it.
           if (level === 1) {
@@ -176,6 +194,18 @@
         const a = JSON.stringify(generatePassage({ level, seed: 4471 }));
         const b = JSON.stringify(generatePassage({ level, seed: 4471 }));
         if (a !== b) problems.push(`L${level}: seed 4471 is not reproducible`);
+
+        const span = spanTotal / 120;
+        const rate = boundaryLeaps / 120;
+        log.push(
+          `L${level}: line spans ${span.toFixed(1)} semitones · a leap into a new register at a phrase boundary in ${Math.round(rate * 100)}%`,
+        );
+        if (level >= 3 && rate < 0.2) {
+          problems.push(`L${level}: only ${boundaryLeaps} of 120 passages change register at a phrase boundary`);
+        }
+        if (level >= 5 && span < 12) {
+          problems.push(`L${level}: the line covers ${span.toFixed(1)} semitones on average — it sits in one zone`);
+        }
       }
 
       log.push(`passages generated: ${checked}`);

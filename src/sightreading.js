@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611020130';
-import { STAFF_GEOM } from './staff.js?v=202611020130';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611020250';
+import { STAFF_GEOM } from './staff.js?v=202611020250';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -295,16 +295,6 @@ function poolFor(key, [low, high]) {
 /** Semitone size of each degree step, used only for weighting. */
 const STEP_WEIGHTS = [0, 62, 26, 7, 4, 1, 0.5];
 
-/**
- * How far along its rise/fall arc the melody should be at this point, with the
- * climax just past the middle. The shape is what makes eight random-ish notes
- * read as a phrase.
- */
-function arc(progress, peakAt = 0.62) {
-  if (progress <= peakAt) return progress / peakAt;
-  return 1 - (progress - peakAt) / (1 - peakAt);
-}
-
 function chooseStep(rng, allowed, directionBias, lastStep) {
   // A leap is answered by a step back the other way. Every source says it the
   // same way — “leap up, step down” — and weighting it was not enough: only 30%
@@ -329,6 +319,13 @@ function chooseStep(rng, allowed, directionBias, lastStep) {
     let weight = STEP_WEIGHTS[step] || 0.3;
     if (directionBias > 0 && Math.sign(step) === -1) weight *= 0.35;
     if (directionBias < 0 && Math.sign(step) === 1) weight *= 0.35;
+    // Step momentum: a line that has just moved by a step tends to go on the same
+    // way for another note or two. That is what turns a shuffled run of small
+    // intervals into a run a player can hear the shape of — and it is the other
+    // half of the skip-reversal rule above, which deals with the leaps.
+    if (Math.abs(lastStep) <= 2 && lastStep !== 0 && Math.sign(step) === Math.sign(lastStep)) {
+      weight *= 1.8;
+    }
     options.push({ step, weight });
   }
   const total = options.reduce((a, o) => a + o.weight, 0);
@@ -551,13 +548,32 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   const peak = Math.min(top, home + reach);
   const lowest = Math.max(0, home - 3 - (level >= 5 ? Math.floor(rng() * 3) : 0));
 
+  // ── the phrase plan ──────────────────────────────────────────────────
+  //
+  // Eight bars are four two-bar phrases, and a melody is not one slow arc. Each
+  // phrase occupies a register; the next one leaps into a different one and stays
+  // there a while, then the answer comes from below and the last phrase comes
+  // home for the cadence. That contrast is the thing a line built only from steps
+  // can never produce: every note lands beside the last one, the walk drifts
+  // slowly, and the whole passage sits in one narrow band from beginning to end.
+  //
+  // The lift is in scale steps and follows what the level allows: a third at I–II
+  // (whose largest interval is a third), a fourth at III, a fifth at IV, a sixth
+  // at V–VI.
+  const barOf = new Map();
+  bars.forEach((events, b) => events.forEach((e) => barOf.set(e, b)));
+  const phraseOf = (event) => Math.min(3, Math.floor((barOf.get(event) || 0) / 2));
+  const lift = spec.maxSemis >= 12 ? 5 : spec.maxSemis >= 9 ? 4 : spec.maxSemis >= 7 ? 3 : 1;
+  const zones = [0, lift, -Math.min(lift, 2), 0];
+
   let prev = home;
   let lastStep = 0;
 
   sounding.forEach((event, i) => {
-    const progress = sounding.length > 1 ? i / (sounding.length - 1) : 0;
-    const target = home + (peak - home) * arc(progress);
-    const directionBias = Math.sign(target - prev);
+    const bar = barOf.get(event) || 0;
+    const zone = Math.max(lowest, Math.min(peak, home + zones[phraseOf(event)]));
+    const opensPhrase = i > 0 && bar % 2 === 0;
+    const directionBias = Math.sign(zone - prev);
 
     if (i === 0) {
       // open on the tonic, or on the third or fifth above it
@@ -579,19 +595,38 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       const allowed = [...spec.steps, -1, -2, -3, -4, -5, -6]
         .filter((s) => spec.steps.includes(Math.abs(s)))
         .filter((s) => event.dur > 2 || Math.abs(s) <= 2);
-      const step = chooseStep(rng, allowed, directionBias, lastStep);
-      let next = prev + step;
-      if (next < lowest || next > peak) next = prev - step;
-      next = Math.max(lowest, Math.min(peak, next));
+      // A phrase that opens in a different register gets there in one move. Three
+      // steps in a row towards a new zone sound like an accident; the leap at the
+      // phrase boundary is what makes the second phrase a phrase. The leap is
+      // capped by the level's own largest interval, so nothing here breaks the
+      // rule the Manual sets.
+      const leap = opensPhrase && Math.abs(zone - prev) >= 3;
+      let step = 0;
+      let next;
+      if (leap) {
+        const want = pool[zone];
+        let best = prev;
+        for (let j = Math.max(0, lowest); j <= Math.min(peak, pool.length - 1); j++) {
+          if (Math.abs(pool[j].midi - pool[prev].midi) > spec.maxSemis) continue;
+          if (Math.abs(pool[j].midi - want.midi) < Math.abs(pool[best].midi - want.midi)) best = j;
+        }
+        next = best;
+        step = next - prev;
+      } else {
+        step = chooseStep(rng, allowed, directionBias, lastStep);
+        next = prev + step;
+        if (next < lowest || next > peak) next = prev - step;
+        next = Math.max(lowest, Math.min(peak, next));
+      }
       // No augmented fourth: the one interval every melody text forbids. A
       // fourth between F and B is the usual accident; take the step next door
       // instead.
-      if (Math.abs(pool[next].midi - pool[prev].midi) === 6) {
+      if (Math.abs(pool[next].midi - pool[prev].midi) === 6 && !leap) {
         const alt = prev + (next > prev ? 1 : -1);
         if (alt > lowest && alt < peak) next = alt;
       }
       prev = next;
-      lastStep = step;
+      lastStep = step;   // a leap here is answered by a step back, like any other
     }
 
     const note = pool[prev];
@@ -964,6 +999,15 @@ export function generatePassage({ level = 5, seed = null } = {}) {
         const candidate = firstOf(firstBeat);
         if (candidate >= 0 && onBeat(list[candidate].start)) break;
         firstBeat -= 1;
+      }
+      // …and it has to *end* where a beat begins. The beat after the ramp may open
+      // with a note that is already off the beat — a tie across the bar's middle,
+      // a dotted figure — so the ramp runs on until a beat starts cleanly, or
+      // until the bar ends, which is always clean.
+      while (lastBeat + 1 < beatsPerBar) {
+        const nextBeat = firstOf(lastBeat + 1);
+        if (nextBeat < 0 || onBeat(list[nextBeat].start)) break;
+        lastBeat += 1;
       }
       const from = firstOf(firstBeat);
       if (from < 0 || !onBeat(list[from].start)) continue;

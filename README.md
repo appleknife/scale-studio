@@ -309,6 +309,18 @@ sight-reading table for that level.
   held note, steadiness is a fair judge, tempo is not scored, and dynamics, bowing
   and tone are not heard at all. The same words sit on the scale screen.
 
+**How a passage is shaped.** Eight bars are four two-bar phrases, and the notes
+are not one long random walk: each phrase occupies a register, the next one *leaps*
+into a different one and stays there, the third answers from below and the last
+comes home for the cadence. The lift follows the level — a third at I–II, a fourth
+at III, a fifth at IV, a sixth at V–VI — so the leap is never wider than the level
+the passage belongs to. On top of that, steps carry momentum (a line that has just
+moved a step tends to go on the same way for a note or two, which is what makes a
+run of small intervals sound intended) and every leap is answered by a step back.
+Measured over 120 passages a level: the line now spans 13.7 semitones at III and
+17–18 at V–VI, and three quarters of the passages from III up change register at a
+phrase boundary, against almost none before.
+
 **Level I is deliberately plain.** D major only, one octave from D4 to D5, 2/4 or
 4/4, quarter and half notes with the occasional whole note, and no leap wider than
 a third — the page the Manual prints for level I. A whole note alone in a bar is

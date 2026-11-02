@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611020130';
-import { CLEF_PATH } from './clef.js?v=202611020130';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611020250';
+import { CLEF_PATH } from './clef.js?v=202611020250';
 
-import { beatLength } from './sightreading.js?v=202611020130';
+import { beatLength } from './sightreading.js?v=202611020250';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -724,7 +724,13 @@ function drawSystem(
       const slope = Math.max(-0.3, Math.min(0.3, contour / span));
 
       const ends = ys.map((y, i) => (up ? y - STEM : y + STEM) - slope * (xs[i] - xs[0]));
-      const anchor = up ? Math.min(...ends) : Math.max(...ends);
+      // A sign is a tall glyph — a sharp reaches nearly two spaces above the line
+      // its note sits on — and a sixteenth's second beam hangs barely that far
+      // above the head. So a beamed sixteenth with an accidental had its beam
+      // drawn through the sign. The beam is lifted clear of its group's signs,
+      // which costs the group a few units of stem and nothing else.
+      const signs = group.some((e) => e.accidental) ? 9 : 0;
+      const anchor = up ? Math.min(...ends) - signs : Math.max(...ends) + signs;
       const at = (event) => anchor + slope * (xOf(event) - xs[0]);
 
       deepest = Math.max(deepest, ...group.map((e) => at(e)));
@@ -1294,7 +1300,12 @@ export function renderScore(
     measureCeiling = sys.dynY + 6;
   }
 
-  const tops = [TOP_PAD];
+  // The first system normally sits at TOP_PAD. Music that reaches very high — a
+  // beam lifted clear of a beamed accidental, a phrase up on the ledger lines —
+  // needs the whole drawing moved down instead: the tempo mark is clamped to
+  // y = 20 so it can never be clipped by the top of the viewBox, and music that
+  // reaches above that clamp is music drawn through the mark.
+  const tops = [Math.max(TOP_PAD, 40 - measured[0].musicTop)];
   for (let s = 1; s < systems; s++) {
     const below = measured[s - 1].dynY - staff; // the dynamic under the one above
     const above = -measured[s].musicTop; // the tallest music of this one
