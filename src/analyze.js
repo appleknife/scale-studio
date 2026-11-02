@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611023630';
-import { getLang, t } from './i18n.js?v=202611023630';
+import { median } from './pitch.js?v=202611023700';
+import { getLang, t } from './i18n.js?v=202611023700';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -761,6 +761,33 @@ export function analyzeSightTake(frames, passage, options = {}) {
     .sort((a, b) => Math.abs(b.bias) - Math.abs(a.bias))
     .slice(0, 1);
 
+  // How long the long notes were actually held.
+  //
+  // This is the least certain of the readings, and the only one the app phrases
+  // as a question: a note's *end* is decided by when the sound stops, and a room
+  // with any ring in it, or a bow lifting a little early, can shorten that in the
+  // evidence without the player having meant it. So: only notes a quarter or
+  // longer, only when at least three of them agree, only when they are well under
+  // the written value — and the screen says "I might have heard", not "you
+  // played".
+  const heldBy = new Map();
+  for (const { d, e } of pairs) {
+    const event = events[e];
+    if (!event || event.dur < 4) continue;
+    const wanted = event.dur * unit;
+    if (!(wanted > 0.15)) continue;
+    const got = notes[d].t1 - notes[d].t0;
+    const cell = heldBy.get(event.dur) || { dur: event.dur, sum: 0, n: 0 };
+    cell.sum += got / wanted;
+    cell.n += 1;
+    heldBy.set(event.dur, cell);
+  }
+  const shortHeld =
+    [...heldBy.values()]
+      .filter((c) => c.n >= 3 && c.sum / c.n < 0.72)
+      .map((c) => ({ dur: c.dur, ratio: c.sum / c.n, n: c.n }))
+      .sort((a, b) => a.ratio - b.ratio)[0] || null;
+
   return {
     score,
     accuracy,
@@ -781,6 +808,7 @@ export function analyzeSightTake(frames, passage, options = {}) {
     worstBars,
     tempo,
     entries,
+    shortHeld,
     duration: frames.length ? frames[frames.length - 1].t : 0,
   };
 }

@@ -334,6 +334,10 @@ export const S = {
     'You took it at about {played} against a printed {printed} — that is fine for a first read, and the next step is a notch quicker.',
     '你大约用 {played} 的速度拉的，谱子上是 {printed}——第一次读这样很好，下一步稍微快一点。',
   ],
+  'sight.tipShortHeld': [
+    'I might have heard your {value} notes coming out a little short — check whether you are holding them for their full value. If you are, ignore me: a room with any ring in it can make a held note look shorter than it was.',
+    '我可能听到你的{value}稍微短了一点——看看是不是没把时值拉满。如果本来就是拉满的，就不用管我：房间里有点回声时，长音在测量里会显得短一些。',
+  ],
   'sight.tipEarly': [
     'The {value} notes kept arriving early. Count them out loud once and they will sit on the beat.',
     '{value}总是来得偏早。出声数一遍，它们就会落在拍子上。',

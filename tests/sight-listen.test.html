@@ -301,6 +301,57 @@
         }
       }
 
+      /* ── 7. A held note that stops early ───────────────────────────── */
+      //
+      // The one reading the app only ever guesses at, because a note's end is
+      // decided by when the sound stops and a live room shortens that. Here the
+      // long notes are played at half their written value on purpose: the app
+      // should notice, and it should say so as a question rather than a verdict.
+      {
+        const { analyzeSightTake } = await import('../src/analyze.js');
+        const { generatePassage, flatten } = await import('../src/sightreading.js');
+
+        let passage = null;
+        let events = null;
+        // A passage with at least three quarter-or-longer notes to judge.
+        for (let seed = 0; seed < 200 && !passage; seed++) {
+          const p = generatePassage({ level: 5, seed });
+          const e = flatten(p).filter((x) => !x.rest && x.note);
+          if (e.filter((x) => x.dur >= 4).length >= 3) {
+            passage = p;
+            events = e;
+          }
+        }
+
+        if (!passage) {
+          problems.push('no passage with long enough notes to test the length reading');
+        } else {
+          const spq = 60 / 58;
+          const make = (hold) => {
+            const frames = [];
+            let t = 0;
+            for (const e of events) {
+              const full = (e.dur / 4) * spq;
+              const sounding = e.dur >= 4 ? full * hold : full * 0.85;
+              for (let s = t; s < t + sounding; s += 0.03) {
+                frames.push({ t: s, freq: 440 * Math.pow(2, (e.midi - 69) / 12), clarity: 0.96, rms: 0.06 });
+              }
+              t += full;
+            }
+            return frames;
+          };
+
+          const honest = analyzeSightTake(make(0.9), passage);
+          const clipped = analyzeSightTake(make(0.45), passage);
+          log.push(
+            `note lengths: held ${honest.shortHeld ? 'flagged' : 'not flagged'} · ` +
+              `short ${clipped.shortHeld ? `${(clipped.shortHeld.ratio * 100).toFixed(0)}% of written` : 'not flagged'}`,
+          );
+          if (honest.shortHeld) problems.push('a passage of full-length notes was called short');
+          if (!clipped.shortHeld) problems.push('notes played at half their length were not noticed');
+        }
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;
