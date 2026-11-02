@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611024230" />
+    <link rel="stylesheet" href="app.css?v=202611024400" />
   </head>
   <body>
     <div class="shell">
@@ -119,6 +119,17 @@
               </p>
             </div>
             <button class="primary-btn" id="openLogBtn" type="button">Open the log</button>
+          </div>
+
+          <div class="test-banner stats-banner">
+            <div class="test-banner-copy">
+              <h3>Your stats</h3>
+              <p id="statsBannerText">
+                Every take, every scale, your own records — best scores, what is improving,
+                and the days you actually played.
+              </p>
+            </div>
+            <button class="primary-btn" id="openStatsBtn" type="button">Open the stats</button>
           </div>
 
           <div class="mode-row">
@@ -463,6 +474,43 @@
               <button class="primary-btn" id="sightNext" type="button" data-i18n="New passage">New passage</button>
             </div>
           </div>
+        </section>
+
+        <!-- ── Your stats ──────────────────────────────────────────────
+             A tracker of your own numbers and nobody else's: the summary on top is
+             about practice as a whole, and the two tabs are the two things the app
+             actually measures. -->
+        <section class="view" id="view-stats" hidden>
+          <button class="back-btn" id="statsBack" type="button">
+            <span aria-hidden="true">←</span> All scales
+          </button>
+
+          <div class="head-row">
+            <div>
+              <h2>Your stats</h2>
+              <p class="subtle" id="statsSub">
+                Every take counted on this device. Nothing here is compared with anybody
+                else — it is your own record, which is the only one worth beating.
+              </p>
+            </div>
+          </div>
+
+          <div class="stat-grid" id="statsSummary"></div>
+
+          <div class="mode-row stats-controls">
+            <div class="segmented" id="statTabs" role="tablist" aria-label="What to look at">
+              <button type="button" role="tab" data-stat-tab="scale" aria-selected="true">Scales</button>
+              <button type="button" role="tab" data-stat-tab="sight" aria-selected="false">Sight reading</button>
+            </div>
+            <div class="segmented small" id="statSort" role="group" aria-label="Sort by">
+              <button type="button" data-stat-sort="average" aria-selected="true">Average</button>
+              <button type="button" data-stat-sort="best" aria-selected="false">Best</button>
+              <button type="button" data-stat-sort="attempts" aria-selected="false">Most played</button>
+            </div>
+          </div>
+
+          <div class="stat-panel" id="statPanel"></div>
+          <p class="stat-note" id="statNote"></p>
         </section>
 
         <!-- ── Practice log ────────────────────────────────────────────── -->
@@ -910,7 +958,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611024230"></script>
+    <script type="module" src="src/app.js?v=202611024400"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

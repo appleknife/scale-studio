@@ -637,7 +637,39 @@ export const S = {
   'log.win.ready1': ['1 scale ready', '1 条音阶就绪'],
   'log.win.readyN': ['{n} scales ready', '{n} 条音阶就绪'],
   'log.win.readyNone': ['not yet — two clean days makes one', '还没有——两个干净的日子才算一条'],
+  // ── Your stats ──
+  'stats.takes': ['takes counted', '计入的次数'],
+  'stats.thisWeek': ['days this week', '本周天数'],
+  'stats.best': ['best score', '最好成绩'],
+  'stats.average': ['recent average', '近期平均'],
+  'stats.streak': ['days in a row', '连续天数'],
+  'stats.scale': ['Scale', '音阶'],
+  'stats.level': ['Level', '级别'],
+  'stats.shape': ['Last few', '最近走势'],
+  'stats.tries': ['Tries', '次数'],
+  'stats.levelN': ['Level {n}', '{n} 级'],
+  'stats.noneScale': [
+    'No scale takes yet. Play one scale and press start — this page fills in from there.',
+    '还没有音阶记录。拉一条音阶、点开始——这一页就会开始积累。',
+  ],
+  'stats.noneSight': [
+    'No sight-reading takes yet. Open the sight-reading section and try a passage.',
+    '还没有视奏记录。去视奏页面读一段试试。',
+  ],
+  'stats.noneMatching': ['Nothing here yet for the scales in this level.', '这个级别还没有对应的记录。'],
+  'stats.ignored': [
+    '{n} take(s) were set aside as test runs — a tap, a cough, or a take that ended before it began. They are not in any of these numbers.',
+    '有 {n} 次被当作测试录音排除了（点了一下、咳嗽，或者刚开始就结束的）——上面的数字里都没有它们。',
+  ],
   'log.win.totalLabel': ['Ready for the audition', '考试就绪'],
+  'stats.ignored': [
+    '{n} takes were set aside as test runs — a tap, a cough, or one that ended before it began. None of them are in these numbers.',
+    '有 {n} 次被当作测试录音排除了（点了一下、咳嗽，或者刚开始就结束的）——上面的数字里都没有它们。',
+  ],
+  'stats.ignoredOne': [
+    '1 take was set aside as a test run — a tap, a cough, or one that ended before it began. It is not in any of these numbers.',
+    '有 1 次被当作测试录音排除了（点了一下、咳嗽，或者刚开始就结束的）——上面的数字里没有它。',
+  ],
   'log.win.total': ['{n} of {total} scales', '{n} / {total} 条音阶'],
   'log.win.none': [
     'Nothing logged yet. One tap on a day below starts it.',
@@ -935,6 +967,10 @@ export const STATIC = {
   'A scale counts as ready once you have played it cleanly on two different days.':
     '一条音阶在两个不同的日子都拉得干净，就算就绪。',
   'Practice log': '练习记录',
+  'Your stats': '我的数据',
+  'Open the stats': '打开数据页',
+  'Every take, every scale, your own records — best scores, what is improving, and the days you actually played.':
+    '每一次录音、每一条音阶，都是你自己的记录——最好成绩、在进步的地方，还有真正练过的日子。',
   'Keeping it safe': '留住这份记录',
   'This log lives in this browser on this device. Save a copy to keep it, or to carry it to another one.':
     '这份记录只存在这台设备的这个浏览器里。存一份副本可以留住它，也可以带到别的设备。',

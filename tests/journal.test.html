@@ -316,6 +316,41 @@
         eq('the fresh log is empty', J.totalDays(J.active(store).state), 0);
       }
 
+      /* ── test runs stay out of the numbers ─────────────────────── */
+      //
+      // A student who taps start to see what happens, a cough, a sibling — those
+      // records must not drag an average down or claim a practice day. The rule
+      // has to be narrow, though: a genuinely bad attempt is still an attempt.
+      {
+        const trial = (o) => J.looksLikeTrial(o);
+        eq('a take with nothing in it is a test', trial({ heard: 1, expected: 29, seconds: 6 }), true);
+        eq('a two-second take is a test', trial({ heard: 12, expected: 29, seconds: 1.8 }), true);
+        eq('giving up at the first bar is a test', trial({ heard: 4, expected: 29, seconds: 8 }), true);
+        eq('a handful of stray notes is a test', trial({ heard: 10, expected: 29, seconds: 9, score: 18 }), true);
+
+        // …but a real, bad attempt is not. This is the line that matters: a
+        // beginner playing every note and scoring badly must keep their numbers.
+        eq('a bad attempt is still an attempt', trial({ heard: 29, expected: 29, seconds: 20, score: 41 }), false);
+        eq('a short but complete sight-reading page counts', trial({ heard: 20, expected: 24, seconds: 12, score: 58 }), false);
+
+        // And the aggregates read the flag.
+        const s = J.emptyState();
+        J.recordTake(s, { kind: 'scale', id: 'G', score: 90, counted: true });
+        J.recordTake(s, {
+          kind: 'scale', id: 'G', score: 5, heard: 1, expected: 29,
+          counted: !J.looksLikeTrial({ heard: 1, expected: 29, seconds: 6 }),
+        });
+        eq('the trial is kept in the record', s.takes.length, 2);
+        eq('but it is flagged', J.trialsIgnored(s), 1);
+        eq('and the average ignores it', Math.round(J.scaleTotals(s, ['G'])[0].average), 90);
+        eq('so does the count', J.recentTakes(s, { counted: true }).length, 1);
+
+        // Records written before the flag existed have none, and must count.
+        const legacy = J.emptyState();
+        legacy.takes = [{ kind: 'scale', id: 'G', score: 77 }];
+        eq('an old record still counts', J.recentTakes(legacy, { counted: true }).length, 1);
+      }
+
       /* ── the note at the foot of the sheet ─────────────────────── */
       //
       // The sentence has to fit the week that happened. These check the choosing,

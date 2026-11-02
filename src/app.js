@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611024230';
-import { renderStaff } from './staff.js?v=202611024230';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611024230';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611024230';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611024230';
-import { generatePassage } from './sightreading.js?v=202611024230';
-import { createPlayer } from './playback.js?v=202611024230';
-import { renderScore } from './score.js?v=202611024230';
-import * as Journal from './journal.js?v=202611024230';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611024230';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611024230';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611024400';
+import { renderStaff } from './staff.js?v=202611024400';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611024400';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611024400';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611024400';
+import { generatePassage } from './sightreading.js?v=202611024400';
+import { createPlayer } from './playback.js?v=202611024400';
+import { renderScore } from './score.js?v=202611024400';
+import * as Journal from './journal.js?v=202611024400';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611024400';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611024400';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611024230';
+} from './tuner.js?v=202611024400';
 
 const LANG = initLang();
 
@@ -28,6 +28,7 @@ const el = {
   views: {
     choose: $('view-choose'),
     practice: $('view-practice'),
+    stats: $('view-stats'),
     result: $('view-result'),
     tune: $('view-tune'),
     sight: $('view-sight'),
@@ -57,6 +58,14 @@ const el = {
   sightAgain: $('sightAgain'),
   sightNext: $('sightNext'),
   openLogBtn: $('openLogBtn'),
+  openStatsBtn: $('openStatsBtn'),
+  statsBack: $('statsBack'),
+  statsSub: $('statsSub'),
+  statsSummary: $('statsSummary'),
+  statTabs: $('statTabs'),
+  statSort: $('statSort'),
+  statPanel: $('statPanel'),
+  statNote: $('statNote'),
   logBannerText: $('logBannerText'),
   trackBack: $('trackBack'),
   streakNum: $('streakNum'),
@@ -1389,6 +1398,9 @@ function stopSightTake(analyse = true) {
         flow: result.continuity,
       },
       bpm: result.unit ? Math.round(60 / (result.unit * 4)) : 0,
+      heard: result.heard,
+      expected: result.expected,
+      seconds: result.duration,
     });
   } else {
     el.sightStatus.textContent = '';
@@ -2100,14 +2112,166 @@ function openTrack() {
   renderLog();
 }
 
+/* ── Your stats ──────────────────────────────────────────────────────── */
+
+const statsView = { tab: 'scale', sort: 'average' };
+
+/**
+ * A sparkline of the last dozen scores: no axes, no labels, just the shape.
+ * Drawn as an SVG polyline so it stays sharp at any size and costs nothing.
+ */
+function sparkline(scores, { width = 104, height = 24 } = {}) {
+  if (!scores || scores.length < 2) return '<span class="spark-empty">—</span>';
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const span = Math.max(6, max - min);
+  const x = (i) => (i / (scores.length - 1)) * (width - 6) + 3;
+  const y = (v) => height - 4 - ((v - min) / span) * (height - 8);
+  const points = scores.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const last = scores[scores.length - 1];
+  return (
+    `<svg class="spark" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">` +
+    `<polyline points="${points}" fill="none" stroke="#2f5d4e" stroke-width="1.6" ` +
+    `stroke-linecap="round" stroke-linejoin="round"/>` +
+    `<circle cx="${x(scores.length - 1).toFixed(1)}" cy="${y(last).toFixed(1)}" r="2.2" fill="#2f5d4e"/>` +
+    '</svg>'
+  );
+}
+
+const statRow = (key, value) => `<div class="stat-row"><span>${key}</span><strong>${value}</strong></div>`;
+
+function renderStats() {
+  const today = todayKey();
+  const ids = MAJOR_KEYS.map((k) => k.id);
+  const counted = Journal.recentTakes(journal, { counted: true });
+  const scales = Journal.recentTakes(journal, { kind: 'scale', counted: true });
+  const sightTakes = Journal.recentTakes(journal, { kind: 'sight', counted: true });
+  const ignored = Journal.trialsIgnored(journal);
+
+  // The summary is about practice, not about one tab.
+  const days = Journal.weekSheet(journal, today, ids).days;
+  const best = counted.reduce((m, t) => Math.max(m, t.score), 0);
+  const lastTen = counted.slice(-10);
+  const recentAvg = lastTen.length
+    ? Math.round(lastTen.reduce((a, t) => a + t.score, 0) / lastTen.length)
+    : null;
+  const tiles = [
+    [t('stats.takes'), counted.length],
+    [t('stats.thisWeek'), days],
+    [t('stats.best'), best ? `${best}%` : '—'],
+    [t('stats.average'), recentAvg == null ? '—' : `${recentAvg}%`],
+    [t('stats.streak'), Journal.streak(journal, today)],
+  ];
+  el.statsSummary.innerHTML = tiles
+    .map(
+      ([label, value]) =>
+        `<div class="stat-tile"><span class="stat-value">${value}</span><span class="stat-label">${label}</span></div>`,
+    )
+    .join('');
+
+  [...el.statTabs.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(b.dataset.statTab === statsView.tab)),
+  );
+  [...el.statSort.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(b.dataset.statSort === statsView.sort)),
+  );
+
+  if (statsView.tab === 'scale') {
+    const rows = Journal.scaleTotals(journal, ids).sort((a, b) => {
+      if (statsView.sort === 'attempts') return b.attempts - a.attempts;
+      if (statsView.sort === 'best') return b.best - a.best;
+      return b.average - a.average;
+    });
+    el.statPanel.innerHTML = rows.length
+      ? `<div class="stat-table">
+          <div class="stat-tr stat-th"><span>${t('stats.scale')}</span><span>${t('stats.shape')}</span><span>${t('stats.tries')}</span><span>${t('stats.average')}</span><span>${t('stats.best')}</span></div>` +
+        rows
+          .map(
+            (row) => `<div class="stat-tr">
+              <span class="stat-key">${keyName(row.id)}</span>
+              <span class="stat-spark">${sparkline(row.recent)}</span>
+              <span>${row.attempts}</span>
+              <span>${Math.round(row.average)}%</span>
+              <span class="stat-best">${row.best}%</span>
+            </div>`,
+          )
+          .join('') +
+        '</div>'
+      : `<p class="stat-empty">${t(scales.length ? 'stats.noneMatching' : 'stats.noneScale')}</p>`;
+  } else {
+    const byLevel = new Map();
+    for (const take of sightTakes) {
+      const cell = byLevel.get(take.level) || { level: take.level, scores: [], best: 0 };
+      cell.scores.push(take.score);
+      cell.best = Math.max(cell.best, take.score);
+      byLevel.set(take.level, cell);
+    }
+    const rows = [...byLevel.values()].sort((a, b) => Number(a.level) - Number(b.level));
+    el.statPanel.innerHTML = rows.length
+      ? `<div class="stat-table is-sight">
+          <div class="stat-tr stat-th"><span>${t('stats.level')}</span><span>${t('stats.shape')}</span><span>${t('stats.tries')}</span><span>${t('stats.average')}</span><span>${t('stats.best')}</span></div>` +
+        rows
+          .map((row) => {
+            const avg = Math.round(row.scores.reduce((a, b) => a + b, 0) / row.scores.length);
+            return `<div class="stat-tr">
+              <span class="stat-key">${t('stats.levelN', { n: row.level })}</span>
+              <span class="stat-spark">${sparkline(row.scores.slice(-12))}</span>
+              <span>${row.scores.length}</span>
+              <span>${avg}%</span>
+              <span class="stat-best">${row.best}%</span>
+            </div>`;
+          })
+          .join('') +
+        '</div>'
+      : `<p class="stat-empty">${t('stats.noneSight')}</p>`;
+  }
+
+  el.statNote.textContent = ignored
+    ? t(ignored === 1 ? 'stats.ignoredOne' : 'stats.ignored', { n: ignored })
+    : '';
+}
+
+el.openStatsBtn.addEventListener('click', () => {
+  cancelListening();
+  showView('stats');
+  renderStats();
+});
+el.statsBack.addEventListener('click', goHome);
+el.statTabs.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-stat-tab]');
+  if (!btn) return;
+  statsView.tab = btn.dataset.statTab;
+  renderStats();
+});
+el.statSort.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-stat-sort]');
+  if (!btn) return;
+  statsView.sort = btn.dataset.statSort;
+  renderStats();
+});
+
 /** A finished take logs itself: nothing to type, and nothing to forget. */
 function noteTake(tag, cardId = null, score = 0, details = null) {
   const today = todayKey();
-  Journal.logTake(journal, today, tag);
-  if (cardId) Journal.noteScale(journal, cardId, today, score);
+  // A test run — a tap, a cough, a sibling — is recorded so nobody loses the fact
+  // that it happened, but it is not allowed to tick the day, move a best score,
+  // or reach the averages. The child's own numbers should only ever reflect
+  // playing.
+  const counted = !(
+    details &&
+    Journal.looksLikeTrial({
+      heard: details.heard,
+      expected: details.expected,
+      seconds: details.seconds,
+      score,
+    })
+  );
+
+  if (counted) Journal.logTake(journal, today, tag);
+  if (cardId && counted) Journal.noteScale(journal, cardId, today, score);
   // Sight reading is filed per level, not per passage: a level VI page is a
   // level VI page whatever it happens to be in.
-  if (tag === 'sight') Journal.noteSight(journal, sight.level, today, score);
+  if (tag === 'sight' && counted) Journal.noteSight(journal, sight.level, today, score);
   // And every take is kept whole — score, the four parts, what it was — because a
   // stat screen can only answer questions the data was asked.
   if (score > 0 && (tag === 'scales' || tag === 'sight')) {
@@ -2118,6 +2282,9 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
       score,
       parts: details && details.parts,
       bpm: details && details.bpm,
+      heard: details && details.heard,
+      expected: details && details.expected,
+      counted,
       key: today,
     });
   }
@@ -2794,6 +2961,9 @@ function finishTake() {
       flow: result.components.continuity,
     },
     bpm: result.stats.bpm,
+    heard: result.stats.heard,
+    expected: result.stats.expected,
+    seconds: result.stats.duration,
   });
 
   // In a mock audition the microphone stays open, the score stays hidden, and

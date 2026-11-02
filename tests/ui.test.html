@@ -272,6 +272,33 @@
           backHome.click();
           await wait(150);
 
+          /* ── your stats ───────────────────────────────────────── */
+          // The screen has to open from the home card, switch tabs, re-sort, and
+          // say what it is *not* counting. The numbers themselves are the journal
+          // suite's job; this is the wiring.
+          d.getElementById('openStatsBtn').click();
+          await wait(250);
+          if (!view('stats')) problems.push('the stats card did not open the stats screen');
+          const tiles = () => [...d.querySelectorAll('#statsSummary .stat-tile')];
+          log.push(`stat tiles: ${tiles().length} · tab ${d.querySelector('#statTabs [aria-selected="true"]').dataset.statTab}`);
+          if (tiles().length !== 5) problems.push(`expected five summary tiles, saw ${tiles().length}`);
+          if (d.querySelector('#statTabs [aria-selected="true"]').dataset.statTab !== 'scale')
+            problems.push('the stats screen should open on the scales tab');
+
+          // With no takes yet, each tab says so rather than showing an empty table.
+          if (!d.querySelector('#statPanel .stat-empty')) problems.push('an empty stats screen shows no explanation');
+
+          d.querySelector('#statTabs [data-stat-tab="sight"]').click();
+          await wait(120);
+          if (d.querySelector('#statTabs [aria-selected="true"]').dataset.statTab !== 'sight')
+            problems.push('the sight-reading tab did not switch');
+          d.querySelector('#statSort [data-stat-sort="best"]').click();
+          await wait(120);
+          if (d.querySelector('#statSort [aria-selected="true"]').dataset.statSort !== 'best')
+            problems.push('the sort control did not switch');
+          d.getElementById('statsBack').click();
+          await wait(150);
+
           /* ── sight reading: picking a bar, and slow practice ────── */
           // The example can start from a bar the reader taps, so the engraver's
           // boxes have to be there, clickable, and marked in exactly one place —

@@ -671,6 +671,123 @@ h3 {
   white-space: nowrap;
 }
 
+/* ── Your stats ──────────────────────────────────────────────────────── */
+
+/* The summary: five numbers about practice as a whole, above the two tabs. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin: 22px 0 6px;
+}
+
+.stat-tile {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 14px 12px;
+}
+
+.stat-value {
+  display: block;
+  font-family: var(--serif);
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stats-controls {
+  margin: 18px 0 12px;
+  justify-content: space-between;
+}
+
+/* The table is a list of rows rather than a <table>: five columns of small
+   numbers with a sparkline in one of them, which a flex row does more honestly
+   than a table does on a phone. */
+.stat-table {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-tr {
+  display: grid;
+  grid-template-columns: minmax(64px, 1.1fr) 116px 54px 74px 64px;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.stat-tr:first-child {
+  border-top: 0;
+}
+
+.stat-th {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: #fbf8f2;
+}
+
+.stat-key {
+  font-family: var(--serif);
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.stat-best {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.stat-spark {
+  display: flex;
+  align-items: center;
+}
+
+.spark-empty {
+  color: var(--muted);
+}
+
+.stat-empty {
+  margin: 18px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.stat-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 560px) {
+  .stat-tr {
+    grid-template-columns: 1fr 84px 40px 56px 56px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
+}
+
 /* ── Sight reading ───────────────────────────────────────────────────── */
 
 /* A second banner on the chooser: the same frame, quieter ink, so the two

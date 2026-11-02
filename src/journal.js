@@ -46,6 +46,27 @@ Those need the four parts, the scale, the level and the time, kept per take.
  */
 export const TAKES_KEPT = 400;
 
+/**
+ * Whether a take is really a take.
+ *
+ * Students press start to see what happens, hold the phone away from the violin,
+ * or let a sibling shout into it. Those records do not belong in a stat screen:
+ * they would drag an average down for a year, and a child watching their "best"
+ * line fall because of a pocket tap learns the wrong thing about their playing.
+ *
+ * So a take is set aside when it is obviously not an attempt — not when it is
+ * merely bad. The rules are deliberately narrow, and every one of them is about
+the *evidence*, not the score: nothing was heard, almost nothing was heard, or
+it was over before anybody could have played a scale.
+ */
+export function looksLikeTrial({ heard = 0, expected = 0, seconds = 0, score = 0 } = {}) {
+  if (heard < 3) return true;                       // a tap, a cough, a room
+  if (seconds > 0 && seconds < 2.5) return true;    // over before a scale could start
+  if (expected > 0 && heard < expected * 0.34) return true; // gave up at the first bar
+  if (score < 25 && heard < expected * 0.6) return true;    // a handful of stray notes
+  return false;
+}
+
 export function recordTake(state, take) {
   if (!Array.isArray(state.takes)) state.takes = [];
   const entry = {
@@ -57,6 +78,11 @@ export function recordTake(state, take) {
     score: Math.round(take.score || 0),
     parts: take.parts || null,
     bpm: take.bpm || 0,
+    heard: take.heard || 0,
+    expected: take.expected || 0,
+    // Kept, not discarded: a teacher may want to know that a run happened, and
+    // the flag is what the averages read. Old records have no flag and count.
+    counted: take.counted !== false,
   };
   state.takes.push(entry);
   if (state.takes.length > TAKES_KEPT) {
@@ -66,10 +92,18 @@ export function recordTake(state, take) {
 }
 
 /** The takes, newest last, optionally one kind ("scale" or "sight"). */
-export function recentTakes(state, { kind = null, limit = TAKES_KEPT } = {}) {
+export function recentTakes(state, { kind = null, limit = TAKES_KEPT, counted = false } = {}) {
   const all = Array.isArray(state.takes) ? state.takes : [];
-  const filtered = kind ? all.filter((t) => t.kind === kind) : all;
+  const filtered = all.filter(
+    (t) => (!kind || t.kind === kind) && (!counted || t.counted !== false),
+  );
   return filtered.slice(-limit);
+}
+
+/** How many takes were set aside as test runs. */
+export function trialsIgnored(state) {
+  const all = Array.isArray(state.takes) ? state.takes : [];
+  return all.filter((t) => t.counted === false).length;
 }
 
 /**
@@ -78,7 +112,7 @@ export function recentTakes(state, { kind = null, limit = TAKES_KEPT } = {}) {
  */
 export function scaleTotals(state, ids = []) {
   const byScale = new Map();
-  for (const take of recentTakes(state, { kind: 'scale' })) {
+  for (const take of recentTakes(state, { kind: 'scale', counted: true })) {
     if (!take.id) continue;
     const cell = byScale.get(take.id) || { id: take.id, scores: [], best: 0, last: null };
     cell.scores.push(take.score);
@@ -105,7 +139,7 @@ export function scaleTotals(state, ids = []) {
  * reason the parts are stored at all.
  */
 export function partAverages(state, { kind = 'scale', window = 12 } = {}) {
-  const takes = recentTakes(state, { kind, limit: window }).filter((t) => t.parts);
+  const takes = recentTakes(state, { kind, limit: window, counted: true }).filter((t) => t.parts);
   if (!takes.length) return null;
   const keys = ['accuracy', 'intonation', 'rhythm', 'flow'];
   const avg = {};
