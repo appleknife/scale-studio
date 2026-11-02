@@ -389,18 +389,22 @@
           if (speeds.length !== 3) problems.push(`expected 3 speeds, saw ${speeds.length}`);
           if (speeds.filter((b) => b.getAttribute('aria-selected') === 'true').length !== 1)
             problems.push('exactly one speed should be selected');
-          // Half speed is the default: practice is not the exam, and the printed
-          // markings at levels V–VI are brisk for a first read.
-          if (speeds[0].getAttribute('aria-selected') !== 'true')
-            problems.push('the passage should start at half speed');
-          if (speeds[0].dataset.rate !== '0.5') problems.push('the first speed is not ½');
+          // The printed marking is the default: a student hears what the page
+          // says, and drops to ½ or ¾ themselves if a level VI excerpt is a
+          // stretch. Half was the default for one build and the teacher asked for
+          // the marking back.
+          if (speeds[speeds.length - 1].getAttribute('aria-selected') !== 'true')
+            problems.push('the passage should start at the printed tempo');
+          if (speeds[speeds.length - 1].dataset.rate !== '1')
+            problems.push('the selected speed is not the printed one');
           if (speeds[speeds.length - 1].textContent.trim() !== 'NYSSMA tempo')
             problems.push('the printed tempo is not labelled as NYSSMA’s');
-          speeds[speeds.length - 1].click();
+          if (speeds[0].dataset.rate !== '0.5') problems.push('the first speed is not ½');
+          speeds[0].click();
           await wait(80);
-          if (speeds[speeds.length - 1].getAttribute('aria-selected') !== 'true')
-            problems.push('choosing the NYSSMA tempo did not mark it');
-          if (speeds.some((b) => b !== speeds[speeds.length - 1] && b.getAttribute('aria-selected') === 'true'))
+          if (speeds[0].getAttribute('aria-selected') !== 'true')
+            problems.push('choosing half speed did not mark it');
+          if (speeds.some((b) => b !== speeds[0] && b.getAttribute('aria-selected') === 'true'))
             problems.push('two speeds are marked at once');
 
           // The switch is test mode now — unticked by default, and ticking it is

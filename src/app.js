@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025700';
-import { renderStaff } from './staff.js?v=202611025700';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611025700';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025700';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025700';
-import { generatePassage } from './sightreading.js?v=202611025700';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025700';
-import { renderScore } from './score.js?v=202611025700';
-import * as Journal from './journal.js?v=202611025700';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025700';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025700';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025800';
+import { renderStaff } from './staff.js?v=202611025800';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611025800';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025800';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025800';
+import { generatePassage } from './sightreading.js?v=202611025800';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025800';
+import { renderScore } from './score.js?v=202611025800';
+import * as Journal from './journal.js?v=202611025800';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025800';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025800';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611025700';
+} from './tuner.js?v=202611025800';
 
 const LANG = initLang();
 
@@ -1025,10 +1025,12 @@ const sight = {
   // marks it and turns the example into "start here", which is what a student
   // who has lost their place actually needs.
   pickedBar: null,
-  // The speed the example and the assisted clicks run at. Half is the default:
-  // practice is not the exam, and the Manual's top-level markings are brisk for a
-  // first read — the student moves up to the NYSSMA tempo when they choose.
-  rate: 0.5,
+  // The speed the example and the assisted clicks run at. The printed marking is
+  // the default — a student should hear what the page says the first time, and
+  // drop to ½ or ¾ themselves if a level VI excerpt is a stretch. (Only VI is
+  // brisk enough to need it; the teacher tried half as the default and asked for
+  // the marking back.)
+  rate: 1,
 };
 
 /* ── Hearing the passage ─────────────────────────────────────────────── */
@@ -1128,7 +1130,7 @@ function hidePlayhead() {
  */
 function movePlayhead(sight, at) {
   const anchors = sight.anchors;
-  if (!anchors || !anchors.length || !playhead) return;
+  if (!anchors || !anchors.length || !playhead) return -1;
   const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   let i = 0;
   while (i + 1 < anchors.length && anchors[i + 1].start <= at) i += 1;
@@ -1151,6 +1153,9 @@ function movePlayhead(sight, at) {
   playhead.dot.setAttribute('cx', String(x));
   playhead.dot.setAttribute('cy', String(here.y));
   playhead.group.style.opacity = '0.85';
+  // Which note it is sitting on, so a caller — or a test — can ask where the line
+  // has got to without re-deriving it from the pixels.
+  return i;
 }
 
 function stopHearing() {
@@ -1503,7 +1508,14 @@ function runAssistPlayhead(take, passage) {
   ensurePlayhead();
   sight.anchors = sightAnchors(passage, el.sightStaff.querySelector('svg'));
   const spq = secondsPerQuarter(passage.tempo) / sight.rate;
-  const total = (passage.bars.length * passage.perBar) / 4;
+  // The clock and the anchors have to be in the same unit, and both are in
+  // **sixteenths** from the start of the passage — that is what movePlayhead()
+  // takes, and what the example's own tick hands it (`bar × perBar + sixteenths
+  // into the bar`). The length of the passage is therefore bars × perBar with no
+  // conversion at all: dividing it by four gave a total in quarters while the
+  // clock arrived in sixteenths, so the line stopped — and disappeared — after a
+  // quarter of the page, which is exactly two bars of eight on a phone.
+  const total = passage.bars.length * passage.perBar;
   const began = performance.now();
   const step = () => {
     if (sight.take !== take) return;
@@ -3783,6 +3795,58 @@ if (params.has('log')) openTrack();
 if (params.has('sightdemo')) {
   openSight(Number(params.get('sightdemo')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
   renderSightResult(analyzeSightTake(sightDemoFrames(sight.passage), sight.passage));
+}
+if (params.has('sightwalk')) {
+  // ?sightwalk=5&seed=7 walks the moving line across the whole passage and
+  // records what it did at each step — the drawing's own geometry, without a
+  // microphone or an audio clock. A suite reads window.__sightWalk and fails if
+  // the line is ever invisible, mis-sized or off the page.
+  openSight(Number(params.get('sightwalk')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
+  const walk = () => {
+    const passage = sight.passage;
+    ensurePlayhead();
+    sight.anchors = sightAnchors(passage, el.sightStaff.querySelector('svg'));
+    // Sixteenths, the same unit runAssistPlayhead() counts in.
+    const total = passage.bars.length * passage.perBar;
+    window.__sightWalkMeta = {
+      perBar: passage.perBar,
+      meter: passage.meter,
+      tempo: passage.tempo,
+      systems: sight.perSystem,
+      events: passage.bars.map((bar, b) =>
+        bar.map((e) => ({ b, start: e.start, dur: e.dur, rest: Boolean(e.rest) })),
+      ),
+      anchors: sight.anchors.map((a) => ({
+        start: a.start,
+        x: Math.round(a.x),
+        y: Math.round(a.y),
+        top: Math.round(a.top),
+      })),
+    };
+    const steps = [];
+    for (let k = 0; k <= 200; k++) {
+      const at = (total * k) / 200;
+      const anchor = movePlayhead(sight, at);
+      const here = sight.anchors[anchor] || { start: 0 };
+      steps.push({
+        at,
+        // The bar the line is actually on, read off the note it landed on — not
+        // off the clock, so a clock that runs at the wrong speed shows up here.
+        bar: Math.min(passage.bars.length, Math.floor(here.start / passage.perBar) + 1),
+        x: Number(playhead.line.getAttribute('x1')),
+        y1: Number(playhead.line.getAttribute('y1')),
+        y2: Number(playhead.line.getAttribute('y2')),
+        cy: Number(playhead.dot.getAttribute('cy')),
+        opacity: playhead.group.style.opacity,
+      });
+    }
+    window.__sightWalk = steps;
+  };
+  // A task later, so the drawing has been laid out and getBBox() has real
+  // numbers in it. A timer rather than requestAnimationFrame: an iframe parked
+  // off-screen — which is how the suite loads this — may never be given a frame,
+  // and a walk that silently never happens cannot fail a test.
+  setTimeout(walk, 0);
 }
 if (params.has('sight')) {
   // ?sight=5&seed=4471 reproduces one passage exactly — handy for a class

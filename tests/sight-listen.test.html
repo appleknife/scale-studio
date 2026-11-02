@@ -444,6 +444,47 @@
         frame.remove();
       }
 
+      /* ── 11. The moving line crosses the whole page ────────────────── */
+      //
+      // The teacher's report: with the clicks on, the line vanished after about
+      // two bars. The clock ran in sixteenths while the length of the passage was
+      // worked out in quarters, so the line finished a quarter of the way through
+      // and was then hidden — two bars of eight. `?sightwalk` walks the line over
+      // the whole passage and records, at every step, which bar it is actually on
+      // (read from the note it landed on, not from the clock), so a clock running
+      // at the wrong speed cannot hide behind a plausible-looking picture.
+      for (const width of [400, 1100]) {
+        const frame = document.createElement('iframe');
+        frame.style.cssText =
+          `position:fixed;left:-4000px;top:0;width:${width}px;height:900px;border:0`;
+        frame.src = '../index.html?sightwalk=5&seed=7';
+        document.body.appendChild(frame);
+        await new Promise((r) => frame.addEventListener('load', r));
+        const w = frame.contentWindow;
+        const walked = await until(() => Boolean(w.__sightWalk), 8000);
+        const steps = w.__sightWalk || [];
+        const bars = steps.map((s) => s.bar);
+        const seen = [...new Set(bars)];
+        const hidden = steps.filter(
+          (s) => s.opacity !== '0.85' || !Number.isFinite(s.x) || !Number.isFinite(s.y1) || s.y2 <= s.y1,
+        );
+        const rows = [...new Set(steps.map((s) => Math.round(s.y1)))].sort((a, b) => a - b);
+        log.push(
+          `line at ${width}px: ${steps.length} steps · bars ${seen.join(',')} · ` +
+            `rows ${rows.length} · invisible ${hidden.length}`,
+        );
+        if (!walked) problems.push(`the line never walked at ${width}px`);
+        if (seen.length !== 8) problems.push(`the line crossed ${seen.length} of 8 bars at ${width}px`);
+        if (bars.some((b, k) => k > 0 && b < bars[k - 1]))
+          problems.push(`the line went backwards through the bars at ${width}px`);
+        if (hidden.length) problems.push(`the line was invisible for ${hidden.length} steps at ${width}px`);
+        // Two bars to a system is the phone's layout; four is the wide one.
+        const systems = width < 560 ? 4 : 2;
+        if (rows.length !== systems)
+          problems.push(`${systems} rows expected at ${width}px, saw ${rows.length}`);
+        frame.remove();
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;

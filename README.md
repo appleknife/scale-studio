@@ -310,11 +310,12 @@ sight-reading table for that level.
   without changing a note of it. The clock is scaled once, in `schedule()`, so the
   shaping (slurs, staccato, the hairpin's ramp) keeps its proportions; the playhead
   follows the audio clock, so it slows with the music. Changing speed while it is
-  sounding restarts it from the same place. **½ is the default**: practice is not
-  the exam, the Manual's markings at V–VI are brisk for a first read, and a teacher
-  asked for the printed tempo to be the thing you opt *into* — so it is labelled as
-  NYSSMA's rather than as the norm. (The *Hear the tempo* metronome still clicks at
-  the printed marking: its job is to be the marking.)
+  sounding restarts it from the same place. **The printed marking is the default**,
+  and it is labelled as NYSSMA's so that dropping to ½ is a decision rather than a
+  correction. Half was the default for one build: the teacher tried it with students
+  and asked for the marking back, because only level VI is genuinely brisk — the
+  rest is fine to hear at speed, and the slider is right there for the piece that
+  is not.
 * **Assistance is the default; test conditions are the switch.** *Start listening*
   counts the student in — one bar, in the metre's own beats, so 4 in 4/4, 3 in 3/4,
   2 in cut time and 6 in 6/8 — then runs a click track and a moving line under the
@@ -332,6 +333,16 @@ sight-reading table for that level.
   `awaitWarm`, says *Waking the microphone up*, and starts counting on the **first
   frame the microphone actually delivers**. If no frame arrives within 8 s the take
   gives up and says so, rather than sitting at "warming" for ever.
+* **The moving line runs the whole page.** It vanished after about two bars because
+  its clock and the notes it was looking up were in different units: the clock
+  arrives in sixteenths — what `movePlayhead()` takes, and what the example's own
+  tick hands it — while the length of the passage was worked out in quarters. So the
+  line finished a quarter of the way through and was then hidden: two bars of eight,
+  which is exactly one system on a phone. `?sightwalk` now walks the line over a
+  passage and records the bar it is *actually* on, read from the note it landed on
+  rather than from the clock, and the listening suite walks it at both layouts —
+  eight bars, four rows at phone width and two at full width, visible at every step.
+  Putting the old division back fails the suite with "crossed 3 of 8 bars".
 * Every passage has a **seed**, so `?sight=5&seed=4471` always gives the same eight
   bars. A teacher can put one passage on a projector, or send the link to a class.
 * The line sits on the staff, opens on a chord tone, steps more than it leaps,
