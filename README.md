@@ -249,6 +249,19 @@ the scoring all follow from it.
   what lets a softly bowed note on a phone count as a note. (A loud room looks
   like the instrument to a level estimator, so the line does not chase it; the
   detector's clarity gate is what keeps noise out.)
+* **Starting a take:** a confident note — loud, clearly periodic, three frames in a
+  row — *or* a note that simply holds for six frames (180 ms). The second rule
+  exists because of a phone: the first one asked for clarity above 0.7 at a fixed
+  level, and iOS's gain control takes a second or two to wind up while a fresh bow
+  attack smears the pitch reading, so a student who was already playing watched a
+  dead needle for four or five seconds. Nothing inaudible gets through either rule
+  — noise has no periodicity, so clarity stays under 0.5 — and the needle now
+  follows the input from the first frame, before the take's own clock has started.
+* **The analysis gate is bounded from both sides.** `segmentNotes()` sets it at
+  1.5 × the room's tenth percentile, but never above a third of the loudest frame.
+  A take that sits entirely around 0.0045 — which is what an iPhone produces with
+  gain control on — used to have the gate placed at 0.0068, *above its own notes*,
+  and came back as "nothing heard" at the end of a perfectly good scale.
 * **Note finding:** a note begins when a stable pitch appears and ends when the
   pitch moves or the sound stops. The first 20% and last 15% of each note are
   ignored so bow attacks do not distort the reading.

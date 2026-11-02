@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611025900';
-import { getLang, t } from './i18n.js?v=202611025900';
+import { median } from './pitch.js?v=202611026000';
+import { getLang, t } from './i18n.js?v=202611026000';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -19,8 +19,12 @@ export const DEFAULTS = {
   // Cents error that still counts as "centred" / where credit reaches zero.
   intonationPerfect: 15,
   intonationZero: 55,
-  // Notes quieter than this are treated as silence (refined per take).
-  minRms: 0.0035,
+  // Notes quieter than this are treated as silence (refined per take). It is a
+  // floor against digital silence, not a guess at how loud a violin should be: a
+  // phone's gain control can put a whole take under the old 0.0035, and then the
+  // take came back as "nothing heard" while the student was playing all the way
+  // through.
+  minRms: 0.0015,
 };
 
 const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
@@ -111,11 +115,16 @@ export function segmentNotes(frames, options = {}) {
   const o = { ...DEFAULTS, ...options };
   if (!frames.length) return { notes: [], gate: o.minRms };
 
-  // The gate follows the room, but it is capped: a quiet passage on the G
-  // string must never be mistaken for silence just because the average is high.
+  // The gate follows the room, and it is bounded from *both* sides. Never below
+  // `minRms`, so silence is not a note; and never above a third of the loudest
+  // frame, so a quiet instrument cannot have the gate placed over its own notes.
+  // That second bound is what a phone needs: with gain control on, a whole take
+  // can sit around 0.0045, and the old formula — 1.5 × the tenth percentile — put
+  // the gate at 0.0068 and heard nothing at all.
   const rmsSorted = frames.map((f) => f.rms).sort((a, b) => a - b);
   const noiseFloor = percentile(rmsSorted, 0.1);
-  const gate = Math.max(o.minRms, Math.min(0.015, noiseFloor * 1.5));
+  const peak = percentile(rmsSorted, 0.98);
+  const gate = Math.max(o.minRms, Math.min(0.015, noiseFloor * 1.5, peak * 0.35));
 
   // Frame-wise pitch in semitones (float), or null when unvoiced.
   const raw = frames.map((f) => {

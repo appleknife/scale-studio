@@ -1,22 +1,22 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025900';
-import { renderStaff } from './staff.js?v=202611025900';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026000';
+import { renderStaff } from './staff.js?v=202611026000';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611025900';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025900';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025900';
-import { generatePassage } from './sightreading.js?v=202611025900';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025900';
-import { renderScore } from './score.js?v=202611025900';
-import * as Journal from './journal.js?v=202611025900';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025900';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025900';
+} from './pitch.js?v=202611026000';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026000';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026000';
+import { generatePassage } from './sightreading.js?v=202611026000';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026000';
+import { renderScore } from './score.js?v=202611026000';
+import * as Journal from './journal.js?v=202611026000';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026000';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026000';
 import {
   STRINGS,
   FIFTHS,
@@ -24,7 +24,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611025900';
+} from './tuner.js?v=202611026000';
 
 const LANG = initLang();
 
@@ -1631,9 +1631,20 @@ function ingestSightFrame(frame) {
   }
 
   if (!take.started) {
-    const strong = frame.rms > strongLevel(state.mic?.floor) && frame.clarity > 0.7;
+    const heard = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
+    // The needle answers while the app is still deciding, exactly as it does on a
+    // scale take — otherwise a test run shows "—" for however long the start rule
+    // takes to be satisfied.
+    if (heard && take.live) {
+      el.sightLive.hidden = false;
+      updateSightLive(take, frame.freq);
+    }
+    // Confident (3 frames) or merely held (6) — see the long note in onFrame: on a
+    // phone the confident rule alone can take seconds to line up.
+    const strong = frame.rms > strongLevel(state.mic?.floor) && frame.clarity > 0.62;
     take.strong = strong ? take.strong + 1 : 0;
-    if (take.strong >= 3) {
+    take.held = heard ? (take.held || 0) + 1 : 0;
+    if (take.strong >= 3 || take.held >= 6) {
       take.started = true;
       sight.phase = 'taking';
       take.t0 = Math.max(0, frame.t - 0.1);
@@ -1844,7 +1855,13 @@ function renderSightResult(result) {
  * Synthetic frames for a sight-reading take, so the result screen can be looked
  * at without a microphone — the same trick the scale demo uses.
  */
-function sightDemoFrames(passage, unit = 0.32, centsByIndex = {}) {
+function sightDemoFrames(passage, unit = 0.32, centsByIndex = {}, voice = {}) {
+  // A phone does not deliver a confident, perfectly periodic frame: the level is
+  // lower and the first reading of a fresh bow attack is smeared. `voice` lets a
+  // suite hand the app that kind of take instead of an ideal one.
+  const clarity = voice.clarity ?? 0.95;
+  const rms = voice.rms ?? 0.06;
+  const silentRms = voice.silentRms ?? 0.0005;
   const events = [];
   passage.bars.forEach((barEvents, barIndex) => {
     for (const event of barEvents) {
@@ -1859,9 +1876,9 @@ function sightDemoFrames(passage, unit = 0.32, centsByIndex = {}) {
     const cents = centsByIndex[i] || 0;
     const freq = midiToFreq(event.note.midi) * Math.pow(2, cents / 1200);
     for (let t = 0; t < dur; t += 0.03) {
-      frames.push({ t: start + t, freq, clarity: 0.95, rms: 0.06 });
+      frames.push({ t: start + t, freq, clarity, rms });
     }
-    frames.push({ t: start + dur + 0.01, freq: 0, clarity: 0, rms: 0.0005 });
+    frames.push({ t: start + dur + 0.01, freq: 0, clarity: 0, rms: silentRms });
   });
   return frames;
 }
@@ -3094,13 +3111,24 @@ async function openMic(emit) {
   analyser.smoothingTimeConstant = 0;
   source.connect(analyser);
 
-  // The analyser is a sink — it works without an output — but some builds only
-  // render a graph that reaches the destination. A gain of exactly zero is
-  // silent, so nothing here can feed back through the speaker into a violin
-  // take, and the meter is guaranteed to be looking at live samples.
+  // The analyser is a sink and works without an output, so by default the
+  // microphone graph never touches the speakers: one less thing for iOS to
+  // reconfigure under the first second of a take. If a browser still refuses to
+  // render a graph that goes nowhere — which shows up as *exact* zeros for the
+  // first half-second — a silent path to the destination is added then (see
+  // ensurePulled below).
   const sink = ctx.createGain();
   sink.gain.value = 0;
-  analyser.connect(sink).connect(ctx.destination);
+  let pulled = false;
+  const ensurePulled = () => {
+    if (pulled) return;
+    pulled = true;
+    try {
+      analyser.connect(sink).connect(ctx.destination);
+    } catch {
+      /* nothing else to try — the analyser still works on its own */
+    }
+  };
 
   const buf = new Float32Array(analyser.fftSize);
   const detector = new PitchDetector({
@@ -3166,29 +3194,40 @@ async function openMic(emit) {
   };
 
   const startedAt = performance.now();
+  let still = 0;
+  let silentTicks = 0;
   const timer = setInterval(() => {
     if (ctx.state !== 'running') {
       // Reading an interrupted context yields the last buffer over and over —
-      // which is worse than silence, because it looks like a held note.
-      if (!mic.stalled) {
+      // which is worse than silence, because it looks like a held note. Half a
+      // second of this is iOS reconfiguring the session around a new stream;
+      // longer than that and it is not coming back on its own.
+      still += 1;
+      if (still > 15 && !mic.stalled) {
         mic.stalled = true;
         onMicStalled();
       }
       return;
     }
+    still = 0;
+    mic.stalled = false;
     analyser.getFloatTimeDomainData(buf);
     const { freq, clarity, rms } = detector.detect(buf);
     mic.floor = nextFloor(mic.floor, rms);
+    if (rms === 0) {
+      silentTicks += 1;
+      if (silentTicks > 25) ensurePulled();
+    } else {
+      silentTicks = 0;
+    }
     emit({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms });
   }, 30);
 
   ctx.addEventListener?.('statechange', () => {
-    if (ctx.state === 'running') {
-      mic.stalled = false;
-    } else if (!mic.stalled) {
-      mic.stalled = true;
-      onMicStalled();
-    }
+    // Clearing a stall is always safe. Declaring one is left to the interval,
+    // which waits half a second first: a session reconfiguring itself looks
+    // suspended for a moment and is not an interruption.
+    if (ctx.state === 'running') mic.stalled = false;
   });
 
   return mic;
@@ -3413,12 +3452,37 @@ function onFrame(frame) {
   // the take's own peak, for the "was anything heard at all" question.
   take.peak = Math.max(take.peak || 0, frame.rms);
 
+  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
+
+  // The needle answers the bow from the first frame, not from the first *scored*
+  // note. A student watching for the app to hear them was looking at "—" for
+  // seconds while the take's own start rule made up its mind; the readout is a
+  // rehearsal aid, so it may as well tell the truth immediately.
+  if (voiced) updateTuner(69 + 12 * Math.log2(frame.freq / 440));
+
   if (!take.started) {
-    const strong = frame.rms > strongLevel(state.mic?.floor) && frame.clarity > 0.7;
+    // Two ways to start, and the second one exists because a phone needed it.
+    //
+    // The first is the confident note: loud, clearly periodic, three frames in a
+    // row. The second is simply a note that *holds* — quieter, less certain of its
+    // own periodicity, but present for six frames (180 ms). The old rule was the
+    // confident one alone (clarity 0.7 at a fixed 0.007), and on an iPhone it is
+    // a lottery: the gain control is still winding up over the first second, and
+    // YIN on a fresh bow attack is smeared, so a student who was already playing
+    // watched a dead needle for four or five seconds before three frames happened
+    // to line up. Room noise cannot pass either rule — a noise frame has no
+    // periodicity, so clarity stays under 0.5.
+    const strong = frame.rms > strongLevel(state.mic?.floor) && frame.clarity > 0.62;
     take.strong = strong ? take.strong + 1 : 0;
-    if (take.strong >= 3) {
+    take.held = voiced ? (take.held || 0) + 1 : 0;
+    if (take.strong >= 3 || take.held >= 6) {
       take.started = true;
-      devLog('take-started', { index: state.test ? state.test.index : -1, rms: Number(frame.rms.toFixed(4)) });
+      devLog('take-started', {
+        index: state.test ? state.test.index : -1,
+        rms: Number(frame.rms.toFixed(4)),
+        clarity: Number(frame.clarity.toFixed(3)),
+        via: take.strong >= 3 ? 'strong' : 'held',
+      });
       take.t0 = Math.max(0, frame.t - 0.1);
       setStatus(true, t('status.listeningScale'));
       el.listenHint.textContent = t('hint.allTheWay');
@@ -3429,7 +3493,6 @@ function onFrame(frame) {
   const elapsed = Math.max(0, frame.t - take.t0);
   take.frames.push({ t: elapsed, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
 
-  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
   if (voiced) {
     take.lastVoiced = elapsed;
     const midiFloat = 69 + 12 * Math.log2(frame.freq / 440);
@@ -3437,7 +3500,6 @@ function onFrame(frame) {
       take.noteCount += 1;
       take.lastMidi = midiFloat;
     }
-    updateTuner(midiFloat);
   }
 
   const silence = elapsed - take.lastVoiced;
@@ -4079,7 +4141,15 @@ if (params.has('sightplay')) {
   const offsets = params.has('detune')
     ? Object.fromEntries([...Array(64).keys()].map((k) => [k, 42]))
     : {};
-  const frames = sightDemoFrames(sight.passage, 0.32, offsets);
+  // ?sightplay=5&soft — the same take through a phone's microphone: quiet, and
+  // never quite certain of its own periodicity, which is what used to leave the
+  // take waiting for a "confident" frame that never came.
+  const frames = sightDemoFrames(
+    sight.passage,
+    0.32,
+    offsets,
+    params.has('soft') ? { clarity: 0.58, rms: 0.0045, silentRms: 0.0004 } : {},
+  );
   const holdAt = params.has('hold') ? Number(params.get('hold')) / 1000 : Infinity;
   let i = 0;
   const step = () => {

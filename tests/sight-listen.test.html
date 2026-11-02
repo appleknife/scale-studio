@@ -524,6 +524,25 @@
         frame.remove();
       }
 
+      /* ── 13. A phone's first notes ─────────────────────────────────── */
+      //
+      // The teacher started a scale take and the needle sat still for four or five
+      // seconds. The cause was the start rule: a "confident" note meant clarity
+      // above 0.7 at a fixed level, three frames running, and a phone's first
+      // seconds — gain control winding up, a fresh bow attack smearing YIN — do
+      // not reliably produce that. A note that merely *holds* for six frames now
+      // starts the take too. This page feeds the app that kind of take.
+      {
+        const frame = await load('../index.html?sightplay=5&seed=7&soft');
+        const d = frame.contentDocument;
+        const finished = await until(() => !d.getElementById('sightResult').hidden, 20000);
+        const pct = d.getElementById('sightPct').textContent.trim();
+        log.push(`soft take (clarity 0.58, rms 0.0045): ${finished ? `scored ${pct}` : 'never started'}`);
+        if (!finished) problems.push('a quiet, smeared take never started');
+        if (!/^\d+%$/.test(pct)) problems.push(`a quiet, smeared take scored "${pct}"`);
+        frame.remove();
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;
