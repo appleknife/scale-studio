@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611020030" />
+    <link rel="stylesheet" href="app.css?v=202611020130" />
   </head>
   <body>
     <div class="shell">
@@ -362,6 +362,17 @@
             <button class="primary-btn" id="sightStart" type="button" data-i18n="Start listening">Start listening</button>
             <button class="quiet-btn" id="sightStop" type="button" hidden data-i18n="Finish">Finish</button>
             <p class="sight-status" id="sightStatus" role="status" aria-live="polite"></p>
+            <label class="volume" for="sightVolume">
+              <span class="volume-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 9h3l4.5-3.5v13L7 15H4z" />
+                  <path d="M16 8.5a5 5 0 0 1 0 7" />
+                  <path d="M18.6 6a8.5 8.5 0 0 1 0 12" />
+                </svg>
+              </span>
+              <input id="sightVolume" type="range" min="0" max="100" step="1" value="80"
+                aria-label="Volume" data-i18n-aria="Volume" />
+            </label>
           </div>
 
           <!-- Closed by default: the honest limits of a phone microphone, for
@@ -832,7 +843,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611020030"></script>
+    <script type="module" src="src/app.js?v=202611020130"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

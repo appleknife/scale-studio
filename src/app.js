@@ -1,15 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611020030';
-import { renderStaff } from './staff.js?v=202611020030';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611020030';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611020030';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611020030';
-import { generatePassage } from './sightreading.js?v=202611020030';
-import { createPlayer } from './playback.js?v=202611020030';
-import { renderScore } from './score.js?v=202611020030';
-import * as Journal from './journal.js?v=202611020030';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611020030';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611020130';
+import { renderStaff } from './staff.js?v=202611020130';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611020130';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611020130';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611020130';
+import { generatePassage } from './sightreading.js?v=202611020130';
+import { createPlayer } from './playback.js?v=202611020130';
+import { renderScore } from './score.js?v=202611020130';
+import * as Journal from './journal.js?v=202611020130';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611020130';
 import {
   STRINGS,
   FIFTHS,
@@ -17,7 +17,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611020030';
+} from './tuner.js?v=202611020130';
 
 const LANG = initLang();
 
@@ -85,6 +85,7 @@ const el = {
   lessonSheet: $('lessonSheet'),
   copySheet: $('copySheet'),
   clearLog: $('clearLog'),
+  sightVolume: $('sightVolume'),
   sightLive: $('sightLive'),
   sightLiveNote: $('sightLiveNote'),
   sightLiveCents: $('sightLiveCents'),
@@ -1351,8 +1352,6 @@ function sightDemoFrames(passage, unit = 0.32, centsByIndex = {}) {
   return frames;
 }
 
-let clickCtx = null;
-
 /**
  * Two bars of clicks at the passage's own tempo, with a heavier downbeat.
  *
@@ -1362,10 +1361,11 @@ let clickCtx = null;
  * "♪ = 120" has to sound like 120 eighths, not 40 dotted quarters.
  */
 function playTempo(passage) {
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return;
-  if (!clickCtx) clickCtx = new Ctx();
-  if (clickCtx.state === 'suspended') clickCtx.resume();
+  // The clicks share the player's context and its volume: one audio context per
+  // page (browsers hand out only a few), and one slider for every sound the app
+  // makes, so turning the example down turns the metronome down with it.
+  const clickCtx = player.context;
+  if (clickCtx.state === 'suspended') clickCtx.resume().catch(() => {});
 
   const unit = unitLength(passage.tempo.unit);
   const tickSeconds = 60 / passage.tempo.bpm;
@@ -1390,7 +1390,7 @@ function playTempo(passage) {
     gain.gain.setValueAtTime(0.0001, when);
     gain.gain.linearRampToValueAtTime(downbeat ? 0.22 : beat ? 0.12 : 0.07, when + 0.005);
     gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.07);
-    osc.connect(gain).connect(clickCtx.destination);
+    osc.connect(gain).connect(player.output);
     osc.start(when);
     osc.stop(when + 0.09);
   }
@@ -1407,6 +1407,30 @@ el.sightAgain.addEventListener('click', () => {
 });
 el.sightNext.addEventListener('click', () => newPassage(sight.level));
 el.sightHearBtn.addEventListener('click', hearPassage);
+
+// The volume is remembered on the device: a student who needs the example louder
+// should not have to find the slider again every visit.
+const VOLUME_KEY = 'scaleStudio.volume';
+function applyVolume(percent) {
+  const value = Math.max(0, Math.min(100, Number(percent)));
+  el.sightVolume.value = String(value);
+  player.setVolume(value / 100);
+  try {
+    localStorage.setItem(VOLUME_KEY, String(value));
+  } catch {
+    /* private mode — the slider still works for this visit */
+  }
+}
+let storedVolume = 80;
+try {
+  const saved = Number(localStorage.getItem(VOLUME_KEY));
+  if (Number.isFinite(saved) && saved >= 0 && saved <= 100) storedVolume = saved;
+} catch {
+  /* no storage */
+}
+player.setVolume(storedVolume / 100);
+el.sightVolume.value = String(storedVolume);
+el.sightVolume.addEventListener('input', () => applyVolume(el.sightVolume.value));
 el.sightTempoBtn.addEventListener('click', () => {
   if (sight.passage) playTempo(sight.passage);
 });

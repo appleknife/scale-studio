@@ -460,6 +460,7 @@ export const S = {
   'aria.notation': ['Scale notation', '音阶乐谱'],
   'aria.dial': ['Tuning dial', '调音表盘'],
   'aria.score': ['Sight-reading passage', '视奏乐谱'],
+  'Volume': ['Volume', '音量'],
 
   /* Practice log, as the screen says it */
   'log.banner.streak': ['{n} days in a row · {days} this week', '{n} 天连续 · 本周 {days} 天'],

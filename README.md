@@ -281,6 +281,13 @@ sight-reading table for that level.
   the shaping, and the teacher's own recorded violin takes its place (see *recording
   the playback voice*). The playhead is driven by the audio clock, not by a timer, so
   it cannot drift away from what is being heard.
+* **Stop** ends the example — in sound, not just on screen. Every note of a passage
+  is scheduled up front, so cancelling the playhead alone left the music running to
+  the end of the bar. Each sounding now gets its own gain node, faded out over 40 ms
+  (a hard cut clicks) and then torn down.
+* **The volume slider** next to *Start listening* sets the level for the example and
+  the metronome together — one audio context and one master gain for every sound the
+  app makes — and it remembers the level on that device.
 * **Hear the tempo** clicks two bars at the printed speed, with a heavier downbeat.
 * Every passage has a **seed**, so `?sight=5&seed=4471` always gives the same eight
   bars. A teacher can put one passage on a projector, or send the link to a class.

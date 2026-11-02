@@ -16,7 +16,7 @@
 // `capture.html` and will replace the voice without touching anything else: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611020030';
+import { makeHallIR } from './recorder.js?v=202611020130';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -202,37 +202,73 @@ export function bowedVoice(ctx, destination) {
  * gesture, and the user's click is that gesture — so the first play makes it and
  * every later play reuses it.
  */
-export function createPlayer({ wet = 0.24 } = {}) {
+export function createPlayer({ wet = 0.24, volume: start = 0.8 } = {}) {
   let ctx = null;
   let master = null;
   let dry = null;
+  let hall = null;
   let hallGain = null;
   let current = null;
+  let volume = Math.max(0, Math.min(1, start));
+
+  // Half scale at full volume: a monophonic line of shaped notes needs the
+  // headroom, and the slider then goes from silent to "as loud as it gets".
+  const levelFor = (v) => 0.5 * v;
+
+  /** The input side of the hall, created on first use. */
+  function hallInput() {
+    if (!hall) build();
+    return hall;
+  }
 
   function build() {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) throw new Error('no-audio');
     ctx = new Ctx();
     master = ctx.createGain();
-    master.gain.value = 0.42;
+    master.gain.value = levelFor(volume);
     master.connect(ctx.destination);
 
     dry = ctx.createGain();
     dry.gain.value = 1;
     dry.connect(master);
 
-    const hall = ctx.createConvolver();
+    hall = ctx.createConvolver();
     hall.buffer = makeHallIR(ctx, 2.4, 3.4);
     hallGain = ctx.createGain();
     hallGain.gain.value = wet;
     hall.connect(hallGain).connect(master);
-    // Voices feed this one node and it feeds both the dry path and the hall.
-    return { out: dry, hall };
   }
 
   return {
     get playing() {
       return Boolean(current);
+    },
+
+    /**
+     * The audio context and the node everything is mixed into, so the metronome
+     * can share them: one context per page (browsers give you a limited number),
+     * and one volume control for every sound the app makes.
+     */
+    get context() {
+      if (!ctx) build();
+      return ctx;
+    },
+
+    get output() {
+      if (!ctx) build();
+      return master;
+    },
+
+    get volume() {
+      return volume;
+    },
+
+    /** 0–1. Applied smoothly, so dragging the slider does not click. */
+    setVolume(next) {
+      volume = Math.max(0, Math.min(1, Number(next) || 0));
+      if (master) master.gain.setTargetAtTime(levelFor(volume), ctx.currentTime, 0.02);
+      return volume;
     },
 
     /**
@@ -245,7 +281,16 @@ export function createPlayer({ wet = 0.24 } = {}) {
       this.stop();
 
       const plan = schedule(passage, { rate });
-      const voice = bowedVoice(ctx, dry);
+      // Every sounding of the passage gets its own gate, wired to the dry path and
+      // to the hall. Stopping closes the gate — cancelling the animation was all
+      // the old stop did, and since every note is scheduled up front the music
+      // simply carried on to the end of the bar.
+      const gate = ctx.createGain();
+      gate.gain.value = 1;
+      gate.connect(dry);
+      gate.connect(hallInput());
+
+      const voice = bowedVoice(ctx, gate);
       const start = ctx.currentTime + 0.14;
       for (const note of plan.notes) {
         voice.play({ ...note, at: start + note.time });
@@ -263,16 +308,22 @@ export function createPlayer({ wet = 0.24 } = {}) {
         }
       };
 
-      current = { plan, start, raf: requestAnimationFrame(frame) };
+      current = { plan, start, raf: requestAnimationFrame(frame), gate };
       return plan;
     },
 
     stop() {
       if (!current) return;
       cancelAnimationFrame(current.raf);
+      const { gate } = current;
       current = null;
-      // The voices are short-lived and already scheduled; nothing to unwind but
-      // the clock. A stopped playhead is quieter than an abrupt gain cut.
+      const now = ctx.currentTime;
+      // Fade the gate over 40 ms rather than cutting: a hard stop on a sounding
+      // note is a click. Then tear the node down, so a passage that has been
+      // stopped releases its oscillators instead of ringing out.
+      gate.gain.setValueAtTime(gate.gain.value, now);
+      gate.gain.linearRampToValueAtTime(0, now + 0.04);
+      setTimeout(() => gate.disconnect(), 400);
     },
 
     /** Which position, in sixteenths, the music has reached at `seconds`. */
