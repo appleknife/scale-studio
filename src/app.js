@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025400';
-import { renderStaff } from './staff.js?v=202611025400';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611025400';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025400';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025400';
-import { generatePassage } from './sightreading.js?v=202611025400';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025400';
-import { renderScore } from './score.js?v=202611025400';
-import * as Journal from './journal.js?v=202611025400';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025400';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025400';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025500';
+import { renderStaff } from './staff.js?v=202611025500';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611025500';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025500';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025500';
+import { generatePassage } from './sightreading.js?v=202611025500';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025500';
+import { renderScore } from './score.js?v=202611025500';
+import * as Journal from './journal.js?v=202611025500';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025500';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025500';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611025400';
+} from './tuner.js?v=202611025500';
 
 const LANG = initLang();
 
@@ -3750,6 +3750,9 @@ if (params.has('sightplay')) {
   openSight(Number(params.get('sightplay')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
   armSightTake({ live: params.get('live') !== '0' });
   const assisted = params.has('assist');
+  // How many click nodes the run is still holding, so a suite can measure a leak
+  // after leaving without an audio device.
+  window.__assistClicks = () => assistClicks.length;
   // `warm` walks the microphone warm-up: the take arms with awaitWarm and the
   // first frame — held back here, the way a phone's capture path holds it — is
   // what starts the count-in (see startSightTake and ingestSightFrame).

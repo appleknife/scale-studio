@@ -408,6 +408,42 @@
         frame.remove();
       }
 
+      /* ── 10. Walking out of an assisted run ────────────────────────── */
+      //
+      // The teacher's report was clicks that kept going and a line that kept
+      // moving after they had gone back to the menu. The click track is scheduled
+      // on the audio clock, so nothing but an explicit stop will end it: leaving
+      // the screen has to reach stopAssistAudio() and hidePlayhead().
+      {
+        const frame = await load('../index.html?sightplay=5&seed=7&assist');
+        const d = frame.contentDocument;
+        const w = frame.contentWindow;
+        await until(() => !d.getElementById('countIn').hidden, 4000);
+        await until(() => d.getElementById('countIn').hidden, 9000);
+        await wait(300);
+        d.getElementById('sightBack').click();
+        await wait(200);
+        const line = d.querySelector('.sight-playhead');
+        const left = {
+          countIn: d.getElementById('countIn').hidden,
+          line: !line || line.style.opacity === '0',
+          start: !d.getElementById('sightStart').hidden,
+          menu: !d.getElementById('view-choose').hidden,
+        };
+        log.push(
+          `left mid-run: count-in ${left.countIn ? 'hidden' : 'still up'} · ` +
+            `line ${left.line ? 'hidden' : 'still moving'} · start ${left.start ? 'back' : 'missing'} · ` +
+            `menu ${left.menu ? 'shown' : 'missing'}`,
+        );
+        if (!left.countIn) problems.push('leaving left the count-in on screen');
+        if (!left.line) problems.push('leaving left the playhead running');
+        if (!left.start) problems.push('leaving did not hand the start button back');
+        if (!left.menu) problems.push('leaving did not reach the menu');
+        const clicksLeft = typeof w.__assistClicks === 'function' ? w.__assistClicks() : 0;
+        if (clicksLeft) problems.push(`${clicksLeft} click(s) were still scheduled after leaving`);
+        frame.remove();
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;
