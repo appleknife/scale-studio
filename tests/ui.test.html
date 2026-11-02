@@ -173,6 +173,46 @@
           if (mixed.filter((t) => t.includes('1 oct')).length !== 2)
             problems.push(`III–IV should play two one-octave scales: ${mixed.join(',')}`);
 
+          /* ── Changing the level from inside the audition ──────────── */
+          // The level used to be reachable only by going into Scales and backing
+          // out. It now sits on the picker and on the draw, and changing it moves
+          // the audition to that level's own flow.
+          const markedIn = (row) =>
+            [...d.querySelectorAll(`#${row} button[data-level]`)]
+              .filter((b) => b.getAttribute('aria-selected') === 'true')
+              .map((b) => b.dataset.level);
+          if (d.querySelectorAll('#drawLevels button').length !== 3)
+            problems.push('the draw screen has no level row');
+          if (markedIn('drawLevels').join() !== '3-4')
+            problems.push(`the draw's level row shows ${markedIn('drawLevels').join() || 'nothing'}`);
+
+          d.querySelector('#drawLevels [data-level="1-2"]').click();
+          await wait(200);
+          log.push(`level row on the draw → I–II lands on: ${['test-pick', 'test-draw'].filter(view).join()}`);
+          if (!view('test-pick')) problems.push('changing to I–II on the draw did not reach the picker');
+          if (markedIn('pickLevels').join() !== '1-2')
+            problems.push(`the picker's level row shows ${markedIn('pickLevels').join() || 'nothing'}`);
+          if (markedIn('levelTabs').join() !== '1-2')
+            problems.push('the scales screen kept the old level');
+          if (!/Choose three scales/.test(d.getElementById('pickTitle').textContent))
+            problems.push('the picker still asks for seven scales');
+          if (d.querySelectorAll('#pickGrid .pick-chip[aria-pressed="true"]').length !== 0)
+            problems.push('the old seven stayed picked after the level changed');
+          if (!d.getElementById('pickContinue').disabled)
+            problems.push('continue was live on an empty pick after the level changed');
+
+          // And back the other way: a picker at I–II moved to V–VI is a draw.
+          d.querySelector('#pickLevels [data-level="5-6"]').click();
+          await wait(2600);
+          if (!view('test-draw')) problems.push('changing to V–VI on the picker did not draw');
+          if (markedIn('drawLevels').join() !== '5-6')
+            problems.push(`the re-drawn screen shows ${markedIn('drawLevels').join() || 'nothing'}`);
+          const redrawn = [...d.querySelectorAll('#reels .reel-sig')].map((s) => s.textContent);
+          log.push(`level row on the picker → V–VI reels: ${redrawn.join(' | ')}`);
+          if (!redrawn.every((t) => t.includes('2 oct')))
+            problems.push(`a V–VI draw came out at the wrong octaves: ${redrawn.join(',')}`);
+          if (d.getElementById('beginBtn').disabled) problems.push('the re-draw never finished landing');
+
           /* ── the practice log: a copy out, and a copy back in ────── */
           d.getElementById('openLogBtn').click();
           await wait(200);

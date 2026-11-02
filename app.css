@@ -203,6 +203,12 @@ h3 {
   margin: 22px 0 4px;
 }
 
+/* On the mock audition's picker and draw the row sits between the title and the
+   content, so it is spaced away from both rather than tucked under the title. */
+.test-level-row {
+  margin: 14px 0 18px;
+}
+
 /* The speed sits directly under the level, and belongs to it: two rows of the same
    kind of switch, one under the other, rather than a second control block. */
 .speed-row {

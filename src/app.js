@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025600';
-import { renderStaff } from './staff.js?v=202611025600';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611025600';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025600';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025600';
-import { generatePassage } from './sightreading.js?v=202611025600';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025600';
-import { renderScore } from './score.js?v=202611025600';
-import * as Journal from './journal.js?v=202611025600';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025600';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025600';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025700';
+import { renderStaff } from './staff.js?v=202611025700';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611025700';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025700';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025700';
+import { generatePassage } from './sightreading.js?v=202611025700';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025700';
+import { renderScore } from './score.js?v=202611025700';
+import * as Journal from './journal.js?v=202611025700';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025700';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025700';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611025600';
+} from './tuner.js?v=202611025700';
 
 const LANG = initLang();
 
@@ -124,6 +124,9 @@ const el = {
   grid: $('scaleGrid'),
   gridNote: $('gridNote'),
   levelTabs: $('levelTabs'),
+  // The two mock-audition screens carry the level too — see syncLevelTabs.
+  pickLevels: $('pickLevels'),
+  drawLevels: $('drawLevels'),
   modeTabs: $('modeTabs'),
   formTabs: $('formTabs'),
   testBannerText: $('testBannerText'),
@@ -348,12 +351,26 @@ function updateLevelCopy() {
   if (el.drawLevel) el.drawLevel.textContent = LEVEL_MARK[level] || '';
 }
 
+/**
+ * Marks the current level on every row that offers one.
+ *
+ * The level is one piece of state, but three screens show it — the scales grid,
+ * the mock audition's picker and its draw — because it decides what each of them
+ * does. They are kept in step here rather than in each place that changes it.
+ */
+function syncLevelTabs() {
+  for (const row of [el.levelTabs, el.pickLevels, el.drawLevels]) {
+    if (!row) continue;
+    [...row.querySelectorAll('button')].forEach((b) =>
+      b.setAttribute('aria-selected', String(b.dataset.level === state.level)),
+    );
+  }
+}
+
 function setLevel(level) {
   state.level = level;
   state.practiceOctaves = LEVELS[level].octaves;
-  [...el.levelTabs.querySelectorAll('button')].forEach((b) =>
-    b.setAttribute('aria-selected', String(b.dataset.level === level)),
-  );
+  syncLevelTabs();
   renderGrid();
 }
 
@@ -423,6 +440,7 @@ function showDraw(scales, animate) {
   el.testBar.hidden = true;
   el.redrawBtn.textContent = state.level === '1-2' ? t('btn.chooseAgain') : t('btn.drawAgain');
   el.drawSub.textContent = t(`test.sub.${state.level}`);
+  syncLevelTabs();
   showView('test-draw');
   spinReels(animate);
 }
@@ -432,8 +450,26 @@ function showDraw(scales, animate) {
 function openPicker() {
   cancelListening();
   state.pick = { ids: [], twoOct: [] };
+  syncLevelTabs();
   showView('test-pick');
   renderPicker();
+}
+
+/**
+ * Changing the level from inside the mock audition.
+ *
+ * The level is not decoration on this screen: it decides whether the student
+ * chooses their scales (I–IV) or the app draws them (V–VI), and how many octaves
+ * each one is. So changing it moves the audition to that level's own flow — the
+ * picker, or a fresh draw — rather than leaving a stale pick or a draw made for
+ * another level on screen. Either way the selection starts clean, because a set of
+ * seven chosen for III–IV cannot be a set of three for I–II.
+ */
+function changeTestLevel(level) {
+  if (!LEVELS[level] || level === state.level) return;
+  setLevel(level);
+  if (LEVELS[level].choose) openPicker();
+  else drawThree();
 }
 
 function canContinue() {
@@ -3482,6 +3518,19 @@ el.levelTabs.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-level]');
   if (btn) setLevel(btn.dataset.level);
 });
+
+// The mock audition's own two screens carry the level as well. On the scales
+// screen a level change is just a different grid; here it moves the audition to
+// that level's flow, because the level is what the draw is made of.
+for (const row of [el.pickLevels, el.drawLevels]) {
+  if (!row) continue;
+  row.addEventListener('click', (event) => {
+    const btn = event.target.closest('button[data-level]');
+    if (btn) changeTestLevel(btn.dataset.level);
+  });
+}
+// The three rows start on whatever level the app opened at.
+syncLevelTabs();
 
 el.octaveTabs.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-oct]');

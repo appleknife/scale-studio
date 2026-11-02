@@ -157,6 +157,15 @@ single most useful tip from each scale, and an encouraging line drawn at random
 from a small pool. Tap any scale row to open its full breakdown — score ring,
 coloured staff, all the tips.
 
+**The level lives on the audition's own screens.** It is one piece of state and
+three screens show it — the scales grid, the picker and the draw — and all three
+mark it from `syncLevelTabs()`. Changing it on the picker or the draw does not just
+relabel a page: the audition moves to that level's flow, because the level is what
+the draw is *made of*. Pick I–II on the draw and the picker opens, empty, asking for
+three; pick V–VI on the picker and three scales are drawn. Before this the level was
+only reachable through the scales screen, so changing it meant leaving the audition,
+crossing the grid, and coming back.
+
 The draw is majors only, because that is what Levels 5–6 require, and it always
 uses the familiar spelling: **B**, **F♯**, **C♯** — never C♭, G♭ or D♭.
 

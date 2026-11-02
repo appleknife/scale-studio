@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611025600" />
+    <link rel="stylesheet" href="app.css?v=202611025700" />
   </head>
   <body>
     <div class="shell">
@@ -296,6 +296,19 @@
             three use the same finger pattern.
           </p>
 
+          <!-- The level is a property of the audition, so it can be changed here
+               as well as on the scales screen: changing it moves the audition to
+               that level's own flow instead of sending the student back to the
+               menu to find the switch. -->
+          <div class="mode-row level-row test-level-row">
+            <span class="control-label">Level</span>
+            <div class="segmented" id="pickLevels" role="tablist" aria-label="NYSSMA level" data-i18n-aria="aria.level">
+              <button type="button" role="tab" data-level="1-2" aria-selected="false">I–II</button>
+              <button type="button" role="tab" data-level="3-4" aria-selected="false">III–IV</button>
+              <button type="button" role="tab" data-level="5-6" aria-selected="false">V–VI</button>
+            </div>
+          </div>
+
           <div class="pick-grid" id="pickGrid"></div>
           <p class="pick-count" id="pickCount">0 of 3 chosen</p>
 
@@ -318,6 +331,18 @@
 
           <h2 class="draw-title">Your three scales</h2>
           <p class="subtle" id="drawSub">Drawn from the twelve NYSSMA keys — no repeats.</p>
+
+          <!-- The same level row as the picker, because the draw is made for the
+               level: changing it re-draws, so nobody has to walk back to the menu
+               (and through the scales screen) to say which level they are in. -->
+          <div class="mode-row level-row test-level-row">
+            <span class="control-label">Level</span>
+            <div class="segmented" id="drawLevels" role="tablist" aria-label="NYSSMA level" data-i18n-aria="aria.level">
+              <button type="button" role="tab" data-level="1-2" aria-selected="false">I–II</button>
+              <button type="button" role="tab" data-level="3-4" aria-selected="false">III–IV</button>
+              <button type="button" role="tab" data-level="5-6" aria-selected="false">V–VI</button>
+            </div>
+          </div>
 
           <div class="reels" id="reels">
             <div class="reel">
@@ -983,7 +1008,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611025600"></script>
+    <script type="module" src="src/app.js?v=202611025700"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.
