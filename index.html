@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611021900" />
+    <link rel="stylesheet" href="app.css?v=202611022330" />
   </head>
   <body>
     <div class="shell">
@@ -348,13 +348,25 @@
             </div>
           </div>
 
+          <!-- The example can be heard slower than the printed tempo. Nothing else
+               changes: same notes, same shaping, just more room to follow them. -->
+          <div class="mode-row speed-row">
+            <span class="control-label">Slow practice</span>
+            <div class="segmented" id="sightSpeeds" role="group" aria-label="Playback speed" data-i18n-aria="sight.speedAria">
+              <button type="button" data-rate="0.5" aria-selected="false">½ speed</button>
+              <button type="button" data-rate="0.75" aria-selected="false">¾ speed</button>
+              <button type="button" data-rate="1" aria-selected="true">At tempo</button>
+            </div>
+          </div>
+
           <div class="score-card">
             <div class="score-meta" id="sightMeta"></div>
             <div class="score-staff" id="sightStaff"></div>
             <p class="score-note" id="sightNote" data-i18n="sight.intro">
-              Study it, hear the tempo, then play — the app waits for your first note. It
-              listens for the notes and the pulse; it cannot judge dynamics or articulation,
-              and it is deliberately kind about tempo.
+              Study it, hear the tempo, then play — the app waits for your first note. Tap a
+              bar to mark it, and the example starts from there. It listens for the notes and
+              the pulse; it cannot judge dynamics or articulation, and it is deliberately kind
+              about tempo.
             </p>
           </div>
 
@@ -843,7 +855,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611021900"></script>
+    <script type="module" src="src/app.js?v=202611022330"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

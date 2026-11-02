@@ -147,6 +147,80 @@
         frame.remove();
       }
 
+      /* ── 5. A stumble, then a restart ──────────────────────────────── */
+      //
+      // The question a teacher asks about a test: if a student freezes halfway
+      // and then picks the piece up again in a later bar, does the app know where
+      // they came back in? It is answered on the frames, without a microphone: the
+      // score is matched to what was *heard* by pitch, not by clock, so the notes
+      // played after the gap should land on the notes written where they resumed.
+      {
+        const { analyzeSightTake } = await import('../src/analyze.js');
+        const { generatePassage, flatten } = await import('../src/sightreading.js');
+
+        const passage = generatePassage({ level: 5, seed: 4471 });
+        const perBar = passage.perBar;
+        // `start` is measured inside its bar, so positions in the whole passage
+        // need the bar's own offset added — the same arithmetic the analyser does.
+        const events = flatten(passage)
+          .filter((e) => !e.rest && e.note)
+          .map((e) => ({ ...e, abs: (e.bar - 1) * perBar + e.start }));
+        // Bars 3 and 4 are what the student stumbles through and abandons; bar 5
+        // onwards is where they pick the piece up again.
+        const freezeFrom = 2 * perBar;
+        const resumeAt = 4 * perBar;
+        const before = events.filter((e) => e.abs < freezeFrom);
+        const after = events.filter((e) => e.abs >= resumeAt);
+
+        const spq = 60 / 58;            // a slow-ish read, 58 to the quarter
+        const frames = [];
+        let t = 0;
+        const play = (event, gapBefore) => {
+          t += gapBefore;
+          const end = t + (event.dur / 4) * spq * 0.85;
+          for (let s = t; s < end; s += 0.03) {
+            frames.push({
+              t: s,
+              freq: 440 * Math.pow(2, (event.midi - 69) / 12),
+              clarity: 0.96,
+              rms: 0.06,
+            });
+          }
+          t = end;
+        };
+        before.forEach((e, i) => play(e, i === 0 ? 0 : 0.02));
+        // the freeze: three seconds of nothing at all
+        t += 3.0;
+        after.forEach((e) => play(e, 0.02));
+
+        const result = analyzeSightTake(frames, passage);
+        const resumed = result.results.filter(
+          (r) => r.event.abs >= resumeAt && r.status === 'exact',
+        ).length;
+        const skipped = result.results.filter(
+          (r) => r.event.abs >= freezeFrom && r.event.abs < resumeAt,
+        );
+        const skippedMissed = skipped.filter((r) => r.status === 'missed').length;
+        log.push(
+          `restart: ${resumed}/${after.length} notes after the gap matched their own place · ` +
+            `${skippedMissed}/${skipped.length} notes skipped during the freeze counted as missed · ` +
+            `score ${result.score}%`,
+        );
+        if (resumed < after.length - 1) {
+          problems.push(
+            `a restart was not followed: only ${resumed} of ${after.length} notes after the gap were matched`,
+          );
+        }
+        if (skippedMissed < skipped.length - 1) {
+          problems.push(
+            `the notes skipped during a freeze were not counted (${skippedMissed} of ${skipped.length}) — the score would flatter the take`,
+          );
+        }
+        if (result.score >= 96) {
+          problems.push(`a take with a three-second freeze still scored ${result.score}%`);
+        }
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;

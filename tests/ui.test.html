@@ -242,6 +242,65 @@
             problems.push('switching back lost the first log');
           if (d.getElementById('lessonSheet').textContent.includes('Maya'))
             problems.push('the lesson sheet still says Maya after switching away');
+
+          /* ── sight reading: picking a bar, and slow practice ────── */
+          // The example can start from a bar the reader taps, so the engraver's
+          // boxes have to be there, clickable, and marked in exactly one place —
+          // and the button has to say what it will now do.
+          d.getElementById('openSightBtn').click();
+          await wait(450);
+          const boxes = () => [...d.querySelectorAll('#sightStaff .score-bar-box')];
+          const picked = () => boxes().filter((b) => b.classList.contains('is-picked'));
+          log.push(`bar boxes: ${boxes().length}`);
+          if (boxes().length !== 8) problems.push(`expected 8 bar boxes, saw ${boxes().length}`);
+          if (boxes().length !== new Set(boxes().map((b) => b.dataset.bar)).size)
+            problems.push('two bar boxes claim the same bar');
+
+          const hear = d.getElementById('sightHearBtn');
+          if (hear.textContent.trim() !== 'Hear the passage')
+            problems.push(`the hear button reads "${hear.textContent.trim()}" before a pick`);
+
+          boxes()[2].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+          await wait(120);
+          if (picked().length !== 1) problems.push('tapping a bar did not mark one bar');
+          if (picked()[0] && picked()[0].dataset.bar !== '2')
+            problems.push(`the wrong bar was marked (${picked()[0].dataset.bar})`);
+          log.push(`hear button with bar 3 picked: "${hear.textContent.trim()}"`);
+          if (hear.textContent.trim() !== 'Start at bar 3')
+            problems.push(`the hear button reads "${hear.textContent.trim()}" with a bar picked`);
+
+          // The same bar again lets it go. A student who taps the wrong bar must
+          // not be stuck with it.
+          boxes()[2].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+          await wait(120);
+          if (picked().length !== 0) problems.push('tapping the marked bar did not clear it');
+          if (hear.textContent.trim() !== 'Hear the passage')
+            problems.push('the hear button kept the pick after it was cleared');
+
+          // A new passage must not carry a bar number over.
+          boxes()[4].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+          await wait(80);
+          d.getElementById('sightNewBtn').click();
+          await wait(350);
+          if (picked().length !== 0) problems.push('a new passage kept the old bar marked');
+          if (hear.textContent.trim() !== 'Hear the passage')
+            problems.push('a new passage kept "start at bar" on the button');
+
+          // Slow practice: three speeds, one marked, and choosing one moves the
+          // mark without opening the audio path (this test never plays).
+          const speeds = [...d.querySelectorAll('#sightSpeeds button')];
+          log.push(`speeds: ${speeds.map((b) => b.dataset.rate).join('/')}`);
+          if (speeds.length !== 3) problems.push(`expected 3 speeds, saw ${speeds.length}`);
+          if (speeds.filter((b) => b.getAttribute('aria-selected') === 'true').length !== 1)
+            problems.push('exactly one speed should be selected');
+          if (speeds[speeds.length - 1].getAttribute('aria-selected') !== 'true')
+            problems.push('the passage should start at tempo');
+          speeds[0].click();
+          await wait(80);
+          if (speeds[0].getAttribute('aria-selected') !== 'true')
+            problems.push('choosing half speed did not mark it');
+          if (speeds.some((b) => b !== speeds[0] && b.getAttribute('aria-selected') === 'true'))
+            problems.push('two speeds are marked at once');
         } catch (err) {
           problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
         }

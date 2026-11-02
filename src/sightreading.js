@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021900';
-import { STAFF_GEOM } from './staff.js?v=202611021900';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611022330';
+import { STAFF_GEOM } from './staff.js?v=202611022330';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -627,7 +627,13 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // and capping the climax at an octave meant that note could never appear.
   const top = pool.length - 1;
   const headroom = Math.max(1, top - home - 6);
-  const reach = level >= 5 ? 7 + Math.floor(rng() * headroom) : 7;
+  // Now and then the line is sent to the very top of the printed range. That is
+  // the only way the range's top note can ever appear: left to the ordinary draw
+  // the climax never aimed higher than a sixth above home, so level VI's F6 —
+  // the note in the Manual's own range picture, three ledger lines up — was
+  // decoration. The teacher asked for it to turn up now and then, not often.
+  const highClimb = level >= 5 && chance(rng, 0.18);
+  const reach = highClimb ? top - home : 7 + Math.floor(rng() * headroom);
   const peak = Math.min(top, home + reach);
   const lowest = Math.max(0, home - 3 - (level >= 5 ? Math.floor(rng() * 3) : 0));
 
@@ -647,7 +653,12 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   bars.forEach((events, b) => events.forEach((e) => barOf.set(e, b)));
   const phraseOf = (event) => Math.min(3, Math.floor((barOf.get(event) || 0) / 2));
   const lift = spec.maxSemis >= 12 ? 5 : spec.maxSemis >= 9 ? 4 : spec.maxSemis >= 7 ? 3 : 1;
-  const zones = [0, lift, -Math.min(lift, 2), 0];
+  // The second phrase is where the melody goes furthest from home: the register
+  // lift as a rule, and on a high climb the peak itself — otherwise the line
+  // touches the top note once and falls straight back, which reads as a mistake
+  // rather than as the high point of a phrase.
+  const climbZone = Math.max(lift, peak - home);
+  const zones = [0, highClimb ? climbZone : lift, -Math.min(lift, 2), 0];
 
   let prev = home;
   let lastStep = 0;

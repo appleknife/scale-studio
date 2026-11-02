@@ -288,7 +288,21 @@ sight-reading table for that level.
 * **The volume slider** next to *Start listening* sets the level for the example and
   the metronome together — one audio context and one master gain for every sound the
   app makes — and it remembers the level on that device.
-* **Hear the tempo** clicks two bars at the printed speed, with a heavier downbeat.
+* **Hear the tempo** clicks two bars at the printed speed, with a heavier downbeat. Its
+  clicks are set against the example rather than in the abstract — a 70 ms sine
+  against a shaped note held for a beat — so the metronome is not the quiet thing
+  under the passage at the same slider position.
+* **A bar is a target.** The engraver lays an invisible box over each one, and the
+  screen makes it clickable: tap a bar and it is marked in green, and *Hear the
+  passage* becomes *Start at bar 6* — the example begins there, playhead and all.
+  Tap it again and the pick is let go. It is the gesture a student who has lost
+  their place actually needs, and it costs nothing to offer before a take.
+* **Slow practice** — ½ speed, ¾ speed, at tempo — slows the example without
+  changing a note of it. The clock is scaled once, in `schedule()`, so the shaping
+  (slurs, staccato, the hairpin's ramp) keeps its proportions; the playhead follows
+  the audio clock, so it slows with the music. Changing speed while it is sounding
+  restarts it from the same place. The metronome keeps the printed tempo: its job
+  is to be the printed tempo.
 * Every passage has a **seed**, so `?sight=5&seed=4471` always gives the same eight
   bars. A teacher can put one passage on a projector, or send the link to a class.
 * The line sits on the staff, opens on a chord tone, steps more than it leaps,
@@ -298,6 +312,15 @@ sight-reading table for that level.
 * **Start listening** waits for your first note, then marks the passage: notes,
   intonation, pulse and stops, in the same forgiving spirit as the scales. Tempo is
   not scored and dynamics and articulation are out of reach — the card says so.
+* **A stumble can be picked up again.** The score is matched to what was heard by
+  *pitch*, not by the clock, so a student who freezes in bar 3 and comes back in at
+  bar 5 is followed: the notes they play land on the notes written where they
+  resumed. What they abandoned counts as missed, exactly as a judge would mark it —
+  measured on a synthetic take: 21 of 21 notes after the gap matched their own
+  place, the 9 abandoned ones counted as missed, and the take scored 85 % instead
+  of 100 %. And because a stumble is not a finish, a take that is still far from
+  complete is given 4.5 s of silence before it closes instead of 2.2 s, so a
+  student working out where to come back in is not cut off mid-thought.
 * **The needle** under the buttons is the same readout the scale take shows: the
   note you are sounding and how many cents off centre it sits. It is a rehearsal
   aid, so it only appears while a take is running; a mock audition will arm the
@@ -320,6 +343,18 @@ run of small intervals sound intended) and every leap is answered by a step back
 Measured over 120 passages a level: the line now spans 13.7 semitones at III and
 17–18 at V–VI, and three quarters of the passages from III up change register at a
 phrase boundary, against almost none before.
+
+**The top of the printed range is used, now and then.** Level VI's range picture
+stops at F6 — three ledger lines above the staff — and level V's at D6. They were
+decoration: the melody aimed at a phrase register, never at the edge of the range,
+so no generated passage ever went near those notes. Levels V and VI now climb on
+purpose about one passage in six, and when they do, the second phrase lives in that
+register for both of its bars with the very top note touched once (three to five of
+its notes sit within a step of it) — which is what makes it read as the high point
+of a phrase rather than as a stray high note. In the draw, F6 turns up
+in roughly one level VI passage in ten (only the keys with an F natural can reach
+it), D6 in about one level V passage in six, and `sightreading.test.html` holds
+both ends of that: it has to happen, and it has to stay special.
 
 **Level I is deliberately plain.** D major only, one octave from D4 to D5, 2/4 or
 4/4, quarter and half notes with the occasional whole note, and no leap wider than

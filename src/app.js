@@ -1,15 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611021900';
-import { renderStaff } from './staff.js?v=202611021900';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611021900';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611021900';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611021900';
-import { generatePassage } from './sightreading.js?v=202611021900';
-import { createPlayer } from './playback.js?v=202611021900';
-import { renderScore } from './score.js?v=202611021900';
-import * as Journal from './journal.js?v=202611021900';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611021900';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611022330';
+import { renderStaff } from './staff.js?v=202611022330';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611022330';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611022330';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611022330';
+import { generatePassage } from './sightreading.js?v=202611022330';
+import { createPlayer } from './playback.js?v=202611022330';
+import { renderScore } from './score.js?v=202611022330';
+import * as Journal from './journal.js?v=202611022330';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611022330';
 import {
   STRINGS,
   FIFTHS,
@@ -17,7 +17,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611021900';
+} from './tuner.js?v=202611022330';
 
 const LANG = initLang();
 
@@ -41,6 +41,7 @@ const el = {
   sightHearBtn: $('sightHearBtn'),
   sightTempoBtn: $('sightTempoBtn'),
   sightLevels: $('sightLevels'),
+  sightSpeeds: $('sightSpeeds'),
   sightMeta: $('sightMeta'),
   sightStaff: $('sightStaff'),
   sightStart: $('sightStart'),
@@ -936,6 +937,12 @@ const sight = {
   // screen can show a playhead and the button can turn into Stop.
   hearing: false,
   anchors: null,
+  // The bar the reader has tapped, or null for the whole passage. Tapping a bar
+  // marks it and turns the example into "start here", which is what a student
+  // who has lost their place actually needs.
+  pickedBar: null,
+  // 1 at the printed tempo, 0.75 or 0.5 for a first, slow read.
+  rate: 1,
 };
 
 /* ── Hearing the passage ─────────────────────────────────────────────── */
@@ -1047,9 +1054,24 @@ function movePlayhead(sight, at) {
 function stopHearing() {
   player.stop();
   sight.hearing = false;
-  el.sightHearBtn.textContent = t('sight.hear');
   el.sightHearBtn.classList.remove('is-on');
+  paintHearLabel();
   hidePlayhead();
+}
+
+/** The hear button's words follow the selection: whole passage, or from a bar. */
+function paintHearLabel() {
+  if (player.playing) return;
+  el.sightHearBtn.textContent =
+    sight.pickedBar == null ? t('sight.hear') : t('sight.hearFrom', { bar: sight.pickedBar + 1 });
+}
+
+/** Marks the picked bar in the drawing, and nothing else. */
+function paintPickedBar() {
+  el.sightStaff.querySelectorAll('.score-bar-box').forEach((box) => {
+    box.classList.toggle('is-picked', Number(box.dataset.bar) === sight.pickedBar);
+  });
+  paintHearLabel();
 }
 
 function hearPassage() {
@@ -1059,6 +1081,7 @@ function hearPassage() {
   }
   const passage = sight.passage;
   if (!passage) return;
+  const fromBar = sight.pickedBar || 0;
   ensurePlayhead();
   sight.anchors = sightAnchors(passage, el.sightStaff.querySelector('svg'));
   sight.hearing = true;
@@ -1066,9 +1089,27 @@ function hearPassage() {
   el.sightHearBtn.classList.add('is-on');
   let plan = null;
   plan = player.play(passage, {
-    onTick: (seconds) => movePlayhead(sight, (seconds / plan.secondsPerQuarter) * 4),
+    rate: sight.rate,
+    fromBar,
+    // The playhead counts in sixteenths from the start of the *passage*, so the
+    // bar the example starts from has to be added back on.
+    onTick: (seconds) =>
+      movePlayhead(sight, fromBar * passage.perBar + (seconds / plan.secondsPerQuarter) * 4),
     onEnd: () => stopHearing(),
   });
+}
+
+/**
+ * Tapping a bar picks it out. Tapping it again lets it go. While a bar is
+ * picked, the example starts there — the whole point of the gesture for a
+ * student who has lost their place in the middle of a read.
+ */
+function pickBar(event) {
+  const box = event.target.closest && event.target.closest('.score-bar-box');
+  if (!box || !sight.passage) return;
+  const bar = Number(box.dataset.bar);
+  sight.pickedBar = sight.pickedBar === bar ? null : bar;
+  paintPickedBar();
 }
 
 /** The note glyph printed next to a tempo mark. */
@@ -1104,6 +1145,8 @@ function renderSight() {
   [...el.sightLevels.querySelectorAll('button')].forEach((b) =>
     b.setAttribute('aria-selected', String(Number(b.dataset.sightLevel) === sight.level)),
   );
+  // The boxes are new elements after every redraw, so the mark has to be re-laid.
+  paintPickedBar();
 }
 
 /** Below this width the passage is drawn two bars to a system. */
@@ -1122,6 +1165,7 @@ function newPassage(level = sight.level, seed = null) {
   stopHearing();
   sight.passage = generatePassage({ level: sight.level, seed });
   sight.anchors = null;    // the drawing is about to be replaced
+  sight.pickedBar = null;  // and a bar number means nothing on the next page
   playhead = null;
   stopSightTake(false);
   el.sightResult.hidden = true;
@@ -1178,6 +1222,17 @@ function armSightTake(options = {}) {
     strong: 0,
     lastVoiced: 0,
     peak: 0,
+    // How many notes the page asks for, and how many separate soundings have
+    // been heard so far — the second against the first is what tells a stumble
+    // from a finish (see the silence rule in ingestSightFrame).
+    expected: sight.passage
+      ? sight.passage.bars.reduce(
+          (n, bar) => n + bar.filter((e) => !e.rest && e.note).length,
+          0,
+        )
+      : 0,
+    onsets: 0,
+    voiced: false,
     live: options.live !== false,
     liveMidi: null,
     liveCents: null,
@@ -1242,12 +1297,21 @@ function ingestSightFrame(frame) {
   const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > 0.004;
   if (voiced) {
     take.lastVoiced = elapsed;
+    if (!take.voiced) take.onsets += 1;
     if (take.live) updateSightLive(take, frame.freq);
   }
+  take.voiced = voiced;
 
   // Ends on its own after a real pause once something has been played, so nobody
-  // has to reach for a button with a violin under their chin.
-  if (take.frames.length > 40 && elapsed - take.lastVoiced > 2.2) finishSightTake();
+  // has to reach for a button with a violin under their chin. A take that is
+  // still far from finished gets a longer silence, though: a student who has
+  // stumbled and is working out where to come back in has not finished the
+  // piece, and ending the take there would score their hesitation as the end of
+  // the passage — the one place the app would be harsher than a judge. Once most
+  // of the notes have been heard, the shorter wait returns.
+  const quiet = elapsed - take.lastVoiced;
+  const unfinished = take.expected > 0 && take.onsets < take.expected * 0.8;
+  if (take.frames.length > 40 && quiet > (unfinished ? 4.5 : 2.2)) finishSightTake();
 }
 
 function stopSightTake(analyse = true) {
@@ -1393,8 +1457,13 @@ function playTempo(passage) {
     const gain = clickCtx.createGain();
     osc.type = 'sine';
     osc.frequency.value = downbeat ? 1320 : beat ? 880 : 760;
+    // These levels are set against the example, not in the abstract: a click is
+    // 70 ms of sine where a played note is a shaped tone held for a beat, so at
+    // the old 0.22/0.12/0.07 the metronome was inaudible under the passage — the
+    // teacher could hear the example at the same slider position and not this.
+    // Roughly the same peak as the voice, which puts them at the same loudness.
     gain.gain.setValueAtTime(0.0001, when);
-    gain.gain.linearRampToValueAtTime(downbeat ? 0.22 : beat ? 0.12 : 0.07, when + 0.005);
+    gain.gain.linearRampToValueAtTime(downbeat ? 0.5 : beat ? 0.34 : 0.24, when + 0.005);
     gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.07);
     osc.connect(gain).connect(player.output);
     osc.start(when);
@@ -1413,6 +1482,22 @@ el.sightAgain.addEventListener('click', () => {
 });
 el.sightNext.addEventListener('click', () => newPassage(sight.level));
 el.sightHearBtn.addEventListener('click', hearPassage);
+// A bar in the drawing is a target: tap it to mark it, tap again to let it go.
+el.sightStaff.addEventListener('click', pickBar);
+// Speed applies to the next sounding. If the example is already playing, it is
+// restarted from the same place at the new speed — reaching for the control and
+// then having to press play again would be two gestures for one wish.
+el.sightSpeeds.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-rate]');
+  if (!btn) return;
+  const wasPlaying = player.playing;
+  if (wasPlaying) stopHearing();
+  sight.rate = Number(btn.dataset.rate) || 1;
+  [...el.sightSpeeds.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(b === btn)),
+  );
+  if (wasPlaying) hearPassage();
+});
 
 // The volume is remembered on the device: a student who needs the example louder
 // should not have to find the slider again every visit.

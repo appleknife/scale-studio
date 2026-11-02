@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611021900';
-import { CLEF_PATH } from './clef.js?v=202611021900';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611022330';
+import { CLEF_PATH } from './clef.js?v=202611022330';
 
-import { beatLength } from './sightreading.js?v=202611021900';
+import { beatLength } from './sightreading.js?v=202611022330';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -571,17 +571,21 @@ function drawSystem(
    * *beamed* one has no flag at all — the beam runs to its neighbour — and
    * treating the two alike pushed every sixteenth group clean out of its bar.
    * A dotted note reaches out too: the dot sits a step to the right.
+   *
+   * "Beamed" has to mean the beam groups actually drawn, not merely "has a short
+   * note next door". An eighth at the end of a beat is followed by an eighth of
+   * the next beat — short on both sides by duration, in two separate groups, and
+   * so flagged. Allowance for a beam it never had left its flag hanging over the
+   * following note head, which is what a level VI high passage caught.
    */
-  function rights(events) {
-    const beamable = (e) => e && !e.rest && e.dur <= 2;
-    return events.map((e, i) => {
+  function rights(events, beamed) {
+    return events.map((e) => {
       // A rest's ink is a block 14 wide, so it reaches 7 either side of the point
       // it is set at — the same as a note head.
       if (!e || e.rest || !e.note) return 7;
       if (e.dur === 3 || e.dur === 6 || e.dur === 12) return 12.9;
       if (e.dur <= 2) {
-        const beamed = beamable(events[i - 1]) || beamable(events[i + 1]);
-        if (beamed) return HEAD_RX;
+        if (beamed.has(e)) return HEAD_RX;
         const up = STAFF_GEOM.stemUp(e.note.letter, e.note.octave);
         return up ? 5.2 + 11.7 : HEAD_RX;
       }
@@ -589,12 +593,12 @@ function drawSystem(
     });
   }
 
-  function positions(events, barX) {
+  function positions(events, barX, beamed) {
     // The bar's usable width has to account for what actually sticks out of its
     // first and last event: an accidental hangs a long way left of its note, and
     // a flag a long way right of its stem. Without this, a flag at the end of a
     // bar reached into the next bar and met the sharp in front of its first note.
-    const right = rights(events);
+    const right = rights(events, beamed);
     const firstLeft = leftOf(events[0]);
     const lastRight = right[right.length - 1];
     const x0 = barX + Math.max(inset, firstLeft + 2);
@@ -694,7 +698,14 @@ function drawSystem(
   for (let bar = barFrom; bar < barTo; bar++) {
     const events = passage.bars[bar];
     const barX = musicLeft + (bar - barFrom) * barWidth;
-    const xs = positions(events, barX);
+    // The groups are worked out before the spacing now, because how much room a
+    // note needs depends on whether the engraver will beam it or flag it.
+    const groups = beamGroups(events, beat);
+    const beamed = new Set();
+    for (const group of groups) {
+      if (group.length > 1) for (const e of group) beamed.add(e);
+    }
+    const xs = positions(events, barX, beamed);
     const xOf = (event) => xs.get(event);
 
     // Barlines go between bars, never in front of the first one. A line at the
@@ -706,9 +717,8 @@ function drawSystem(
       );
     }
 
-    // Beam geometry first: the dynamics are placed below the deepest beam, so a
+    // Beam geometry next: the dynamics are placed below the deepest beam, so a
     // beamed group can never sit on top of an mf.
-    const groups = beamGroups(events, beat);
     const beamOf = new Map();
     let deepest = bottom;
     let tupletLow = 0;
@@ -1207,6 +1217,20 @@ function drawSystem(
           `fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>`,
       );
     }
+  }
+
+  // One invisible box per bar, declared by the only part of the app that knows
+  // where a bar begins and ends. The screen makes them clickable, so a student
+  // can pick a bar out — to start the example there, or to work on it alone —
+  // without the renderer ever having to guess its own geometry from the outside.
+  // They are laid down last, which puts them above the notes: a click anywhere in
+  // the bar counts, including on a note head.
+  for (let bar = barFrom; bar < barTo; bar++) {
+    const x = musicLeft + (bar - barFrom) * barWidth;
+    part.push(
+      `<rect class="score-bar-box" data-bar="${bar}" x="${x}" y="${top}" ` +
+        `width="${barWidth}" height="${bottom - top}" fill="none"/>`,
+    );
   }
 
   // Closing barline: a plain line where the music carries on — only the last

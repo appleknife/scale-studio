@@ -26,7 +26,7 @@
       // whether it is a new bow stroke) and a voice that turns that into audio.
       // Both are weighed here — the arithmetic exactly, the voice by rendering it
       // offline and measuring where the sound actually is.
-      import { schedule, bowedVoice, secondsPerQuarter, DYNAMIC_GAIN } from '../src/playback.js?v=202611021900';
+      import { schedule, bowedVoice, secondsPerQuarter, DYNAMIC_GAIN } from '../src/playback.js?v=202611022330';
 
       const problems = [];
       const log = [];
@@ -106,6 +106,36 @@
         // Half speed doubles every time.
         const slow = schedule(fourQuarters, { rate: 0.5 });
         check(Math.abs(slow.notes[3].time - 6) < 1e-9, `at half speed the fourth note is at ${slow.notes[3].time} s, not 6`);
+
+        /* ── starting from a bar ────────────────────────────────────── */
+        //
+        // A picked bar moves the whole clock, not just which notes are heard: the
+        // example must *begin* there, so the first note after the cut is at zero
+        // and nothing before it survives.
+        const threeBars = copy(fourQuarters);
+        threeBars.bars = [0, 1, 2].map(() => copy(fourQuarters.bars[0]));
+        const fromBar2 = schedule(threeBars, { fromBar: 1 });
+        check(fromBar2.notes.length === 8, `starting at bar 2 gave ${fromBar2.notes.length} notes, not 8`);
+        check(
+          Math.abs(fromBar2.notes[0].time) < 1e-9,
+          `starting at bar 2 put its first note at ${fromBar2.notes[0].time} s, not 0`,
+        );
+        check(
+          JSON.stringify(fromBar2.notes.map((n) => Number(n.time.toFixed(3)))) ===
+            '[0,1,2,3,4,5,6,7]',
+          `starting at bar 2 spread the notes as ${fromBar2.notes.map((n) => n.time.toFixed(2)).join(', ')}`,
+        );
+        check(
+          Math.abs(fromBar2.seconds - 8) < 1e-9,
+          `the cut passage lasts ${fromBar2.seconds} s, not 8`,
+        );
+        // And through the last bar it must not reach back for anything.
+        const fromLast = schedule(threeBars, { fromBar: 2 });
+        check(fromLast.notes.length === 4, `starting at the last bar gave ${fromLast.notes.length} notes`);
+        // Slow practice and a picked bar are independent.
+        const both = schedule(threeBars, { fromBar: 2, rate: 0.5 });
+        check(Math.abs(both.notes[0].time) < 1e-9, 'half speed from a bar does not start at zero');
+        check(Math.abs(both.notes[3].time - 6) < 1e-9, `half speed from a bar put the fourth note at ${both.notes[3].time} s`);
 
         /* ── the voice ──────────────────────────────────────────────── */
         //

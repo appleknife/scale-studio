@@ -16,7 +16,7 @@
 // `capture.html` and will replace the voice without touching anything else: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611021900';
+import { makeHallIR } from './recorder.js?v=202611022330';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -48,22 +48,33 @@ export const DYNAMIC_GAIN = { pp: 0.34, p: 0.46, mp: 0.58, mf: 0.72, f: 0.86, ff
  * attack), a staccato shortens the note, and a hairpin ramps the gain across the
  * notes it covers.
  */
-export function schedule(passage, { rate = 1 } = {}) {
+export function schedule(passage, { rate = 1, fromBar = 0 } = {}) {
   const spq = secondsPerQuarter(passage.tempo) / rate;
   const base = DYNAMIC_GAIN[passage.dynamic] ?? DYNAMIC_GAIN.mf;
   const swell = passage.swell || null;
   const notes = [];
   let previous = null;
+  // Everything before the bar the reader picked is simply not played, and the
+  // clock starts at that bar. Keeping the whole passage here (rather than handing
+  // the player a sliced copy) keeps every bar index — and so the hairpin, which
+  // names the bar it lives in — pointing where it did.
+  const offset = ((fromBar * passage.perBar) / 4) * spq;
 
   for (let index = 0; index < passage.bars.length; index++) {
     const bar = passage.bars[index];
     for (let i = 0; i < bar.length; i++) {
       const event = bar[i];
+      if (index < fromBar) {
+        // Nothing before the cut is heard, and the first note after it gets a
+        // fresh attack rather than being tied to a note nobody heard.
+        previous = null;
+        continue;
+      }
       if (event.rest || !event.note) {
         previous = null;
         continue;
       }
-      const time = ((index * passage.perBar + event.start) / 4) * spq;
+      const time = ((index * passage.perBar + event.start) / 4) * spq - offset;
       let duration = (event.dur / 4) * spq;
       let gain = base;
 
@@ -280,12 +291,12 @@ export function createPlayer({ wet = 0.24, volume: start = 0.8 } = {}) {
      * Plays `passage` and calls `onTick(seconds)` every frame while it sounds, so
      * a playhead can follow. Resolves when the last note's tail has died away.
      */
-    play(passage, { rate = 1, onTick = null, onEnd = null } = {}) {
+    play(passage, { rate = 1, fromBar = 0, onTick = null, onEnd = null } = {}) {
       if (!ctx) build();
-      if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(() => {});
       this.stop();
 
-      const plan = schedule(passage, { rate });
+      const plan = schedule(passage, { rate, fromBar });
       // Every sounding of the passage gets its own gate, wired to the dry path and
       // to the hall. Stopping closes the gate — cancelling the animation was all
       // the old stop did, and since every note is scheduled up front the music

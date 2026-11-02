@@ -203,6 +203,12 @@ h3 {
   margin: 22px 0 4px;
 }
 
+/* The speed sits directly under the level, and belongs to it: two rows of the same
+   kind of switch, one under the other, rather than a second control block. */
+.speed-row {
+  margin: 10px 0 16px;
+}
+
 .banner-level {
   font-size: 13px;
   font-weight: 400;
@@ -719,6 +725,24 @@ h3 {
   opacity: 0;
   transition: opacity 180ms ease;
   pointer-events: none;
+}
+
+/* A bar is a target. The engraver lays an invisible box over each one; pointing
+   at it hints that, and tapping marks it — a marked bar is where the example will
+   start. `pointer-events: all` is what makes an unfilled box clickable at all,
+   and the boxes are drawn last, so a tap on a note head counts for its bar. */
+.score-staff .score-bar-box {
+  pointer-events: all;
+  cursor: pointer;
+  transition: fill 140ms ease;
+}
+
+.score-staff .score-bar-box:hover {
+  fill: rgba(47, 93, 78, 0.05);
+}
+
+.score-staff .score-bar-box.is-picked {
+  fill: rgba(47, 93, 78, 0.1);
 }
 
 /* A button that is currently doing something — "Hear the passage" while the

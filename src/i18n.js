@@ -251,6 +251,8 @@ export const S = {
   // ── Sight reading: hearing it first ──
   'sight.hear': ['Hear the passage', '听一遍谱子'],
   'sight.stopHearing': ['Stop the example', '停止试听'],
+  'sight.hearFrom': ['Start at bar {bar}', '从第 {bar} 小节开始'],
+  'sight.speedAria': ['Playback speed', '回放速度'],
 
   // ── Sight reading: listening ──
   'sight.waitingMic': ['Asking for the microphone…', '正在请求麦克风…'],
@@ -566,6 +568,10 @@ export const STATIC = {
     '选一个调，点“开始”。你拉出第一个音之前它只是安静地等着；之后它会完整听一遍，告诉你听到了什么——不计时，不催你。',
   'Mock audition': '模拟考试',
   'Level': '级别',
+  'Slow practice': '慢练',
+  '½ speed': '½ 速度',
+  '¾ speed': '¾ 速度',
+  'At tempo': '原速',
   'Scales': '音阶',
   'NYSSMA majors': 'NYSSMA 大调',
   'Minor scales': '小调',
@@ -671,7 +677,7 @@ export const STATIC = {
   'Try again': '再试一次',
   'Support Scale Studio': '支持 Scale Studio',
   'sight.intro':
-    '先看一遍，听一下速度，然后开始拉——应用会等你第一个音。它只听音高和节拍；力度和弓法它判断不了，速度也比评委宽容。',
+    '先看一遍，听一下速度，然后开始拉——应用会等你第一个音。点一下某一小节，可以把它标出来，试听就从那里开始。它只听音高和节拍；力度和弓法它判断不了，速度也比评委宽容。',
   'help.support':
     'Scale Studio 一直免费，也会一直免费。如果它对你或你的学生有帮助，也可以<a href="https://ko-fi.com/apple" target="_blank" rel="noopener noreferrer">请我喝杯咖啡</a>——这样我才能继续把这类东西做下去。',
 
