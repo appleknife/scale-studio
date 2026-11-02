@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611020250';
-import { CLEF_PATH } from './clef.js?v=202611020250';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611021245';
+import { CLEF_PATH } from './clef.js?v=202611021245';
 
-import { beatLength } from './sightreading.js?v=202611020250';
+import { beatLength } from './sightreading.js?v=202611021245';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -787,7 +787,12 @@ function drawSystem(
       // reads as part of the letters.
       const clear = firstWithDynamic ? xOf(firstWithDynamic) + 24 : 0;
       const near = Math.max(a ? xOf(a) : 0, clear);
-      const far = b ? xOf(b) : 0;
+      // The marking the ramp arrives at sits to the right of its open end, so the
+      // hairpin stops short of the barline by enough room to hold it. A wedge drawn
+      // to the bar's edge leaves nowhere for the "f" it is rising towards, and a
+      // marking pulled back inside the wedge is drawn through it.
+      const room = passage.swell.target ? 40 : 12;
+      const far = Math.min(b ? xOf(b) : 0, barX + barWidth - room);
       const span = far - near;
       // Under three spaces of span a hairpin is a smudge; a printed score writes
       // the word instead, and so does this.
@@ -812,6 +817,15 @@ function drawSystem(
         part.push(
           `<text class="score-dyn" x="${fmt((near + far) / 2)}" y="${dynY}" font-size="15" ` +
             `font-style="italic" text-anchor="middle">${kind === 'dim' ? 'dim.' : 'cresc.'}</text>`,
+        );
+      }
+      // …and the marking it arrives at, just past the open end: "mp < f" is what a
+      // player reads, and a ramp that opens onto nothing is only a wedge.
+      if (span >= 34 && passage.swell.target) {
+        const x = Math.max(near, far) + 22;
+        part.push(
+          `<text class="score-dyn" x="${fmt(x)}" y="${dynY}" font-size="19" ` +
+            `text-anchor="middle">${passage.swell.target}</text>`,
         );
       }
     }

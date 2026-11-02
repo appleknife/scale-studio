@@ -16,7 +16,7 @@
 // `capture.html` and will replace the voice without touching anything else: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611020250';
+import { makeHallIR } from './recorder.js?v=202611021245';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -67,13 +67,18 @@ export function schedule(passage, { rate = 1 } = {}) {
       let duration = (event.dur / 4) * spq;
       let gain = base;
 
-      // A hairpin is a ramp across the notes it covers: quiet at the point of the
-      // wedge and full at the open end.
+      // A hairpin is a ramp across the notes it covers — from the marking the
+      // passage opens with to the one the hairpin arrives at, which is the marking
+      // printed beside its open end. With no target to reach it still ramps, just
+      // less far.
       if (swell && swell.bar === index && i >= swell.from && i <= swell.to) {
         const steps = Math.max(1, swell.to - swell.from);
         const through = (i - swell.from) / steps;
-        const shape = swell.kind === 'dim' ? 1 - through : through;
-        gain = base * (0.7 + 0.55 * shape);
+        // Both directions run from the marking the passage opens with to the one
+        // the ramp arrives at; only the target differs, so there is no second
+        // direction to encode here.
+        const goal = DYNAMIC_GAIN[swell.target] ?? base * (swell.kind === 'dim' ? 0.75 : 1.25);
+        gain = base + (goal - base) * through;
       }
 
       const legato = Boolean(previous && previous.slurStart);

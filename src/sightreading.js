@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611020250';
-import { STAFF_GEOM } from './staff.js?v=202611020250';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021245';
+import { STAFF_GEOM } from './staff.js?v=202611021245';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -105,7 +105,10 @@ const LEVELS = {
     sixteenths: 0.35,
     slurs: 0.75,
     tempo: { '*': { unit: 'q', bpm: 80 } },
-    dynamics: ['f', 'ff'],
+    // The markings grow with the level, one rung at a time: mf from I, f from III,
+    // mp from IV, p from V. Fortissimo is nowhere in the Manual's sight-reading
+    // criteria, and level VI used to be the one level that never drew an f at all.
+    dynamics: ['mf', 'f'],
     marks: ['staccato'],
     // Level III is also where silence arrives: a quarter rest first, a half rest
     // now and then, and an eighth rest inside a beat.
@@ -133,7 +136,7 @@ const LEVELS = {
       ],
     },
     tempo: { '2/2': { unit: 'h', bpm: 76 }, '*': { unit: 'q', bpm: 88 } },
-    dynamics: ['mf', 'f'],
+    dynamics: ['mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
     rests: true,
     accidentals: 1,
@@ -162,7 +165,7 @@ const LEVELS = {
     // be slower than any sight-reading example ever printed. The simple metres
     // are not repeated here — they carry over from level IV at ♩ = 88.
     tempo: { '6/8': { unit: 'qd', bpm: 60 } },
-    dynamics: ['mp', 'f'],
+    dynamics: ['p', 'mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
     rests: true,
     accidentals: 2,
@@ -230,7 +233,7 @@ const LEVELS = {
     // any printed example. Only what changes is listed: 4/4 goes up to 120 and
     // 6/8 takes its own marking, while the rest carry on from level V at 88.
     tempo: { '6/8': { unit: 'qd', bpm: 72 }, '4/4': { unit: 'q', bpm: 120 } },
-    dynamics: ['mp', 'mf'],
+    dynamics: ['p', 'mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
     rests: true,
     accidentals: 2,
@@ -340,6 +343,9 @@ function chooseStep(rng, allowed, directionBias, lastStep) {
 /* ── Generating ────────────────────────────────────────────────────────── */
 
 const BAR_COUNT = 8;
+
+/** The marking ladder, soft to loud. Used to turn a ramp towards its next rung. */
+const DYNAMIC_ORDER = ['pp', 'p', 'mp', 'mf', 'f', 'ff'];
 
 /**
  * Build one passage.
@@ -1017,7 +1023,16 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       // No rest under a hairpin: a ramp is one bow that keeps moving, and a rest
       // in the middle of one is the same contradiction as a slur over silence.
       if (list.slice(from, to + 1).some((e) => !e.note)) continue;
-      swell = { bar: peak.bar, kind, from, to };
+      // A ramp is written *towards* a marking — "mp < f" is music, a hairpin that
+      // opens onto nothing is not. The passage's opening dynamic is the one it
+      // starts from, so the target is the next rung up (or down) in the level's
+      // own list; when there is no rung to reach, the ramp is left without one.
+      const rung = DYNAMIC_ORDER.indexOf(dynamic);
+      const reach = spec.dynamics.filter((d) =>
+        kind === 'cresc' ? DYNAMIC_ORDER.indexOf(d) > rung : DYNAMIC_ORDER.indexOf(d) < rung,
+      );
+      const target = reach.length ? (kind === 'cresc' ? reach[0] : reach[reach.length - 1]) : null;
+      swell = { bar: peak.bar, kind, from, to, target };
       break;
     }
   }

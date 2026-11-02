@@ -1,15 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611020250';
-import { renderStaff } from './staff.js?v=202611020250';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611020250';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611020250';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611020250';
-import { generatePassage } from './sightreading.js?v=202611020250';
-import { createPlayer } from './playback.js?v=202611020250';
-import { renderScore } from './score.js?v=202611020250';
-import * as Journal from './journal.js?v=202611020250';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611020250';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611021245';
+import { renderStaff } from './staff.js?v=202611021245';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611021245';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611021245';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611021245';
+import { generatePassage } from './sightreading.js?v=202611021245';
+import { createPlayer } from './playback.js?v=202611021245';
+import { renderScore } from './score.js?v=202611021245';
+import * as Journal from './journal.js?v=202611021245';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611021245';
 import {
   STRINGS,
   FIFTHS,
@@ -17,7 +17,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611020250';
+} from './tuner.js?v=202611021245';
 
 const LANG = initLang();
 

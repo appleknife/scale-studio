@@ -195,10 +195,33 @@
         const b = JSON.stringify(generatePassage({ level, seed: 4471 }));
         if (a !== b) problems.push(`L${level}: seed 4471 is not reproducible`);
 
+        // ── the markings ─────────────────────────────────────────────
+        // The ladder grows one rung at a time: mf from I, f from III, mp from IV,
+        // p from V. Fortissimo is not in the Manual's sight-reading criteria, and
+        // level VI used to be the one level that never drew an f at all, so both
+        // are pinned here — every passage uses a marking from its own level, and
+        // every marking in that list actually turns up.
+        for (let seed = 0; seed < 60; seed++) {
+          const p = generatePassage({ level, seed });
+          if (!p) continue;
+          if (!spec.dynamics.includes(p.dynamic)) {
+            problems.push(`L${level} seed ${seed}: the marking ${p.dynamic} is not in this level's list`);
+          }
+          if (p.dynamic === 'ff') problems.push(`L${level} seed ${seed}: fortissimo, which the Manual does not ask for`);
+        }
+        const seen = new Set();
+        for (let seed = 0; seed < 120; seed++) {
+          const p = generatePassage({ level, seed });
+          if (p) seen.add(p.dynamic);
+        }
+        for (const mark of spec.dynamics) {
+          if (!seen.has(mark)) problems.push(`L${level}: the marking ${mark} never appears in 120 passages`);
+        }
+
         const span = spanTotal / 120;
         const rate = boundaryLeaps / 120;
         log.push(
-          `L${level}: line spans ${span.toFixed(1)} semitones · a leap into a new register at a phrase boundary in ${Math.round(rate * 100)}%`,
+          `L${level}: line spans ${span.toFixed(1)} semitones · a leap into a new register at a phrase boundary in ${Math.round(rate * 100)}% · markings ${spec.dynamics.join('/')}`,
         );
         if (level >= 3 && rate < 0.2) {
           problems.push(`L${level}: only ${boundaryLeaps} of 120 passages change register at a phrase boundary`);

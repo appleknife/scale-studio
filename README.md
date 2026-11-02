@@ -395,7 +395,16 @@ trouble are the ones where a stroked line is not good enough:
   two spaces, because a hairpin is read by its angle: a fixed one-space opening on a
   four-beat ramp came out as a sliver that looked like a staff line. Under three
   spaces of span there is no room for a wedge at all, and the printed word —
-  *cresc.*, *dim.* — is written instead, which is what an engraver does too.
+  *cresc.*, *dim.* — is written instead, which is what an engraver does too. The
+  ramp also carries the marking it arrives at, printed just past its open end, so
+  a passage reads *mp < f* rather than a wedge that opens onto nothing — and the
+  playback ramps to that marking's own level, not to an arbitrary one.
+* **The markings grow a rung at a time**: *mf* at levels I–II, *f* from III, *mp*
+  from IV, *p* from V. Fortissimo is not in the Manual's sight-reading criteria and
+  is never drawn; level VI used to be the one level that never drew an *f* at all,
+  which is the sort of thing only a teacher notices. The sightreading suite pins
+  both — every passage uses a marking from its level's list, and every marking in
+  that list turns up within 120 passages.
 * The **tempo mark** is printed over the first bar, so it is placed last: the
   system records how high its music reaches and the mark goes above that, rather
   than through a beam that opens the passage high.
