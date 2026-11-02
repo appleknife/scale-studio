@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021455';
-import { STAFF_GEOM } from './staff.js?v=202611021455';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021530';
+import { STAFF_GEOM } from './staff.js?v=202611021530';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -152,17 +152,31 @@ const LEVELS = {
     steps: [1, 2, 3, 4, 5, 6, 7],
     maxSemis: 12,
     rhythms: {
-      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2], [4 / 3, 4 / 3, 4 / 3, 4]],
-      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8], [4 / 3, 4 / 3, 4 / 3, 4, 4]],
+      // The dotted-eighth-and-sixteenth figure arrives here: a dotted eighth is
+      // three sixteenths, and it beams with the sixteenth that completes its
+      // beat. It is the one rhythm in the ladder that is easier to *mistime* than
+      // to play, which is why the Manual saves it for the top levels.
+      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2], [4 / 3, 4 / 3, 4 / 3, 4], [3, 1, 4]],
+      '3/4': [
+        [4, 4, 4],
+        [2, 2, 4, 4],
+        [8, 4],
+        [4, 8],
+        [4 / 3, 4 / 3, 4 / 3, 4, 4],
+        [3, 1, 4, 4],
+        [4, 3, 1, 4],
+      ],
       '4/4': [
         [4, 4, 4, 4],
         [4, 2, 2, 4, 4],
         [8, 4, 4],
         [4, 4, 2, 2, 4],
         [4 / 3, 4 / 3, 4 / 3, 4, 4, 4],
+        [3, 1, 4, 4, 4],
+        [4, 4, 3, 1, 4],
       ],
       '2/2': [[4, 4, 4, 4], [8, 4, 4], [6, 2, 4, 4], [4, 4, 6, 2], [8, 6, 2]],
-      '6/8': [[2, 2, 2, 6], [6, 2, 2, 2], [2, 2, 2, 2, 2, 2], [4, 2, 6], [6, 6]],
+      '6/8': [[2, 2, 2, 6], [6, 2, 2, 2], [2, 2, 2, 2, 2, 2], [4, 2, 6], [3, 1, 2, 6]],
     },
     // 6/8 is marked in dotted quarters at both these levels; the Manual's
     // "eighth = 120" belongs to the simple metres, not to 6/8, where it would
@@ -182,7 +196,7 @@ const LEVELS = {
     steps: [1, 2, 3, 4, 5, 6, 7],
     maxSemis: 12,
     rhythms: {
-      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [2, 4, 2], [1, 1, 2, 4], [2, 1, 1, 4], [1, 1, 1, 1]],
+      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [2, 4, 2], [1, 1, 2, 4], [2, 1, 1, 4], [1, 1, 1, 1], [3, 1, 4]],
       '3/4': [
         [4, 4, 4],
         [2, 2, 4, 4],
@@ -194,6 +208,7 @@ const LEVELS = {
         // four sixteenths under one beam, which the Manual's own level VI
         // example uses in both beats — a whole beat of them
         [1, 1, 1, 1, 4, 4],
+        [3, 1, 4, 4],
         [4, 1, 1, 1, 1, 4],
         [4, 4, 1, 1, 1, 1],
       ],
@@ -213,6 +228,8 @@ const LEVELS = {
         [4, 2, 1, 1, 4, 4],
         [4 / 3, 4 / 3, 4 / 3, 4, 4, 4],
         [4 / 3, 4 / 3, 4 / 3, 4 / 3, 4 / 3, 4 / 3, 4, 4],
+        [3, 1, 4, 4, 4],
+        [4, 4, 3, 1, 4],
       ],
       '2/2': [
         [4, 4, 4, 4],
@@ -222,6 +239,7 @@ const LEVELS = {
         [4, 4, 4, 1, 1, 2],
         [8, 4, 1, 1, 2],
         [4 / 3, 4 / 3, 4 / 3, 4, 8],
+        [4, 4, 3, 1, 4],
       ],
       '6/8': [
         [2, 2, 2, 6],
@@ -231,6 +249,7 @@ const LEVELS = {
         [6, 6],
         [2, 2, 2, 4, 1, 1],
         [6, 2, 1, 1, 2],
+        [3, 1, 2, 6],
       ],
     },
     // 6/8 is a dotted-quarter metre; ♪ = 120 in the Manual's list belongs to the

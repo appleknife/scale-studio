@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611021455';
-import { CLEF_PATH } from './clef.js?v=202611021455';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611021530';
+import { CLEF_PATH } from './clef.js?v=202611021530';
 
-import { beatLength } from './sightreading.js?v=202611021455';
+import { beatLength } from './sightreading.js?v=202611021530';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -434,7 +434,9 @@ function beamGroups(events, beat) {
     group = [];
   };
   for (const e of events) {
-    if (e.rest || e.dur > 2) {
+    // A dotted eighth (three sixteenths) beams with the sixteenth that completes
+    // its beat — that is the figure, and beamed is how it is printed.
+    if (e.rest || e.dur > 3) {
       close();
       continue;
     }
@@ -460,11 +462,13 @@ function sixteenthRuns(group) {
   for (const e of group) {
     if (e.dur === 1) run.push(e);
     else {
-      if (run.length > 1) runs.push(run);
+      // A lone sixteenth still needs its second beam — as a stub. Leaving single
+      // runs out is what made a sixteenth after a dotted eighth read as an eighth.
+      if (run.length) runs.push(run);
       run = [];
     }
   }
-  if (run.length > 1) runs.push(run);
+  if (run.length) runs.push(run);
   return runs;
 }
 
@@ -886,14 +890,18 @@ function drawSystem(
       const back = (BEAM + GAP2) / Math.abs(ux);
       const dy2 = dir * back;
       for (const run of sixteenthRuns(group)) {
-        part.push(
-          bar(
-            stemX(run[0]),
-            beam.at(run[0]) + dy2,
-            stemX(run[run.length - 1]),
-            beam.at(run[run.length - 1]) + dy2,
-          ),
-        );
+        const from = stemX(run[0]);
+        const to = stemX(run[run.length - 1]);
+        if (run.length === 1) {
+          // One sixteenth inside a beam is written with a stub of second beam,
+          // half a space long, pointing back into the group. Without it the note
+          // reads as an eighth — and the dotted-eighth figure is exactly this.
+          const place = group.indexOf(run[0]);
+          const toward = place > 0 ? -1 : 1;
+          part.push(bar(from, beam.at(run[0]) + dy2, from + toward * 13, beam.at(run[0]) + dy2));
+        } else {
+          part.push(bar(from, beam.at(run[0]) + dy2, to, beam.at(run[run.length - 1]) + dy2));
+        }
       }
 
       // A triplet gets its number. It needs no bracket: the beam has already

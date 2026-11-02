@@ -356,6 +356,17 @@ beats of sixteenths a passage on average. From level V on the runs multiply; lev
 VI, whose own printed example is built from them, gets them in almost every
 passage.
 
+**Level V is where the dotted rhythm arrives** — a dotted eighth (three sixteenths
+and a dot) beamed to the sixteenth that completes its beat. It is the one figure in
+the ladder that is easier to *mistime* than to play, which is why the Manual saves
+it for the top two levels, and it was missing entirely: the rhythm tables had dotted
+quarters and triplets but no dotted eighths at all. Levels V and VI now draw it in
+about two passages out of three (78 and 83 of 120), and the suite checks that
+nothing below V draws one. The engraver had to learn the shape too — a lone
+sixteenth inside a beam is written with a *stub* of second beam, half a space long,
+pointing back into its group, and without it the second note of the figure read as
+an eighth.
+
 ### Drawing the notation
 
 Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave

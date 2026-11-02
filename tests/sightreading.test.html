@@ -328,6 +328,24 @@
         if (per > 1.4) problems.push(`level 3 carries ${per.toFixed(2)} beats of sixteenths a passage — that is not one`);
       }
 
+      // Dotted eighths are the level V figure: three sixteenths and a dot, beamed
+      // with the sixteenth that completes the beat. Nothing below V has one — a
+      // dotted rhythm is easier to mistime than to play, which is why the Manual
+      // saves it for the top two levels — and both of those must actually draw it.
+      for (const level of SIGHT_LEVELS) {
+        let dotted = 0;
+        for (let seed = 0; seed < 120; seed++) {
+          if (flatten(generatePassage({ level, seed })).some((e) => e.dur === 3 && !e.rest)) dotted++;
+        }
+        log.push(`L${level}: a dotted eighth in ${dotted}/120 passages`);
+        if (level >= 5 && dotted < 40) {
+          problems.push(`L${level}: a dotted eighth in only ${dotted} of 120 passages`);
+        }
+        if (level < 5 && dotted) {
+          problems.push(`L${level}: ${dotted} passages with a dotted eighth, which starts at V`);
+        }
+      }
+
       // Rests: which ones, and how often. Quarter rests were the thing missing —
       // the chooser used to take the first short slot in a middle bar, which was
       // almost always an eighth — so the kinds are counted, and both a quarter and
