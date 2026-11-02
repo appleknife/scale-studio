@@ -377,6 +377,37 @@
         frame.remove();
       }
 
+      /* ── 9. The microphone warm-up ─────────────────────────────────── */
+      //
+      // On a phone the capture path wakes a second or two after the button, and a
+      // count-in that runs during that window sends the student's first bar into a
+      // microphone that is not listening. So an assisted run waits for the first
+      // frame — which is what this page holds back for 600 ms, then releases.
+      {
+        const frame = await load('../index.html?sightplay=5&seed=7&assist&warm');
+        const d = frame.contentDocument;
+        await wait(250);
+        const early = !d.getElementById('countIn').hidden;
+        const warming = d.getElementById('sightStatus').textContent.trim().length > 0;
+        const started = await until(() => !d.getElementById('countIn').hidden, 4000);
+        const cleared = await until(() => d.getElementById('countIn').hidden, 9000);
+        const finished = await until(() => !d.getElementById('sightResult').hidden, 20000);
+        const pct = d.getElementById('sightPct').textContent.trim();
+        log.push(
+          `warm-up: count-in before any frame ${early ? 'early (wrong)' : 'held'} · ` +
+            `status ${warming ? 'set' : 'missing'} · count-in ${started ? 'started' : 'never started'} · ` +
+            `cleared ${cleared} · scored ${pct}`,
+        );
+
+        if (early) problems.push('the count-in began before the microphone delivered anything');
+        if (!warming) problems.push('nothing told the student the microphone was waking up');
+        if (!started) problems.push('the first frame did not start the count-in');
+        if (!cleared) problems.push('the warm-up run never cleared its count-in');
+        if (!finished) problems.push('a warmed-up assisted run never finished and scored');
+        if (!/^\d+%$/.test(pct)) problems.push(`a warmed-up assisted run scored "${pct}"`);
+        frame.remove();
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;

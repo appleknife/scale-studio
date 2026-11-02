@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025300';
-import { renderStaff } from './staff.js?v=202611025300';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611025300';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025300';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025300';
-import { generatePassage } from './sightreading.js?v=202611025300';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025300';
-import { renderScore } from './score.js?v=202611025300';
-import * as Journal from './journal.js?v=202611025300';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025300';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025300';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025400';
+import { renderStaff } from './staff.js?v=202611025400';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611025400';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025400';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025400';
+import { generatePassage } from './sightreading.js?v=202611025400';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025400';
+import { renderScore } from './score.js?v=202611025400';
+import * as Journal from './journal.js?v=202611025400';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025400';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025400';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611025300';
+} from './tuner.js?v=202611025400';
 
 const LANG = initLang();
 
@@ -989,8 +989,10 @@ const sight = {
   // marks it and turns the example into "start here", which is what a student
   // who has lost their place actually needs.
   pickedBar: null,
-  // 1 at the printed tempo, 0.75 or 0.5 for a first, slow read.
-  rate: 1,
+  // The speed the example and the assisted clicks run at. Half is the default:
+  // practice is not the exam, and the Manual's top-level markings are brisk for a
+  // first read — the student moves up to the NYSSMA tempo when they choose.
+  rate: 0.5,
 };
 
 /* ── Hearing the passage ─────────────────────────────────────────────── */
@@ -1176,9 +1178,32 @@ function pickBar(event) {
   paintPickedBar();
 }
 
-/** The note glyph printed next to a tempo mark. */
+/**
+ * The note glyph printed next to a tempo mark, as markup.
+ *
+ * The quarter and eighth characters (♩ ♪) are in every font. The half-note
+ * symbol is not: it lives in Unicode's Musical Symbols block, and a phone renders
+ * it as an empty box — which is exactly what the teacher saw on a cut-time page
+ * ("a box of lines plus a box"). So the half note is drawn instead of typed:
+ * one head, one stem, at the size of the text beside it. The head is hollow — a
+ * filled head is a quarter note, and a cut-time marking is a minim.
+ */
+function tempoGlyphHtml(unit) {
+  if (unit !== 'h') {
+    return `<span class="tempo-glyph">${{ e: '\u266A', q: '\u2669', qd: '\u2669.' }[unit] || '\u2669'}</span>`;
+  }
+  return (
+    '<svg class="tempo-glyph-svg" viewBox="0 0 18 25" width="15" height="21" aria-hidden="true">' +
+    '<ellipse cx="6.6" cy="19.4" rx="5.6" ry="3.9" transform="rotate(-24 6.6 19.4)" ' +
+    'fill="none" stroke="currentColor" stroke-width="1.5"/>' +
+    '<line x1="11.9" y1="18.4" x2="11.9" y2="2.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>' +
+    '</svg>'
+  );
+}
+
+/** The same glyph as plain text, for anywhere that cannot take markup. */
 function tempoGlyph(unit) {
-  return { e: '\u266A', q: '\u2669', h: '\u{1D15E}', qd: '\u2669.' }[unit] || '\u2669';
+  return { e: '\u266A', q: '\u2669', h: 'half', qd: '\u2669.' }[unit] || '\u2669';
 }
 
 /** That glyph's length in sixteenths, for turning a marking into a click. */
@@ -1193,7 +1218,11 @@ function renderSight() {
   const keyName =
     getLang() === 'zh' ? `${passage.key.name}\u5927\u8c03` : `${passage.key.name} major`;
   const mark = tempoGlyph(passage.tempo.unit);
-  el.sightMeta.textContent = `${keyName} \u00b7 ${passage.meter} \u00b7 ${mark} = ${passage.tempo.bpm}`;
+  // The meta line and the printed mark both draw the half note rather than typing
+  // it: the character is missing from every phone font.
+  el.sightMeta.innerHTML = `${keyName} \u00b7 ${passage.meter} \u00b7 ${tempoGlyphHtml(
+    passage.tempo.unit,
+  )} = ${passage.tempo.bpm}`;
   // A phone cannot show eight bars of music without shrinking the notes below
   // reading size, so under a comfortable width the passage is laid out two bars
   // to a system. The bar width inside the drawing is unchanged — the page is
@@ -1202,6 +1231,8 @@ function renderSight() {
   sight.perSystem = wide ? 4 : 2;
   el.sightStaff.innerHTML = renderScore(passage, {
     tempoText: `${mark} = ${passage.tempo.bpm}`,
+    tempoMark:
+      passage.tempo.unit === 'h' ? { unit: 'h', bpm: passage.tempo.bpm } : null,
     ariaLabel: t('aria.score'),
     barsPerSystem: sight.perSystem,
   });
@@ -1273,15 +1304,43 @@ async function startSightTake(options = {}) {
   }
 
   armSightTake(options);
-  if (assistOn()) startAssistedRun();
+  const take = sight.take;
+  // The count-in does not begin until the microphone is actually delivering
+  // sound. On a phone the capture path can take a second or two to wake up, and
+  // a count-in during that window is worse than useless: the student plays on the
+  // downbeat into a microphone that is not listening yet, and the first bar or two
+  // come back as "not heard". So the first frame starts the count-in. The hook is
+  // at the top of ingestSightFrame.
+  if (assistOn()) {
+    take.awaitWarm = true;
+    el.sightStatus.textContent = t('sight.warmingMic');
+    // If no frame ever arrives — the operating system held the stream back, or
+    // the browser opened it and then went quiet — the screen must not sit at
+    // "warming" for ever. The student gets told, and can press start again.
+    setTimeout(() => {
+      if (sight.take !== take || !take.awaitWarm) return;
+      take.awaitWarm = false;
+      stopSightTake(false);
+      el.sightStatus.textContent = t('sight.noMicFrames');
+    }, 8000);
+  }
 }
 
 /* ── Assisted runs ───────────────────────────────────────────────────── */
 
-const ASSIST_KEY = 'scaleStudio.assist';
+// Stored as 'on' when the switch is ticked, i.e. when the student has asked for
+// test conditions. A fresh key, because the old one meant the opposite.
+const ASSIST_KEY = 'scaleStudio.testRun';
 
+/**
+ * Assistance is the default; the switch turns it OFF for a test run.
+ *
+ * Practice wants the count-in, the clicks and the line — they are what a student
+ * needs while learning to read against a pulse. What the audition wants is the
+ * page and nothing else, so "test" is the thing you opt into.
+ */
 function assistOn() {
-  return Boolean(el.sightAssist && el.sightAssist.checked);
+  return !(el.sightAssist && el.sightAssist.checked);
 }
 
 /**
@@ -1300,10 +1359,22 @@ function startAssistedRun() {
   const passage = sight.passage;
   const take = sight.take;
   if (!passage || !take) return;
-  const plan = countInPlan(passage.meter, passage.tempo);
+  // The clicks and the line run at the speed the student chose — half by default.
+  // A count-in at the printed tempo under a half-speed practice would be the
+  // app contradicting itself.
+  const base = countInPlan(passage.meter, passage.tempo);
+  const plan = {
+    clicks: base.clicks,
+    interval: base.interval / sight.rate,
+    seconds: base.seconds / sight.rate,
+  };
   const ctx = player.context;
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
+  // Nothing that sounds during the count-in is heard: the take's clock starts on
+  // the downbeat, and a student who tries the first note early would otherwise
+  // start the run before the bar had finished counting them in.
+  take.counting = true;
   el.countIn.hidden = false;
   el.countInNum.textContent = String(plan.clicks);
   el.countInLabel.textContent = passage.meter;
@@ -1327,6 +1398,7 @@ function startAssistedRun() {
   setTimeout(() => {
     if (sight.take !== take) return;
     el.countIn.hidden = true;
+    take.counting = false;
     take.startAtNextFrame = true;
     take.assisted = true;
     el.sightStatus.textContent = t('sight.playing');
@@ -1394,7 +1466,7 @@ function runClickTrack(ctx, passage, plan) {
 function runAssistPlayhead(take, passage) {
   ensurePlayhead();
   sight.anchors = sightAnchors(passage, el.sightStaff.querySelector('svg'));
-  const spq = secondsPerQuarter(passage.tempo);
+  const spq = secondsPerQuarter(passage.tempo) / sight.rate;
   const total = (passage.bars.length * passage.perBar) / 4;
   const began = performance.now();
   const step = () => {
@@ -1473,6 +1545,19 @@ function ingestSightFrame(frame) {
   const take = sight.take;
   if (!take) return;
   take.peak = Math.max(take.peak || 0, frame.rms);
+
+  // The first frame the microphone delivers is what starts an assisted run — see
+  // the warm-up note in startSightTake. Everything before that is the capture
+  // path waking up, and none of it belongs to the take.
+  if (take.awaitWarm) {
+    take.awaitWarm = false;
+    startAssistedRun();
+    return;
+  }
+
+  // A count-in is not part of anyone's playing, even if the student tries a note
+  // over it. The take's clock starts on the downbeat that follows.
+  if (take.counting) return;
 
   // An assisted run is timed from its count-in, not from the first note: the
   // clicks have already said where beat one is, so a late entry is a late entry,
@@ -1824,12 +1909,14 @@ player.setVolume(storedVolume / 100);
 el.sightVolume.value = String(storedVolume);
 el.sightVolume.addEventListener('input', () => applyVolume(el.sightVolume.value));
 
-// Assisted runs are remembered like the volume: a student working with the clicks
-// this week should not have to find the switch again next time.
+// The switch is remembered like the volume, and it stores *test mode* — the
+// thing you opt into. A student who wants the audition conditions this week
+// should not have to find the switch again next time; everyone else gets the
+// count-in and the clicks, which is the default.
 try {
   el.sightAssist.checked = localStorage.getItem(ASSIST_KEY) === 'on';
 } catch {
-  /* no storage — off by default */
+  /* no storage — assistance on by default */
 }
 el.sightAssist.addEventListener('change', () => {
   try {
@@ -3662,9 +3749,19 @@ if (params.has('sightplay')) {
   // ?sightplay=5&assist           the same, with the count-in and the clicks
   openSight(Number(params.get('sightplay')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
   armSightTake({ live: params.get('live') !== '0' });
-  if (params.has('assist')) {
-    el.sightAssist.checked = true;
-    startAssistedRun();
+  const assisted = params.has('assist');
+  // `warm` walks the microphone warm-up: the take arms with awaitWarm and the
+  // first frame — held back here, the way a phone's capture path holds it — is
+  // what starts the count-in (see startSightTake and ingestSightFrame).
+  const warming = assisted && params.has('warm');
+  if (assisted) {
+    el.sightAssist.checked = false;
+    if (warming) {
+      sight.take.awaitWarm = true;
+      el.sightStatus.textContent = t('sight.warmingMic');
+    } else {
+      startAssistedRun();
+    }
   }
   const offsets = params.has('detune')
     ? Object.fromEntries([...Array(64).keys()].map((k) => [k, 42]))
@@ -3680,7 +3777,23 @@ if (params.has('sightplay')) {
     if (frame.t >= holdAt) return;
     setTimeout(step, 0);
   };
-  step();
+  // A count-in runs on the audio clock, in real seconds, while these frames carry
+  // simulated time — so the feed waits for it, the way a student does.
+  const feed = () => {
+    if (sight.take && sight.take.counting) return setTimeout(feed, 50);
+    step();
+  };
+  if (warming) {
+    setTimeout(() => {
+      routeFrame(frames[0]);
+      i = 1;
+      feed();
+    }, 600);
+  } else if (assisted) {
+    setTimeout(feed, 50);
+  } else {
+    step();
+  }
 }
 if (params.has('sightleak')) {
   // Walking away mid-take must stop the counting: arm, play a little, leave,

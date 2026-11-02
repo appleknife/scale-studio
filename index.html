@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611025300" />
+    <link rel="stylesheet" href="app.css?v=202611025400" />
   </head>
   <body>
     <div class="shell">
@@ -381,9 +381,9 @@
           <div class="mode-row speed-row">
             <span class="control-label">Slow practice</span>
             <div class="segmented" id="sightSpeeds" role="group" aria-label="Playback speed" data-i18n-aria="sight.speedAria">
-              <button type="button" data-rate="0.5" aria-selected="false">½ speed</button>
+              <button type="button" data-rate="0.5" aria-selected="true">½ speed</button>
               <button type="button" data-rate="0.75" aria-selected="false">¾ speed</button>
-              <button type="button" data-rate="1" aria-selected="true">At tempo</button>
+              <button type="button" data-rate="1" aria-selected="false">NYSSMA tempo</button>
             </div>
           </div>
 
@@ -401,14 +401,17 @@
           <div class="sight-listen">
             <button class="primary-btn" id="sightStart" type="button" data-i18n="Start listening">Start listening</button>
             <button class="quiet-btn" id="sightStop" type="button" hidden data-i18n="Finish">Finish</button>
+            <!-- Assistance is the default: a count-in, the clicks and the line. This
+                 switch turns it *off*, for a run that feels like the audition —
+                 nothing to follow but the page. -->
             <label class="assist-toggle">
               <input type="checkbox" id="sightAssist" />
-              <span>Assisted — count-in, clicks and the moving line</span>
+              <span>Test — no clicks, no line, just the page</span>
             </label>
             <p class="assist-note">
               The clicks come out of the speaker and the microphone is open —
-              headphones keep one out of the other. Assisted runs are kept in your
-              stats under their own heading.
+              headphones keep one out of the other. Test runs are kept in your stats
+              under their own heading.
             </p>
             <p class="sight-status" id="sightStatus" role="status" aria-live="polite"></p>
             <label class="volume" for="sightVolume">
@@ -980,7 +983,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611025300"></script>
+    <script type="module" src="src/app.js?v=202611025400"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

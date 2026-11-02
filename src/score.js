@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611025300';
-import { CLEF_PATH } from './clef.js?v=202611025300';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611025400';
+import { CLEF_PATH } from './clef.js?v=202611025400';
 
-import { beatLength } from './sightreading.js?v=202611025300';
+import { beatLength } from './sightreading.js?v=202611025400';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -479,7 +479,7 @@ function drawSystem(
   barFrom,
   barTo,
   top,
-  { timeSignature, tempoText, showTempo, final = false, width = WIDTH, ceiling = null },
+  { timeSignature, tempoText, tempoMark = null, showTempo, final = false, width = WIDTH, ceiling = null },
 ) {
   const part = [];
   const bottom = top + 4 * LINE_GAP;
@@ -1252,9 +1252,31 @@ function drawSystem(
   // it; TOP_PAD leaves room for the usual case and this moves it the rest of the
   // way. Never higher than twenty units from the top of the drawing, or it would
   // be clipped by the viewBox.
-  if (showTempo && tempoText) {
+  if (showTempo && (tempoText || tempoMark)) {
     const y = Math.max(20, Math.min(top - 18, musicTop - 16));
-    part.push(`<text class="score-tempo" x="${tempoX}" y="${y}" font-size="17">${tempoText}</text>`);
+    if (tempoMark && tempoMark.unit === 'h') {
+      // A half note is *drawn*, not typed: its Unicode character is missing from
+      // every phone font and comes out as an empty box. One head, one stem, then
+      // the marking beside it, the way an engraver prints it. The head is the
+      // score's own hollow note head, a shade smaller — a filled head would be a
+      // quarter note, and a cut-time marking is not one.
+      const hx = tempoX;
+      const hy = y - 5.2;
+      part.push(
+        `<g class="score-tempo-mark">` +
+          `<ellipse cx="${fmt(hx + 6.4)}" cy="${fmt(hy)}" rx="6.4" ry="4.1" ` +
+          `transform="rotate(${HEAD_ANGLE} ${fmt(hx + 6.4)} ${fmt(hy)})" ` +
+          `fill="none" stroke="${INK}" stroke-width="1.55"/>` +
+          `<line x1="${fmt(hx + 11.6)}" y1="${fmt(hy - 1.4)}" x2="${fmt(hx + 11.6)}" y2="${fmt(hy - 15.6)}" ` +
+          `stroke="${INK}" stroke-width="1.55" stroke-linecap="round"/>` +
+          `<text class="score-tempo" x="${fmt(hx + 18.4)}" y="${fmt(y)}" font-size="17">= ${tempoMark.bpm}</text>` +
+          `</g>`,
+      );
+    } else {
+      part.push(
+        `<text class="score-tempo" x="${tempoX}" y="${y}" font-size="17">${tempoText}</text>`,
+      );
+    }
   }
 
   return { markup: part.join(''), dynY: lastDynY, musicTop };
@@ -1314,7 +1336,12 @@ export function noteMarkSvg({ height = 100, colour = INK } = {}) {
  */
 export function renderScore(
   passage,
-  { tempoText = '', ariaLabel = 'Sight-reading passage', barsPerSystem = BARS_PER_SYSTEM } = {},
+  {
+    tempoText = '',
+    tempoMark = null,
+    ariaLabel = 'Sight-reading passage',
+    barsPerSystem = BARS_PER_SYSTEM,
+  } = {},
 ) {
   const narrow = barsPerSystem === 2;
   const per = narrow ? 2 : BARS_PER_SYSTEM;
@@ -1334,7 +1361,8 @@ export function renderScore(
       width,
       timeSignature: s === 0,
       tempoText: s === 0 ? tempoText : '',
-      showTempo: s === 0 && Boolean(tempoText),
+      tempoMark: s === 0 ? tempoMark : null,
+      showTempo: s === 0 && Boolean(tempoText || tempoMark),
       final: s === systems - 1,
       ceiling,
     });

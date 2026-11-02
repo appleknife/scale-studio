@@ -297,12 +297,32 @@ sight-reading table for that level.
   passage* becomes *Start at bar 6* — the example begins there, playhead and all.
   Tap it again and the pick is let go. It is the gesture a student who has lost
   their place actually needs, and it costs nothing to offer before a take.
-* **Slow practice** — ½ speed, ¾ speed, at tempo — slows the example without
-  changing a note of it. The clock is scaled once, in `schedule()`, so the shaping
-  (slurs, staccato, the hairpin's ramp) keeps its proportions; the playhead follows
-  the audio clock, so it slows with the music. Changing speed while it is sounding
-  restarts it from the same place. The metronome keeps the printed tempo: its job
-  is to be the printed tempo.
+* **Slow practice** — ½ speed, ¾ speed, *NYSSMA tempo* — slows the example
+  without changing a note of it. The clock is scaled once, in `schedule()`, so the
+  shaping (slurs, staccato, the hairpin's ramp) keeps its proportions; the playhead
+  follows the audio clock, so it slows with the music. Changing speed while it is
+  sounding restarts it from the same place. **½ is the default**: practice is not
+  the exam, the Manual's markings at V–VI are brisk for a first read, and a teacher
+  asked for the printed tempo to be the thing you opt *into* — so it is labelled as
+  NYSSMA's rather than as the norm. (The *Hear the tempo* metronome still clicks at
+  the printed marking: its job is to be the marking.)
+* **Assistance is the default; test conditions are the switch.** *Start listening*
+  counts the student in — one bar, in the metre's own beats, so 4 in 4/4, 3 in 3/4,
+  2 in cut time and 6 in 6/8 — then runs a click track and a moving line under the
+  page while the take is scored. The checkbox under the buttons is **Test — no
+  clicks, no line, just the page**, unticked by default; ticking it gives the
+  audition's conditions. Assisted and test runs are filed separately in the stats
+  screen (*With the clicks and the line*), because a score with the wheels on is not
+  the same claim as one without. Nothing that sounds during the count-in is heard:
+  the take's clock starts on the downbeat, so an early first note is an early first
+  note, exactly as it would be for a judge.
+* **The count-in waits for the microphone.** On a phone the capture path can take a
+  second or two to wake up, and a count-in during that window sent the student's
+  first bar into a microphone that was not listening yet — the teacher's report was
+  runs whose first bar or two were missing. An assisted take now arms with
+  `awaitWarm`, says *Waking the microphone up*, and starts counting on the **first
+  frame the microphone actually delivers**. If no frame arrives within 8 s the take
+  gives up and says so, rather than sitting at "warming" for ever.
 * Every passage has a **seed**, so `?sight=5&seed=4471` always gives the same eight
   bars. A teacher can put one passage on a projector, or send the link to a class.
 * The line sits on the staff, opens on a chord tone, steps more than it leaps,
@@ -493,7 +513,12 @@ trouble are the ones where a stroked line is not good enough:
   that list turns up within 120 passages.
 * The **tempo mark** is printed over the first bar, so it is placed last: the
   system records how high its music reaches and the mark goes above that, rather
-  than through a beam that opens the passage high.
+  than through a beam that opens the passage high. In cut time the unit is a
+  **half note, drawn rather than typed**: its character (𝅗𝅥) is missing from every
+  phone font and came out as an empty box on a level IV page, so the mark is one
+  hollow head and one stem — the score's own note head, a shade smaller — with
+  *"= 76"* beside it. The filled head it started as read as a quarter note, which
+  is the wrong marking for 2/2.
 * A **down-stem flag stops short of the head**, and has to. Flags hang on the
   right of their stem; on an up stem the head is on the left, so the hook can trail
   almost to the head and still pass beside it — that is the approved drawing. On a

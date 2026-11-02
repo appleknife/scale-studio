@@ -284,6 +284,14 @@ export const S = {
 
   // ── Sight reading: listening ──
   'sight.waitingMic': ['Asking for the microphone…', '正在请求麦克风…'],
+  'sight.warmingMic': [
+    'Waking the microphone up — the count-in starts the moment it can hear you.',
+    '正在唤醒麦克风——等它能听见你，预备拍才开始。',
+  ],
+  'sight.noMicFrames': [
+    'The microphone did not send anything through. Check the microphone permission for this page in the browser, then press start again.',
+    '麦克风什么也没送过来。检查一下浏览器里这个页面的麦克风权限，再点一次开始。',
+  ],
   'sight.armed': [
     'Ready when you are — the app starts on your first note.',
     '准备好了就开始，应用会在你第一个音时开始。',
@@ -326,13 +334,15 @@ export const S = {
     'Bars {bars} are where it came apart — those two are worth a slow pass on their own.',
     '第 {bars} 小节散了——这两小节值得单独慢练一遍。',
   ],
+  // The tempo is reported, not prescribed: a first read at half the printed speed
+  // is the normal way to learn a page, and the app has no business hurrying it.
   'sight.tipTempo.faster': [
-    'You took it at about {played} against a printed {printed}. The notes were there, so let the metronome hold you back a little.',
-    '你大约用 {played} 的速度拉的，谱子上是 {printed}。音都对了，让节拍器稍微拦着你一点。',
+    'You took it at about {played}; the page asks for {printed} — a touch quicker than the marking.',
+    '你大约用 {played} 的速度拉的，谱子上写的是 {printed}——比谱面稍微快了一点。',
   ],
   'sight.tipTempo.slower': [
-    'You took it at about {played} against a printed {printed} — that is fine for a first read, and the next step is a notch quicker.',
-    '你大约用 {played} 的速度拉的，谱子上是 {printed}——第一次读这样很好，下一步稍微快一点。',
+    'You took it at about {played}; the page asks for {printed} — slower than the marking, which is exactly right for a first read.',
+    '你大约用 {played} 的速度拉的，谱子上写的是 {printed}——比谱面慢一些，第一次读这样刚刚好。',
   ],
   'sight.tipShortHeld': [
     'I might have heard your {value} notes coming out a little short — check whether you are holding them for their full value. If you are, ignore me: a room with any ring in it can make a held note look shorter than it was.',
@@ -976,9 +986,10 @@ export const STATIC = {
   'Choose a space. Scales is where most days start — pick a key, press start, and the app listens to the whole scale.':
     '选一个空间。大多数时候都是先练音阶——挑一个调，点开始，应用会听完整条音阶。',
   'Menu': '菜单',
-  'Assisted — count-in, clicks and the moving line': '辅助模式——预备拍、节拍和移动指示线',
-  'The clicks come out of the speaker and the microphone is open — headphones keep one out of the other. Assisted runs are kept in your stats under their own heading.':
-    '节拍声从扬声器出来，而麦克风是开着的——戴上耳机就不会互相串。辅助模式的成绩在数据页里单独列出来。',
+  'Test — no clicks, no line, just the page': '考试模式——没有节拍、没有指示线，只有谱子',
+  'NYSSMA tempo': 'NYSSMA 原速',
+  'The clicks come out of the speaker and the microphone is open — headphones keep one out of the other. Test runs are kept in your stats under their own heading.':
+    '节拍声从扬声器出来，而麦克风是开着的——戴上耳机就不会互相串。考试模式的成绩在数据页里单独列出来。',
   'With the clicks and the line': '开着节拍和指示线时',
   'Twelve majors and the minor forms, levels I–VI. Play one and the app listens.':
     '十二个大调加上小调的各种形式，一至六级。拉一条，应用就听着。',
