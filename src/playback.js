@@ -16,8 +16,8 @@
 // anything else changing: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611022700';
-import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611022700';
+import { makeHallIR } from './recorder.js?v=202611022830';
+import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611022830';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -102,9 +102,11 @@ export function schedule(passage, { rate = 1, fromBar = 0 } = {}) {
         duration,
         midi: event.midi,
         gain,
-        // The printed dynamic, so a sampled voice can choose its layer. The
-        // hairpin above has already been folded into `gain`.
+        // The printed dynamic, so a sampled voice can choose its layer; and the
+        // hairpin as a *ratio* rather than an absolute, because a sampled voice
+        // mixes its own levels and only needs to know where the ramp has got to.
         level: passage.dynamic || 'mf',
+        ramp: base > 0 ? gain / base : 1,
         legato,
         accent: event.mark === 'accent',
         staccato: event.mark === 'staccato',

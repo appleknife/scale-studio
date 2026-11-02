@@ -16,7 +16,7 @@
       // every take honestly, and the two decisions the sampler makes — which take
       // covers a pitch, and how far to shift it so it is in tune — can be weighed
       // exactly without decoding a single audio file.
-      import { pickSample, rateFor, LEVEL_GAIN, LEVEL_TILT } from '../src/sampler.js?v=202611022700';
+      import { pickSample, rateFor, LEVEL_GAIN, LEVEL_TILT, BANK_GAIN } from '../src/sampler.js?v=202611022830';
 
       const problems = [];
       const log = [];
@@ -91,19 +91,38 @@
           `recorded tuning: ${Math.min(...raw).toFixed(0)} to +${Math.max(...raw).toFixed(0)} cents ` +
             `(spread ${(Math.max(...raw) - Math.min(...raw)).toFixed(0)}) — each is corrected`,
         );
+        // Where a take lands, in cents against the note the page asked for. The
+        // answer should be that take's own deliberate offset and nothing else:
+        // the recorded error has been taken out.
+        const landing = (s, midi) => {
+          const recorded = 440 * 2 ** ((s.midi + (s.cents || 0) / 100 - 69) / 12);
+          const heard = recorded * rateFor(s, midi);
+          const wanted = 440 * 2 ** ((midi - 69) / 12);
+          return 1200 * Math.log2(heard / wanted);
+        };
         let worst = 0;
         for (const s of smooth) {
-          // The take as recorded, in hertz…
-          const recorded = 440 * 2 ** ((s.midi + (s.cents || 0) / 100 - 69) / 12);
           for (const midi of [s.midi - 1, s.midi, s.midi + 1]) {
-            // …what comes out when it is shifted to cover `midi`, in cents against
-            // the note the page asked for.
-            const heard = recorded * rateFor(s, midi);
-            const wanted = 440 * 2 ** ((midi - 69) / 12);
-            worst = Math.max(worst, Math.abs(1200 * Math.log2(heard / wanted)));
+            worst = Math.max(worst, Math.abs(landing(s, midi) - (s.tune || 0)));
           }
         }
         check(worst < 0.01, `corrected pitches land ${worst.toFixed(3)} cents off their note`);
+
+        // The deliberate offsets: the A takes sit high on purpose, and every
+        // other take is exactly where it was measured.
+        const lifted = samples.filter((s) => s.tune > 0);
+        log.push(`deliberate tune: ${lifted.map((s) => `${s.id} +${s.tune}¢`).join(' · ') || 'none'}`);
+        check(lifted.every((s) => s.id.startsWith('A')), 'something other than an A take was lifted');
+        check(lifted.length === 3, `${lifted.length} takes carry a deliberate offset, wanted the three As`);
+        const a4 = smooth.find((s) => s.id === 'A4-smooth');
+        const centsAbove = landing(a4, a4.midi);
+        log.push(`A4 plays ${centsAbove.toFixed(1)} cents above equal temperament`);
+        check(Math.abs(centsAbove - a4.tune) < 0.1, `A4 did not land on its offset (${centsAbove.toFixed(1)}¢)`);
+
+        // And the level: the takes were recorded quiet, so the sampler lifts the
+        // whole set. The lift is in the voice, not in the files.
+        log.push(`bank gain ×${BANK_GAIN} (${(20 * Math.log10(BANK_GAIN)).toFixed(0)} dB)`);
+        check(BANK_GAIN > 2, 'the recorded set is not being brought up to level');
         // And the correction is doing real work: without it the same note would be
         // as far out as the take itself.
         const worstRaw = Math.max(...smooth.map((s) => Math.abs(s.cents)));

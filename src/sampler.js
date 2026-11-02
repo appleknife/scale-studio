@@ -25,6 +25,16 @@
 export const LEVEL_GAIN = { p: 0.45, mp: 0.66, mf: 1, f: 1.34, ff: 1.6 };
 
 /**
+ * The takes were recorded with a lot of headroom — peaks between −25 and −13
+ * dBFS, the page asks for "peak in the green" — so the sampler brings the whole
+ * set up to the level the rest of the app is mixed at. Their room tone sits 42
+ * to 49 dB below the note, so a 18 dB lift puts the noise floor around −55 dBFS:
+ * inaudible under the note. Before this the example was roughly 20 dB quieter
+ * than the metronome at the same slider position.
+ */
+export const BANK_GAIN = 6.5;
+
+/**
  * The tilt that stands in for bowing harder or softer. A forte is brighter, not
  * just louder; a piano has its top thinned out. Frequencies are the point at
  * which the shape starts, in hertz.
@@ -94,7 +104,11 @@ export function pickSample(index, midi, { staccato = false, accent = false, lega
  * `sample.midi` plus or minus its measured cents.
  */
 export function rateFor(sample, midi) {
-  const played = sample.midi + (sample.cents || 0) / 100;
+  // `tune` is a deliberate offset on top of the measurement: the teacher's ear
+  // said the A takes sat a little low, so they sit a few cents high — the same
+  // thing a soloist does to the A string, and written down here rather than
+  // baked into the file so it can be changed without re-recording anything.
+  const played = sample.midi + ((sample.cents || 0) - (sample.tune || 0)) / 100;
   return Math.pow(2, (midi - played) / 12);
 }
 
@@ -143,7 +157,7 @@ export async function loadBank(ctx, base = 'samples/', bank = emptyBank()) {
  */
 export function sampleVoice(ctx, destination, bank) {
   return {
-    play({ midi, at, duration, gain, level = 'mf', legato = false, accent = false, staccato = false }) {
+    play({ midi, at, duration, gain, ramp = 1, level = 'mf', legato = false, accent = false, staccato = false }) {
       const sample = pickSample(bank.index, midi, { staccato, accent, legato, level });
       if (!sample) return false;
       const buffer = bank.buffers.get(sample.id);
@@ -189,7 +203,11 @@ export function sampleVoice(ctx, destination, bank) {
       const offset = (sample.skip || 0) + (legato ? 0.05 : 0);
       const attack = legato ? 0.012 : 0.004;
       const release = Math.min(0.14, Math.max(0.035, want * 0.3));
-      const peak = gain * tilt.gain * (sample.gain || 1);
+      // `ramp` is where a hairpin has got to (1 with no hairpin); the absolute
+      // level comes from LEVEL_TILT, which is the sampled voice's own ladder —
+      // using `gain` here as well would count the dynamic twice.
+      const level_ = (ramp == null ? 1 : ramp) * tilt.gain;
+      const peak = level_ * (sample.gain || 1) * BANK_GAIN;
 
       // A held note outlasts its take; the loop runs between two points an
       // integer number of periods apart, so the join lands on a zero crossing.

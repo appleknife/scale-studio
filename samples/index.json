@@ -4,7 +4,7 @@
  "kind": "sight-reading playback voice",
  "sampleRate": 44100,
  "format": "m4a",
- "note": "One take every whole tone from G3 to F6, recorded by the teacher at mezzo-forte. cents is the measured error of each take and is corrected at playback, so the set is in tune with itself; gain evens out the takes; skip is the silence before the bow speaks. The loud and soft layers are made from these by gain and a gentle filter tilt.",
+ "note": "One take every whole tone from G3 to F6, recorded by the teacher at mezzo-forte. cents is the measured centre of each take (the median of its vibrato, measured frame by frame) and is corrected at playback, so the set is in tune with itself; tune is a deliberate offset on top of that \u2014 the A takes sit 8 cents high, the teacher's ear. gain evens out the takes; skip is the silence before the bow speaks.",
  "samples": [
   {
    "id": "G3-smooth",
@@ -14,10 +14,11 @@
    "midi": 55,
    "seconds": 1.858,
    "skip": 0.0155,
-   "cents": -1.6,
+   "cents": -1.9,
    "gain": 1.09,
    "loopStart": 0.6185,
-   "loopEnd": 1.4561
+   "loopEnd": 1.4561,
+   "tune": 0
   },
   {
    "id": "A3-smooth",
@@ -27,10 +28,11 @@
    "midi": 57,
    "seconds": 1.842,
    "skip": 0.0203,
-   "cents": -8.0,
+   "cents": -7.0,
    "gain": 0.919,
    "loopStart": 0.613,
-   "loopEnd": 1.4232
+   "loopEnd": 1.4232,
+   "tune": 8
   },
   {
    "id": "B3-smooth",
@@ -40,10 +42,11 @@
    "midi": 59,
    "seconds": 1.923,
    "skip": 0.0172,
-   "cents": -25.6,
+   "cents": -24.6,
    "gain": 0.926,
    "loopStart": 0.6408,
-   "loopEnd": 1.4439
+   "loopEnd": 1.4439,
+   "tune": 0
   },
   {
    "id": "Cs4-smooth",
@@ -53,10 +56,11 @@
    "midi": 61,
    "seconds": 1.939,
    "skip": 0.025,
-   "cents": 4.1,
+   "cents": 3.8,
    "gain": 1.248,
    "loopStart": 0.6461,
-   "loopEnd": 1.4534
+   "loopEnd": 1.4534,
+   "tune": 0
   },
   {
    "id": "Ds4-smooth",
@@ -66,10 +70,11 @@
    "midi": 63,
    "seconds": 1.877,
    "skip": 0.0271,
-   "cents": -24.1,
+   "cents": -26.8,
    "gain": 1.66,
    "loopStart": 0.6246,
-   "loopEnd": 1.4923
+   "loopEnd": 1.4923,
+   "tune": 0
   },
   {
    "id": "F4-smooth",
@@ -79,10 +84,11 @@
    "midi": 65,
    "seconds": 1.905,
    "skip": 0.0234,
-   "cents": 5.1,
+   "cents": 4.0,
    "gain": 1.147,
    "loopStart": 0.6345,
-   "loopEnd": 1.4461
+   "loopEnd": 1.4461,
+   "tune": 0
   },
   {
    "id": "G4-smooth",
@@ -92,10 +98,11 @@
    "midi": 67,
    "seconds": 1.869,
    "skip": 0.0153,
-   "cents": -4.0,
+   "cents": -3.2,
    "gain": 1.0,
    "loopStart": 0.6215,
-   "loopEnd": 1.4296
+   "loopEnd": 1.4296,
+   "tune": 0
   },
   {
    "id": "A4-smooth",
@@ -105,10 +112,11 @@
    "midi": 69,
    "seconds": 1.962,
    "skip": 0.0212,
-   "cents": 8.1,
+   "cents": 6.7,
    "gain": 0.845,
    "loopStart": 0.653,
-   "loopEnd": 1.4561
+   "loopEnd": 1.4561,
+   "tune": 8
   },
   {
    "id": "B4-smooth",
@@ -118,10 +126,11 @@
    "midi": 71,
    "seconds": 1.951,
    "skip": 0.0215,
-   "cents": 6.3,
+   "cents": 6.4,
    "gain": 0.491,
    "loopStart": 0.6493,
-   "loopEnd": 1.455
+   "loopEnd": 1.455,
+   "tune": 0
   },
   {
    "id": "Cs5-smooth",
@@ -131,10 +140,11 @@
    "midi": 73,
    "seconds": 1.873,
    "skip": 0.0203,
-   "cents": 2.4,
+   "cents": 2.0,
    "gain": 1.076,
    "loopStart": 0.6236,
-   "loopEnd": 1.4252
+   "loopEnd": 1.4252,
+   "tune": 0
   },
   {
    "id": "Ds5-smooth",
@@ -144,10 +154,11 @@
    "midi": 75,
    "seconds": 1.922,
    "skip": 0.0173,
-   "cents": -6.0,
+   "cents": -11.8,
    "gain": 1.409,
    "loopStart": 0.6407,
-   "loopEnd": 1.4412
+   "loopEnd": 1.4412,
+   "tune": 0
   },
   {
    "id": "F5-smooth",
@@ -157,10 +168,11 @@
    "midi": 77,
    "seconds": 1.926,
    "skip": 0.0158,
-   "cents": 6.5,
+   "cents": 7.7,
    "gain": 1.202,
    "loopStart": 0.6419,
-   "loopEnd": 1.4441
+   "loopEnd": 1.4441,
+   "tune": 0
   },
   {
    "id": "G5-smooth",
@@ -170,10 +182,11 @@
    "midi": 79,
    "seconds": 1.98,
    "skip": 0.0219,
-   "cents": 15.3,
+   "cents": 6.9,
    "gain": 0.937,
    "loopStart": 0.6593,
-   "loopEnd": 1.4637
+   "loopEnd": 1.4637,
+   "tune": 0
   },
   {
    "id": "A5-smooth",
@@ -183,10 +196,11 @@
    "midi": 81,
    "seconds": 1.887,
    "skip": 0.0216,
-   "cents": 14.4,
+   "cents": 12.1,
    "gain": 0.527,
    "loopStart": 0.6284,
-   "loopEnd": 1.429
+   "loopEnd": 1.429,
+   "tune": 8
   },
   {
    "id": "B5-smooth",
@@ -196,10 +210,11 @@
    "midi": 83,
    "seconds": 1.929,
    "skip": 0.0227,
-   "cents": 10.0,
+   "cents": 16.7,
    "gain": 0.58,
    "loopStart": 0.6425,
-   "loopEnd": 1.4443
+   "loopEnd": 1.4443,
+   "tune": 0
   },
   {
    "id": "Cs6-smooth",
@@ -209,10 +224,11 @@
    "midi": 85,
    "seconds": 1.836,
    "skip": 0.0199,
-   "cents": 19.9,
+   "cents": 23.0,
    "gain": 0.884,
    "loopStart": 0.612,
-   "loopEnd": 1.4129
+   "loopEnd": 1.4129,
+   "tune": 0
   },
   {
    "id": "Ds6-smooth",
@@ -222,10 +238,11 @@
    "midi": 87,
    "seconds": 1.9,
    "skip": 0.0159,
-   "cents": 6.0,
+   "cents": 5.2,
    "gain": 1.611,
    "loopStart": 0.633,
-   "loopEnd": 1.4403
+   "loopEnd": 1.4403,
+   "tune": 0
   },
   {
    "id": "F6-smooth",
@@ -235,10 +252,11 @@
    "midi": 89,
    "seconds": 1.869,
    "skip": 0.0205,
-   "cents": 18.8,
+   "cents": 23.0,
    "gain": 1.207,
    "loopStart": 0.623,
-   "loopEnd": 1.4232
+   "loopEnd": 1.4232,
+   "tune": 0
   },
   {
    "id": "G3-staccato",
@@ -249,7 +267,8 @@
    "seconds": 0.4,
    "skip": 0.0163,
    "cents": -6.7,
-   "gain": 1.38
+   "gain": 1.38,
+   "tune": 0
   },
   {
    "id": "G3-accent",
@@ -260,7 +279,8 @@
    "seconds": 1.888,
    "skip": 0.0155,
    "cents": -0.2,
-   "gain": 0.604
+   "gain": 0.604,
+   "tune": 0
   },
   {
    "id": "D4-staccato",
@@ -271,7 +291,8 @@
    "seconds": 0.491,
    "skip": 0.0177,
    "cents": 1.6,
-   "gain": 0.706
+   "gain": 0.706,
+   "tune": 0
   },
   {
    "id": "D4-accent",
@@ -282,7 +303,8 @@
    "seconds": 1.901,
    "skip": 0.0156,
    "cents": 15.4,
-   "gain": 1.168
+   "gain": 1.168,
+   "tune": 0
   },
   {
    "id": "A4-staccato",
@@ -293,7 +315,8 @@
    "seconds": 0.509,
    "skip": 0.0161,
    "cents": 20.8,
-   "gain": 1.131
+   "gain": 1.131,
+   "tune": 0
   },
   {
    "id": "A4-accent",
@@ -304,7 +327,8 @@
    "seconds": 1.914,
    "skip": 0.0175,
    "cents": 3.0,
-   "gain": 0.671
+   "gain": 0.671,
+   "tune": 0
   },
   {
    "id": "E5-staccato",
@@ -315,7 +339,8 @@
    "seconds": 0.567,
    "skip": 0.0573,
    "cents": 21.3,
-   "gain": 1.48
+   "gain": 1.48,
+   "tune": 0
   },
   {
    "id": "E5-accent",
@@ -326,7 +351,8 @@
    "seconds": 1.907,
    "skip": 0.0157,
    "cents": 26.4,
-   "gain": 1.308
+   "gain": 1.308,
+   "tune": 0
   },
   {
    "id": "B5-staccato",
@@ -337,7 +363,8 @@
    "seconds": 0.543,
    "skip": 0.0172,
    "cents": 34.2,
-   "gain": 0.879
+   "gain": 0.879,
+   "tune": 0
   },
   {
    "id": "B5-accent",
@@ -348,7 +375,8 @@
    "seconds": 1.829,
    "skip": 0.1102,
    "cents": 23.0,
-   "gain": 0.926
+   "gain": 0.926,
+   "tune": 0
   },
   {
    "id": "A4-B4-slurhead",
@@ -361,7 +389,8 @@
    "cents": 3.4,
    "gain": 0.609,
    "loopStart": 0.1009,
-   "loopEnd": 0.55
+   "loopEnd": 0.55,
+   "tune": 0
   },
   {
    "id": "A4-C5-slurhead",
@@ -374,7 +403,8 @@
    "cents": -5.0,
    "gain": 0.877,
    "loopStart": 0.1005,
-   "loopEnd": 0.5514
+   "loopEnd": 0.5514,
+   "tune": 0
   },
   {
    "id": "A4-G4-slurhead",
@@ -387,7 +417,8 @@
    "cents": -7.8,
    "gain": 0.798,
    "loopStart": 0.1006,
-   "loopEnd": 0.5497
+   "loopEnd": 0.5497,
+   "tune": 0
   },
   {
    "id": "A4-Fs4-slurhead",
@@ -400,7 +431,8 @@
    "cents": 9.8,
    "gain": 1.38,
    "loopStart": 0.1001,
-   "loopEnd": 0.5503
+   "loopEnd": 0.5503,
+   "tune": 0
   },
   {
    "id": "D5-E5-slurhead",
@@ -413,7 +445,8 @@
    "cents": -4.5,
    "gain": 1.827,
    "loopStart": 0.1,
-   "loopEnd": 0.5505
+   "loopEnd": 0.5505,
+   "tune": 0
   },
   {
    "id": "D5-F5-slurhead",
@@ -426,7 +459,8 @@
    "cents": 18.3,
    "gain": 1.453,
    "loopStart": 0.1005,
-   "loopEnd": 0.55
+   "loopEnd": 0.55,
+   "tune": 0
   },
   {
    "id": "D5-C5-slurhead",
@@ -439,7 +473,8 @@
    "cents": -5.0,
    "gain": 0.777,
    "loopStart": 0.1007,
-   "loopEnd": 0.5513
+   "loopEnd": 0.5513,
+   "tune": 0
   },
   {
    "id": "D5-B4-slurhead",
@@ -452,7 +487,8 @@
    "cents": 3.4,
    "gain": 0.78,
    "loopStart": 0.1014,
-   "loopEnd": 0.5507
+   "loopEnd": 0.5507,
+   "tune": 0
   }
  ]
 }

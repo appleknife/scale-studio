@@ -793,13 +793,22 @@ chain is app-specific, so a later zip of *f* and *p* takes becomes another six
 entries a note and the sampler prefers the real layer without a line changing.
 
 **The takes were in tune per note, not with each other.** Measured against equal
-temperament they sit between **26 cents flat and 20 cents sharp** — normal for a
+temperament they sit between **27 cents flat and 23 cents sharp** — normal for a
 human, fatal for a sample set, because played one after another the instrument would
-sound like it cannot tune. So each entry carries its own `cents`, measured from the
-mean period of the whole take (robust to the vibrato), and the playback rate is
-shifted by exactly that much. The vibrato then moves around a true centre instead
-of around a wrong one. `sampler.test.html` holds the arithmetic: every corrected
-pitch lands within a hundredth of a cent of the note the page asks for.
+sound like it cannot tune. So each entry carries its own `cents` and the playback
+rate is shifted by exactly that much; the vibrato then moves around a true centre
+instead of around a wrong one. The figure is the **median of the pitch frame by
+frame**, not the mean of the whole take: with a vibrato 50 cents wide the mean
+depends on where the player lingers, and the median is the centre the ear hears. On
+the first pass the whole-note mean was used and some takes came out up to 8 cents
+low, which the teacher heard.
+
+**One deliberate offset sits on top of the measurements.** The teacher's ear said
+the A takes sat a little low, so A3, A4 and A5 carry `tune: 8` — eight cents high,
+the same thing a soloist does to the A string, and written into the index rather
+than edited into the files, so it can be changed without re-recording anything.
+`sampler.test.html` holds all of it: every corrected pitch lands on its own offset
+within a hundredth of a cent, and only the three A takes carry one.
 
 **The takes were not all played at the same level.** RMS differs by nearly 5 dB
 across the set, so each entry carries a `gain` that flattens it to the median. That
@@ -839,6 +848,16 @@ which is fetched once while the student is reading the page. AAC rather than Opu
 for one reason: iPhone and iPad. It was checked by decoding every file back to PCM
 and comparing with the original: identical length, identical onset, 0.9995
 correlation over the attack.
+
+**The set is lifted 16 dB on the way out.** The takes were recorded with a lot of
+headroom — peaks between −25 and −13 dBFS, because the recording page asks for
+"peak in the green" — so at first the example was about 20 dB quieter than the
+metronome at the same slider position, which is what the teacher reported. Their
+room tone sits 42 to 49 dB below the note, so the lift puts the noise floor around
+−55 dBFS and is inaudible; `BANK_GAIN` in `src/sampler.js` is the one number that
+sets it. The dynamic ladder is the sampler's own (`LEVEL_GAIN`), and a hairpin comes
+through as a ratio on top of it — using the synth's absolute gains as well would
+have counted every dynamic twice and made a piano 11 dB below a mezzo-forte.
 
 ## Languages
 
