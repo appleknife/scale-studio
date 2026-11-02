@@ -877,6 +877,50 @@ sets it. The dynamic ladder is the sampler's own (`LEVEL_GAIN`), and a hairpin c
 through as a ratio on top of it — using the synth's absolute gains as well would
 have counted every dynamic twice and made a piano 11 dB below a mezzo-forte.
 
+## Offline
+
+The app keeps itself on the device. A service worker (`sw.js`) caches the page and
+the fourteen modules it imports the first time it is opened, and after that every
+screen works with no connection at all — the scoring, the tuner, the sight-reading
+generator, the practice log: none of them ever needed a server.
+
+The **recorded violin is not cached with the shell**. It is 800 kB against the
+shell's 200, and a student who never uses sight reading should not carry it. It is
+fetched the first time something asks to hear a passage, and a teacher preparing a
+classroom of tablets can press **"Store the violin on this device"** in *How it
+works*, which fetches all 36 takes with a progress count and says when it is done.
+If the takes are missing when a passage is played offline, the synth covers them —
+a quieter app rather than a broken one.
+
+Three things are deliberate:
+
+* **The version moves with the stamps.** `sw.js` caches under a version string that
+the publish step sets to the same number as every `?v=` in the HTML. Drift between
+the two is silent and nasty — the page asks for files the cache calls something
+else, and a student keeps last month's app — so `offline.test.html` fails if they
+disagree, and also fails if the shell list names a file that is not there (a
+missing file makes `addAll` reject and the install never happens, without a word).
+* **A new version waits, and the page says so.** No `skipWaiting`: taking over
+mid-session would swap the code under a running page. The page shows a quiet strip
+at the foot — *A newer version is ready · Reload · Later* — and only then does the
+worker take over.
+* **The page is revalidated in the background.** The shell is served from the cache
+instantly, and a navigation refreshes it when there is a connection, so an online
+teacher gets the current drawing of a passage even before the worker turns over.
+
+**What is not tested here.** Whether a worker really takes over and fills its cache
+cannot be measured in this headless setup: the browser runs on a virtual clock and
+the install's fetches never advance it — the same wall the audio decode hits. That
+part is checked by hand on a real device in airplane mode, which is how a teacher
+will meet it anyway.
+
+**iOS.** Safari can clear caches for a site that has not been used for about a week
+— unless the app has been added to the home screen, which the manifest already
+supports. So the classroom instruction is: add it to the home screen, and it stays.
+The practice log lives in `localStorage` rather than the cache and is unaffected;
+the log's download/load-a-copy file remains the way to move a log between devices,
+because offline is not sync.
+
 ## Languages
 
 The app is in English and Simplified Chinese. The switch is the pill in the top

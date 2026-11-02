@@ -1,15 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611022930';
-import { renderStaff } from './staff.js?v=202611022930';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611022930';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611022930';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611022930';
-import { generatePassage } from './sightreading.js?v=202611022930';
-import { createPlayer } from './playback.js?v=202611022930';
-import { renderScore } from './score.js?v=202611022930';
-import * as Journal from './journal.js?v=202611022930';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611022930';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023000';
+import { renderStaff } from './staff.js?v=202611023000';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611023000';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023000';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023000';
+import { generatePassage } from './sightreading.js?v=202611023000';
+import { createPlayer } from './playback.js?v=202611023000';
+import { renderScore } from './score.js?v=202611023000';
+import * as Journal from './journal.js?v=202611023000';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023000';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023000';
 import {
   STRINGS,
   FIFTHS,
@@ -17,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611022930';
+} from './tuner.js?v=202611023000';
 
 const LANG = initLang();
 
@@ -187,6 +188,12 @@ const el = {
   helpBtn: $('helpBtn'),
   helpDialog: $('helpDialog'),
   closeHelp: $('closeHelp'),
+  helpOffline: $('helpOffline'),
+  offlineStatus: $('offlineStatus'),
+  offlineBtn: $('offlineBtn'),
+  updateNote: $('updateNote'),
+  updateBtn: $('updateBtn'),
+  updateLater: $('updateLater'),
 };
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 52;
@@ -2732,6 +2739,44 @@ el.closeHelp.addEventListener('click', () => {
   if (typeof el.helpDialog.close === 'function') el.helpDialog.close();
   else el.helpDialog.removeAttribute('open');
 });
+
+/* ── Offline ──────────────────────────────────────────────────────────── */
+
+/** Says what is actually on this device, and offers the missing piece. */
+function paintOffline(message = null) {
+  const stored = samplesStored();
+  el.offlineStatus.textContent = message || (stored ? t('offline.ready') : t('offline.status'));
+  el.offlineBtn.textContent = stored ? t('offline.refresh') : t('offline.download');
+}
+
+el.offlineBtn.addEventListener('click', async () => {
+  el.offlineBtn.disabled = true;
+  try {
+    const result = await downloadSamples((done, total) => {
+      el.offlineBtn.textContent = t('offline.progress', { done, total });
+    });
+    paintOffline(
+      result.complete
+        ? t('offline.done')
+        : t('offline.partial', { n: result.missing, total: result.total }),
+    );
+  } catch {
+    paintOffline(t('offline.failed'));
+  } finally {
+    el.offlineBtn.disabled = false;
+  }
+});
+
+el.updateBtn.addEventListener('click', () => applyUpdate());
+el.updateLater.addEventListener('click', () => {
+  el.updateNote.hidden = true;
+});
+
+// Registered at the end of the boot, so it never delays a screen. Where service
+// workers are missing — an old browser, a file:// copy, a private window that
+// refuses — the app simply behaves as it did before.
+startOffline({ onUpdateReady: () => { el.updateNote.hidden = false; } });
+paintOffline();
 
 function cancelListening() {
   if (state.mic) {

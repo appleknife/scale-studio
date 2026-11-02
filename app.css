@@ -1932,6 +1932,66 @@ dialog .primary-btn {
   font-size: 14px;
 }
 
+/* The offline row inside the help dialog: a quiet line and one button, because
+   being able to work without a connection is worth saying but not worth a screen. */
+.help-offline {
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.help-offline .help-note {
+  margin: 0 0 10px;
+}
+
+.help-offline .quiet-btn {
+  font-size: 13px;
+  padding: 8px 14px;
+}
+
+/* The offer to take a newer version: a strip at the foot of the page, quiet
+   enough to ignore and close enough to use. */
+.update-note {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px -18px rgba(36, 31, 26, 0.5);
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+.update-note .quiet-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.link-btn {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 6px 4px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.link-btn:hover {
+  color: var(--ink-soft);
+}
+
 /* ── Focus & motion ──────────────────────────────────────────────────── */
 
 :focus-visible {

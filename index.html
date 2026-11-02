@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611022930" />
+    <link rel="stylesheet" href="app.css?v=202611023000" />
   </head>
   <body>
     <div class="shell">
@@ -803,6 +803,14 @@
       </footer>
     </div>
 
+    <!-- Shown when a newer version has been stored and is waiting to take over.
+         The app keeps working either way; this is the offer to switch. -->
+    <div class="update-note" id="updateNote" hidden>
+      <span data-i18n="update.ready">A newer version is ready.</span>
+      <button class="quiet-btn" id="updateBtn" type="button" data-i18n="update.reload">Reload</button>
+      <button class="link-btn" id="updateLater" type="button" data-i18n="update.later">Later</button>
+    </div>
+
     <dialog id="helpDialog" aria-labelledby="helpTitle">
       <h2 id="helpTitle">How the score works</h2>
       <p data-i18n="help.intro">
@@ -831,6 +839,15 @@
         Play in a quiet room, fairly close to the microphone, and let the first note
         ring for a moment — the app starts on the first sustained pitch it hears.
       </p>
+      <div class="help-offline" id="helpOffline">
+        <p class="help-note" id="offlineStatus" data-i18n="offline.status">
+          This copy of the app is stored on this device, so it opens without a
+          connection once it has been used here once.
+        </p>
+        <button class="quiet-btn" id="offlineBtn" type="button" data-i18n="offline.download">
+          Make the violin available offline
+        </button>
+      </div>
       <p class="help-note help-support" data-i18n="help.support">
         Scale Studio is free and stays free. If it has been useful to you or your
         students and you would like to help, you can
@@ -855,7 +872,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611022930"></script>
+    <script type="module" src="src/app.js?v=202611023000"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

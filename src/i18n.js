@@ -252,6 +252,34 @@ export const S = {
   'sight.hear': ['Hear the passage', '听一遍谱子'],
   'sight.stopHearing': ['Stop the example', '停止试听'],
   'sight.hearFrom': ['Start at bar {bar}', '从第 {bar} 小节开始'],
+
+  // ── Offline ──
+  'offline.status': [
+    'This copy of the app is stored on this device, so it opens without a connection once it has been used here once.',
+    '这个应用已经存在这台设备上，用过一次之后没有网络也能打开。',
+  ],
+  'offline.ready': [
+    'This copy of the app and the recorded violin are both stored on this device — everything works without a connection.',
+    '应用和录音小提琴都已存在这台设备上——没有网络也能完整使用。',
+  ],
+  'offline.download': ['Store the violin on this device', '把小提琴录音存到本机'],
+  'offline.refresh': ['Check the violin again', '重新检查小提琴录音'],
+  'offline.progress': ['Storing the violin… {done}/{total}', '正在存小提琴录音… {done}/{total}'],
+  'offline.done': [
+    'The violin is on this device now. Nothing else needs a connection.',
+    '小提琴录音已存到本机，其他功能都不需要网络。',
+  ],
+  'offline.partial': [
+    '{n} of {total} files could not be downloaded — try again on a better connection.',
+    '有 {n} / {total} 个文件没下载成功，网络好一点时再试一次。',
+  ],
+  'offline.failed': [
+    'The download could not start. Check the connection and try again.',
+    '下载没能开始，检查一下网络再试。',
+  ],
+  'update.ready': ['A newer version is ready.', '有新版本了。'],
+  'update.reload': ['Reload', '刷新'],
+  'update.later': ['Later', '稍后'],
   'sight.speedAria': ['Playback speed', '回放速度'],
 
   // ── Sight reading: listening ──
@@ -680,6 +708,9 @@ export const STATIC = {
   Finish: '完成',
   'Try again': '再试一次',
   'Support Scale Studio': '支持 Scale Studio',
+  /* offline */
+  'Make the violin available offline': '把小提琴录音存到本机',
+
   'sight.intro':
     '先看一遍，听一下速度，然后开始拉——应用会等你第一个音。点一下某一小节，可以把它标出来，试听就从那里开始。它只听音高和节拍；力度和弓法它判断不了，速度也比评委宽容。',
   'help.support':

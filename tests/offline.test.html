@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Offline tests</title>
+    <style>
+      body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; white-space: pre-wrap; }
+      .bad { color: #a3231c; font-weight: 700; }
+      .ok { color: #0a7a3d; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      // Offline is invisible when it works, which is exactly why it needs a test.
+      //
+      // What can be weighed here is the part that fails *silently*: a shell list
+      // naming a file that is not there (install rejects, and the app quietly
+      // stays online-only), and a cache version that has drifted from the page's
+      // ?v= stamps (every student keeps the old files, with no error at all).
+      //
+      // What cannot: whether a worker actually takes over and fills its cache. A
+      // headless browser runs on a virtual clock, and the install's network
+      // fetches never advance it — the same reason the audio decode cannot be
+      // measured here. That part is checked by hand on a real device, in airplane
+      // mode, which is how a teacher will meet it anyway.
+      const problems = [];
+      const log = [];
+      const check = (ok, message) => {
+        if (!ok) problems.push(message);
+        return ok;
+      };
+
+      const stampOf = (html) => {
+        const m = html.match(/\?v=(\d{12})/);
+        return m ? m[1] : null;
+      };
+
+      (async () => {
+        let swText = '';
+        let html = '';
+        try {
+          swText = await (await fetch('../sw.js', { cache: 'no-store' })).text();
+          html = await (await fetch('../index.html', { cache: 'no-store' })).text();
+        } catch (err) {
+          problems.push(`cannot read the app: ${err.message}`);
+        }
+
+        /* ── the version the two halves agree on ────────────────────── */
+
+        const version = (swText.match(/VERSION = '(\d+)'/) || [])[1];
+        const stamp = stampOf(html);
+        log.push(`worker version ${version} · page stamp ?v=${stamp}`);
+        check(Boolean(version), 'sw.js has no VERSION');
+        check(
+          version === stamp,
+          `the worker caches version ${version} but the page asks for ${stamp} — a student would keep the old files`,
+        );
+
+        /* ── the shell list ────────────────────────────────────────── */
+
+        // A file named here but missing on the server makes `addAll` reject, and
+        // the install fails without a word to anyone.
+        const base = (swText.match(/const BASE = \[([\s\S]*?)\];/) || [])[1] || '';
+        const files = [...base.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+        log.push(`shell list: ${files.length} entries`);
+        check(files.length > 15, `the shell list has only ${files.length} entries`);
+        check(files.includes('index.html'), 'the shell list does not include the page itself');
+
+        const missing = [];
+        for (const file of files) {
+          const response = await fetch(`../${file}`, { cache: 'no-store' });
+          if (!response.ok) missing.push(`${file} (${response.status})`);
+        }
+        check(!missing.length, `the shell list names files that are not there: ${missing.join(', ')}`);
+
+        // Every module the app imports has to be in the list, or the app opens
+        // offline and then dies on a missing import — and the module graph is a
+        // thing people add to, so this is checked by reading the imports rather
+        // than by trusting the list to be kept up to date.
+        const shellFiles = new Set(files);
+        const needed = new Set();
+        for (const file of files.filter((f) => f.endsWith('.js'))) {
+          const source = await (await fetch(`../${file}`, { cache: 'no-store' })).text();
+          for (const [, name] of source.matchAll(/from '\.\/([\w-]+\.js)/g)) needed.add(`src/${name}`);
+        }
+        const absent = [...needed].filter((file) => !shellFiles.has(file));
+        log.push(`modules imported by the cached modules: ${needed.size}`);
+        check(!absent.length, `not in the shell list: ${absent.join(', ')}`);
+        // And the other way: nothing cached that the app no longer uses.
+        const extra = files.filter((f) => f.startsWith('src/') && ![...needed].includes(f) && f !== 'src/app.js');
+        check(!extra.length, `the shell list caches modules nothing imports: ${extra.join(', ')}`);
+
+        /* ── the worker is real code ───────────────────────────────── */
+
+        // Parse it without running it: a syntax error would leave the app with no
+        // offline copy at all.
+        try {
+          // eslint-disable-next-line no-new-func
+          new Function('self', 'caches', 'fetch', swText);
+          log.push('sw.js parses');
+        } catch (err) {
+          problems.push(`sw.js does not parse: ${err.message}`);
+        }
+        for (const handler of ['install', 'activate', 'fetch']) {
+          check(
+            swText.includes(`addEventListener('${handler}'`),
+            `sw.js has no ${handler} handler`,
+          );
+        }
+
+        /* ── the violin, by name ───────────────────────────────────── */
+
+        // The takes are fetched by name at download time, so every name in the
+        // index has to resolve — a single 404 is a take the app can never play.
+        try {
+          const index = await (await fetch('../samples/index.json', { cache: 'no-store' })).json();
+          const gone = [];
+          for (const sample of index.samples) {
+            const response = await fetch(`../samples/${sample.file}`, { cache: 'no-store' });
+            if (!response.ok) gone.push(sample.file);
+          }
+          log.push(`samples: all ${index.samples.length} takes resolve`);
+          check(!gone.length, `missing sample files: ${gone.slice(0, 4).join(', ')}`);
+        } catch (err) {
+          problems.push(`cannot read the sample index: ${err.message}`);
+        }
+
+        /* ── the app offers it ─────────────────────────────────────── */
+
+        const row = html.includes('id="helpOffline"') && html.includes('id="offlineBtn"');
+        check(row, 'the help dialog has no offline row');
+        const appJs = await (await fetch('../src/app.js', { cache: 'no-store' })).text();
+        check(/startOffline\(/.test(appJs), 'app.js never registers the worker');
+        check(/downloadSamples\(/.test(appJs), 'nothing can download the violin for offline use');
+        check(/samplesStored\(/.test(appJs), 'the app cannot tell whether the violin is stored');
+        log.push('the app registers the worker, can store the violin, and reports what it holds');
+
+        document.getElementById('report').textContent = problems.length
+          ? `${problems.length} problems\n\n${[...new Set(problems)].join('\n')}\n\n${log.join('\n')}`
+          : `OFFLINE OK\n${log.join('\n')}`;
+        document.title = problems.length ? `OFFLINE: ${problems.length} problems` : 'OFFLINE OK';
+
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'offline', problems: [...new Set(problems)], log: log.join('\n') }),
+        });
+      })();
+    </script>
+  </body>
+</html>
