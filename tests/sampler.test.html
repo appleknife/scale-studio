@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sampler tests</title>
+    <style>
+      body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; white-space: pre-wrap; }
+      .bad { color: #a3231c; font-weight: 700; }
+      .ok { color: #0a7a3d; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // The recorded violin is data as much as code: the index has to describe
+      // every take honestly, and the two decisions the sampler makes — which take
+      // covers a pitch, and how far to shift it so it is in tune — can be weighed
+      // exactly without decoding a single audio file.
+      import { pickSample, rateFor, LEVEL_GAIN, LEVEL_TILT } from '../src/sampler.js?v=202611022700';
+
+      const problems = [];
+      const log = [];
+      const check = (ok, message) => {
+        if (!ok) problems.push(message);
+        return ok;
+      };
+
+      let index = null;
+      try {
+        const response = await fetch('../samples/index.json');
+        if (!response.ok) throw new Error(`index.json ${response.status}`);
+        index = await response.json();
+      } catch (err) {
+        problems.push(`cannot read samples/index.json: ${err.message}`);
+      }
+
+      if (index) {
+        const samples = index.samples;
+        log.push(`${samples.length} takes · ${index.format} · ${index.sampleRate} Hz`);
+
+        /* ── the set as a whole ─────────────────────────────────────── */
+
+        check(samples.length >= 18, `only ${samples.length} takes in the index`);
+
+        const ids = new Set(samples.map((s) => s.id));
+        check(ids.size === samples.length, 'two takes share an id');
+        const files = new Set(samples.map((s) => s.file));
+        check(files.size === samples.length, 'two takes share a file');
+
+        // One sustained take every whole tone from G3 to F6 — the range the
+        // Manual sets for level VI — or a pitch has to stretch two semitones.
+        const smooth = samples.filter((s) => s.style === 'smooth').sort((a, b) => a.midi - b.midi);
+        const gaps = [];
+        for (let i = 1; i < smooth.length; i++) gaps.push(smooth[i].midi - smooth[i - 1].midi);
+        log.push(`smooth takes: ${smooth.length}, from ${smooth[0].midi} to ${smooth.at(-1).midi}, step ${[...new Set(gaps)].join('/')}`);
+        check(smooth[0].midi === 55, `the lowest sustained take is ${smooth[0].midi}, not G3 (55)`);
+        check(smooth.at(-1).midi === 89, `the highest sustained take is ${smooth.at(-1).midi}, not F6 (89)`);
+        check(
+          new Set(gaps).size === 1 && gaps[0] === 2,
+          `the sustained takes are not every whole tone: ${[...new Set(gaps)].join(', ')}`,
+        );
+
+        // Every take needs the three numbers the voice cannot work without.
+        for (const s of samples) {
+          if (!(s.seconds > 0.05)) problems.push(`${s.id}: ${s.seconds} s long`);
+          if (!(s.gain > 0.2 && s.gain < 4)) problems.push(`${s.id}: gain ${s.gain} is out of range`);
+          if (s.skip == null || s.skip < 0 || s.skip > 0.2) problems.push(`${s.id}: skip ${s.skip}`);
+          if (!Number.isFinite(s.cents) || Math.abs(s.cents) > 60) problems.push(`${s.id}: cents ${s.cents}`);
+        }
+
+        // A sustained take that is shorter than its loop cannot loop, and one
+        // whose loop points are backwards would click or hang.
+        for (const s of smooth) {
+          if (s.loopStart == null || s.loopEnd == null) {
+            problems.push(`${s.id}: no loop points`);
+            continue;
+          }
+          const length = s.loopEnd - s.loopStart;
+          if (s.loopEnd <= s.loopStart) problems.push(`${s.id}: loop runs backwards`);
+          if (length < 0.3 || length > 1.3) problems.push(`${s.id}: loop is ${length.toFixed(2)} s`);
+          if (s.loopEnd > s.seconds) problems.push(`${s.id}: loop ends past the take`);
+        }
+
+        /* ── tuning: the reason the set is playable ─────────────────── */
+
+        // Every take is shifted by its own measured error, so the pitch that
+        // comes out of the speaker is the pitch on the page. The spread of the
+        // raw recordings is reported: that is what the correction is for.
+        const raw = smooth.map((s) => s.cents);
+        log.push(
+          `recorded tuning: ${Math.min(...raw).toFixed(0)} to +${Math.max(...raw).toFixed(0)} cents ` +
+            `(spread ${(Math.max(...raw) - Math.min(...raw)).toFixed(0)}) — each is corrected`,
+        );
+        let worst = 0;
+        for (const s of smooth) {
+          // The take as recorded, in hertz…
+          const recorded = 440 * 2 ** ((s.midi + (s.cents || 0) / 100 - 69) / 12);
+          for (const midi of [s.midi - 1, s.midi, s.midi + 1]) {
+            // …what comes out when it is shifted to cover `midi`, in cents against
+            // the note the page asked for.
+            const heard = recorded * rateFor(s, midi);
+            const wanted = 440 * 2 ** ((midi - 69) / 12);
+            worst = Math.max(worst, Math.abs(1200 * Math.log2(heard / wanted)));
+          }
+        }
+        check(worst < 0.01, `corrected pitches land ${worst.toFixed(3)} cents off their note`);
+        // And the correction is doing real work: without it the same note would be
+        // as far out as the take itself.
+        const worstRaw = Math.max(...smooth.map((s) => Math.abs(s.cents)));
+        check(worstRaw > 15, `the takes need no correction (worst ${worstRaw.toFixed(0)}¢)`);
+
+        /* ── which take covers which note ───────────────────────────── */
+
+        // Plain notes come from the nearest sustained take, and never from one
+        // more than a semitone away.
+        for (let midi = 55; midi <= 89; midi++) {
+          const pick = pickSample(index, midi);
+          const away = Math.abs(pick.midi - midi);
+          if (pick.style !== 'smooth') problems.push(`midi ${midi} came back as a ${pick.style} take`);
+          if (away > 1) problems.push(`midi ${midi} is ${away} semitones from its take`);
+        }
+        // Articulations use the takes recorded for them when one is close.
+        const short = pickSample(index, 69, { staccato: true });
+        const hard = pickSample(index, 69, { accent: true });
+        const glide = pickSample(index, 71, { legato: true });
+        log.push(`A4: plain ${pickSample(index, 69).id} · staccato ${short.id} · accent ${hard.id} · slur landing ${glide.id}`);
+        check(short.style === 'staccato', `a staccato note took a ${short.style} sample`);
+        check(hard.style === 'accent', `an accented note took a ${hard.style} sample`);
+        check(glide.style === 'slurhead', `a slur landing took a ${glide.style} sample`);
+        // …and fall back to the sustained note when nothing is close enough.
+        const far = pickSample(index, 89, { staccato: true });
+        check(far.style === 'smooth', `a staccato note at F6 took a ${far.style} sample`);
+
+        // The loud and soft layers are derived for now. When real ones are
+        // recorded they are preferred automatically — the lookup already asks
+        // for the layer first and only falls back to the mezzo-forte takes.
+        const soft = pickSample(index, 69, { level: 'p' });
+        log.push(`a p note uses ${soft.id} (level ${soft.level}) — the soft layer is derived until it is recorded`);
+        check(soft.level === 'mf', `nothing is recorded at p yet, but the lookup returned ${soft.level}`);
+        const pretend = {
+          samples: [
+            { id: 'x-mf', style: 'smooth', level: 'mf', midi: 69, cents: 0, gain: 1 },
+            { id: 'x-p', style: 'smooth', level: 'p', midi: 69, cents: 0, gain: 1 },
+          ],
+        };
+        check(pickSample(pretend, 69, { level: 'p' }).id === 'x-p', 'a recorded p take was not preferred');
+        check(pickSample(pretend, 69, { level: 'f' }).id === 'x-mf', 'a missing f take did not fall back to mf');
+
+        /* ── the derived loud and soft layers ───────────────────────── */
+
+        const levels = Object.keys(LEVEL_GAIN);
+        log.push(`levels: ${levels.map((l) => `${l} ×${LEVEL_GAIN[l]}`).join(' · ')}`);
+        for (const level of levels) {
+          if (!(LEVEL_TILT[level].gain > 0)) problems.push(`level ${level} has no gain`);
+        }
+        const order = ['p', 'mp', 'mf', 'f', 'ff'];
+        for (let i = 1; i < order.length; i++) {
+          if (!(LEVEL_GAIN[order[i]] > LEVEL_GAIN[order[i - 1]])) {
+            problems.push(`${order[i]} is not louder than ${order[i - 1]}`);
+          }
+        }
+        check(LEVEL_GAIN.mf === 1, 'mezzo-forte should be the recorded level, ×1');
+        // The soft layer has to be darker, the loud one brighter — that tilt is
+        // the whole reason the derived layers are not just quieter takes.
+        check(Boolean(LEVEL_TILT.p.lowpass && LEVEL_TILT.p.lowpass < 3000), 'the soft layer has no low-pass to darken it');
+        check((LEVEL_TILT.f.highShelf || 0) > 0, 'the loud layer is not brightened');
+      }
+
+      document.getElementById('report').textContent = problems.length
+        ? `${problems.length} problems\n\n${[...new Set(problems)].join('\n')}\n\n${log.join('\n')}`
+        : `SAMPLER OK\n${log.join('\n')}`;
+      document.title = problems.length ? `SAMPLER: ${problems.length} problems` : 'SAMPLER OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'sampler', problems: [...new Set(problems)], log: log.join('\n') }),
+      });
+    </script>
+  </body>
+</html>

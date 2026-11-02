@@ -276,11 +276,11 @@ sight-reading table for that level.
 * **Hear the passage** plays it back, with a green playhead that follows the music
   through the staff. It is the same reading a student is about to do — the slurs are
   bowed in one stroke, the staccato notes are short, an accent has an edge, and the
-  hairpin is actually performed rather than just printed. The voice is a bowed
-  string made of oscillators for now; it is a placeholder that shows the rhythm and
-  the shaping, and the teacher's own recorded violin takes its place (see *recording
-  the playback voice*). The playhead is driven by the audio clock, not by a timer, so
-  it cannot drift away from what is being heard.
+  hairpin is actually performed rather than just printed. The voice is **the
+  teacher's own violin**, recorded with `capture.html` and shipped in `samples/`
+  (see *the recorded voice*); a synthesised bowed string stands in for any note the
+  sample set cannot cover. The playhead is driven by the audio clock, not by a
+  timer, so it cannot drift away from what is being heard.
 * **Stop** ends the example — in sound, not just on screen. Every note of a passage
   is scheduled up front, so cancelling the playhead alone left the music running to
   the end of the bar. Each sounding now gets its own gain node, faded out over 40 ms
@@ -777,9 +777,68 @@ a take clips or barely registers.
 Everything is held in the tab and handed back as one zip: 16-bit mono WAVs named
 `G3-smooth-mf.wav`, `A4-B4-slur.wav` and so on, plus a `manifest.json` carrying each
 take's pitch, style, level, length and peak. **Nothing is uploaded anywhere**, and
-closing the tab throws the takes away — download first. The build step converts the
-WAVs to a compressed format the app fetches lazily; the manifest is what tells it
-which file is which note.
+closing the tab throws the takes away — download first.
+
+## The recorded voice
+
+The first set of takes is recorded, measured and shipped: 36 files, 800 kB, in
+`samples/` with an `index.json` beside them. `src/sampler.js` plays them; the
+synthesised string in `src/playback.js` answers only for notes the set cannot cover.
+
+**Building a new set from a zip** is a fixed four-step job, done once per recording
+and never at run time: split the recorded slur pairs into their landing halves;
+measure each take's mean pitch, RMS and onset; compute loop points from the
+measured pitch; encode to 44.1 kHz mono AAC and write `index.json`. Nothing in that
+chain is app-specific, so a later zip of *f* and *p* takes becomes another six
+entries a note and the sampler prefers the real layer without a line changing.
+
+**The takes were in tune per note, not with each other.** Measured against equal
+temperament they sit between **26 cents flat and 20 cents sharp** — normal for a
+human, fatal for a sample set, because played one after another the instrument would
+sound like it cannot tune. So each entry carries its own `cents`, measured from the
+mean period of the whole take (robust to the vibrato), and the playback rate is
+shifted by exactly that much. The vibrato then moves around a true centre instead
+of around a wrong one. `sampler.test.html` holds the arithmetic: every corrected
+pitch lands within a hundredth of a cent of the note the page asks for.
+
+**The takes were not all played at the same level.** RMS differs by nearly 5 dB
+across the set, so each entry carries a `gain` that flattens it to the median. That
+is also why the recording page's "barely registers" warning means nothing here: the
+quiet notes are quietly *recorded*, not badly recorded.
+
+**Loud and soft are made from the mezzo-forte takes**, as asked — but with the
+timbre nudged as well as the level, because a violin that is only turned down stops
+sounding like a violin. `LEVEL_GAIN` sets the loudness (p ×0.45 … ff ×1.6) and
+`LEVEL_TILT` shapes it: the soft layer is low-passed at 2.4 kHz with its top pulled
+down 4 dB, so it is darker, not just quieter; the loud layer gets a 3.5 dB shelf up
+at 1.6 kHz, so it has the edge of a forte. This is the one thing in the set that is
+an impression rather than a recording — real *f* and *p* passes replace it the day
+they exist, and nothing else has to change.
+
+**The vibration you played is kept.** For a held note a recording with vibrato is
+better than one without: it is what a student should hear, and it survives the
+semitone of pitch-shifting the set needs. Two things to listen for, though. The same
+pitch played twice uses the same take, so the vibrato repeats exactly — if that ever
+sounds mechanical, the fix is to alternate between the two nearest takes. And a
+sixteenth note is too short to show any vibrato at all, which is right: the sample
+starts with the bow's own attack, and the vibrato has not developed yet.
+
+**Articulations come from the takes recorded for them.** A staccato note uses a
+staccato take when one is within three semitones (they were recorded every six, so
+that covers the whole range), an accented note uses an accent take, and a slur's
+second note uses the **landing half** of a recorded slur — the second note split out
+of the pair, with no attack of its own, which is precisely what "one bow" means.
+
+**Long notes loop.** A whole note at level I is four seconds; the takes are under
+two. Each sustained take carries loop points measured as two positive-going zero
+crossings an integer number of periods apart, so the join lands where the waveform
+is silent and the loop cannot click.
+
+**The files** are 44.1 kHz mono AAC at 96 kbps — 22 kB a take, 800 kB for the set,
+which is fetched once while the student is reading the page. AAC rather than Opus
+for one reason: iPhone and iPad. It was checked by decoding every file back to PCM
+and comparing with the original: identical length, identical onset, 0.9995
+correlation over the attack.
 
 ## Languages
 
@@ -817,8 +876,16 @@ src/journal.js        practice-log rules: streak, rest days, ready scales, week 
                       and the save/load copy format
 src/recorder.js       in-memory recording and the synthesised hall
 src/capture.js        the sample-recording tool: take list, trimming, WAV and zip
-src/playback.js       hearing the passage: the schedule, the placeholder voice, the
-                      player that drives the playhead
+src/playback.js       hearing the passage: the schedule, the player that drives the
+                      playhead, and the synthesised fallback voice
+src/sampler.js        the recorded violin: which take covers a note, the tuning
+                      correction, the derived loud and soft layers
+samples/              the recorded takes (36 m4a files) and index.json, which carries
+                      each take's measured cents, gain, onset and loop points
+tests/sampler.test.html   the sample set and the voice's arithmetic: every whole tone
+                      present, every take's tuning corrected to within 0.01 of a
+                      cent, articulation takes used when they are close enough,
+                      and the dynamic ladder in order
 src/app.js            screens, microphone, results
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
 tests/sightreading.test.html  720 generated passages against the level rules

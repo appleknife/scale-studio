@@ -1,15 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611022630';
-import { renderStaff } from './staff.js?v=202611022630';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611022630';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611022630';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611022630';
-import { generatePassage } from './sightreading.js?v=202611022630';
-import { createPlayer } from './playback.js?v=202611022630';
-import { renderScore } from './score.js?v=202611022630';
-import * as Journal from './journal.js?v=202611022630';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611022630';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611022700';
+import { renderStaff } from './staff.js?v=202611022700';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611022700';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611022700';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611022700';
+import { generatePassage } from './sightreading.js?v=202611022700';
+import { createPlayer } from './playback.js?v=202611022700';
+import { renderScore } from './score.js?v=202611022700';
+import * as Journal from './journal.js?v=202611022700';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611022700';
 import {
   STRINGS,
   FIFTHS,
@@ -17,7 +17,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611022630';
+} from './tuner.js?v=202611022700';
 
 const LANG = initLang();
 
@@ -950,6 +950,22 @@ const sight = {
 const player = createPlayer();
 
 /**
+ * Fetches the teacher's recorded violin in the background, without blocking
+ * anything. It happens while the student is reading the page, so by the time
+ * they press *Hear the passage* the example is the real instrument; if it is not
+ * ready — or cannot be fetched at all — the synth answers and nothing breaks.
+ */
+let voiceLoading = null;
+function readyViolin() {
+  if (voiceLoading) return voiceLoading;
+  voiceLoading = player.loadVoice('samples/').catch(() => {
+    voiceLoading = null; // a student on a bad connection keeps the synth, silently
+    return null;
+  });
+  return voiceLoading;
+}
+
+/**
  * Where each of the passage's events sits in the drawing, and which staff it
  * belongs to. The notes are drawn in order — barlines, beams and slurs first,
  * then the events one by one — so the n-th note head (or rest) in the document is
@@ -1147,6 +1163,9 @@ function renderSight() {
   );
   // The boxes are new elements after every redraw, so the mark has to be re-laid.
   paintPickedBar();
+  // And the recorded violin starts loading the moment there is a passage to
+  // hear, which is a second or two before anyone presses the button.
+  readyViolin();
 }
 
 /** Below this width the passage is drawn two bars to a system. */

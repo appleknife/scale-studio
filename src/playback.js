@@ -9,14 +9,15 @@
 //               once per frame with where the music has got to, so the score can
 //               show a playhead.
 //
-// The voice is a **placeholder**: a bowed string made of oscillators, bow noise
-// and a filter envelope. It is good enough that the rhythm and the shaping are
-// audible — which is what a student needs to hear before sight-reading — and it
-// is obviously not a violin. The real thing is recorded by the teacher with
-// `capture.html` and will replace the voice without touching anything else: the
+// The voice is the teacher's **own violin** when the samples are loaded (see
+// sampler.js), and a synthesised bowed string when they are not — oscillators,
+// bow noise and a filter envelope, good enough that the rhythm and the shaping
+// are audible, and obviously not a violin. The sampled voice slots in without
+// anything else changing: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611022630';
+import { makeHallIR } from './recorder.js?v=202611022700';
+import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611022700';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -101,6 +102,9 @@ export function schedule(passage, { rate = 1, fromBar = 0 } = {}) {
         duration,
         midi: event.midi,
         gain,
+        // The printed dynamic, so a sampled voice can choose its layer. The
+        // hairpin above has already been folded into `gain`.
+        level: passage.dynamic || 'mf',
         legato,
         accent: event.mark === 'accent',
         staccato: event.mark === 'staccato',
@@ -226,6 +230,10 @@ export function createPlayer({ wet = 0.24, volume: start = 0.8 } = {}) {
   let hallGain = null;
   let current = null;
   let volume = Math.max(0, Math.min(1, start));
+  // The recorded violin, once it has loaded. Until then — and for any single
+  // note the bank cannot cover — the synth answers.
+  let bank = null;
+  let bankReady = false;
 
   // Half scale at full volume: a monophonic line of shaped notes needs the
   // headroom, and the slider then goes from silent to "as loud as it gets".
@@ -307,9 +315,13 @@ export function createPlayer({ wet = 0.24, volume: start = 0.8 } = {}) {
       gate.connect(hallInput());
 
       const voice = bowedVoice(ctx, gate);
+      const sampled = bank ? sampleVoice(ctx, gate, bank) : null;
       const start = ctx.currentTime + 0.14;
       for (const note of plan.notes) {
-        voice.play({ ...note, at: start + note.time });
+        const when = { ...note, at: start + note.time };
+        // A note the bank has no take for falls through to the synth, so a
+        // half-loaded set is a slightly mixed voice rather than silence.
+        if (!(sampled && sampled.play(when))) voice.play(when);
       }
 
       const frame = () => {
@@ -345,6 +357,31 @@ export function createPlayer({ wet = 0.24, volume: start = 0.8 } = {}) {
     /** Which position, in sixteenths, the music has reached at `seconds`. */
     positionAt(plan, seconds) {
       return (seconds / plan.secondsPerQuarter) * 4;
+    },
+
+    /**
+     * Loads the recorded violin and switches the player over to it. Safe to call
+     * more than once: the bank is fetched on the first call and handed back
+     * afterwards, so a second passage costs nothing.
+     */
+    loadVoice(base = 'samples/') {
+      if (!bank) bank = emptyBank();
+      // Decoding needs *a* context, not the playing one: an OfflineAudioContext
+      // can be made before the student has touched anything, which is what lets
+      // the violin load while they are still reading the page. The buffers it
+      // returns are plain data and are used by the playing context later.
+      const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!Ctx) return Promise.reject(new Error('no-audio'));
+      const decoder = new Ctx(1, 1, 44100);
+      return loadBank(decoder, base, bank).then(() => {
+        bankReady = true;
+        return bank;
+      });
+    },
+
+    /** Whether the recorded violin is in use yet. */
+    get sampled() {
+      return bankReady;
     },
   };
 }
