@@ -16,7 +16,14 @@
       // every take honestly, and the two decisions the sampler makes — which take
       // covers a pitch, and how far to shift it so it is in tune — can be weighed
       // exactly without decoding a single audio file.
-      import { pickSample, rateFor, LEVEL_GAIN, LEVEL_TILT, BANK_GAIN } from '../src/sampler.js?v=202611022830';
+      import {
+        pickSample,
+        rateFor,
+        noteShape,
+        LEVEL_GAIN,
+        LEVEL_TILT,
+        BANK_GAIN,
+      } from '../src/sampler.js?v=202611022900';
 
       const problems = [];
       const log = [];
@@ -164,6 +171,34 @@
         };
         check(pickSample(pretend, 69, { level: 'p' }).id === 'x-p', 'a recorded p take was not preferred');
         check(pickSample(pretend, 69, { level: 'f' }).id === 'x-mf', 'a missing f take did not fall back to mf');
+
+        /* ── how long a short note sounds ───────────────────────────── */
+        //
+        // A staccato take is 0.4–0.6 s and most of that is the note's own ring
+        // after the bow has stopped. Cutting it at the written length is what
+        // made dotted notes sound clipped; the fix is to let the take end by
+        // itself and run under the next note.
+        {
+          const shortTake = index.samples.find((s) => s.style === 'staccato');
+          const plain = index.samples.find((s) => s.style === 'smooth');
+          const ring = noteShape(shortTake, {
+            staccato: true, legato: false, duration: 0.07, rate: 1, bufferSeconds: 0.45,
+          });
+          const cut = noteShape(plain, {
+            staccato: true, legato: false, duration: 0.07, rate: 1, bufferSeconds: 1.9,
+          });
+          const held = noteShape(plain, {
+            staccato: false, legato: false, duration: 0.5, rate: 1, bufferSeconds: 1.9,
+          });
+          log.push(
+            `a short note: staccato take rings ${ring.want.toFixed(2)} s · sustained take cut to ${cut.want.toFixed(2)} s · plain note ${held.want.toFixed(2)} s`,
+          );
+          check(ring.want > 0.3, `a staccato take still rings for only ${ring.want.toFixed(2)} s`);
+          check(ring.want > cut.want * 3, 'the staccato take is not ringing out under the next note');
+          check(cut.want < 0.1, 'a short note on a sustained take is not being cut');
+          check(Math.abs(held.want - 0.5) < 1e-9, 'a plain note is not its written length');
+          check(ring.fade < 0.06, 'the ring is being faded out rather than left to decay');
+        }
 
         /* ── the derived loud and soft layers ───────────────────────── */
 

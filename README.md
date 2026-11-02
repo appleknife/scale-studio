@@ -849,6 +849,16 @@ for one reason: iPhone and iPad. It was checked by decoding every file back to P
 and comparing with the original: identical length, identical onset, 0.9995
 correlation over the attack.
 
+**A short note rings.** A staccato take is 0.4–0.6 s long and most of that is the
+note's own ring: the bow has already stopped by then and the sound is dying away.
+The voice used to cut the take at the written length — 70 ms for a staccato
+sixteenth — which is what made every dotted note sound clipped. A short note now
+lets its staccato take end by itself and simply runs under the next note; measured,
+0.42 s instead of 0.07. A short note that has to borrow a *sustained* take is still
+cut, because a sustained take has no ring to give and would only be a long note in
+the wrong rhythm. `noteShape()` in `src/sampler.js` is the one place that decides
+this, and `sampler.test.html` holds both halves of it.
+
 **The set is lifted 16 dB on the way out.** The takes were recorded with a lot of
 headroom — peaks between −25 and −13 dBFS, because the recording page asks for
 "peak in the green" — so at first the example was about 20 dB quieter than the

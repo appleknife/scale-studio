@@ -148,6 +148,35 @@ export async function loadBank(ctx, base = 'samples/', bank = emptyBank()) {
   return bank;
 }
 
+/* ── How long a note sounds ──────────────────────────────────────────── */
+
+/**
+ * The envelope for one note: where to start in the take, how long to let it
+ * sound, and how long the fades are.
+ *
+ * The interesting case is a **short note**. A recorded staccato take is 0.4 to
+ * 0.6 s long and most of that is the note's own ring: the bow has already
+ * stopped by then, and the sound is dying away. Cutting such a take at the
+ * written length — which is what the voice used to do — chops the ring off and
+ * makes every dotted note sound clipped. So a short note played from a *staccato*
+ * take is allowed to ring out in full and simply runs under the next note. A
+ * short note played from a sustained take is still cut, because a sustained
+ * take has no ring to give: it would just be a long note in the wrong rhythm.
+ */
+export function noteShape(sample, { staccato, legato, duration, rate, bufferSeconds }) {
+  const offset = (sample.skip || 0) + (legato ? 0.05 : 0);
+  const available = (bufferSeconds - offset) / rate;
+  const shortTake = staccato && sample.style === 'staccato';
+  const want = shortTake
+    ? Math.max(0.08, Math.min(available - 0.015, 0.7))
+    : Math.max(0.04, duration);
+  const attack = shortTake ? 0.003 : legato ? 0.012 : 0.004;
+  // A short take fades only in its last few milliseconds, where the recording is
+  // already 40 dB down; a cut note takes a real release so it does not click.
+  const fade = shortTake ? Math.min(0.05, want * 0.15) : Math.min(0.14, Math.max(0.035, want * 0.3));
+  return { offset, want, attack, fade, available, shortTake };
+}
+
 /* ── The voice ────────────────────────────────────────────────────────── */
 
 /**
@@ -195,14 +224,18 @@ export function sampleVoice(ctx, destination, bank) {
       const amp = ctx.createGain();
       tail.connect(amp).connect(destination);
 
-      // A staccato note is cut short of its written length, an accent is only
-      // louder, and a slur landing starts a little way into the take so it has
-      // no attack of its own — that is the whole difference between a slur and
-      // two notes.
-      const want = staccato ? Math.max(0.07, Math.min(duration, duration * 0.5)) : duration;
-      const offset = (sample.skip || 0) + (legato ? 0.05 : 0);
-      const attack = legato ? 0.012 : 0.004;
-      const release = Math.min(0.14, Math.max(0.035, want * 0.3));
+      // A short note lets its staccato take ring out (see noteShape), an accent is
+      // only louder, and a slur landing starts a little way into the take so it
+      // has no attack of its own — that is the whole difference between a slur
+      // and two notes.
+      const { offset, want, attack, fade, shortTake } = noteShape(sample, {
+        staccato,
+        legato,
+        duration,
+        rate,
+        bufferSeconds: buffer.duration,
+      });
+      const release = fade;
       // `ramp` is where a hairpin has got to (1 with no hairpin); the absolute
       // level comes from LEVEL_TILT, which is the sampled voice's own ladder —
       // using `gain` here as well would count the dynamic twice.
@@ -211,8 +244,10 @@ export function sampleVoice(ctx, destination, bank) {
 
       // A held note outlasts its take; the loop runs between two points an
       // integer number of periods apart, so the join lands on a zero crossing.
+      // A short take is never looped: it is already as long as it is, and the
+      // whole point is to let it end by itself.
       const span = (buffer.duration - offset) / rate;
-      if (sample.loopEnd && want > span - 0.06) {
+      if (!shortTake && sample.loopEnd && want > span - 0.06) {
         source.loop = true;
         source.loopStart = sample.loopStart;
         source.loopEnd = sample.loopEnd;
