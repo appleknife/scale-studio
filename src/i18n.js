@@ -608,6 +608,10 @@ export const S = {
   /* Practice log, as the screen says it */
   'log.banner.streak': ['{n} days in a row · {days} this week', '{n} 天连续 · 本周 {days} 天'],
   'log.banner.empty': ['Start the log — one tap is enough.', '开始记录吧——点一下就算。'],
+  'log.banner.emptyNamed': [
+    '{name} · nothing logged yet today',
+    '{name} · 今天还没有记录',
+  ],
   // ── The week: the student's own goal, and what actually happened ──
   'log.goal.none': [
     'What would you like this week to look like?',

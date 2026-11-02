@@ -243,6 +243,35 @@
           if (d.getElementById('lessonSheet').textContent.includes('Maya'))
             problems.push('the lesson sheet still says Maya after switching away');
 
+          /* ── whose log, before anything personal shows ──────────── */
+          // On a shared tablet the name should be answerable from the home screen.
+          // The old way made a sibling open the log — and so see the other child's
+          // week — just to find their own name.
+          const home = () => [...d.querySelectorAll('#homeWhoChips [data-who]')];
+          const backHome = d.getElementById('trackBack');
+          backHome.click();
+          await wait(200);
+          log.push(`home names: ${home().map((c) => c.textContent).join(', ')}`);
+          if (d.getElementById('homeWho').hidden) problems.push('the home screen has no name row');
+          if (home().length !== 2) problems.push(`expected 2 names on the home screen, saw ${home().length}`);
+          const pressed = home().filter((c) => c.getAttribute('aria-pressed') === 'true');
+          if (pressed.length !== 1) problems.push('exactly one name should be marked active');
+
+          // Switching from the home screen has to take effect everywhere: the
+          // banner, and the log when it is next opened.
+          home()[1].click();
+          await wait(200);
+          if (!d.getElementById('logBannerText').textContent.includes('Maya'))
+            problems.push('switching on the home screen did not change the banner');
+          d.getElementById('openLogBtn').click();
+          await wait(200);
+          if (!namesOf()[1].getAttribute('aria-pressed') === 'true')
+            problems.push('the log did not follow the home switch');
+          if (!d.getElementById('lessonSheet').textContent.includes('Maya'))
+            problems.push('the lesson sheet did not follow the home switch');
+          backHome.click();
+          await wait(150);
+
           /* ── sight reading: picking a bar, and slow practice ────── */
           // The example can start from a bar the reader taps, so the engraver's
           // boxes have to be there, clickable, and marked in exactly one place —

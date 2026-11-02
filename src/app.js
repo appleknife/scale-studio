@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023930';
-import { renderStaff } from './staff.js?v=202611023930';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611023930';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023930';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023930';
-import { generatePassage } from './sightreading.js?v=202611023930';
-import { createPlayer } from './playback.js?v=202611023930';
-import { renderScore } from './score.js?v=202611023930';
-import * as Journal from './journal.js?v=202611023930';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023930';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023930';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611024100';
+import { renderStaff } from './staff.js?v=202611024100';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611024100';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611024100';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611024100';
+import { generatePassage } from './sightreading.js?v=202611024100';
+import { createPlayer } from './playback.js?v=202611024100';
+import { renderScore } from './score.js?v=202611024100';
+import * as Journal from './journal.js?v=202611024100';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611024100';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611024100';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611023930';
+} from './tuner.js?v=202611024100';
 
 const LANG = initLang();
 
@@ -83,6 +83,8 @@ const el = {
   logWarn: $('logWarn'),
   logStatus: $('logStatus'),
   whoChips: $('whoChips'),
+  homeWho: $('homeWho'),
+  homeWhoChips: $('homeWhoChips'),
   nameForm: $('nameForm'),
   nameInput: $('nameInput'),
   nameSave: $('nameSave'),
@@ -1688,10 +1690,14 @@ function renderLogBanner() {
   const days = Journal.streak(journal, today);
   const sheet = Journal.weekSheet(journal, today, []);
   // On a shared device the name belongs in the one-line summary, or the home
-  // screen is quietly about nobody in particular.
+  // screen is quietly about nobody in particular — including when the log is
+  // empty, which is exactly when somebody has just switched and needs to know
+  // that the blank week in front of them is theirs.
   const who = journalStore.profiles.length > 1 ? displayName(activeProfile) : '';
   el.logBannerText.textContent = !days
-    ? t('log.banner.empty')
+    ? who
+      ? t('log.banner.emptyNamed', { name: who })
+      : t('log.banner.empty')
     : who
       ? t('log.banner.named', { name: who, n: days, days: sheet.days })
       : t('log.banner.streak', { n: days, days: sheet.days });
@@ -1814,6 +1820,21 @@ function renderRecList() {
 /** The names row and the manage list — one source, so they cannot disagree. */
 function renderWho() {
   const full = journalStore.profiles.length >= Journal.MAX_PROFILES;
+  const multiple = journalStore.profiles.length > 1;
+  // The home row exists so a sibling never has to open somebody else's log to
+  // find their own. Hidden on a device with one name: a lone "Me" chip is a
+  // question with nothing to ask.
+  el.homeWho.hidden = !multiple;
+  if (multiple) {
+    el.homeWhoChips.innerHTML = journalStore.profiles
+      .map(
+        (profile) =>
+          `<button class="chip" type="button" data-who="${esc(profile.id)}" ` +
+          `aria-pressed="${profile.id === activeProfile.id}">${esc(displayName(profile))}</button>`,
+      )
+      .join('');
+  }
+
   el.whoChips.innerHTML =
     journalStore.profiles
       .map(
@@ -2111,7 +2132,15 @@ function switchProfile(id) {
   el.logStatus.textContent = '';
   renderLog();
   renderLogBanner();
+  // Both rows mark the new name, wherever the switch was made.
+  renderWho();
 }
+
+// The same chips on the home screen, before anything personal is on it.
+el.homeWho.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-who]');
+  if (button) switchProfile(button.dataset.who);
+});
 
 el.whoChips.addEventListener('click', (event) => {
   if (event.target.closest('[data-who-add]')) {
@@ -3188,6 +3217,10 @@ if (params.has('autostart')) {
 window.__scaleStudioReady = true;
 
 renderLogBanner();
+// The names row has to be right on the first screen, not after a visit to the
+// log: on a shared tablet it is the first question, and it is the only one that
+// can be asked before anything personal appears.
+renderWho();
 
 if (params.has('help')) el.helpDialog.showModal();
 if (params.has('draw')) drawThree();

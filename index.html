@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611023930" />
+    <link rel="stylesheet" href="app.css?v=202611024100" />
   </head>
   <body>
     <div class="shell">
@@ -59,6 +59,16 @@
 
         <!-- ── Choose a scale ─────────────────────────────────────────── -->
         <section class="view" id="view-choose">
+          <!-- On a shared tablet, whose log is open is a question that should be
+               answered *before* the app shows anything personal. It used to be
+               answered inside the practice log, which meant a sibling had to walk
+               through someone else's week to find their own. Shown only when there
+               is more than one name. -->
+          <div class="who-row home-who" id="homeWho" hidden>
+            <span class="who-label">Who's practicing?</span>
+            <div class="chip-row" id="homeWhoChips"></div>
+          </div>
+
           <div class="intro">
             <h1>Which scale today?</h1>
             <p>
@@ -900,7 +910,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611023930"></script>
+    <script type="module" src="src/app.js?v=202611024100"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

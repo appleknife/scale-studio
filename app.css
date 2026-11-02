@@ -2461,6 +2461,14 @@ dialog .primary-btn {
   margin-top: 18px;
 }
 
+/* The same row at the top of the home screen: the name is answered before
+   anything personal is shown, so a sibling never has to open another's log. */
+.home-who {
+  margin: 0 0 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
 .who-label {
   font-size: 11px;
   letter-spacing: 0.09em;
