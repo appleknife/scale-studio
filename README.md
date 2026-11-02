@@ -380,6 +380,14 @@ eighth motion in their place (4+4+4+2+2, 8+4+2+2, 4+2+2+4+4) and keeps its
 triplet, and `sightreading.test.html` walks every 2/2 passage it can draw to check
 both directions: nothing shorter than an eighth, and the triplet still there.
 
+The cut-time **tempo stays where it is** — half = 76, a quarter pulse of 152, a step
+above the simple metres' 88 and level VI's 120 — and that is deliberate, not an
+oversight. Cut time in this app is meant to run a little quicker than the other
+metres, and it can, because the metre carries no sixteenths: the page is faster
+without being harder to read. Both the table in `src/sightreading.js` and the
+filter's comment say so, so a later tidy-up does not "fix" the speed to match the
+quarter pulse.
+
 ### Drawing the notation
 
 Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave

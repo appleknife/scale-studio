@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021745';
-import { STAFF_GEOM } from './staff.js?v=202611021745';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021900';
+import { STAFF_GEOM } from './staff.js?v=202611021900';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -137,6 +137,13 @@ const LEVELS = {
         [6, 2, 6, 2],
       ],
     },
+    // Cut time is deliberately the brisker metre: half = 76 is a quarter pulse of
+    // 152, a full step above 4/4's 88, and level VI keeps it that way under 4/4's
+    // 120. That is the teacher's call, and it works because of what the metre may
+    // contain — cut time stops at eighths (see the filter in generatePassage), so
+    // the page is quicker without being harder to read. Do not "correct" this to
+    // half = 44 to line the quarter pulse up with the simple metres; the speed is
+    // the point.
     tempo: { '2/2': { unit: 'h', bpm: 76 }, '*': { unit: 'q', bpm: 88 } },
     dynamics: ['mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
