@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Scale Studio — the playback voice</title>
-    <link rel="stylesheet" href="app.css?v=202611022500" />
+    <link rel="stylesheet" href="app.css?v=202611022630" />
     <link rel="icon" href="icons/icon-192.png" />
     <style>
       /* A tool page, so it borrows the app's paper and ink and adds only what a
@@ -282,8 +282,8 @@
         <p class="lede">
           The sight-reading section can play a passage back so a student hears it before trying it.
           A synthesised tone would sound like a keyboard, so the app plays a real violin instead —
-          yours. This page records it: about fifty takes, one note each, and it hands them back as
-          one zip file.
+          yours. This page records it: about seventy takes, one note each, and it hands them back
+          as one zip file.
         </p>
 
         <div class="setup">
@@ -332,7 +332,7 @@
     </div>
 
     <script type="module">
-      import { renderBar } from './src/score.js?v=202611022500';
+      import { renderBar } from './src/score.js?v=202611022630';
       import {
         STAGES,
         buildTakes,
@@ -340,7 +340,7 @@
         trimTake,
         makeZip,
         openInput,
-      } from './src/capture.js?v=202611022500';
+      } from './src/capture.js?v=202611022630';
 
       const takes = buildTakes();
       const held = new Map(); // id → { wav, seconds, peak }
@@ -433,10 +433,13 @@
         keepBtn.disabled = !pending;
 
         if (pending) {
+          // A soft take is quiet on purpose, so the "barely registers" floor is
+          // lower for it — otherwise every correct piano note would be flagged.
+          const floor = take.level === 'p' ? 0.012 : 0.03;
           say(
             `Recorded ${pending.seconds.toFixed(2)} s · peak ${dB(pending.peak)} dBFS` +
-              (pending.peak > 0.98 ? ' — that is clipping, ease off the bow' : pending.peak < 0.03 ? ' — very quiet' : ''),
-            pending.peak > 0.98 || pending.peak < 0.03 ? 'warn' : '',
+              (pending.peak > 0.98 ? ' — that is clipping, ease off the bow' : pending.peak < floor ? ' — very quiet' : ''),
+            pending.peak > 0.98 || pending.peak < floor ? 'warn' : '',
           );
         } else if (mine) {
           say(`Kept · ${mine.seconds.toFixed(2)} s`, 'good');

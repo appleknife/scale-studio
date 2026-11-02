@@ -36,8 +36,8 @@
         encodeWav,
         makeZip,
         crc32,
-      } from '../src/capture.js?v=202611022500';
-      import { renderBar } from '../src/score.js?v=202611022500';
+      } from '../src/capture.js?v=202611022630';
+      import { renderBar } from '../src/score.js?v=202611022630';
 
       const problems = [];
       const log = [];
@@ -57,21 +57,22 @@
       const badName = takes.find((t) => !/^[A-Za-z0-9#-]+\.wav$/.test(t.file));
       check(!badName, `a filename is not filesystem-safe: ${badName && badName.file}`);
 
-      // Every whole tone from the bottom of the range to the top, at both levels:
-      // a gap here is a passage that would have to stretch a sample two semitones.
+      // Every whole tone from the bottom of the range to the top, at all three
+      // levels: a gap here is a passage that would have to stretch a sample two
+      // semitones, and a missing level is a dynamic the playback cannot play.
       const smooth = takes.filter((t) => t.style === 'smooth');
       const pitches = (RANGE.to - RANGE.from) / RANGE.step + 1;
       const missing = [];
       for (let midi = RANGE.from; midi <= RANGE.to; midi += RANGE.step) {
-        for (const level of ['mf', 'f']) {
+        for (const level of ['p', 'mf', 'f']) {
           if (!smooth.some((t) => t.midi === midi && t.level === level)) missing.push(`${midi}/${level}`);
         }
       }
       check(missing.length === 0, `smooth bow is missing ${missing.slice(0, 6).join(', ')}`);
-      check(smooth.length === pitches * 2, `expected ${pitches * 2} smooth takes, built ${smooth.length}`);
+      check(smooth.length === pitches * 3, `expected ${pitches * 3} smooth takes, built ${smooth.length}`);
       // Each pass must be the whole ladder on its own, in order, or the rail has
       // two dots with the same name and the teacher cannot tell them apart.
-      for (const stage of ['smooth-mf', 'smooth-f']) {
+      for (const stage of ['smooth-p', 'smooth-mf', 'smooth-f']) {
         const list = takes.filter((t) => t.stage === stage);
         check(list.length === pitches, `${stage} has ${list.length} takes, wanted ${pitches}`);
         check(
@@ -192,7 +193,9 @@
         (s) => `${s.name} ${takes.filter((t) => t.stage === s.id).length}`,
       ).join(' · ');
       log.push(`${takes.length} takes: ${perStage}`);
-      log.push(`smooth bow covers ${RANGE.from}–${RANGE.to} MIDI every ${RANGE.step} semitones, two levels`);
+      log.push(
+        `smooth bow covers ${RANGE.from}–${RANGE.to} MIDI every ${RANGE.step} semitones, three levels`,
+      );
       log.push(`trim: ${cut.seconds.toFixed(2)} s of a 0.9 s take · peak ${cut.peak.toFixed(2)}`);
       log.push(`wav ${wav.length} bytes for ${samples.length} samples · zip ${zip.byteLength} bytes for 2 files`);
 

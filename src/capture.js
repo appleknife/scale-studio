@@ -9,7 +9,7 @@
 //
 // Nothing here touches the DOM, so `tests/capture.test.html` can weigh it.
 
-import { makeNote } from './music.js?v=202611022500';
+import { makeNote } from './music.js?v=202611022630';
 
 /* ── What to record ───────────────────────────────────────────────────── */
 
@@ -66,7 +66,7 @@ export function stringFor(midi) {
   return midi <= 84 ? 'E string' : 'E string, higher position';
 }
 
-const levelName = (level) => (level === 'f' ? 'loud' : 'medium');
+const levelName = (level) => ({ p: 'soft', f: 'loud' }[level] || 'medium');
 
 /** The notation a take is drawn with — the engraver's own event shape. */
 function noteEvent(midi, dur, extra = {}) {
@@ -91,6 +91,18 @@ export const STAGES = [
     hint:
       'The same note list again, this time at a strong forte — the level you would use under a ' +
       'forte marking. Still even: loud is not the same as an accent.',
+    seconds: 2,
+    silence: 0.45,
+  },
+  {
+    id: 'smooth-p',
+    name: 'Smooth bow · soft',
+    title: 'the same note list once more, at a real piano',
+    hint:
+      'Soft is a different sound, not a turned-down one: less weight in the bow, slower speed, ' +
+      'and the bow a little closer to the fingerboard, which is where the top of the sound thins ' +
+      'out. Two seconds, even, no fade at the end — and do this pass last, when the arm is warm ' +
+      'and the ear knows what mf sounded like.',
     seconds: 2,
     silence: 0.45,
   },
@@ -130,16 +142,21 @@ export function buildTakes() {
   const takes = [];
   const push = (take) => takes.push({ ...take, index: takes.length });
 
-  // The two dynamic layers are two passes, not two takes per note: the bow arm
-  // holds one level far better across eighteen notes than across thirty-six
-  // alternations, and the page's rail then has one dot per pitch instead of two
-  // dots with the same name.
-  for (const level of ['mf', 'f']) {
+  // Three dynamic layers — soft, medium, loud — and still one pass each, not a
+  // take per note: the bow arm holds one level far better across eighteen notes
+  // than across fifty-four alternations, and the page's rail then has one dot per
+  // pitch instead of three dots with the same name.
+  //
+  // The soft layer is recorded, not derived. Turning an mf sample down is the
+  // cheap way to get a piano and it is the one that sounds wrong: a violin played
+  // softly is darker and slower to speak, not merely quieter, so a scaled-down mf
+  // reads as "pressed, but hushed".
+  for (const level of ['mf', 'f', 'p']) {
     for (let midi = RANGE.from; midi <= RANGE.to; midi += RANGE.step) {
       const note = spell(midi);
       push({
         id: `smooth-${level}-${midi}`,
-        stage: level === 'f' ? 'smooth-f' : 'smooth-mf',
+        stage: `smooth-${level}`,
         style: 'smooth',
         level,
         midi,
