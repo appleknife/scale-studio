@@ -418,6 +418,59 @@
         eq('a bad value falls back to V–VI', J.auditionLevel(s), '5-6');
       }
 
+      /* ── the takes a stats view would read ─────────────────────── */
+      //
+      // Every take is now kept whole — score, parts, scale, level, time — so a
+      // stat screen can answer questions the log was never asked. These check
+      // the keeping, the cap, and the aggregates that do not need a screen.
+      {
+        const s = J.emptyState();
+        eq('a fresh log has no takes', J.recentTakes(s).length, 0);
+        eq('and no averages', J.partAverages(s), null);
+
+        J.recordTake(s, {
+          kind: 'scale', id: 'G', score: 88, key: '2026-03-09',
+          parts: { accuracy: 0.9, intonation: 0.8, rhythm: 0.7, flow: 1 },
+        });
+        J.recordTake(s, {
+          kind: 'scale', id: 'G', score: 94, key: '2026-03-10',
+          parts: { accuracy: 1, intonation: 0.9, rhythm: 0.8, flow: 1 },
+        });
+        J.recordTake(s, {
+          kind: 'sight', id: '', level: '5', score: 71, key: '2026-03-10',
+          parts: { accuracy: 0.7, intonation: 0.6, rhythm: 0.8, flow: 0.5 },
+        });
+
+        eq('three takes kept', J.recentTakes(s).length, 3);
+        eq('two scale takes', J.recentTakes(s, { kind: 'scale' }).length, 2);
+        eq('one sight take', J.recentTakes(s, { kind: 'sight' }).length, 1);
+
+        const totals = J.scaleTotals(s, ['G', 'D']);
+        eq('one scale has takes', totals.length, 1);
+        eq('its best is the best take', totals[0].best, 94);
+        eq('its average is the mean', Math.round(totals[0].average), 91);
+        eq('and it keeps the recent scores in order', totals[0].recent.join(','), '88,94');
+
+        const parts = J.partAverages(s, { kind: 'scale' });
+        eq('the parts average over its takes', parts.takes, 2);
+        eq('steadiness averaged', Math.round(parts.rhythm * 100), 75);
+        eq('the sight parts are separate', Math.round(J.partAverages(s, { kind: 'sight' }).flow * 100), 50);
+
+        // A long history is capped, oldest first, so storage cannot grow forever.
+        const many = J.emptyState();
+        for (let i = 0; i < J.TAKES_KEPT + 25; i++) J.recordTake(many, { kind: 'scale', id: 'G', score: 50 });
+        eq('the cap holds', many.takes.length, J.TAKES_KEPT);
+        eq('the newest survive', J.recentTakes(many).at(-1).score, 50);
+
+        // An old log with no takes array keeps working, and gains one on the next
+        // take rather than throwing on a missing field.
+        const old = J.emptyState();
+        delete old.takes;
+        eq('an old log reads as no takes', J.recentTakes(old).length, 0);
+        J.recordTake(old, { kind: 'scale', id: 'G', score: 80 });
+        eq('and gains an array on the first take', old.takes.length, 1);
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `LOG FAILED\n${problems.join('\n')}`
         : 'LOG OK';

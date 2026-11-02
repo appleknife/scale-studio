@@ -30,7 +30,90 @@ const STORE_KEY = 'scale-studio.journal.v2';
 export const MAX_PROFILES = 8;
 
 export function emptyState() {
-  return { v: 1, days: {}, rests: [], plan: '', scales: {}, goal: null };
+  return { v: 1, days: {}, rests: [], plan: '', scales: {}, goal: null, takes: [] };
+}
+
+/**
+ * The last few hundred takes, in order, with what each one was made of.
+ *
+ * The scores alone were enough for "what is my best on this scale", but not for
+the questions a player actually asks a stat tracker: am I getting steadier? is my
+intonation better on the A string or the E? which day of the week do I play well?
+Those need the four parts, the scale, the level and the time, kept per take.
+ *
+ * Four hundred is a school year of a few takes a day, and about 40 kB of text —
+ * small enough to keep entirely on the device, which is the only place it goes.
+ */
+export const TAKES_KEPT = 400;
+
+export function recordTake(state, take) {
+  if (!Array.isArray(state.takes)) state.takes = [];
+  const entry = {
+    at: take.at || new Date().toISOString(),
+    key: take.key || dayKey(),
+    kind: take.kind || 'scale',
+    id: take.id || '',
+    level: take.level || '',
+    score: Math.round(take.score || 0),
+    parts: take.parts || null,
+    bpm: take.bpm || 0,
+  };
+  state.takes.push(entry);
+  if (state.takes.length > TAKES_KEPT) {
+    state.takes.splice(0, state.takes.length - TAKES_KEPT);
+  }
+  return entry;
+}
+
+/** The takes, newest last, optionally one kind ("scale" or "sight"). */
+export function recentTakes(state, { kind = null, limit = TAKES_KEPT } = {}) {
+  const all = Array.isArray(state.takes) ? state.takes : [];
+  const filtered = kind ? all.filter((t) => t.kind === kind) : all;
+  return filtered.slice(-limit);
+}
+
+/**
+ * Per-scale totals, for a leaderboard of your own scales: attempts, best,
+ * average, and the recent scores a sparkline would draw.
+ */
+export function scaleTotals(state, ids = []) {
+  const byScale = new Map();
+  for (const take of recentTakes(state, { kind: 'scale' })) {
+    if (!take.id) continue;
+    const cell = byScale.get(take.id) || { id: take.id, scores: [], best: 0, last: null };
+    cell.scores.push(take.score);
+    cell.best = Math.max(cell.best, take.score);
+    cell.last = take;
+    byScale.set(take.id, cell);
+  }
+  return [...byScale.values()]
+    .map((cell) => ({
+      id: cell.id,
+      attempts: cell.scores.length,
+      best: cell.best,
+      average: cell.scores.reduce((a, b) => a + b, 0) / cell.scores.length,
+      recent: cell.scores.slice(-12),
+      last: cell.last,
+    }))
+    .sort((a, b) => b.average - a.average)
+    .filter((row) => !ids.length || ids.includes(row.id));
+}
+
+/**
+ * The four parts of a take, averaged over the last `window` takes of a kind.
+ * This is the "am I getting better at anything in particular" question, and the
+ * reason the parts are stored at all.
+ */
+export function partAverages(state, { kind = 'scale', window = 12 } = {}) {
+  const takes = recentTakes(state, { kind, limit: window }).filter((t) => t.parts);
+  if (!takes.length) return null;
+  const keys = ['accuracy', 'intonation', 'rhythm', 'flow'];
+  const avg = {};
+  for (const key of keys) {
+    const values = takes.map((t) => t.parts[key]).filter((v) => Number.isFinite(v));
+    avg[key] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  }
+  return { ...avg, takes: takes.length };
 }
 
 /**

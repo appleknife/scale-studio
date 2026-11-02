@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611024100';
-import { renderStaff } from './staff.js?v=202611024100';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611024100';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611024100';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611024100';
-import { generatePassage } from './sightreading.js?v=202611024100';
-import { createPlayer } from './playback.js?v=202611024100';
-import { renderScore } from './score.js?v=202611024100';
-import * as Journal from './journal.js?v=202611024100';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611024100';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611024100';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611024230';
+import { renderStaff } from './staff.js?v=202611024230';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611024230';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611024230';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611024230';
+import { generatePassage } from './sightreading.js?v=202611024230';
+import { createPlayer } from './playback.js?v=202611024230';
+import { renderScore } from './score.js?v=202611024230';
+import * as Journal from './journal.js?v=202611024230';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611024230';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611024230';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611024100';
+} from './tuner.js?v=202611024230';
 
 const LANG = initLang();
 
@@ -1381,7 +1381,15 @@ function stopSightTake(analyse = true) {
     // Compared against earlier readings at this level, before this one is filed.
     result.compared = Journal.compareTake(Journal.sightEntry(journal, sight.level), result.score);
     renderSightResult(result);
-    noteTake('sight', null, result.score);
+    noteTake('sight', null, result.score, {
+      parts: {
+        accuracy: result.accuracy,
+        intonation: result.intonation,
+        rhythm: result.rhythm,
+        flow: result.continuity,
+      },
+      bpm: result.unit ? Math.round(60 / (result.unit * 4)) : 0,
+    });
   } else {
     el.sightStatus.textContent = '';
   }
@@ -1821,19 +1829,24 @@ function renderRecList() {
 function renderWho() {
   const full = journalStore.profiles.length >= Journal.MAX_PROFILES;
   const multiple = journalStore.profiles.length > 1;
-  // The home row exists so a sibling never has to open somebody else's log to
-  // find their own. Hidden on a device with one name: a lone "Me" chip is a
-  // question with nothing to ask.
-  el.homeWho.hidden = !multiple;
-  if (multiple) {
-    el.homeWhoChips.innerHTML = journalStore.profiles
+  // The row is always on the home screen now, even for one name: with a single
+  // "Me" chip and an Add beside it, a parent can see that more than one log is
+  // possible without first having to find the log screen. Hiding it until a
+  // second name existed made the feature undiscoverable — which is exactly what
+  // the teacher reported.
+  el.homeWho.hidden = false;
+  el.homeWhoChips.innerHTML =
+    journalStore.profiles
       .map(
         (profile) =>
           `<button class="chip" type="button" data-who="${esc(profile.id)}" ` +
           `aria-pressed="${profile.id === activeProfile.id}">${esc(displayName(profile))}</button>`,
       )
-      .join('');
-  }
+      .join('') +
+    (full
+      ? ''
+      : `<button class="chip add-chip" type="button" data-who-add="1">${t('log.addName')}</button>`);
+  el.homeWho.classList.toggle('is-single', !multiple);
 
   el.whoChips.innerHTML =
     journalStore.profiles
@@ -2088,13 +2101,26 @@ function openTrack() {
 }
 
 /** A finished take logs itself: nothing to type, and nothing to forget. */
-function noteTake(tag, cardId = null, score = 0) {
+function noteTake(tag, cardId = null, score = 0, details = null) {
   const today = todayKey();
   Journal.logTake(journal, today, tag);
   if (cardId) Journal.noteScale(journal, cardId, today, score);
   // Sight reading is filed per level, not per passage: a level VI page is a
   // level VI page whatever it happens to be in.
   if (tag === 'sight') Journal.noteSight(journal, sight.level, today, score);
+  // And every take is kept whole — score, the four parts, what it was — because a
+  // stat screen can only answer questions the data was asked.
+  if (score > 0 && (tag === 'scales' || tag === 'sight')) {
+    Journal.recordTake(journal, {
+      kind: tag === 'sight' ? 'sight' : 'scale',
+      id: cardId || '',
+      level: tag === 'sight' ? sight.level : '',
+      score,
+      parts: details && details.parts,
+      bpm: details && details.bpm,
+      key: today,
+    });
+  }
   saveJournal();
   if (!el.views.track.hidden) renderLog();
 }
@@ -2136,8 +2162,15 @@ function switchProfile(id) {
   renderWho();
 }
 
-// The same chips on the home screen, before anything personal is on it.
+// The same chips on the home screen, before anything personal is on it. Adding a
+// name from here has to take the parent to the form, which lives in the log — so
+// it opens the log first rather than leaving a form on a screen that has none.
 el.homeWho.addEventListener('click', (event) => {
+  if (event.target.closest('[data-who-add]')) {
+    openTrack();
+    openNameForm({ kind: 'add' });
+    return;
+  }
   const button = event.target.closest('[data-who]');
   if (button) switchProfile(button.dataset.who);
 });
@@ -2753,7 +2786,15 @@ function finishTake() {
   const result = analyzeTake(take.frames, state.scale);
   // Before the take is logged: the comparison is against what came before it.
   result.compared = Journal.compareTake(Journal.scaleEntry(journal, state.cardId), result.score);
-  noteTake('scales', state.cardId, result.score);
+  noteTake('scales', state.cardId, result.score, {
+    parts: {
+      accuracy: result.components.accuracy,
+      intonation: result.components.intonation,
+      rhythm: result.components.steadiness,
+      flow: result.components.continuity,
+    },
+    bpm: result.stats.bpm,
+  });
 
   // In a mock audition the microphone stays open, the score stays hidden, and
   // the next scale arrives after a short pause.
