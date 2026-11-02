@@ -163,12 +163,20 @@ export async function loadBank(ctx, base = 'samples/', bank = emptyBank()) {
  * short note played from a sustained take is still cut, because a sustained
  * take has no ring to give: it would just be a long note in the wrong rhythm.
  */
-export function noteShape(sample, { staccato, legato, duration, rate, bufferSeconds }) {
+export function noteShape(sample, { staccato, legato, duration, written, rate, bufferSeconds }) {
   const offset = (sample.skip || 0) + (legato ? 0.05 : 0);
   const available = (bufferSeconds - offset) / rate;
   const shortTake = staccato && sample.style === 'staccato';
+  // How long a short note may ring: its take, but never much past its own slot.
+  // The dotted-eighth-and-sixteenth figure is why. Marked staccato, the written
+  // pair is 0.51 s then 0.17 s; letting the sixteenth ring its whole 0.42 s take
+  // ran it far into the next beat and the pair stopped sounding like dotted-short
+  // and started sounding like two long notes. One and a half times the written
+  // length keeps the ring audible and the rhythm intact — a sixteenth gets 0.26 s
+  // of your take's decay, a dotted eighth still gets all of it.
+  const room = Math.max(0.1, (written || duration) * 1.5);
   const want = shortTake
-    ? Math.max(0.08, Math.min(available - 0.015, 0.7))
+    ? Math.max(0.08, Math.min(available - 0.015, room, 0.7))
     : Math.max(0.04, duration);
   const attack = shortTake ? 0.003 : legato ? 0.012 : 0.004;
   // A short take fades only in its last few milliseconds, where the recording is
@@ -186,7 +194,7 @@ export function noteShape(sample, { staccato, legato, duration, rate, bufferSeco
  */
 export function sampleVoice(ctx, destination, bank) {
   return {
-    play({ midi, at, duration, gain, ramp = 1, level = 'mf', legato = false, accent = false, staccato = false }) {
+    play({ midi, at, duration, written, gain, ramp = 1, level = 'mf', legato = false, accent = false, staccato = false }) {
       const sample = pickSample(bank.index, midi, { staccato, accent, legato, level });
       if (!sample) return false;
       const buffer = bank.buffers.get(sample.id);
@@ -232,6 +240,7 @@ export function sampleVoice(ctx, destination, bank) {
         staccato,
         legato,
         duration,
+        written,
         rate,
         bufferSeconds: buffer.duration,
       });

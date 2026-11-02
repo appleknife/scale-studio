@@ -23,7 +23,7 @@
         LEVEL_GAIN,
         LEVEL_TILT,
         BANK_GAIN,
-      } from '../src/sampler.js?v=202611022900';
+      } from '../src/sampler.js?v=202611022930';
 
       const problems = [];
       const log = [];
@@ -181,23 +181,32 @@
         {
           const shortTake = index.samples.find((s) => s.style === 'staccato');
           const plain = index.samples.find((s) => s.style === 'smooth');
-          const ring = noteShape(shortTake, {
-            staccato: true, legato: false, duration: 0.07, rate: 1, bufferSeconds: 0.45,
-          });
+          // The figure that sounded too long: a dotted eighth and a staccato
+          // sixteenth, at a level VI tempo — 0.51 s written, then 0.17 s.
+          const shape = (o) => noteShape(shortTake, { rate: 1, bufferSeconds: 0.45, legato: false, ...o });
+          const dotted = shape({ staccato: true, duration: 0.23, written: 0.51 });
+          const sixteenth = shape({ staccato: true, duration: 0.08, written: 0.17 });
           const cut = noteShape(plain, {
-            staccato: true, legato: false, duration: 0.07, rate: 1, bufferSeconds: 1.9,
+            staccato: true, legato: false, duration: 0.08, written: 0.17, rate: 1, bufferSeconds: 1.9,
           });
           const held = noteShape(plain, {
-            staccato: false, legato: false, duration: 0.5, rate: 1, bufferSeconds: 1.9,
+            staccato: false, legato: false, duration: 0.5, written: 0.5, rate: 1, bufferSeconds: 1.9,
           });
           log.push(
-            `a short note: staccato take rings ${ring.want.toFixed(2)} s · sustained take cut to ${cut.want.toFixed(2)} s · plain note ${held.want.toFixed(2)} s`,
+            `a short note: dotted eighth rings ${dotted.want.toFixed(2)} s · sixteenth rings ` +
+              `${sixteenth.want.toFixed(2)} s · sustained take cut to ${cut.want.toFixed(2)} s · ` +
+              `plain note ${held.want.toFixed(2)} s`,
           );
-          check(ring.want > 0.3, `a staccato take still rings for only ${ring.want.toFixed(2)} s`);
-          check(ring.want > cut.want * 3, 'the staccato take is not ringing out under the next note');
+          // The dotted note keeps a real ring…
+          check(dotted.want > 0.3, `the dotted note rings for only ${dotted.want.toFixed(2)} s`);
+          // …the sixteenth does not run on into the next beat, which is what made
+          // the pair sound like two long notes…
+          check(sixteenth.want < 0.3, `the sixteenth rings ${sixteenth.want.toFixed(2)} s — too long for its slot`);
+          // …and it still rings past its written length rather than being cut.
+          check(sixteenth.want > 0.17, 'the sixteenth is cut at its written length, with no ring');
           check(cut.want < 0.1, 'a short note on a sustained take is not being cut');
           check(Math.abs(held.want - 0.5) < 1e-9, 'a plain note is not its written length');
-          check(ring.fade < 0.06, 'the ring is being faded out rather than left to decay');
+          check(dotted.fade < 0.06, 'the ring is being faded out rather than left to decay');
         }
 
         /* ── the derived loud and soft layers ───────────────────────── */

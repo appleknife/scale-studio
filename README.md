@@ -854,7 +854,15 @@ note's own ring: the bow has already stopped by then and the sound is dying away
 The voice used to cut the take at the written length — 70 ms for a staccato
 sixteenth — which is what made every dotted note sound clipped. A short note now
 lets its staccato take end by itself and simply runs under the next note; measured,
-0.42 s instead of 0.07. A short note that has to borrow a *sustained* take is still
+0.42 s instead of 0.07.
+
+But not for as long as it likes. The teacher's next note on this was that the
+dotted-eighth-and-sixteenth figure sounded *too* long, and the culprit was the
+sixteenth: its written slot is 0.17 s, so a 0.42 s ring ran it a whole beat into the
+music and the pair stopped reading as dotted-short. A ring is now capped at **one
+and a half times the written length** — the sixteenth rings 0.26 s, the dotted
+eighth before it still gets all 0.42 — so the note keeps a natural tail without
+giving up its rhythm. A short note that has to borrow a *sustained* take is still
 cut, because a sustained take has no ring to give and would only be a long note in
 the wrong rhythm. `noteShape()` in `src/sampler.js` is the one place that decides
 this, and `sampler.test.html` holds both halves of it.

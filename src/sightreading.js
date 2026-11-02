@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611022900';
-import { STAFF_GEOM } from './staff.js?v=202611022900';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611022930';
+import { STAFF_GEOM } from './staff.js?v=202611022930';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
