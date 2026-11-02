@@ -80,6 +80,9 @@ export function recordTake(state, take) {
     bpm: take.bpm || 0,
     heard: take.heard || 0,
     expected: take.expected || 0,
+    // A run with the clicks and the moving line. Recorded, not hidden — but read
+    // separately, because a score with the wheels on is a different claim.
+    assisted: Boolean(take.assisted),
     // Kept, not discarded: a teacher may want to know that a run happened, and
     // the flag is what the averages read. Old records have no flag and count.
     counted: take.counted !== false,

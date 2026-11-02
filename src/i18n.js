@@ -670,6 +670,9 @@ export const S = {
     '1 take was set aside as a test run — a tap, a cough, or one that ended before it began. It is not in any of these numbers.',
     '有 1 次被当作测试录音排除了（点了一下、咳嗽，或者刚开始就结束的）——上面的数字里没有它。',
   ],
+  'stats.withHelp': ['With the clicks and the line', '开着节拍和指示线时'],
+  'sight.assist': ['Assisted — count-in, clicks and the moving line', '辅助模式——预备拍、节拍和移动指示线'],
+  'sight.assistCounting': ['Counting you in — {n}', '预备拍——{n}'],
   'log.win.total': ['{n} of {total} scales', '{n} / {total} 条音阶'],
   'log.win.none': [
     'Nothing logged yet. One tap on a day below starts it.',
@@ -973,6 +976,10 @@ export const STATIC = {
   'Choose a space. Scales is where most days start — pick a key, press start, and the app listens to the whole scale.':
     '选一个空间。大多数时候都是先练音阶——挑一个调，点开始，应用会听完整条音阶。',
   'Menu': '菜单',
+  'Assisted — count-in, clicks and the moving line': '辅助模式——预备拍、节拍和移动指示线',
+  'The clicks come out of the speaker and the microphone is open — headphones keep one out of the other. Assisted runs are kept in your stats under their own heading.':
+    '节拍声从扬声器出来，而麦克风是开着的——戴上耳机就不会互相串。辅助模式的成绩在数据页里单独列出来。',
+  'With the clicks and the line': '开着节拍和指示线时',
   'Twelve majors and the minor forms, levels I–VI. Play one and the app listens.':
     '十二个大调加上小调的各种形式，一至六级。拉一条，应用就听着。',
   'Eight bars you have never seen, written to your level.':

@@ -671,6 +671,71 @@ h3 {
   white-space: nowrap;
 }
 
+/* ── Assisted sight reading ──────────────────────────────────────────── */
+
+.assist-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.assist-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.assist-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 52ch;
+}
+
+/* The count-in, read from a music stand's distance: one big numeral, the metre
+   under it, over a wash so it cannot be missed while the student is setting up. */
+.count-in {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 18px auto 12px;
+  padding: 18px 0 20px;
+  max-width: 220px;
+  background: var(--accent-wash);
+  border: 1px solid rgba(47, 93, 78, 0.16);
+  border-radius: 20px;
+}
+
+.count-in-num {
+  font-family: var(--serif);
+  font-size: 64px;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.count-in-label {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stat-heading {
+  margin: 26px 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 /* ── The menu ────────────────────────────────────────────────────────── */
 
 /* Five doors: one wide one for scales, because that is what most visits are

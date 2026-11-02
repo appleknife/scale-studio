@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611024530';
-import { renderStaff } from './staff.js?v=202611024530';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611024530';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611024530';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611024530';
-import { generatePassage } from './sightreading.js?v=202611024530';
-import { createPlayer } from './playback.js?v=202611024530';
-import { renderScore } from './score.js?v=202611024530';
-import * as Journal from './journal.js?v=202611024530';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611024530';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611024530';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025130';
+import { renderStaff } from './staff.js?v=202611025130';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611025130';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025130';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025130';
+import { generatePassage } from './sightreading.js?v=202611025130';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025130';
+import { renderScore } from './score.js?v=202611025130';
+import * as Journal from './journal.js?v=202611025130';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025130';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025130';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611024530';
+} from './tuner.js?v=202611025130';
 
 const LANG = initLang();
 
@@ -114,6 +114,10 @@ const el = {
   clearLog: $('clearLog'),
   sightVolume: $('sightVolume'),
   sightLive: $('sightLive'),
+  sightAssist: $('sightAssist'),
+  countIn: $('countIn'),
+  countInNum: $('countInNum'),
+  countInLabel: $('countInLabel'),
   sightLiveNote: $('sightLiveNote'),
   sightLiveCents: $('sightLiveCents'),
   sightMarker: $('sightMarker'),
@@ -1269,6 +1273,106 @@ async function startSightTake(options = {}) {
   }
 
   armSightTake(options);
+  if (assistOn()) startAssistedRun();
+}
+
+/* ── Assisted runs ───────────────────────────────────────────────────── */
+
+const ASSIST_KEY = 'scaleStudio.assist';
+
+function assistOn() {
+  return Boolean(el.sightAssist && el.sightAssist.checked);
+}
+
+/**
+ * A count-in, then the clicks and the moving line while the student plays.
+ *
+ * This is the training-wheels mode: the metronome says where the beat is and the
+ * playhead says where in the bar the music is, so a student who has never read a
+ * passage against a pulse has something to follow. What it deliberately does NOT
+ * do is play the passage's sound — the microphone is open, and the example
+ * underneath the student would follow them into the scoring.
+ *
+ * The count is one bar, in the metre's own beats: 3 in 3/4, 2 in cut time, and 6
+ * in 6/8, because that is how a student counts it aloud.
+ */
+function startAssistedRun() {
+  const passage = sight.passage;
+  const take = sight.take;
+  if (!passage || !take) return;
+  const plan = countInPlan(passage.meter, passage.tempo);
+  const ctx = player.context;
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+  el.countIn.hidden = false;
+  el.countInNum.textContent = String(plan.clicks);
+  el.countInLabel.textContent = passage.meter;
+  el.sightStatus.textContent = t('sight.assistCounting', { n: plan.clicks });
+
+  const start = ctx.currentTime + 0.15;
+  for (let i = 0; i < plan.clicks; i++) {
+    clickAt(ctx, start + i * plan.interval, i === 0 ? 1 : 0.6);
+  }
+  // The numbers follow the clicks: one per beat, counting down.
+  for (let i = 0; i < plan.clicks; i++) {
+    setTimeout(() => {
+      if (sight.take !== take) return;
+      el.countInNum.textContent = String(plan.clicks - i);
+    }, Math.max(0, (start - ctx.currentTime) * 1000 + i * plan.interval * 1000) - 150 + 150);
+  }
+
+  // After the bar of count-in the take's clock starts, and the click track and
+  // the playhead run from the downbeat. A late entry costs, exactly as it would
+  // with a judge — which is the point of practising with the wheels on.
+  setTimeout(() => {
+    if (sight.take !== take) return;
+    el.countIn.hidden = true;
+    take.startAtNextFrame = true;
+    take.assisted = true;
+    el.sightStatus.textContent = t('sight.playing');
+    runClickTrack(ctx, passage, plan);
+    runAssistPlayhead(take, passage);
+  }, (plan.seconds + 0.15) * 1000);
+}
+
+/** One click, at a time on the audio clock, sharing the player's volume. */
+function clickAt(ctx, when, strength = 0.6) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = strength >= 1 ? 1320 : 880;
+  gain.gain.setValueAtTime(0.0001, when);
+  gain.gain.linearRampToValueAtTime(strength >= 1 ? 0.5 : 0.34, when + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.07);
+  osc.connect(gain).connect(player.output);
+  osc.start(when);
+  osc.stop(when + 0.09);
+}
+
+/** The clicks under the passage, at the printed tempo, one bar at a time. */
+function runClickTrack(ctx, passage, plan) {
+  const bars = passage.bars.length;
+  const start = ctx.currentTime + 0.02;
+  for (let i = 0; i < bars * plan.clicks; i++) {
+    clickAt(ctx, start + i * plan.interval, i % plan.clicks === 0 ? 1 : 0.6);
+  }
+}
+
+/** The playhead moving at the printed tempo, so the eye has somewhere to be. */
+function runAssistPlayhead(take, passage) {
+  ensurePlayhead();
+  sight.anchors = sightAnchors(passage, el.sightStaff.querySelector('svg'));
+  const spq = secondsPerQuarter(passage.tempo);
+  const total = (passage.bars.length * passage.perBar) / 4;
+  const began = performance.now();
+  const step = () => {
+    if (sight.take !== take) return;
+    const at = Math.min(total, ((performance.now() - began) / 1000 / spq) * 4);
+    movePlayhead(sight, at);
+    if (at < total) requestAnimationFrame(step);
+    else hidePlayhead();
+  };
+  requestAnimationFrame(step);
 }
 
 /**
@@ -1338,6 +1442,20 @@ function ingestSightFrame(frame) {
   if (!take) return;
   take.peak = Math.max(take.peak || 0, frame.rms);
 
+  // An assisted run is timed from its count-in, not from the first note: the
+  // clicks have already said where beat one is, so a late entry is a late entry,
+  // exactly as it would be for a judge.
+  if (take.startAtNextFrame && !take.started) {
+    take.startAtNextFrame = false;
+    take.started = true;
+    sight.phase = 'taking';
+    take.t0 = frame.t;
+    if (take.live) {
+      el.sightLive.hidden = false;
+      resetSightLive();
+    }
+  }
+
   if (!take.started) {
     const strong = frame.rms > 0.007 && frame.clarity > 0.7;
     take.strong = strong ? take.strong + 1 : 0;
@@ -1403,6 +1521,9 @@ function stopSightTake(analyse = true) {
       heard: result.heard,
       expected: result.expected,
       seconds: result.duration,
+      // A run with the clicks and the line is kept, and kept apart: a score with
+      // the wheels on is not the same claim as one without.
+      assisted: Boolean(take.assisted),
     });
   } else {
     el.sightStatus.textContent = '';
@@ -1656,6 +1777,21 @@ try {
 player.setVolume(storedVolume / 100);
 el.sightVolume.value = String(storedVolume);
 el.sightVolume.addEventListener('input', () => applyVolume(el.sightVolume.value));
+
+// Assisted runs are remembered like the volume: a student working with the clicks
+// this week should not have to find the switch again next time.
+try {
+  el.sightAssist.checked = localStorage.getItem(ASSIST_KEY) === 'on';
+} catch {
+  /* no storage — off by default */
+}
+el.sightAssist.addEventListener('change', () => {
+  try {
+    localStorage.setItem(ASSIST_KEY, el.sightAssist.checked ? 'on' : 'off');
+  } catch {
+    /* private mode */
+  }
+});
 el.sightTempoBtn.addEventListener('click', () => {
   if (sight.passage) playTempo(sight.passage);
 });
@@ -2201,16 +2337,20 @@ function renderStats() {
         '</div>'
       : `<p class="stat-empty">${t(scales.length ? 'stats.noneMatching' : 'stats.noneScale')}</p>`;
   } else {
-    const byLevel = new Map();
-    for (const take of sightTakes) {
-      const cell = byLevel.get(take.level) || { level: take.level, scores: [], best: 0 };
-      cell.scores.push(take.score);
-      cell.best = Math.max(cell.best, take.score);
-      byLevel.set(take.level, cell);
-    }
-    const rows = [...byLevel.values()].sort((a, b) => Number(a.level) - Number(b.level));
-    el.statPanel.innerHTML = rows.length
-      ? `<div class="stat-table is-sight">
+    /** One table per kind of run, so an assisted score never props up a solo one. */
+    const table = (list, heading) => {
+      const byLevel = new Map();
+      for (const take of list) {
+        const cell = byLevel.get(take.level) || { level: take.level, scores: [], best: 0 };
+        cell.scores.push(take.score);
+        cell.best = Math.max(cell.best, take.score);
+        byLevel.set(take.level, cell);
+      }
+      const rows = [...byLevel.values()].sort((a, b) => Number(a.level) - Number(b.level));
+      if (!rows.length) return '';
+      return (
+        (heading ? `<h4 class="stat-heading">${heading}</h4>` : '') +
+        `<div class="stat-table is-sight">
           <div class="stat-tr stat-th"><span>${t('stats.level')}</span><span>${t('stats.shape')}</span><span>${t('stats.tries')}</span><span>${t('stats.average')}</span><span>${t('stats.best')}</span></div>` +
         rows
           .map((row) => {
@@ -2225,6 +2365,16 @@ function renderStats() {
           })
           .join('') +
         '</div>'
+      );
+    };
+
+    const solo = table(sightTakes.filter((take) => !take.assisted));
+    const helped = table(
+      sightTakes.filter((take) => take.assisted),
+      t('stats.withHelp'),
+    );
+    el.statPanel.innerHTML = solo || helped
+      ? solo + helped
       : `<p class="stat-empty">${t('stats.noneSight')}</p>`;
   }
 
@@ -2286,6 +2436,7 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
       bpm: details && details.bpm,
       heard: details && details.heard,
       expected: details && details.expected,
+      assisted: Boolean(details && details.assisted),
       counted,
       key: today,
     });

@@ -26,7 +26,14 @@
       // whether it is a new bow stroke) and a voice that turns that into audio.
       // Both are weighed here — the arithmetic exactly, the voice by rendering it
       // offline and measuring where the sound actually is.
-      import { schedule, bowedVoice, secondsPerQuarter, DYNAMIC_GAIN } from '../src/playback.js?v=202611024530';
+      import {
+        schedule,
+        bowedVoice,
+        secondsPerQuarter,
+        countInPlan,
+        DYNAMIC_GAIN,
+      } from '../src/playback.js?v=202611025130';
+
 
       const problems = [];
       const log = [];
@@ -62,6 +69,37 @@
         check(Math.abs(secondsPerQuarter({ unit: 'q', bpm: 60 }) - 1) < 1e-9, 'a quarter at 60 is not one second');
         check(Math.abs(secondsPerQuarter({ unit: 'h', bpm: 60 }) - 0.5) < 1e-9, 'a half-note pulse at 60 is wrong');
         check(Math.abs(secondsPerQuarter({ unit: 'qd', bpm: 72 }) - 60 / 72 / 1.5) < 1e-9, 'a dotted-quarter pulse is wrong');
+
+        /* ── the count-in ───────────────────────────────────────────── */
+        //
+        // One click per beat, counted the way a student counts aloud: a quarter in
+        // the simple metres, a half in cut time, and six eighths in 6/8. It also
+        // has to be exactly one bar long, or the downbeat lands somewhere the page
+        // does not.
+        {
+          const q = { unit: 'q', bpm: 60 };
+          for (const [meter, want] of [
+            ['4/4', 4], ['3/4', 3], ['2/4', 2], ['2/2', 2], ['6/8', 6],
+          ]) {
+            const tempo = meter === '6/8' ? { unit: 'qd', bpm: 72 } : q;
+            const got = countInPlan(meter, tempo).clicks;
+            check(got === want, `${meter} counts in ${got}, wanted ${want}`);
+          }
+          const threeFour = countInPlan('3/4', q);
+          check(Math.abs(threeFour.seconds - 3) < 1e-9, `3/4 count-in lasts ${threeFour.seconds} s`);
+          const sixEight = countInPlan('6/8', { unit: 'qd', bpm: 72 });
+          check(
+            Math.abs(sixEight.seconds - (60 / 72) * 2) < 1e-9,
+            `6/8 count-in lasts ${sixEight.seconds} s`,
+          );
+          const cut = countInPlan('2/2', { unit: 'h', bpm: 76 });
+          check(Math.abs(cut.interval - 60 / 76) < 1e-9, `cut time clicks every ${cut.interval} s`);
+          log.push(
+            `count-in bars: 4/4 ${countInPlan('4/4', q).clicks} · ` +
+              `3/4 ${countInPlan('3/4', q).clicks} · ` +
+              `2/2 ${cut.clicks} · 6/8 ${sixEight.clicks}`,
+          );
+        }
 
         const plan = schedule(fourQuarters);
         check(plan.notes.length === 4, `four quarters became ${plan.notes.length} notes`);

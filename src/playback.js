@@ -16,8 +16,8 @@
 // anything else changing: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611024530';
-import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611024530';
+import { makeHallIR } from './recorder.js?v=202611025130';
+import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611025130';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -29,6 +29,25 @@ export function secondsPerQuarter(tempo) {
   // in sixteenths, so this is the one conversion that has to be right.
   const quarters = UNIT_QUARTERS[tempo.unit] || 1;
   return 60 / tempo.bpm / quarters;
+}
+
+/**
+ * How a bar divides into clicks, for the count-in and for a click track.
+ *
+ * The click follows the metre the way a player counts it: a quarter in 4/4, 3/4
+ * and 2/4; a half in cut time, because a bar of 2/2 is two beats and not four; and
+ * an eighth in 6/8, so a student counts six rather than the two dotted quarters an
+ * advanced player feels. Plain numbers, so the count-in can be tested without any
+ * audio.
+ */
+export function countInPlan(meter, tempo) {
+  const spq = secondsPerQuarter(tempo);
+  const [num, den] = String(meter).split('/').map(Number);
+  const quartersPerBar = (num / den) * 4;
+  const felt = den === 2 ? 2 : den === 8 ? 0.5 : 1; // half · eighth · quarter
+  const clicks = Math.max(1, Math.round(quartersPerBar / felt));
+  const interval = spq * felt;
+  return { clicks, interval, seconds: clicks * interval };
 }
 
 /**
