@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021420';
-import { STAFF_GEOM } from './staff.js?v=202611021420';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021455';
+import { STAFF_GEOM } from './staff.js?v=202611021455';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -110,10 +110,11 @@ const LEVELS = {
     // criteria, and level VI used to be the one level that never drew an f at all.
     dynamics: ['mf', 'f'],
     marks: ['staccato'],
-    // Level III is also where silence arrives: a quarter rest first, a half rest
-    // now and then, and an eighth rest inside a beat. The sixteenth rest waits
-    // until level VI (see `sixteenthRest` there).
+    // Level III is also where silence arrives, and only two kinds of it: a quarter
+    // rest most of the time, a half rest now and then. The eighth rest arrives at
+    // IV and the sixteenth at VI.
     rests: true,
+    restKinds: ['quarter', 'half'],
     accidentals: 0,
   },
   4: {
@@ -140,6 +141,8 @@ const LEVELS = {
     dynamics: ['mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
     rests: true,
+    // The eighth rest arrives here, a level after the quarter and half.
+    restKinds: ['quarter', 'half', 'eighth'],
     accidentals: 1,
   },
   5: {
@@ -169,6 +172,7 @@ const LEVELS = {
     dynamics: ['p', 'mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
     rests: true,
+    restKinds: ['quarter', 'half', 'eighth'],
     accidentals: 2,
   },
   6: {
@@ -239,7 +243,7 @@ const LEVELS = {
     rests: true,
     // The sixteenth rest belongs to the top level: it only makes sense inside a
     // run of sixteenths, and level VI is the one that has runs to break.
-    sixteenthRest: true,
+    restKinds: ['quarter', 'half', 'eighth', 'sixteenth'],
     accidentals: 2,
   },
 };
@@ -463,12 +467,14 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   }
 
   // ── rests (level III and up) ──────────────────────────────────────────
-  // One slot of one bar, sometimes two, is turned into silence. Which kind
-  // matters as much as how often: a quarter rest is the one a sight-reader meets
-  // constantly, a half rest takes two beats and is rarer, and a sixteenth rest
-  // only makes sense inside a run of sixteenths, where it breaks the beam. The
-  // old chooser took the first short slot it found in one middle bar, which was
-  // nearly always an eighth — quarter rests hardly ever appeared.
+  // One slot of one bar, sometimes two, is turned into silence. Which kind matters
+  // as much as how often, and the kinds are the level's own: quarter and half at
+  // III, the eighth rest from IV, the sixteenth only at VI. A quarter rest is the
+  // one a sight-reader meets constantly, a half rest takes two beats of the bar and
+  // is rarer, and a sixteenth rest only makes sense inside a run of sixteenths,
+  // where it breaks the beam. The old chooser took the first short slot it found in
+  // one middle bar, which was nearly always an eighth — quarter rests hardly ever
+  // appeared, and levels drew kinds they were never meant to have.
   if (spec.rests && chance(rng, 0.6)) {
     // A bar never opens a passage or closes it with a silence: the first note and
     // the cadence have to sound. Any other slot may go quiet, including the first
@@ -493,13 +499,20 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     // whole-bar rest (drawn as a whole rest, not this glyph), and in 6/8 the beat
     // is a dotted quarter, so neither takes one.
     const allowsHalf = meter === '3/4' || meter === '4/4' || meter === '2/2';
-    // A sixteenth rest is level VI's figure and nobody else's: the teacher is
-    // clear that it does not turn up before the top level. At III it would also
-    // carve a hole in the one guaranteed cluster of the passage, which is the
-    // figure that level is *for*.
+    // Which kinds this level is allowed to draw at all. The teacher's rule: level
+    // III has quarter and half rests only; the eighth rest arrives at IV, and the
+    // sixteenth rest belongs to level VI alone. A weight of zero simply keeps a
+    // kind out of the draw.
+    const kinds = spec.restKinds || ['quarter', 'half'];
+    const allows = (kind) => kinds.includes(kind);
     const table = compound
-      ? [[2, 1]] // an eighth rest; a quarter rest would cross 6/8's own beat
-      : [[4, 5], [2, 2], [8, allowsHalf ? 2 : 0], [1, spec.sixteenthRest ? 1 : 0]];
+      ? [[2, allows('eighth') ? 1 : 0]] // a quarter rest would cross 6/8's own beat
+      : [
+          [4, allows('quarter') ? 5 : 0],
+          [2, allows('eighth') ? 2 : 0],
+          [8, allows('half') && allowsHalf ? 2 : 0],
+          [1, allows('sixteenth') ? 1 : 0],
+        ];
 
     const options = table
       .map(([dur, weight]) => ({
