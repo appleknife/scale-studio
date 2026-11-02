@@ -348,6 +348,43 @@ export function smallWins(state, today, ids = []) {
   };
 }
 
+/**
+ * The note at the end of the week sheet.
+ *
+ * This is the one place the app talks to the student rather than about them, so
+ * it is built from what the log actually holds and nothing else: no praise for
+ * days that were not practised, and no scolding for a week that was thin. What
+ * it can do is notice — the goal that was met, the scale that came good, the
+ * thing they said was hard, the run they are on — and say which one it saw.
+ *
+ * Returns a descriptor; the screens own the language. Journal logic stays
+ * testable, and the sentences stay translatable.
+ */
+export function weekNote(state, today, ids = []) {
+  const sheet = weekSheet(state, today, ids);
+  const goal = goalProgress(state, today, ids);
+  const wins = smallWins(state, today, ids);
+  const ready = readyNames(state, ids, today);
+  const base = {
+    days: sheet.days,
+    target: goal ? goal.target : 0,
+    done: goal ? goal.raw : 0,
+    hard: sheet.hard.length ? sheet.hard[0].key : null,
+    ready,
+    streak: streak(state, today),
+    takes: sheet.takes,
+  };
+
+  if (!wins.hasAnyHistory) return { kind: 'start', ...base };
+  if (goal && goal.met) return { kind: 'goalMet', ...base };
+  // One day short is a different sentence from far short: it is still reachable.
+  if (goal && goal.target - goal.raw === 1) return { kind: 'goalNear', ...base };
+  if (goal) return { kind: 'goalShort', ...base };
+  if (sheet.days >= 4) return { kind: 'plenty', ...base };
+  if (sheet.days >= 1) return { kind: 'some', ...base };
+  return { kind: 'quiet', ...base };
+}
+
 /* ── Storage ───────────────────────────────────────────────────────────── */
 
 export function load(storage = globalThis.localStorage) {

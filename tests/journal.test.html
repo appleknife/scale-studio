@@ -316,6 +316,60 @@
         eq('the fresh log is empty', J.totalDays(J.active(store).state), 0);
       }
 
+      /* ── the note at the foot of the sheet ─────────────────────── */
+      //
+      // The sentence has to fit the week that happened. These check the choosing,
+      // not the wording: an empty log is never congratulated, a met goal is
+      // named as met, one day short is its own case, and a thin week is not a
+      // scolding.
+      {
+        const ids = ['G', 'D'];
+        const empty = J.emptyState();
+        eq('nothing logged is a beginning, not a failure', J.weekNote(empty, TODAY, ids).kind, 'start');
+
+        const met = J.emptyState();
+        J.setGoal(met, 'days', 3);
+        J.logTake(met, '2026-03-09');
+        J.logTake(met, '2026-03-10');
+        J.logTake(met, '2026-03-11');
+        eq('the goal that was met', J.weekNote(met, TODAY, ids).kind, 'goalMet');
+
+        const near = J.emptyState();
+        J.setGoal(near, 'days', 3);
+        J.logTake(near, '2026-03-09');
+        J.logTake(near, '2026-03-10');
+        eq('one day short is still reachable', J.weekNote(near, TODAY, ids).kind, 'goalNear');
+
+        const short = J.emptyState();
+        J.setGoal(short, 'days', 5);
+        J.logTake(short, '2026-03-10');
+        const shortNote = J.weekNote(short, TODAY, ids);
+        eq('far short is its own sentence', shortNote.kind, 'goalShort');
+        eq('and it knows the numbers', `${shortNote.days}/${shortNote.target}`, '1/5');
+
+        // Four days by Thursday: a heavy week with no goal set.
+        const lots = J.emptyState();
+        ['2026-03-09', '2026-03-10', '2026-03-11', '2026-03-12'].forEach((k) => J.logTake(lots, k));
+        eq('a heavy week with no goal', J.weekNote(lots, '2026-03-12', ids).kind, 'plenty');
+
+        // A week that is quiet after history is not the same as a log that is new.
+        const quiet = J.emptyState();
+        J.logTake(quiet, '2026-03-02');
+        eq('a quiet week after history', J.weekNote(quiet, TODAY, ids).kind, 'quiet');
+
+        // The extra sentence prefers a named scale, then the hard thing, then the run.
+        const named = J.emptyState();
+        J.noteScale(named, 'G', '2026-03-09', 94);
+        J.noteScale(named, 'G', '2026-03-10', 95);
+        const namedNote = J.weekNote(named, TODAY, ids);
+        eq('a scale that came good is noticed', namedNote.ready.join(','), 'G');
+
+        const hard = J.emptyState();
+        J.logTake(hard, '2026-03-09');
+        J.toggleHard(hard, '2026-03-09', 'rhythm');
+        eq('the thing they called hard is carried', J.weekNote(hard, TODAY, ids).hard, 'rhythm');
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `LOG FAILED\n${problems.join('\n')}`
         : 'LOG OK';

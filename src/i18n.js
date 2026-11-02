@@ -317,6 +317,91 @@ export const S = {
     '{n} stop(s). Read it a bar at a time, slowly, until it flows.',
     '停顿了 {n} 次。一小节一小节慢慢读，直到顺下来。',
   ],
+  // Where it broke, how fast it went, and which kind of note drifted off the beat.
+  'sight.tipBar.one': [
+    'Bar {bars} is where it came apart — take that one on its own, twice slowly, then put it back.',
+    '第 {bars} 小节散了——单独把那一小节慢慢来两遍，再放回整首里。',
+  ],
+  'sight.tipBar.many': [
+    'Bars {bars} are where it came apart — those two are worth a slow pass on their own.',
+    '第 {bars} 小节散了——这两小节值得单独慢练一遍。',
+  ],
+  'sight.tipTempo.faster': [
+    'You took it at about {played} against a printed {printed}. The notes were there, so let the metronome hold you back a little.',
+    '你大约用 {played} 的速度拉的，谱子上是 {printed}。音都对了，让节拍器稍微拦着你一点。',
+  ],
+  'sight.tipTempo.slower': [
+    'You took it at about {played} against a printed {printed} — that is fine for a first read, and the next step is a notch quicker.',
+    '你大约用 {played} 的速度拉的，谱子上是 {printed}——第一次读这样很好，下一步稍微快一点。',
+  ],
+  'sight.tipEarly': [
+    'The {value} notes kept arriving early. Count them out loud once and they will sit on the beat.',
+    '{value}总是来得偏早。出声数一遍，它们就会落在拍子上。',
+  ],
+  'sight.tipLate': [
+    'The {value} notes kept arriving late. They are usually the ones your bow is not quite ready for — prepare the stroke sooner.',
+    '{value}总是来得偏晚。通常是弓还没准备好——把运弓提前一点。',
+  ],
+  // ── The note at the foot of the week sheet ──
+  //
+  // Written to sound like a teacher who was listening rather than a dashboard:
+  // short sentences, second person, one thing noticed and one thing to do. It
+  // never congratulates a week that did not happen, and it never scolds.
+  'note.start': [
+    'Nothing logged yet, and that is allowed. Pick a small goal below — three days of ten minutes is a real week — and this page will start to keep count for you.',
+    '还没有记录，这没关系。在下面挑一个小目标——比如三天、每天十分钟，也是一周——这一页就会替你记着。',
+  ],
+  'note.goalMet': [
+    'You said {target} days this week, and you practiced {days}. That is the promise kept, and it is the hard part — the next week is easier because of it.',
+    '你说这周练 {target} 天，结果练了 {days} 天。说到的做到了，这才是最难的部分——正因为这样，下一周会容易些。',
+  ],
+  'note.goalNear': [
+    'One more day and the goal you set is met — {done} of {target} so far. If today is still free, ten minutes is enough to finish it.',
+    '再练一天，你自己定的目标就完成了——现在是 {done} / {target}。如果今天还有空，十分钟就够了。',
+  ],
+  'note.goalShort': [
+    'You have practiced {days} of the {target} days you picked. Not every week lands the way we plan it — the days you did were still real practice, and this one starts again on Monday.',
+    '你定了 {target} 天，练了 {days} 天。不是每一周都能按计划走——练过的那些天都是真的进步，下周一开始重新算。',
+  ],
+  'note.plenty': [
+    '{days} days this week. That is a lot of playing, and it shows in the numbers below — take a rest day on purpose, so the week does not turn into a grind.',
+    '这周练了 {days} 天，相当多了，下面的数字看得出来——记得主动休息一天，别让练习变成负担。',
+  ],
+  'note.some': [
+    '{days} days this week. Steady is worth more than big — if you want, set a small goal below and let it do the remembering.',
+    '这周练了 {days} 天。稳稳地练比一次练很多更有用——如果愿意，在下面定个小目标，让它帮你记着。',
+  ],
+  'note.quiet': [
+    'A quiet week so far. It happens to everyone, and it says nothing about you — the easiest way back is ten minutes on the thing you already like playing.',
+    '这周到目前为止比较安静。谁都会有这样的时候，这并不能说明什么——最容易回来的办法，是拿那个你已经喜欢的曲子练十分钟。',
+  ],
+  'note.extra.ready': [
+    '{names} came good this week — two clean days is what it takes, so that one is ready for the audition.',
+    '这周 {names} 拉好了——两个干净的日子就算过，这条可以去考试了。',
+  ],
+  'note.extra.hard': [
+    'You said {thing} was the hard one. Bring it to your lesson first, before the pieces — that is what the note is for.',
+    '你说难的是{thing}。上课时先拿这个出来，再练曲子——记下来就是为了这个。',
+  ],
+  'note.extra.streak': [
+    '{n} days in a row now. The days are doing the work even when a session feels small.',
+    '已经连续 {n} 天了。就算某天只练了一点点，这些天也在起作用。',
+  ],
+  'note.extra.go': [
+    'Play one bar you already know well, slowly, and stop while it still feels good — that is how the next day gets easier.',
+    '挑一小节你已经很熟的地方，慢慢拉，感觉还好的时候就停——这样第二天才更容易开始。',
+  ],
+  'noteValue.sixteenth': ['sixteenth-note', '十六分音符'],
+  'noteValue.dottedSixteenth': ['dotted-sixteenth', '附点十六分音符'],
+  'noteValue.eighth': ['eighth-note', '八分音符'],
+  'noteValue.dottedEighth': ['dotted-eighth', '附点八分音符'],
+  'noteValue.quarter': ['quarter-note', '四分音符'],
+  'noteValue.dottedQuarter': ['dotted-quarter', '附点四分音符'],
+  'noteValue.half': ['half-note', '二分音符'],
+  'noteValue.dottedHalf': ['dotted-half', '附点二分音符'],
+  'noteValue.whole': ['whole-note', '全音符'],
+  'noteValue.some': ['some', '有些'],
+
   // What the listening noticed, as opposed to what it scored.
   'tip.bias.title': ['The {note} kept sitting off', '{note} 总是偏一点'],
   'tip.bias.high': [
@@ -524,8 +609,8 @@ export const S = {
     'What would you like this week to look like?',
     '这周想练成什么样？',
   ],
-  'log.goal.days1': ['Practise on 1 day', '本周练 1 天'],
-  'log.goal.daysN': ['Practise on {n} days', '本周练 {n} 天'],
+  'log.goal.days1': ['Practice on 1 day', '本周练 1 天'],
+  'log.goal.daysN': ['Practice on {n} days', '本周练 {n} 天'],
   'log.goal.ready1': ['Get 1 more scale ready for the audition', '再让 1 条音阶达到考试标准'],
   'log.goal.readyN': ['Get {n} more scales ready for the audition', '再让 {n} 条音阶达到考试标准'],
   'log.goal.count': ['{done} of {target}', '{done} / {target}'],
@@ -583,6 +668,11 @@ export const S = {
   'log.sheet.week': ['Week of {date}', '本周（{date} 起）'],
   'log.sheet.goal': ['Goal: {goal} · {done} of {target}', '目标：{goal} · {done} / {target}'],
   'log.sheet.days': ['Practiced {n} days, rested {rests}', '练了 {n} 天，休息 {rests} 天'],
+  'log.sheet.daysNone': ['Practiced {n} days, no rest days', '练了 {n} 天，没有休息日'],
+  'log.sheet.day1': ['Practiced 1 day', '练了 1 天'],
+  'log.sheet.day1Rest': ['Practiced 1 day, rested {rests}', '练了 1 天，休息 {rests} 天'],
+  'log.sheet.rest1': ['Practiced {n} days, rested 1 day', '练了 {n} 天，休息 1 天'],
+  'log.sheet.dayRest1': ['Practiced 1 day, rested 1 day', '练了 1 天，休息 1 天'],
   'log.savedCopy': [
     'Saved {n} days to a file — look in your downloads.',
     '已把 {n} 天的记录存成文件——在「下载」里。',

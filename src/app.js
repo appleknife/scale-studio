@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023400';
-import { renderStaff } from './staff.js?v=202611023400';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611023400';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023400';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023400';
-import { generatePassage } from './sightreading.js?v=202611023400';
-import { createPlayer } from './playback.js?v=202611023400';
-import { renderScore } from './score.js?v=202611023400';
-import * as Journal from './journal.js?v=202611023400';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023400';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023400';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023630';
+import { renderStaff } from './staff.js?v=202611023630';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611023630';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023630';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023630';
+import { generatePassage } from './sightreading.js?v=202611023630';
+import { createPlayer } from './playback.js?v=202611023630';
+import { renderScore } from './score.js?v=202611023630';
+import * as Journal from './journal.js?v=202611023630';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023630';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023630';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611023400';
+} from './tuner.js?v=202611023630';
 
 const LANG = initLang();
 
@@ -91,6 +91,7 @@ const el = {
   recList: $('recList'),
   reverbToggle: $('reverbToggle'),
   lessonSheet: $('lessonSheet'),
+  weekNote: $('weekNote'),
   copySheet: $('copySheet'),
   shareSheet: $('shareSheet'),
   clearLog: $('clearLog'),
@@ -249,6 +250,19 @@ const LEVELS = {
 };
 
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+/** A written duration, as the words a teacher would use for it. */
+const NOTE_VALUE_KEY = {
+  1: 'noteValue.sixteenth',
+  1.5: 'noteValue.dottedSixteenth',
+  2: 'noteValue.eighth',
+  3: 'noteValue.dottedEighth',
+  4: 'noteValue.quarter',
+  6: 'noteValue.dottedQuarter',
+  8: 'noteValue.half',
+  12: 'noteValue.dottedHalf',
+  16: 'noteValue.whole',
+};
 
 /* ── Screens ──────────────────────────────────────────────────────────── */
 
@@ -1405,7 +1419,9 @@ function renderSightResult(result) {
     .map(([label, value]) => `<li><span>${label}</span><span>${value}</span></li>`)
     .join('');
 
-  // A handful of kind, specific observations rather than a verdict.
+  // A handful of kind, specific observations rather than a verdict, ordered by
+  // what a teacher would say first: where it broke, then how fast it went, then
+  // the pitch.
   const tips = [];
   const missed = result.missed.length;
   if (missed > 0) {
@@ -1423,6 +1439,20 @@ function renderSightResult(result) {
   } else {
     tips.push(t('sight.tipAllNotes'));
   }
+  if (result.worstBars && result.worstBars.length) {
+    const bars = result.worstBars.map((b) => b.bar).sort((a, b) => a - b);
+    tips.push(
+      t(bars.length === 1 ? 'sight.tipBar.one' : 'sight.tipBar.many', { bars: bars.join(' & ') }),
+    );
+  }
+  if (result.tempo) {
+    tips.push(
+      t(result.tempo.faster ? 'sight.tipTempo.faster' : 'sight.tipTempo.slower', {
+        played: result.tempo.played,
+        printed: result.tempo.printed,
+      }),
+    );
+  }
   const off = result.results.filter((r) => r.status === 'exact' && Math.abs(r.cents) > 25);
   if (off.length) {
     const first = off[0];
@@ -1435,6 +1465,14 @@ function renderSightResult(result) {
   }
   if (result.rhythm < 0.75) tips.push(t('sight.tipPulse'));
   if (result.stops > 0) tips.push(t('sight.tipStops', { n: result.stops }));
+  if (result.entries && result.entries.length) {
+    const e = result.entries[0];
+    tips.push(
+      t(e.bias < 0 ? 'sight.tipEarly' : 'sight.tipLate', {
+        value: t(NOTE_VALUE_KEY[e.dur] || 'noteValue.some'),
+      }),
+    );
+  }
   // What the listening noticed rather than what it scored: a pitch that keeps
   // sitting off, or a take that sped up. Specific enough to act on tonight.
   if (result.habits && result.habits.bias) {
@@ -1454,7 +1492,7 @@ function renderSightResult(result) {
     );
   }
 
-  el.sightTips.innerHTML = tips.slice(0, 3).map((text) => `<li>${text}</li>`).join('');
+  el.sightTips.innerHTML = tips.slice(0, 4).map((text) => `<li>${text}</li>`).join('');
 }
 
 /**
@@ -1659,6 +1697,41 @@ function chips(container, items, dataKey, isOn, label) {
     .join('');
 }
 
+/**
+ * The note to the student at the foot of the week sheet.
+ *
+ * The data picks the sentence (journal.weekNote); this only turns it into words.
+ * One thing is noticed, then one thing is suggested — the shape a teacher uses,
+ * and the shape the evidence supports: specific, comparative, and never a score
+ * for a week that did not happen.
+ */
+function weekNoteText(ids, today) {
+  const note = Journal.weekNote(journal, today, ids);
+  const main = t(`note.${note.kind}`, {
+    days: note.days,
+    target: note.target,
+    done: note.done,
+  });
+
+  // One extra sentence, chosen by what the week actually contains. Naming a
+  // scale that came good beats a generic encouragement; if there is none, the
+  // thing they said was hard is the next best; if neither, the run they are on.
+  let extra = '';
+  if (note.ready && note.ready.length) {
+    extra = t('note.extra.ready', { names: note.ready.map((id) => keyName(id)).join(', ') });
+  } else if (note.hard) {
+    // The chip is a label ("Intonation"); inside a sentence it reads as a word.
+    const thing = t(`log.hard.${note.hard}`);
+    const inline = getLang() === 'zh' ? thing : thing.charAt(0).toLowerCase() + thing.slice(1);
+    extra = t('note.extra.hard', { thing: inline });
+  } else if (note.streak >= 3) {
+    extra = t('note.extra.streak', { n: note.streak });
+  } else {
+    extra = t('note.extra.go');
+  }
+  return `${main} ${extra}`;
+}
+
 function sheetText() {
   const today = todayKey();
   const ids = MAJOR_KEYS.map((k) => k.id);
@@ -1686,7 +1759,21 @@ function sheetText() {
         : t(goal.target === 1 ? 'log.goal.days1' : 'log.goal.daysN', { n: goal.target });
     lines.push(t('log.sheet.goal', { goal: said, done: goal.done, target: goal.target }));
   }
-  lines.push(t('log.sheet.days', { n: s.days, rests: s.rests }));
+  // "Practiced 1 days" is exactly the sort of thing that makes an app feel
+  // machine-written, and this sheet is read aloud in a lesson.
+  const daysKey =
+    s.days === 1
+      ? s.rests === 1
+        ? 'log.sheet.dayRest1'
+        : s.rests === 0
+          ? 'log.sheet.day1'
+          : 'log.sheet.day1Rest'
+      : s.rests === 1
+        ? 'log.sheet.rest1'
+        : s.rests === 0
+          ? 'log.sheet.daysNone'
+          : 'log.sheet.days';
+  lines.push(t(daysKey, { n: s.days, rests: s.rests }));
   if (s.takes) lines.push(t('log.sheet.takes', { n: s.takes }));
   const tags = Object.entries(s.tags)
     .map(([tag, n]) => `${t(`log.tag.${tag}`)} ×${n}`)
@@ -1813,6 +1900,7 @@ function renderLog() {
 
   renderWeekWins(ids, today);
 
+  el.weekNote.textContent = weekNoteText(ids, today);
   el.lessonSheet.textContent = sheetText();
   el.copySheet.textContent = t('log.copy');
   if (!el.shareSheet.hidden) el.shareSheet.textContent = t('log.share');

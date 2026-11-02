@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611023400" />
+    <link rel="stylesheet" href="app.css?v=202611023630" />
   </head>
   <body>
     <div class="shell">
@@ -559,6 +559,8 @@
           </div>
 
           <h3 class="section-title">Take this to your lesson</h3>
+          <!-- The one place the app speaks to the student rather than about them. -->
+          <p class="week-note" id="weekNote"></p>
           <pre class="sheet" id="lessonSheet"></pre>
           <div class="actions">
             <button class="quiet-btn" id="shareSheet" type="button" hidden>Share the week</button>
@@ -886,7 +888,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611023400"></script>
+    <script type="module" src="src/app.js?v=202611023630"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

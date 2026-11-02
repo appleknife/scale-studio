@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611023400';
-import { getLang, t } from './i18n.js?v=202611023400';
+import { median } from './pitch.js?v=202611023630';
+import { getLang, t } from './i18n.js?v=202611023630';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -700,6 +700,67 @@ export function analyzeSightTake(frames, passage, options = {}) {
       ),
   );
 
+  // --- What else the take can say ----------------------------------------
+  //
+  // Three readings that are reliable enough to speak about, each with a rule for
+  // staying quiet: the speed against the page's own marking, where the music came
+  // apart, and whether one kind of note was consistently early or late.
+  const perBar = passage.perBar || 16;
+
+  // Where it broke: notes missed or wrong, counted by bar. A bar with two or more
+  // is a bar to look at; one is just a slip.
+  const barCount = new Map();
+  results.forEach((r, i) => {
+    if (r.status !== 'missed' && r.status !== 'wrong') return;
+    const bar = Math.floor((events[i].abs || 0) / perBar) + 1;
+    barCount.set(bar, (barCount.get(bar) || 0) + 1);
+  });
+  const worstBars = [...barCount.entries()]
+    .filter(([, n]) => n >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .map(([bar, n]) => ({ bar, n }))
+    .slice(0, 2);
+
+  // The speed against the printed marking. Only worth saying when the student is
+  // close to playing the passage — a take that stalled is not a tempo question.
+  let tempo = null;
+  if (unit > 0 && passage.tempo && passage.tempo.bpm) {
+    const printed = passage.tempo.bpm;
+    const played = 60 / (unit * 4); // seconds per sixteenth → quarters per minute
+    if (Number.isFinite(played) && played > 0) {
+      const ratio = played / printed;
+      // A take that stalled is not a tempo question, so the speed is only
+      // reported when most of the notes actually sounded.
+      const missedCount = results.filter((r) => r.status === 'missed').length;
+      if (Math.abs(ratio - 1) >= 0.08 && missedCount <= events.length * 0.15) {
+        tempo = { played: Math.round(played), printed, ratio, faster: ratio > 1 };
+      }
+    }
+  }
+
+  // One kind of note consistently early or late: sixteenths that all arrive a
+  // little before their beat are a habit, not a mistake.
+  const byDur = new Map();
+  for (let k = 1; k < pairs.length; k++) {
+    const prev = pairs[k - 1];
+    const here = pairs[k];
+    if (here.e !== prev.e + 1) continue;
+    const units = events[here.e].abs - events[prev.e].abs;
+    if (!(units > 0)) continue;
+    const actual = notes[here.d].t0 - notes[prev.d].t0;
+    const expectedTime = unit * units;
+    if (!(expectedTime > 0)) continue;
+    const cell = byDur.get(events[here.e].dur) || { dur: events[here.e].dur, sum: 0, n: 0 };
+    cell.sum += actual / expectedTime - 1;
+    cell.n += 1;
+    byDur.set(events[here.e].dur, cell);
+  }
+  const entries = [...byDur.values()]
+    .filter((c) => c.n >= 3 && Math.abs(c.sum / c.n) >= 0.12)
+    .map((c) => ({ dur: c.dur, bias: c.sum / c.n, n: c.n }))
+    .sort((a, b) => Math.abs(b.bias) - Math.abs(a.bias))
+    .slice(0, 1);
+
   return {
     score,
     accuracy,
@@ -717,6 +778,9 @@ export function analyzeSightTake(frames, passage, options = {}) {
     octaveErrors,
     wrong,
     habits,
+    worstBars,
+    tempo,
+    entries,
     duration: frames.length ? frames[frames.length - 1].t : 0,
   };
 }

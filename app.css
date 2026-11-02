@@ -2648,6 +2648,21 @@ dialog .primary-btn {
   line-height: 1.55;
 }
 
+/* The note to the student: set in the serif, a size up from body text, because it
+   is the only place the app speaks to them rather than about them. */
+.week-note {
+  margin: 0 0 14px;
+  padding: 16px 18px;
+  background: var(--accent-wash);
+  border: 1px solid rgba(47, 93, 78, 0.16);
+  border-radius: 16px;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.62;
+  color: var(--ink);
+  max-width: 62ch;
+}
+
 /* The week grid sets the height of the row. The streak card is a column with a
    footer line, so the space reads as margin rather than as a dead patch under
    the rest button. */
