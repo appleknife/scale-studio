@@ -2186,6 +2186,15 @@ dialog .primary-btn {
   .volume {
     margin-left: 0;
   }
+
+  /* Three speeds beside a label are wider than a phone. The switch tightens up
+     rather than wrapping onto its own line, so the row keeps its shape and the
+     page never grows wider than the screen — which is what a pill that cannot
+     shrink does to everything below it. */
+  .speed-row .segmented button {
+    font-size: 12.5px;
+    padding: 7px 11px;
+  }
 }
 
 /* The live intonation readout, on the same footing as the scale take's: a small
