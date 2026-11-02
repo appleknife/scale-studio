@@ -365,7 +365,9 @@ about two passages out of three (78 and 83 of 120), and the suite checks that
 nothing below V draws one. The engraver had to learn the shape too — a lone
 sixteenth inside a beam is written with a *stub* of second beam, half a space long,
 pointing back into its group, and without it the second note of the figure read as
-an eighth.
+an eighth. The stub also has to follow the beam's **slope**: drawn level beside a
+slanted beam it met the beam at one end and drifted away at the other, which on a
+leaping figure is the difference between a second beam and a stray dash.
 
 ### Drawing the notation
 

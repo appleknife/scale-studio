@@ -6,10 +6,10 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611021530';
-import { CLEF_PATH } from './clef.js?v=202611021530';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611021615';
+import { CLEF_PATH } from './clef.js?v=202611021615';
 
-import { beatLength } from './sightreading.js?v=202611021530';
+import { beatLength } from './sightreading.js?v=202611021615';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -894,11 +894,18 @@ function drawSystem(
         const to = stemX(run[run.length - 1]);
         if (run.length === 1) {
           // One sixteenth inside a beam is written with a stub of second beam,
-          // half a space long, pointing back into the group. Without it the note
-          // reads as an eighth — and the dotted-eighth figure is exactly this.
+          // pointing back into the group. Without it the note reads as an eighth
+          // — and the dotted-eighth figure is exactly this.
+          //
+          // The stub follows the beam's own line. Drawn flat, a slanted beam got a
+          // horizontal dash beside it that met the beam at one end and drifted off
+          // it at the other, which is exactly how it looked.
           const place = group.indexOf(run[0]);
           const toward = place > 0 ? -1 : 1;
-          part.push(bar(from, beam.at(run[0]) + dy2, from + toward * 13, beam.at(run[0]) + dy2));
+          const slope = ux ? uy / ux : 0;
+          const stub = 11;
+          const y0 = beam.at(run[0]) + dy2;
+          part.push(bar(from, y0, from + toward * stub, y0 + slope * toward * stub));
         } else {
           part.push(bar(from, beam.at(run[0]) + dy2, to, beam.at(run[run.length - 1]) + dy2));
         }
