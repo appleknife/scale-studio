@@ -133,6 +133,13 @@
               }
               // A slur is one stroke of the bow, so the bow cannot stop under it.
               if (open && under > 0 && e.rest) problems.push(`${id}: a slur runs over a rest`);
+              // A dot under a slur is portato, which this app neither prints nor
+              // plays — and drawn under the curve the dot lands on the slur's own
+              // line. A mark survives only on the slur's last note, where it means
+              // the release, which is what the end of a slur actually is.
+              if (open && e.mark && !e.slurEnd) {
+                problems.push(`${id}: a ${e.mark} mark sits inside a slur`);
+              }
               if (e.slurEnd) {
                 if (!open) problems.push(`${id}: a slur ends without starting`);
                 open = false;

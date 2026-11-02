@@ -505,6 +505,13 @@ trouble are the ones where a stroked line is not good enough:
   ramp also carries the marking it arrives at, printed just past its open end, so
   a passage reads *mp < f* rather than a wedge that opens onto nothing — and the
   playback ramps to that marking's own level, not to an arbitrary one.
+* **A mark lives only at the end of a slur.** A dot inside a slur is *portato*,
+  which the app neither prints nor plays — and drawn under the curve the dot sat
+  right on the slur's own line, which the teacher photographed. Marks are placed
+  before slurs, so the generator's pass now clears every mark in a slurred run and
+  keeps only the one on its last note, where a dot means the release. The
+  sightreading suite walks every generated passage and fails on a dot or a wedge
+  anywhere else in a slur, including on the slur's first note.
 * **The markings grow a rung at a time**: *mf* at levels I–II, *f* from III, *mp*
   from IV, *p* from V. Fortissimo is not in the Manual's sight-reading criteria and
   is never drawn; level VI used to be the one level that never drew an *f* at all,

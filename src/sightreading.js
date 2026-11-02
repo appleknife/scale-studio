@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611025500';
-import { STAFF_GEOM } from './staff.js?v=202611025500';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611025600';
+import { STAFF_GEOM } from './staff.js?v=202611025600';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -1049,19 +1049,21 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     }
   }
 
-  // ── a slurred note keeps its mark only at the end ────────────────────────
+  // ── a slurred run keeps its mark only at the end ─────────────────────────
   //
-  // A dot under a slur is *portato*, which this app does not print and cannot
-  // play, and drawn under the curve the dot sits right on the slur's own line —
-  // the teacher found exactly that. Marks are placed before slurs, so a slur can
-  // land on a run that already has one; a slurred run now keeps a mark only on
-  // its last note, where a dot means the note is released short, which is what
-  // the end of a slur actually does.
+  // A dot under or inside a slur is *portato*, which this app does not print and
+  // cannot play, and drawn under the curve the dot sits right on the slur's own
+  // line — the teacher found exactly that. The teacher's rule is the one the
+  // generator now follows: a mark is possible only on the **end** of a slur, where
+  // it means the note is released short, which is what the end of a slur is.
+  // Marks are placed before slurs, so a slur can land on a run that already has
+  // one — including on its own first note, which the first version of this pass
+  // left alone.
   for (const bar of bars) {
     for (let i = 0; i < bar.length; i++) {
-      if (!bar[i].slurStart) continue;
-      for (let j = i + 1; j < bar.length; j++) {
-        if (bar[j].slurEnd) break;
+      if (!bar[i].slurStart || bar[i].slurEnd) continue;
+      for (let j = i; j < bar.length; j++) {
+        if (j > i && bar[j].slurEnd) break;
         if (bar[j].mark) delete bar[j].mark;
       }
     }
