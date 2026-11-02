@@ -335,8 +335,12 @@ passage from level IV on.
 **Level III is where silence arrives too** — one rest in most passages, two now
 and then. Which kind is the point: a **quarter rest** is the one a sight-reader
 meets constantly and it is placed most often; a **half rest** takes two beats of
-the bar and so turns up about half as often; an eighth rest fills in, and a
-sixteenth rest only appears inside a run of sixteenths, where it breaks the beam.
+the bar and so turns up about half as often; an eighth rest fills in. The
+**sixteenth rest is level VI's figure and nobody else's** — the teacher is clear
+that it does not turn up before the top level — and even there it only appears
+inside a run of sixteenths, where it breaks the beam. (It used to be allowed at any
+level from III up and only ever happened to appear at VI; that is now a rule the
+suite checks rather than a coincidence of the draw.)
 A half rest is only written where there is a two-beat group to hold it — 3/4, 4/4
 and 2/2 — because in 2/4 it would be a whole-bar rest and in 6/8 the beat is a
 dotted quarter. Levels I and II have no rests at all, and `sightreading.test.html`

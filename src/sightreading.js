@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021345';
-import { STAFF_GEOM } from './staff.js?v=202611021345';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021420';
+import { STAFF_GEOM } from './staff.js?v=202611021420';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -111,7 +111,8 @@ const LEVELS = {
     dynamics: ['mf', 'f'],
     marks: ['staccato'],
     // Level III is also where silence arrives: a quarter rest first, a half rest
-    // now and then, and an eighth rest inside a beat.
+    // now and then, and an eighth rest inside a beat. The sixteenth rest waits
+    // until level VI (see `sixteenthRest` there).
     rests: true,
     accidentals: 0,
   },
@@ -236,6 +237,9 @@ const LEVELS = {
     dynamics: ['p', 'mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
     rests: true,
+    // The sixteenth rest belongs to the top level: it only makes sense inside a
+    // run of sixteenths, and level VI is the one that has runs to break.
+    sixteenthRest: true,
     accidentals: 2,
   },
 };
@@ -489,13 +493,13 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     // whole-bar rest (drawn as a whole rest, not this glyph), and in 6/8 the beat
     // is a dotted quarter, so neither takes one.
     const allowsHalf = meter === '3/4' || meter === '4/4' || meter === '2/2';
-    // A sixteenth rest belongs inside a run of sixteenths — but at level III the run
-    // is the one guaranteed figure of the passage, and a rest in the middle of it
-    // turns four sixteenths into two and a gap. The teacher's instruction is a
-    // *cluster* of four, so at that level the sixteenth rest is left out.
+    // A sixteenth rest is level VI's figure and nobody else's: the teacher is
+    // clear that it does not turn up before the top level. At III it would also
+    // carve a hole in the one guaranteed cluster of the passage, which is the
+    // figure that level is *for*.
     const table = compound
       ? [[2, 1]] // an eighth rest; a quarter rest would cross 6/8's own beat
-      : [[4, 5], [2, 2], [8, allowsHalf ? 2 : 0], [1, lean < 1 ? 0 : 1]];
+      : [[4, 5], [2, 2], [8, allowsHalf ? 2 : 0], [1, spec.sixteenthRest ? 1 : 0]];
 
     const options = table
       .map(([dur, weight]) => ({
