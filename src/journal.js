@@ -39,6 +39,55 @@ export function emptyState() {
  * "practice more" is neither. The student still chooses, which is the autonomy
  * part — the app only offers shapes that can be counted honestly.
  */
+/**
+ * What the audition asks for, by level group — straight from the Manual.
+ *
+ * Levels I–II: three scales, one octave, chosen by the student. III–IV: seven,
+ * two of them in two octaves, also chosen. V–VI: fifteen major scales in two
+ * octaves, which in this app is twelve keys, because C♯ and D♭ are the same
+ * scale played the same way.
+ *
+ * The point of writing it down here is that the log can then say "two of three"
+ * to a beginner instead of showing twelve scales and implying they all have to
+ * be ready. The `choose` flag is what makes that difference: at I–IV any three
+ * (or seven) will do, so the app counts how many are ready and lets the student
+ * pick; at V–VI every key is required, so the count is the whole list.
+ */
+export const AUDITION = {
+  '1-2': { need: 3, octaves: 1, choose: true },
+  '3-4': { need: 7, octaves: 2, choose: true },
+  '5-6': { need: 12, octaves: 2, choose: false },
+};
+
+/** The scales a beginner is usually given first: open strings, one pattern. */
+export const FIRST_THREE = ['G', 'D', 'A'];
+
+export function auditionLevel(state) {
+  return AUDITION[state.audition] ? state.audition : '5-6';
+}
+
+export function setAudition(state, group) {
+  state.audition = AUDITION[group] ? group : '5-6';
+  return state.audition;
+}
+
+/** How far through the level's requirement the student is. */
+export function auditionProgress(state, ids = [], today = dayKey()) {
+  const group = auditionLevel(state);
+  const spec = AUDITION[group];
+  const ready = scalesReady(state, ids).filter((s) => s.ready);
+  return {
+    group,
+    ...spec,
+    ready: ready.length,
+    readyIds: ready.map((s) => s.id),
+    // At I–IV the requirement is met by *any* of them, so the count stops at the
+    // requirement rather than running to twelve and looking like a failure.
+    done: spec.choose ? Math.min(ready.length, spec.need) : ready.length,
+    met: ready.length >= spec.need,
+  };
+}
+
 export const GOALS = [
   { kind: 'days', target: 3 },
   { kind: 'days', target: 5 },

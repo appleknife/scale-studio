@@ -2852,6 +2852,35 @@ dialog .primary-btn {
   margin-top: 2px;
 }
 
+/* At the beginner levels the usual first three are marked, so a student who has
+   no idea where to start is not choosing from twelve at random. A dotted edge
+   rather than a colour: nothing here is more "correct", only better known. */
+.ready-item.is-suggested {
+  border-style: dashed;
+  border-color: #cdbfa6;
+}
+
+.ready-item.is-suggested .ready-sub {
+  color: var(--ink-soft);
+}
+
+/* The level switch sits right under the heading, small, so the section says what
+   it is counting before it shows anything to count. */
+.audition-row {
+  margin: 8px 0 6px;
+}
+
+.ready-count {
+  margin: 14px 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ready-count.is-met {
+  color: var(--accent);
+}
+
 .rec-card {
   background: var(--surface);
   border: 1px solid var(--line);

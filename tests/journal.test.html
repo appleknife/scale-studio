@@ -370,6 +370,54 @@
         eq('the thing they called hard is carried', J.weekNote(hard, TODAY, ids).hard, 'rhythm');
       }
 
+      /* ── what the audition asks for ─────────────────────────────── */
+      //
+      // The Manual asks a level I student for three scales they choose, not for
+      // twelve. These check that the requirement — and the point at which it is
+      // met — follows the level rather than the length of the key list.
+      {
+        const ids = ['G', 'D', 'A', 'C', 'F'];
+        const s = J.emptyState();
+        eq('the strict view until the student says otherwise', J.auditionLevel(s), '5-6');
+        eq('and it wants every key', J.auditionProgress(s, ids).need, 12);
+
+        J.setAudition(s, '1-2');
+        eq('level I–II wants three', J.auditionProgress(s, ids).need, 3);
+        eq('with one octave and a free choice', `${J.auditionProgress(s, ids).octaves}/${J.auditionProgress(s, ids).choose}`, '1/true');
+
+        // Two scales ready is two of three — the count is against the level, not
+        // against the twelve tiles underneath it.
+        J.noteScale(s, 'G', '2026-03-09', 94);
+        J.noteScale(s, 'G', '2026-03-10', 95);
+        J.noteScale(s, 'D', '2026-03-09', 92);
+        J.noteScale(s, 'D', '2026-03-10', 93);
+        const two = J.auditionProgress(s, ids);
+        eq('two of three', `${two.done}/${two.need}`, '2/3');
+        eq('not met yet', two.met, false);
+
+        J.noteScale(s, 'A', '2026-03-11', 91);
+        J.noteScale(s, 'A', '2026-03-12', 92);
+        const three = J.auditionProgress(s, ids);
+        eq('three of three met', three.met, true);
+        eq('the count still reads 3', three.done, 3);
+
+        // A seventh scale at V–VI is progress, not completion.
+        J.setAudition(s, '5-6');
+        const strict = J.auditionProgress(s, ids);
+        eq('V–VI counts every ready key', strict.done, 3);
+        eq('and is not met by three', strict.met, false);
+
+        // A scale played once is not ready, at any level.
+        const half = J.emptyState();
+        J.setAudition(half, '3-4');
+        J.noteScale(half, 'G', '2026-03-10', 95);
+        eq('one clean day is not a ready scale', J.auditionProgress(half, ids).done, 0);
+
+        // An unknown group falls back rather than breaking the section.
+        J.setAudition(s, 'nonsense');
+        eq('a bad value falls back to V–VI', J.auditionLevel(s), '5-6');
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `LOG FAILED\n${problems.join('\n')}`
         : 'LOG OK';

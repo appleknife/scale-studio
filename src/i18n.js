@@ -658,6 +658,25 @@ export const S = {
   'log.hard.tone': ['Tone and bow', '音色与运弓'],
   'log.ready': ['Ready', '已就绪'],
   'log.readyOf': ['{n} of {total} days', '{n}/{total} 天'],
+  'log.ready.suggested': ['One of the usual first three — open strings, one pattern', '常见的第一批之一——空弦起步，同一套指法'],
+  // What the level asks for, in its own words.
+  'log.ready.hint.1-2': [
+    'Level I–II asks for {n} scales, one octave each — you choose which three. G, D and A are the usual first ones: they start on open strings and use the same finger pattern. A scale is ready after two clean days.',
+    '一至二级只要 {n} 条音阶，每条一个八度——三条由你自己挑。通常先学 G、D、A：它们都从空弦开始，指法也一样。一条在两个不同日子拉干净就算就绪。',
+  ],
+  'log.ready.hint.3-4': [
+    'Level III–IV asks for {n} scales, two of them in two octaves — you choose the seven. A scale is ready after two clean days.',
+    '三至四级要 {n} 条音阶，其中两条是两八度——七条由你自己挑。一条在两个不同日子拉干净就算就绪。',
+  ],
+  'log.ready.hint.5-6': [
+    'Level V–VI asks for {n} major scales, all in two octaves. The Manual counts fifteen, which in this app is twelve keys: C♯ and D♭ are one scale played one way. A scale is ready after two clean days.',
+    '五至六级要 {n} 条大调音阶，全部两个八度。手册上算十五条，这里是十二个调：升 C 和降 D 是同一条音阶的两种写法。一条在两个不同日子拉干净就算就绪。',
+  ],
+  'log.ready.count': ['{done} of {need} ready', '{done} / {need} 已就绪'],
+  'log.ready.met': [
+    '{done} of {need} — the ones this level asks for are ready',
+    '{done} / {need}——这一级要求的已经够了',
+  ],
   'log.record': ['Record', '录音'],
   'log.stop': ['Stop', '停止'],
   'log.recording': [
@@ -762,6 +781,7 @@ export const STATIC = {
   '¾ speed': '¾ 速度',
   'At tempo': '原速',
   'Scales': '音阶',
+  'Preparing for': '准备级别',
   'NYSSMA majors': 'NYSSMA 大调',
   'Minor scales': '小调',
   'natural': '自然',

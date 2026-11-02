@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023800';
-import { renderStaff } from './staff.js?v=202611023800';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611023800';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023800';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023800';
-import { generatePassage } from './sightreading.js?v=202611023800';
-import { createPlayer } from './playback.js?v=202611023800';
-import { renderScore } from './score.js?v=202611023800';
-import * as Journal from './journal.js?v=202611023800';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023800';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023800';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023930';
+import { renderStaff } from './staff.js?v=202611023930';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611023930';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023930';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023930';
+import { generatePassage } from './sightreading.js?v=202611023930';
+import { createPlayer } from './playback.js?v=202611023930';
+import { renderScore } from './score.js?v=202611023930';
+import * as Journal from './journal.js?v=202611023930';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023930';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023930';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611023800';
+} from './tuner.js?v=202611023930';
 
 const LANG = initLang();
 
@@ -75,6 +75,9 @@ const el = {
   todayChips: $('todayChips'),
   hardChips: $('hardChips'),
   readyList: $('readyList'),
+  readyHint: $('readyHint'),
+  readyCount: $('readyCount'),
+  auditionLevels: $('auditionLevels'),
   recBtn: $('recBtn'),
   recStatus: $('recStatus'),
   logWarn: $('logWarn'),
@@ -1897,14 +1900,7 @@ function renderLog() {
   );
 
   const ids = MAJOR_KEYS.map((k) => k.id);
-  el.readyList.innerHTML = Journal.scalesReady(journal, ids)
-    .map(
-      (s) => `<div class="ready-item${s.ready ? ' is-ready' : ''}">
-        <span class="ready-key">${keyName(s.id)}</span>
-        <span class="ready-sub">${s.ready ? t('log.ready') : t('log.readyOf', { n: s.days, total: Journal.READY_DAYS })}</span>
-      </div>`,
-    )
-    .join('');
+  renderReady(ids);
 
   renderWeekWins(ids, today);
 
@@ -1915,6 +1911,59 @@ function renderLog() {
   if (!recorder.live) el.recBtn.textContent = t('log.record');
   renderRecList();
 }
+
+/**
+ * The scales-ready section, framed by what the audition actually asks for.
+ *
+ * The Manual asks a level I student for *three* scales, one octave, chosen by
+ * them. Showing twelve tiles and "0 of 2 days" under every one of them says the
+ * opposite — that all twelve must come good — and that is the sort of quiet
+ * pressure that makes a beginner put the app down. So the section carries the
+ * level, the sentence and the count that go with it, and at levels I–IV it says
+ * plainly that the student picks which ones.
+ */
+function renderReady(ids) {
+  const p = Journal.auditionProgress(journal, ids);
+  [...el.auditionLevels.querySelectorAll('button')].forEach((b) =>
+    b.setAttribute('aria-selected', String(b.dataset.audition === p.group)),
+  );
+
+  el.readyHint.textContent = t(`log.ready.hint.${p.group}`, { n: p.need });
+  el.readyCount.textContent = t(
+    p.met ? 'log.ready.met' : 'log.ready.count',
+    { done: p.done, need: p.need },
+  );
+  el.readyCount.classList.toggle('is-met', p.met);
+
+  const first = new Set(Journal.FIRST_THREE);
+  el.readyList.innerHTML = Journal.scalesReady(journal, ids)
+    .map((s) => {
+      // At the beginner levels the usual first three are marked, so a student who
+      // has no idea where to start is not choosing from twelve at random.
+      const suggested = p.choose && p.group === '1-2' && first.has(s.id);
+      const cls = ['ready-item', s.ready && 'is-ready', suggested && 'is-suggested']
+        .filter(Boolean)
+        .join(' ');
+      // The dashed border is the only mark the suggested scales get: the sentence
+      // above already names them, and a second line of text on three tiles out of
+      // twelve made the grid ragged for no extra information.
+      const sub = s.ready ? t('log.ready') : t('log.readyOf', { n: s.days, total: Journal.READY_DAYS });
+      const hint = suggested ? ` title="${t('log.ready.suggested')}"` : '';
+      return `<div class="${cls}"${hint}>
+        <span class="ready-key">${keyName(s.id)}</span>
+        <span class="ready-sub">${sub}</span>
+      </div>`;
+    })
+    .join('');
+}
+
+el.auditionLevels.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-audition]');
+  if (!btn) return;
+  Journal.setAudition(journal, btn.dataset.audition);
+  saveJournal();
+  renderReady(MAJOR_KEYS.map((k) => k.id));
+});
 
 /**
  * The student's own goal for the week, and the week measured against it.
