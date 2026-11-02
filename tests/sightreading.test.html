@@ -299,25 +299,33 @@
       }
 
       // Level III is where sixteenths enter the Manual's ladder, as one beat of
-      // four under a beam. "Occasional" is the whole point at that level, so the
-      // rate is checked from both sides: never is a missing feature, and most
-      // passages is a level that has stopped being level III.
+      // four under a beam — and the teacher's rule for them is "one cluster every
+      // generation". A student only ever practises the pages they are given, so a
+      // third of the passages is the same as never; and a passage made of them is
+      // no longer a level III page. Both sides are checked.
       {
-        const hasRunOfFour = (bar) => {
+        const runsIn = (bar) => {
           let run = 0;
+          let runs = 0;
           for (const e of bar) {
             run = e.dur === 1 ? run + 1 : 0;
-            if (run >= 4) return true;
+            if (run === 4) runs++;
           }
-          return false;
+          return runs;
         };
         let withSixteenths = 0;
+        let totalRuns = 0;
         for (let seed = 0; seed < 120; seed++) {
-          if (generatePassage({ level: 3, seed }).bars.some(hasRunOfFour)) withSixteenths++;
+          const runs = generatePassage({ level: 3, seed }).bars.map(runsIn).reduce((a, b) => a + b, 0);
+          totalRuns += runs;
+          if (runs > 0) withSixteenths++;
         }
-        log.push(`L3: a beat of sixteenths in ${withSixteenths}/120 passages`);
-        if (withSixteenths < 15) problems.push(`level 3 met sixteenths in only ${withSixteenths} of 120 passages`);
-        if (withSixteenths > 80) problems.push(`level 3 has sixteenths in ${withSixteenths} of 120 passages — that is not occasional`);
+        const per = totalRuns / 120;
+        log.push(`L3: a beat of sixteenths in ${withSixteenths}/120 passages (${per.toFixed(2)} a passage)`);
+        if (withSixteenths < 118) {
+          problems.push(`level 3 met sixteenths in only ${withSixteenths} of 120 passages`);
+        }
+        if (per > 1.4) problems.push(`level 3 carries ${per.toFixed(2)} beats of sixteenths a passage — that is not one`);
       }
 
       // Rests: which ones, and how often. Quarter rests were the thing missing —

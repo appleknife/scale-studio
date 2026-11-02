@@ -344,10 +344,14 @@ counts them by kind so they cannot quietly disappear again.
 
 **Level III is also where sixteenths arrive** — the Manual's first level that uses
 them, and its figure is the one a beat of four under a beam, the same group level
-VI leans on. They stay occasional here: a passage has one in about a third of
-draws, and once it has one the rest of the bars are usually plainer. From level V
-on the runs multiply; level VI, whose own printed example is built from them, gets
-them in almost every passage.
+VI leans on. They arrive **once in every passage**: the bar that carries the run is
+chosen up front (never the fourth, which ends on a note to breathe on, and never the
+last), so a student who is given a level III page is always given the figure they
+have to meet — left to the draw it turned up in about a third of them, which for
+any one student is the same as never. A second run is still possible, but rare: 1.07
+beats of sixteenths a passage on average. From level V on the runs multiply; level
+VI, whose own printed example is built from them, gets them in almost every
+passage.
 
 ### Drawing the notation
 

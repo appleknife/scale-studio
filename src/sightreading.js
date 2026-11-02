@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021245';
-import { STAFF_GEOM } from './staff.js?v=202611021245';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611021330';
+import { STAFF_GEOM } from './staff.js?v=202611021330';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -387,6 +387,14 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   const bars = [];
   let previous = null;
   let runBars = 0;
+  // A level that *meets* sixteenths meets them every time. Left to the draw,
+  // level III produced the figure in about a third of its passages, which for a
+  // student is the same as never: the page they are given is the page they
+  // practise. So the bar that carries the run is chosen up front — never the
+  // fourth (which ends on a note to breathe on) and never the last — and the
+  // pattern there is forced. A second run is still possible, at the same lean.
+  const lean = spec.sixteenths ?? 1;
+  const runBar = lean < 1 ? pick(rng, [1, 2, 4, 5]) : -1;
   for (let b = 0; b < BAR_COUNT; b++) {
     // Avoid the same bar twice in a row when there is a choice: eight identical
     // bars of half notes is not a sight-reading test, it is a warm-up.
@@ -400,10 +408,9 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     const runs = base.filter(hasRunOfFour);
     const plain = base.filter((p) => !hasRunOfFour(p));
     // How hard this level leans on the figure. Level VI leans hard, because the
-    // Manual's own example is built from it. Level III meets it now and then:
-    // there the pattern is in the draw for a bar about a third of the time and
-    // out of it otherwise, so most passages have none and the rest have one.
-    const lean = spec.sixteenths ?? 1;
+    // Manual's own example is built from it; at levels IV and V the run is in
+    // every draw. Level III takes the run once in every passage, at the bar
+    // chosen above.
     let pool_;
     if (runBars === 0 && runs.length && lean < 1) {
       pool_ = lean > 0 && chance(rng, lean) ? base : plain;
@@ -416,7 +423,15 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     }
 
     let pattern;
-    if (b === BAR_COUNT - 1) {
+    if (b === runBar && runBars === 0) {
+      const usable = (runs.length ? runs : patterns.filter(hasRunOfFour)).filter(
+        (p) => p !== previous,
+      );
+      if (usable.length) pattern = pick(rng, usable);
+    }
+    if (pattern) {
+      // the run bar is settled
+    } else if (b === BAR_COUNT - 1) {
       // close on something that can hold: a half note or a dotted quarter
       const endings = pool_.filter((p) => p[p.length - 1] >= 6);
       pattern = endings.length ? pick(rng, endings) : pick(rng, pool_);
