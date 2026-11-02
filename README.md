@@ -921,6 +921,31 @@ The practice log lives in `localStorage` rather than the cache and is unaffected
 the log's download/load-a-copy file remains the way to move a log between devices,
 because offline is not sync.
 
+### The week: a goal of the student's own, and what actually happened
+
+The log used to record what happened and stop there. It now also asks, quietly,
+what the student *wanted* — a short menu: three days, five days, one more scale
+ready, two more — and shows the week measured against it, with the scales that came
+good named rather than counted, and days compared with last week.
+
+Three decisions come from the research:
+
+* **A menu, not a text box.** Specific, close-at-hand goals beat vague ones, and
+the student still chooses — autonomy was the least satisfied of the three needs in
+the music-school dropout data.
+* **Recorded and shown back.** Monitoring progress is the best-supported
+motivational lever in the literature, and its effect is larger when the result is
+written down and reported to someone. That is also why the goal now appears on the
+week sheet the teacher reads: *"You said three days, you did four"* is the kind of
+specific feedback that beats general praise.
+* **No loss framing.** A goal is not "failed" in advance because it is Wednesday,
+the count never runs past the target, and a week with no comparison says so rather
+than showing a zero. Nothing here can be lost, only built.
+
+What is deliberately absent: leaderboards, badges for turning up, and points for
+minutes. Those are the game elements the negative-effects literature names most
+often, and competition lands hardest on the students who are already behind.
+
 ## Languages
 
 The app is in English and Simplified Chinese. The switch is the pill in the top

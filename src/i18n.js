@@ -499,6 +499,37 @@ export const S = {
   /* Practice log, as the screen says it */
   'log.banner.streak': ['{n} days in a row · {days} this week', '{n} 天连续 · 本周 {days} 天'],
   'log.banner.empty': ['Start the log — one tap is enough.', '开始记录吧——点一下就算。'],
+  // ── The week: the student's own goal, and what actually happened ──
+  'log.goal.none': [
+    'What would you like this week to look like?',
+    '这周想练成什么样？',
+  ],
+  'log.goal.days1': ['Practise on 1 day', '本周练 1 天'],
+  'log.goal.daysN': ['Practise on {n} days', '本周练 {n} 天'],
+  'log.goal.ready1': ['Get 1 more scale ready for the audition', '再让 1 条音阶达到考试标准'],
+  'log.goal.readyN': ['Get {n} more scales ready for the audition', '再让 {n} 条音阶达到考试标准'],
+  'log.goal.count': ['{done} of {target}', '{done} / {target}'],
+  'log.chip.day1': ['1 day', '1 天'],
+  'log.chip.days': ['{n} days', '{n} 天'],
+  'log.chip.scale1': ['1 scale', '1 条音阶'],
+  'log.chip.scales': ['{n} scales', '{n} 条音阶'],
+  'log.win.daysLabel': ['Days practised', '练习天数'],
+  'log.win.day1': ['1 day', '1 天'],
+  'log.win.daysN': ['{n} days', '{n} 天'],
+  'log.win.more': ['{n} more than last week', '比上周多 {n}'],
+  'log.win.less': ['{n} fewer than last week', '比上周少 {n}'],
+  'log.win.same': ['same as last week', '和上周一样'],
+  'log.win.first': ['a first week — nothing to compare yet', '第一周——还没有可比较的'],
+  'log.win.readyLabel': ['Came good this week', '本周变好的'],
+  'log.win.ready1': ['1 scale ready', '1 条音阶就绪'],
+  'log.win.readyN': ['{n} scales ready', '{n} 条音阶就绪'],
+  'log.win.readyNone': ['not yet — two clean days makes one', '还没有——两个干净的日子才算一条'],
+  'log.win.totalLabel': ['Ready for the audition', '考试就绪'],
+  'log.win.total': ['{n} of {total} scales', '{n} / {total} 条音阶'],
+  'log.win.none': [
+    'Nothing logged yet. One tap on a day below starts it.',
+    '还没有记录。在下面点一下“今天”就开始了。',
+  ],
   'log.planLine': ['You practice {when}.', '你的计划：{when}。'],
   'log.planEmpty': ['Pick a time and it will show here.', '选一个时间，会显示在这里。'],
   'log.rest': ['Mark today as rest', '把今天标为休息'],
@@ -530,6 +561,7 @@ export const S = {
   'log.playFailed': ['Could not play that back.', '这段放不出来。'],
   'log.take': ['Take {n}', '第 {n} 段'],
   'log.sheet.week': ['Week of {date}', '本周（{date} 起）'],
+  'log.sheet.goal': ['Goal: {goal} · {done} of {target}', '目标：{goal} · {done} / {target}'],
   'log.sheet.days': ['Practiced {n} days, rested {rests}', '练了 {n} 天，休息 {rests} 天'],
   'log.savedCopy': [
     'Saved {n} days to a file — look in your downloads.',
@@ -708,6 +740,8 @@ export const STATIC = {
   Finish: '完成',
   'Try again': '再试一次',
   'Support Scale Studio': '支持 Scale Studio',
+  'This week': '这周',
+
   /* offline */
   'Make the violin available offline': '把小提琴录音存到本机',
 

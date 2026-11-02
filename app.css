@@ -2546,6 +2546,108 @@ dialog .primary-btn {
   padding: 20px 22px;
 }
 
+/* The week: the student's own goal and what has actually happened. A card rather
+   than a chart — the numbers are small and the point is the sentence they make. */
+.wins-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  padding: 20px 22px 18px;
+}
+
+.goal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.goal-line {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.goal-count {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* A thin bar, not a ring or a pie: the goal is a small weekly count, and it
+   should be readable at a glance from across a music stand. */
+.goal-track {
+  margin: 10px 0 12px;
+  height: 6px;
+  border-radius: 999px;
+  background: #efe8db;
+  overflow: hidden;
+}
+
+.goal-fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--accent-2);
+  transition: width 320ms ease;
+}
+
+.goal-fill.is-met {
+  background: var(--accent);
+}
+
+.goal-chips {
+  margin-bottom: 4px;
+}
+
+.wins-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+}
+
+.wins-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13.5px;
+}
+
+.win-label {
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.win-value {
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The comparison sits beside the number in the quieter voice: it is context,
+   not a verdict. */
+.win-value em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.win-empty {
+  display: block !important;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 /* The week grid sets the height of the row. The streak card is a column with a
    footer line, so the space reads as margin rather than as a dead patch under
    the rest button. */

@@ -30,7 +30,33 @@ const STORE_KEY = 'scale-studio.journal.v2';
 export const MAX_PROFILES = 8;
 
 export function emptyState() {
-  return { v: 1, days: {}, rests: [], plan: '', scales: {} };
+  return { v: 1, days: {}, rests: [], plan: '', scales: {}, goal: null };
+}
+
+/**
+ * The weekly goals a student can pick from. A short menu rather than a free-text
+ * box: the evidence on goal setting favours specific, close-at-hand goals, and
+ * "practise more" is neither. The student still chooses, which is the autonomy
+ * part — the app only offers shapes that can be counted honestly.
+ */
+export const GOALS = [
+  { kind: 'days', target: 3 },
+  { kind: 'days', target: 5 },
+  { kind: 'ready', target: 1 },
+  { kind: 'ready', target: 2 },
+];
+
+export function setGoal(state, kind, target) {
+  if (!kind || !target) {
+    state.goal = null;
+    return null;
+  }
+  state.goal = { kind, target: Math.max(1, Math.min(7, Number(target) || 1)) };
+  return state.goal;
+}
+
+export function goalKey(goal) {
+  return goal ? `${goal.kind}:${goal.target}` : '';
 }
 
 /* ── Dates ─────────────────────────────────────────────────────────────── */
@@ -194,6 +220,84 @@ export function weekSheet(state, today, ids) {
     .map(([key, n]) => ({ key, n }));
   const ready = scalesReady(state, ids).filter((s) => s.ready).map((s) => s.id);
   return { start, days, rests, takes, tags, hard: hardList, ready, total: ids.length };
+}
+
+/**
+ * Progress against the student's own weekly goal.
+ *
+ * Weeks run Monday to Sunday, and only days up to today count — a goal is not
+ * "failed" in advance because it is Wednesday.
+ */
+export function goalProgress(state, today, ids = []) {
+  if (!state.goal) return null;
+  const { kind, target } = state.goal;
+  const done = kind === 'ready' ? readyThisWeek(state, ids, today) : weekSheet(state, today, ids).days;
+  return {
+    kind,
+    target,
+    done: Math.min(done, target),
+    met: done >= target,
+    raw: done,
+  };
+}
+
+/**
+ * Scales that *became* ready this week — the day they were completed, not the
+ * total standing on the shelf, which would make the same scale count every week.
+ */
+export function readyBetween(state, ids = [], from = dayKey(), to = dayKey()) {
+  return ids.filter((id) => {
+    const entry = state.scales[id];
+    if (!entry || !entry.days || entry.days.length < READY_DAYS) return false;
+    // The day it *became* ready — the second clean day — not the latest day it
+    // was played, or a scale polished for a month would count every week.
+    const completeOn = entry.days[READY_DAYS - 1];
+    return Boolean(completeOn) && completeOn >= from && completeOn <= to;
+  });
+}
+
+export function readyThisWeek(state, ids = [], today = dayKey()) {
+  return readyBetween(state, ids, weekStart(today), today).length;
+}
+
+/** Scales that became ready this week, by id, for naming them in the app. */
+export function readyNames(state, ids = [], today = dayKey()) {
+  return readyBetween(state, ids, weekStart(today), today);
+}
+
+/**
+ * This week against last week, in the terms a student can feel: days, takes and
+ * scales that came good. Everything here is counted from the log, so nothing can
+ * flatter itself. Returns nulls rather than zeroes where there is no comparison
+ * to make yet — "no last week to compare" is honest, "0" is not.
+ */
+export function smallWins(state, today, ids = []) {
+  const thisMonday = weekStart(today);
+  const lastMonday = addDays(thisMonday, -7);
+  const countWeek = (monday) => {
+    let days = 0;
+    let takes = 0;
+    for (let d = 0; d < 7; d++) {
+      const key = addDays(monday, d);
+      if (key > today) break;
+      if (practised(state, key)) days += 1;
+      const day = state.days[key];
+      if (day) takes += day.takes || 0;
+    }
+    return { days, takes };
+  };
+  const now = countWeek(thisMonday);
+  const before = countWeek(lastMonday);
+  return {
+    days: now.days,
+    takes: now.takes,
+    lastDays: state.days && Object.keys(state.days).length ? before.days : null,
+    lastTakes: Object.keys(state.days || {}).length ? before.takes : null,
+    readyNow: readyThisWeek(state, ids, today),
+    readyBefore: readyBetween(state, ids, lastMonday, addDays(thisMonday, -1)).length,
+    readyNames: readyNames(state, ids, today),
+    hasAnyHistory: Object.keys(state.days || {}).length > 0,
+  };
 }
 
 /* ── Storage ───────────────────────────────────────────────────────────── */

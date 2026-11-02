@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611023000" />
+    <link rel="stylesheet" href="app.css?v=202611023200" />
   </head>
   <body>
     <div class="shell">
@@ -515,6 +515,19 @@
             </div>
           </div>
 
+          <h3 class="section-title">This week</h3>
+          <div class="wins-card">
+            <div class="goal-head">
+              <p class="goal-line" id="goalLine"></p>
+              <span class="goal-count" id="goalCount"></span>
+            </div>
+            <div class="goal-track" id="goalTrack" aria-hidden="true">
+              <span class="goal-fill" id="goalFill"></span>
+            </div>
+            <div class="chip-row goal-chips" id="goalChips"></div>
+            <ul class="wins-list" id="winsList"></ul>
+          </div>
+
           <h3 class="section-title">Today</h3>
           <p class="subtle small" id="todayHint">One tap is enough — a minute counts.</p>
           <div class="chip-row" id="todayChips"></div>
@@ -872,7 +885,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611023000"></script>
+    <script type="module" src="src/app.js?v=202611023200"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

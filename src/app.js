@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023000';
-import { renderStaff } from './staff.js?v=202611023000';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611023000';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023000';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023000';
-import { generatePassage } from './sightreading.js?v=202611023000';
-import { createPlayer } from './playback.js?v=202611023000';
-import { renderScore } from './score.js?v=202611023000';
-import * as Journal from './journal.js?v=202611023000';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023000';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023000';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611023200';
+import { renderStaff } from './staff.js?v=202611023200';
+import { PitchDetector, midiToFreq } from './pitch.js?v=202611023200';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611023200';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611023200';
+import { generatePassage } from './sightreading.js?v=202611023200';
+import { createPlayer } from './playback.js?v=202611023200';
+import { renderScore } from './score.js?v=202611023200';
+import * as Journal from './journal.js?v=202611023200';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611023200';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611023200';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +18,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611023000';
+} from './tuner.js?v=202611023200';
 
 const LANG = initLang();
 
@@ -60,6 +60,12 @@ const el = {
   logBannerText: $('logBannerText'),
   trackBack: $('trackBack'),
   streakNum: $('streakNum'),
+  goalLine: $('goalLine'),
+  goalCount: $('goalCount'),
+  goalTrack: $('goalTrack'),
+  goalFill: $('goalFill'),
+  goalChips: $('goalChips'),
+  winsList: $('winsList'),
   streakPlan: $('streakPlan'),
   planSelect: $('planSelect'),
   restBtn: $('restBtn'),
@@ -1646,6 +1652,17 @@ function sheetText() {
       ? `${displayName(activeProfile)} · ${t('log.sheet.week', { date: when })}`
       : t('log.sheet.week', { date: when });
   const lines = [headed];
+  // The student's own goal, on the sheet the teacher reads: it turns "well done"
+  // into "you said three days and you did four", which is the specific kind of
+  // feedback the violin-learning evidence favours over general praise.
+  const goal = Journal.goalProgress(journal, today, ids);
+  if (goal) {
+    const said =
+      goal.kind === 'ready'
+        ? t('log.goal.readyN', { n: goal.target })
+        : t(goal.target === 1 ? 'log.goal.days1' : 'log.goal.daysN', { n: goal.target });
+    lines.push(t('log.sheet.goal', { goal: said, done: goal.done, target: goal.target }));
+  }
   lines.push(t('log.sheet.days', { n: s.days, rests: s.rests }));
   if (s.takes) lines.push(t('log.sheet.takes', { n: s.takes }));
   const tags = Object.entries(s.tags)
@@ -1771,11 +1788,108 @@ function renderLog() {
     )
     .join('');
 
+  renderWeekWins(ids, today);
+
   el.lessonSheet.textContent = sheetText();
   el.copySheet.textContent = t('log.copy');
   if (!recorder.live) el.recBtn.textContent = t('log.record');
   renderRecList();
 }
+
+/**
+ * The student's own goal for the week, and the week measured against it.
+ *
+ * Two rules from the evidence shape this. Progress that is *recorded* and
+ * *shown back* is what changes behaviour ([Harkin et al., 2016]); and the goal
+ * has to be specific, close at hand, and chosen by the student rather than
+ * handed to them, because the need least met in the music-school data is
+ * autonomy ([Wieser et al., 2024]). So: a short menu, no nagging, and a count
+ * that can only say what the log actually holds.
+ */
+function renderWeekWins(ids, today) {
+  const goal = Journal.goalProgress(journal, today, ids);
+  if (!goal) {
+    el.goalLine.textContent = t('log.goal.none');
+    el.goalCount.textContent = '';
+    el.goalTrack.hidden = true;
+  } else {
+    el.goalLine.textContent =
+      goal.kind === 'ready'
+        ? t(goal.target === 1 ? 'log.goal.ready1' : 'log.goal.readyN', { n: goal.target })
+        : t(goal.kind === 'days' && goal.target === 1 ? 'log.goal.days1' : 'log.goal.daysN', {
+            n: goal.target,
+          });
+    el.goalCount.textContent = t('log.goal.count', { done: goal.done, target: goal.target });
+    el.goalTrack.hidden = false;
+    el.goalFill.style.width = `${Math.round((goal.done / goal.target) * 100)}%`;
+    el.goalFill.classList.toggle('is-met', goal.met);
+  }
+
+  const keys = Journal.GOALS.map(Journal.goalKey);
+  chips(
+    el.goalChips,
+    keys,
+    'goal',
+    (key) => Journal.goalKey(journal.goal) === key,
+    (key) => {
+      const [kind, target] = key.split(':');
+      const n = Number(target);
+      return kind === 'days'
+        ? t(n === 1 ? 'log.chip.day1' : 'log.chip.days', { n })
+        : t(n === 1 ? 'log.chip.scale1' : 'log.chip.scales', { n });
+    },
+  );
+
+  const wins = Journal.smallWins(journal, today, ids);
+  const rows = [];
+  if (!wins.hasAnyHistory) {
+    rows.push(`<li class="win-empty">${t('log.win.none')}</li>`);
+  } else {
+    const compare = (now, before, one, many) => {
+      if (before == null) return t('log.win.first');
+      const diff = now - before;
+      if (diff === 0) return t('log.win.same');
+      return diff > 0 ? t('log.win.more', { n: diff }) : t('log.win.less', { n: -diff });
+    };
+    const days =
+      wins.days === 1 ? t('log.win.day1') : t('log.win.daysN', { n: wins.days });
+    rows.push(
+      `<li><span class="win-label">${t('log.win.daysLabel')}</span>` +
+        `<span class="win-value">${days}<em>${compare(wins.days, wins.lastDays)}</em></span></li>`,
+    );
+
+    // Naming the scales is the point: "2 scales ready" is a number, "G major,
+    // D major" is an achievement.
+    const named = wins.readyNames.map((id) => keyName(id));
+    const readyValue =
+      named.length === 0
+        ? t('log.win.readyNone')
+        : t(named.length === 1 ? 'log.win.ready1' : 'log.win.readyN', { n: named.length }) +
+          `: ${named.join(', ')}`;
+    rows.push(
+      `<li><span class="win-label">${t('log.win.readyLabel')}</span>` +
+        `<span class="win-value">${readyValue}</span></li>`,
+    );
+
+    rows.push(
+      `<li><span class="win-label">${t('log.win.takesLabel')}</span>` +
+        `<span class="win-value">${wins.takes}<em>${compare(wins.takes, wins.lastTakes)}</em></span></li>`,
+    );
+  }
+  el.winsList.innerHTML = rows.join('');
+}
+
+el.goalChips.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-goal]');
+  if (!btn) return;
+  const key = btn.dataset.goal;
+  const [kind, target] = key.split(':');
+  // Tapping the goal already chosen lets it go, the same way a picked bar does.
+  const same = Journal.goalKey(journal.goal) === key;
+  Journal.setGoal(journal, same ? null : kind, same ? null : Number(target));
+  saveJournal();
+  renderLog();
+});
 
 function openTrack() {
   cancelListening();
