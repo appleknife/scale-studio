@@ -16,7 +16,12 @@
     </script>
     <script type="module">
       import { MAJOR_KEYS, MINOR_KEYS, buildScale } from '../src/music.js';
-      import { PitchDetector } from '../src/pitch.js';
+      import {
+        PitchDetector,
+        nextFloor,
+        quietLevel,
+        strongLevel,
+      } from '../src/pitch.js';
       import { analyzeTake } from '../src/analyze.js';
 
       const SR = 44100;
@@ -259,6 +264,49 @@
       const aMinorNotes = aMinor.sequence.map((n) => n.name).join(' ');
       log.push('');
       log.push(`A harmonic minor: ${aMinorNotes}`);
+
+      /* ── I. The learned noise floor ────────────────────────────────── */
+      //
+      // A phone's microphone goes through the system's own gain control and
+      // noise gate, so a softly bowed note can arrive at a third of the level a
+      // laptop hears. The thresholds are learned from room noise instead of
+      // fixed — this pins the learning down.
+      {
+        // A quiet room: the floor settles near the noise, and a soft note that a
+        // fixed 0.004 would have thrown away is still heard.
+        let floor = 0.0012;
+        for (let i = 0; i < 400; i++) floor = nextFloor(floor, 0.0007);
+        const soft = 0.0032;
+        log.push(
+          `quiet room: floor ${floor.toFixed(5)} · note line ${quietLevel(floor).toFixed(5)} · ` +
+            `start line ${strongLevel(floor).toFixed(5)} · a ${soft} note ${soft > quietLevel(floor) ? 'heard' : 'thrown away'}`,
+        );
+        if (floor > 0.0009) problems.push(`the floor did not settle in a quiet room (${floor})`);
+        if (!(soft > quietLevel(floor))) problems.push('a soft note was still thrown away in a quiet room');
+
+        // Playing never teaches the floor anything: a bow cannot raise it.
+        let loud = 0.0012;
+        for (let i = 0; i < 200; i++) loud = nextFloor(loud, 0.08);
+        if (loud > 0.0013) problems.push(`playing raised the noise floor to ${loud}`);
+
+        // A loud room looks like the instrument to the estimator, so the line
+        // stays where it is rather than chasing the noise — the pitch detector's
+        // clarity gate is what keeps noise out, and this is the honest limit of
+        // level alone. What matters is that the line never runs away.
+        let noisy = 0.0012;
+        for (let i = 0; i < 400; i++) noisy = nextFloor(noisy, 0.008);
+        log.push(`loud room: floor ${noisy.toFixed(5)} · note line ${quietLevel(noisy).toFixed(5)}`);
+        if (noisy > 0.0013) problems.push(`a loud room moved the floor to ${noisy}`);
+        if (quietLevel(1) > 0.0121) problems.push('the note line is capped too high');
+        if (quietLevel(1e-9) < 0.00159) problems.push('the note line is capped too low');
+        if (Math.abs(quietLevel(0.0012) - 0.0036) > 1e-6)
+          problems.push('the default floor no longer lands on the old fixed 0.004 line');
+
+        // And the starting gate stays above the note line, always.
+        for (const f of [0.0003, 0.0012, 0.003, 0.01, 0.05]) {
+          if (strongLevel(f) <= quietLevel(f)) problems.push(`the start line is under the note line at ${f}`);
+        }
+      }
 
       const payload = {
         problems,

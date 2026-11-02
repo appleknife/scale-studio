@@ -129,6 +129,44 @@ export class PitchDetector {
   }
 }
 
+/**
+ * How loud a frame has to be before the app calls it a note.
+ *
+ * This used to be two fixed numbers — 0.004 for "a note is sounding" and 0.007
+ * for "a confident start" — which is fine on a laptop and wrong on a phone. An
+ * iPhone's built-in microphone goes through Safari's own input processing: it
+ * has automatic gain control, a noise gate and a high-pass filter, none of which
+ * a web page can switch off (WebKit bug 179411 — the echoCancellation /
+ * noiseSuppression / autoGainControl constraints are largely ignored on iOS). A
+ * softly bowed note can arrive at a third of the level the same note has on a
+ * laptop, and a fixed 0.004 then reports "nothing heard".
+ *
+ * So the floor is *learned* instead. `nextFloor` tracks room noise — it follows
+ * quiet frames down and up, but a loud frame does not raise it, because a loud
+ * frame is the instrument. `quietLevel` is the line above that floor, and the
+ * two constants keep it inside a sane range: at the default floor of 0.0012 the
+ * line lands on 0.0036, almost exactly the old 0.004, so a device that was
+ * already working behaves the same.
+ */
+export function nextFloor(floor, rms) {
+  const current = Number.isFinite(floor) && floor > 0 ? floor : 0.0012;
+  const measured = Number.isFinite(rms) && rms > 0 ? rms : 0;
+  // Only frames that could plausibly be room noise teach the estimate anything.
+  if (measured > current * 3) return current;
+  return current * 0.995 + measured * 0.005;
+}
+
+/** The level a frame has to clear to count as a note rather than room noise. */
+export function quietLevel(floor) {
+  const current = Number.isFinite(floor) && floor > 0 ? floor : 0.0012;
+  return Math.min(0.012, Math.max(0.0016, current * 3));
+}
+
+/** The level a frame has to clear to *start* a take — a confident note. */
+export function strongLevel(floor) {
+  return Math.min(0.026, quietLevel(floor) * 2.2);
+}
+
 /** Median of a numeric array (does not modify the input). */
 export function median(values) {
   if (!values.length) return 0;

@@ -485,6 +485,45 @@
         frame.remove();
       }
 
+      /* ── 12. iOS takes the microphone away ─────────────────────────── */
+      //
+      // Locking the screen or taking a call moves the audio context to
+      // "interrupted" and the analyser returns the last buffer over and over — or
+      // nothing. A take running at that moment must be closed without a score,
+      // because filing silence as a bad performance is the one thing worse than
+      // saying nothing. This drives the same handler the context's `statechange`
+      // and the interval both call.
+      {
+        const frame = await load('../index.html?sightplay=5&seed=7&assist');
+        const d = frame.contentDocument;
+        const w = frame.contentWindow;
+        await until(() => !d.getElementById('countIn').hidden, 4000);
+        await until(() => d.getElementById('countIn').hidden, 9000);
+        await wait(200);
+        const running = !d.getElementById('sightStop').hidden;
+        w.__micStalled();
+        await wait(300);
+        const status = d.getElementById('sightStatus').textContent.trim();
+        const paused = {
+          stopGone: d.getElementById('sightStop').hidden,
+          startBack: !d.getElementById('sightStart').hidden,
+          scored: !d.getElementById('sightResult').hidden,
+          line: !d.querySelector('.sight-playhead') || d.querySelector('.sight-playhead').style.opacity === '0',
+        };
+        log.push(
+          `mic taken away mid-take: was running ${running} · stop ${paused.stopGone ? 'hidden' : 'still up'} · ` +
+            `start ${paused.startBack ? 'back' : 'missing'} · scored ${paused.scored ? 'yes (wrong)' : 'no'} · ` +
+            `line ${paused.line ? 'hidden' : 'still moving'} · said "${status}"`,
+        );
+        if (!running) problems.push('the take was not running when the microphone was taken away');
+        if (!paused.stopGone || !paused.startBack)
+          problems.push('taking the microphone away did not hand the buttons back');
+        if (paused.scored) problems.push('a take that lost its microphone was scored anyway');
+        if (!paused.line) problems.push('the line kept moving after the microphone was taken away');
+        if (!status) problems.push('nothing told the student the microphone had been paused');
+        frame.remove();
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `SIGHT LISTEN FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
         : `SIGHT LISTEN OK\n${log.join('\n')}`;

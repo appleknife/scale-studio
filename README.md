@@ -241,10 +241,68 @@ the scoring all follow from it.
 * **Pitch detection:** YIN (cumulative mean normalized difference) over a 2048-sample
   window, sampled about 30 times a second. It is monophonic and vibrato-tolerant;
   it reports the centre of a vibrato, not the wobble.
+* **Level:** the line between "a note" and "room noise" is *learned*, not fixed.
+  `nextFloor()` in `src/pitch.js` follows the quiet frames down and up, and the
+  note line sits three times above that floor, capped at both ends. At the default
+  floor it lands on 0.0036 — the old fixed 0.004 — so a device that already worked
+  behaves exactly as before; in a quiet room it drops to about 0.0023, which is
+  what lets a softly bowed note on a phone count as a note. (A loud room looks
+  like the instrument to a level estimator, so the line does not chase it; the
+  detector's clarity gate is what keeps noise out.)
 * **Note finding:** a note begins when a stable pitch appears and ends when the
   pitch moves or the sound stops. The first 20% and last 15% of each note are
   ignored so bow attacks do not distort the reading.
 * **Scoring:** sequence alignment + per-note cents, onset spacing and gaps.
+
+### On an iPhone or iPad
+
+The microphone on iOS is not the same signal a laptop gives you, and this is worth
+knowing before blaming the app — or a student.
+
+* **Safari processes the input and a web page cannot turn it off.** Automatic gain
+  control, noise suppression and a high-pass filter are applied by the system.
+  `getUserMedia({audio: {echoCancellation: false, noiseSuppression: false,
+  autoGainControl: false}})` is largely ignored on iOS (WebKit
+  [bug 179411](https://bugs.webkit.org/show_bug.cgi?id=179411)); Safari treats
+  `echoCancellation` as the only constraint it really honours. The result is a
+  signal that is quieter, gated and filtered — a soft note can disappear, and a
+  sustained violin note can be treated as "not speech" and held down.
+* **A native tuner can.** Apps such as Tunable or TonalEnergy set an iOS audio
+  session to `playAndRecord` with **mode `.measurement`**, which Apple documents as
+  "minimize the amount of system-supplied signal processing… disables some
+  dynamics processing on input and output". That is why the same note is heard
+  cleanly there and not always here. Web pages have no access to the session mode;
+  the closest lever is `navigator.audioSession.type = 'play-and-record'`, which the
+  app sets before opening the stream (Audio Session API, Safari 16.4+).
+* **Playing while recording makes it worse.** The count-in, the clicks and the
+  example all come out of the speaker while the microphone is open. iOS sees a page
+  that is doing both and turns on echo cancellation and voice processing — exactly
+  the processing that hurts an instrumental signal
+  ([WebKit 311451](https://bugs.webkit.org/show_bug.cgi?id=311451) documents the
+  matching output side: enabling the microphone drops the output to mono and a
+  lower sample rate). Headphones help twice over: no echo to cancel, no processing
+  to apply.
+* **Interruptions are not a freeze, they are a session change.** Locking the screen,
+  a call, Control Centre, or switching tabs moves the `AudioContext` to
+  `interrupted`, and it does not always come back on its own
+  ([WebKit 273511](https://bugs.webkit.org/show_bug.cgi?id=273511),
+  [276016](https://bugs.webkit.org/show_bug.cgi?id=276016)). An interrupted context
+  keeps handing back the *last* buffer, which looks like a held note — worse than
+  silence. So the capture loop stops reading when the context is not `running`, a
+  take that loses its microphone is **closed without a score** and says so, and
+  coming back to the page tries `resume()` (and a `suspend()`/`resume()` pair, the
+  workaround on 276016) before giving up.
+* **The audio context needs a gesture.** On iOS a context that only *analyses* input
+  still needs to be created inside a user gesture, or the analyser returns zeros
+  for ever ([WebKit 180522](https://bugs.webkit.org/show_bug.cgi?id=180522)).
+  `openMic()` creates and resumes the context synchronously inside the click, before
+  awaiting `getUserMedia`.
+* **What is on screen now:** the sight-reading screen has the same small input meter
+  the scales screen has, so "is it hearing me?" has an answer before the first note;
+  and "What it can and can't hear" now ends with the capture settings the browser
+  actually granted — sample rate, and whether echo cancellation, noise suppression
+  and gain control are on. On an iPhone the last three will usually read *on*, and
+  that is the honest reason a note sometimes does not count.
 
 Tuning decisions live in `DEFAULTS` at the top of
 [`src/analyze.js`](src/analyze.js) — for example `intonationPerfect: 15` and

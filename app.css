@@ -1660,6 +1660,21 @@ h3 {
   transition: width 0.12s linear;
 }
 
+/* The same meter on the sight-reading screen: a phone's microphone is at its
+   bottom edge, out of sight, so "is it hearing me?" needs an answer on screen. */
+.sight-level {
+  width: 92px;
+  margin: 10px 0 2px;
+}
+
+/* What the microphone actually granted, inside "What it can and can't hear". */
+.mic-diag {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .status.is-live .status-dot {
   background: var(--accent);
   animation: pulse 1.8s ease-out infinite;

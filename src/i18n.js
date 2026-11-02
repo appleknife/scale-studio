@@ -476,6 +476,21 @@ export const S = {
     'The microphone could not start{detail}.',
     '麦克风启动不了{detail}。',
   ],
+  'mic.paused': [
+    'The phone paused the microphone — nothing was scored.',
+    '手机把麦克风暂停了——这一次没有计分。',
+  ],
+  'mic.pausedHint': [
+    'A locked screen, a call or another app will do that. Bring this page back to the front and press start again.',
+    '锁屏、来电或切到别的应用都会这样。回到这一页，再点一次开始就好。',
+  ],
+  'mic.on': ['on', '开'],
+  'mic.off': ['off', '关'],
+  'mic.unknown': ['not reported', '未知'],
+  'mic.diag': [
+    'This device is capturing at {rate} Hz — echo cancellation: {ec}; noise suppression: {ns}; gain control: {agc}.',
+    '这台设备以 {rate} Hz 采集——回声消除：{ec}；降噪：{ns}；自动增益：{agc}。',
+  ],
   'boot.title': ['This page needs its little server', '这个页面需要本地小服务'],
   'boot.body': [
     'Double-click <strong>Start Scale Studio.cmd</strong> in the app folder and use the page it opens (<code>http://localhost:8777/</code>). Leave the black window open while you practice — closing it stops the app.',
@@ -954,6 +969,8 @@ export const STATIC = {
     '<li><strong>速度</strong>——不打分。比标记慢一点没关系。</li>' +
     '<li><strong>力度、弓法、音色</strong>——听不出来。一支麦克风分不清渐强和加弓压，也分不清断弓和连弓。</li>' +
     '<li><strong>重复音</strong>——同一个音连着拉，可能会合成一个音；换弓的位置它只能大致听出来。</li>',
+  'hear.ios':
+    '<strong>在 iPhone 或 iPad 上</strong>，Safari 会自己对麦克风做处理——自动增益、降噪，还有一层不在录音里的滤波——网页没法关掉，原生调音器却可以。所以同一个音在这里可能显得更轻。如果有时听不到音，注意别挡住设备底部的麦克风，拉得肯定一点。',
 
   /* Practice log — what the sheet markup and the date menu say */
   'log.plan.none': '随时都可以',

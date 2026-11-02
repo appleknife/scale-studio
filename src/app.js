@@ -1,16 +1,22 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025800';
-import { renderStaff } from './staff.js?v=202611025800';
-import { PitchDetector, midiToFreq } from './pitch.js?v=202611025800';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025800';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025800';
-import { generatePassage } from './sightreading.js?v=202611025800';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025800';
-import { renderScore } from './score.js?v=202611025800';
-import * as Journal from './journal.js?v=202611025800';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025800';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025800';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611025900';
+import { renderStaff } from './staff.js?v=202611025900';
+import {
+  PitchDetector,
+  midiToFreq,
+  nextFloor,
+  quietLevel,
+  strongLevel,
+} from './pitch.js?v=202611025900';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611025900';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611025900';
+import { generatePassage } from './sightreading.js?v=202611025900';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611025900';
+import { renderScore } from './score.js?v=202611025900';
+import * as Journal from './journal.js?v=202611025900';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611025900';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611025900';
 import {
   STRINGS,
   FIFTHS,
@@ -18,7 +24,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611025800';
+} from './tuner.js?v=202611025900';
 
 const LANG = initLang();
 
@@ -114,6 +120,7 @@ const el = {
   clearLog: $('clearLog'),
   sightVolume: $('sightVolume'),
   sightLive: $('sightLive'),
+  sightLevel: $('sightLevel'),
   sightAssist: $('sightAssist'),
   countIn: $('countIn'),
   countInNum: $('countInNum'),
@@ -981,7 +988,7 @@ function onTuneFrame(frame) {
   const tune = state.tune;
   if (!tune) return;
 
-  if (!frame.freq || frame.clarity < 0.55 || frame.rms < 0.004) {
+  if (!frame.freq || frame.clarity < 0.55 || frame.rms < quietLevel(state.mic?.floor)) {
     tune.silentFor += 1;
     if (tune.silentFor > 20 && tune.cents != null) {
       tune.cents = null;
@@ -1332,11 +1339,12 @@ async function startSightTake(options = {}) {
   el.sightStatus.textContent = t('sight.waitingMic');
   el.sightResult.hidden = true;
 
-  if (state.mic && state.micMode !== 'take') closeMic();
+  if (state.mic && (state.micMode !== 'take' || state.mic.stalled)) closeMic();
   if (!state.mic) {
     try {
       state.mic = await openMic(routeFrame);
       state.micMode = 'take';
+      paintMicDiagnostics();
     } catch (err) {
       el.sightStart.disabled = false;
       el.sightStatus.textContent = micErrorMessage(err);
@@ -1557,6 +1565,7 @@ function armSightTake(options = {}) {
     liveCents: null,
   };
   el.sightLive.hidden = true;
+  if (el.sightLevel) el.sightLevel.hidden = false;
   resetSightLive();
   el.sightStart.disabled = false;
   el.sightStart.hidden = true;
@@ -1622,7 +1631,7 @@ function ingestSightFrame(frame) {
   }
 
   if (!take.started) {
-    const strong = frame.rms > 0.007 && frame.clarity > 0.7;
+    const strong = frame.rms > strongLevel(state.mic?.floor) && frame.clarity > 0.7;
     take.strong = strong ? take.strong + 1 : 0;
     if (take.strong >= 3) {
       take.started = true;
@@ -1640,7 +1649,7 @@ function ingestSightFrame(frame) {
   const elapsed = Math.max(0, frame.t - take.t0);
   take.frames.push({ t: elapsed, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
 
-  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > 0.004;
+  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
   if (voiced) {
     take.lastVoiced = elapsed;
     if (!take.voiced) take.onsets += 1;
@@ -1676,7 +1685,8 @@ function stopSightTake(analyse = true) {
   el.sightStop.hidden = true;
   el.sightStart.hidden = false;
   el.sightLive.hidden = true;
-  // An assisted run schedules its whole click track ahead on the audio clock, so
+  el.sightLive.hidden = true;
+  if (el.sightLevel) el.sightLevel.hidden = true;
   // the clicks have to be told to stop — otherwise they play on after the take,
   // and after the student has left the screen. The count-in box and the line go
   // with them; a line left standing on the staff looks like a frozen app.
@@ -3037,9 +3047,25 @@ async function openMic(emit) {
     throw err;
   }
 
+  // Tell iOS what kind of audio this page is before anything opens. A page that
+  // records *and* plays — the count-in, the clicks, the example — is
+  // "play-and-record" to the system, and saying so keeps the session from being
+  // treated as a phone call: routed to the earpiece, ducked, or interrupted by
+  // whatever else the phone wants to play. Not every browser has the Audio
+  // Session API, hence the feature test.
+  if ('audioSession' in navigator) {
+    try {
+      navigator.audioSession.type = 'play-and-record';
+    } catch {
+      /* older Safari — nothing to set */
+    }
+  }
+
   // Create (and unlock) the audio context *inside* the click handler. iOS Safari
   // only lets audio start from a gesture, and awaiting getUserMedia first can
-  // consume that gesture — the context then stays suspended and stays silent.
+  // consume that gesture — the context then stays suspended and stays silent
+  // (WebKit bug 180522: on iOS a context that is only analysing input still
+  // needs a gesture before the analyser returns anything but zeros).
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const unlocked = ctx.resume().catch(() => {});
 
@@ -3068,6 +3094,14 @@ async function openMic(emit) {
   analyser.smoothingTimeConstant = 0;
   source.connect(analyser);
 
+  // The analyser is a sink — it works without an output — but some builds only
+  // render a graph that reaches the destination. A gain of exactly zero is
+  // silent, so nothing here can feed back through the speaker into a violin
+  // take, and the meter is guaranteed to be looking at live samples.
+  const sink = ctx.createGain();
+  sink.gain.value = 0;
+  analyser.connect(sink).connect(ctx.destination);
+
   const buf = new Float32Array(analyser.fftSize);
   const detector = new PitchDetector({
     sampleRate: ctx.sampleRate,
@@ -3076,23 +3110,168 @@ async function openMic(emit) {
     maxFreq: 1800,
   });
 
-  const startedAt = performance.now();
-  const timer = setInterval(() => {
-    analyser.getFloatTimeDomainData(buf);
-    const { freq, clarity, rms } = detector.detect(buf);
-    emit({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms });
-  }, 30);
+  // What the browser actually gave us, not what we asked for: on iOS the three
+  // processing constraints are largely ignored and the sample rate is whatever
+  // the hardware is running at. Shown to the user in "What it can and can't
+  // hear", because a teacher debugging a quiet phone should be able to see that
+  // gain control is on.
+  const track = stream.getAudioTracks()[0];
+  let settings = {};
+  try {
+    settings = (track && track.getSettings && track.getSettings()) || {};
+  } catch {
+    settings = {};
+  }
 
-  return {
+  const mic = {
     stream,
     ctx,
+    settings,
+    sampleRate: ctx.sampleRate,
+    // Room noise, learned as the page runs — see nextFloor() in pitch.js.
+    floor: 0.0012,
+    stalled: false,
     close() {
       clearInterval(timer);
       stream.getTracks().forEach((t) => t.stop());
       ctx.close().catch(() => {});
     },
+    /** Try to come back from an interruption — a call, a locked screen, a tab
+     *  switch. iOS moves the context to "interrupted" and leaves it there. */
+    async wake() {
+      if (ctx.state === 'running') {
+        mic.stalled = false;
+        return true;
+      }
+      try {
+        await ctx.resume();
+      } catch {
+        /* still not ours to resume */
+      }
+      if (ctx.state === 'running') {
+        mic.stalled = false;
+        return true;
+      }
+      // A context that is stuck interrupted occasionally comes back after a
+      // suspend/resume pair (the workaround on WebKit bug 276016).
+      try {
+        await ctx.suspend();
+        await ctx.resume();
+      } catch {
+        /* it did not come back */
+      }
+      mic.stalled = ctx.state !== 'running';
+      return !mic.stalled;
+    },
   };
+
+  const startedAt = performance.now();
+  const timer = setInterval(() => {
+    if (ctx.state !== 'running') {
+      // Reading an interrupted context yields the last buffer over and over —
+      // which is worse than silence, because it looks like a held note.
+      if (!mic.stalled) {
+        mic.stalled = true;
+        onMicStalled();
+      }
+      return;
+    }
+    analyser.getFloatTimeDomainData(buf);
+    const { freq, clarity, rms } = detector.detect(buf);
+    mic.floor = nextFloor(mic.floor, rms);
+    emit({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms });
+  }, 30);
+
+  ctx.addEventListener?.('statechange', () => {
+    if (ctx.state === 'running') {
+      mic.stalled = false;
+    } else if (!mic.stalled) {
+      mic.stalled = true;
+      onMicStalled();
+    }
+  });
+
+  return mic;
 }
+
+/**
+ * The phone took the microphone away.
+ *
+ * iOS moves an audio context to "interrupted" when the screen locks, a call
+ * arrives, Control Center opens, or the browser goes to the background — and it
+ * does not always hand it back. A take that is running at that moment must not
+ * be scored: it would file silence as a bad performance. So every take is closed
+ * without a score, and the screen says what happened and what to do.
+ */
+function onMicStalled() {
+  if (sight.phase !== 'idle') {
+    stopSightTake(false);
+    el.sightStatus.textContent = t('mic.paused');
+  }
+  if (state.take) {
+    state.take = null;
+    state.phase = 'idle';
+    el.stopBtn.hidden = true;
+    el.startBtn.hidden = false;
+    el.startBtn.disabled = false;
+    el.startBtn.textContent = t('btn.startListening');
+    setStatus(false, t('mic.paused'));
+    el.listenHint.textContent = t('mic.pausedHint');
+  }
+  if (state.tune?.listening) {
+    state.tune.listening = false;
+    el.tuneStatus.textContent = t('mic.paused');
+  }
+}
+
+/**
+ * What the microphone actually granted, in the words the student can read.
+ *
+ * On a laptop this is dull and honest. On an iPhone it is the answer to "why did
+ * that note not count": Safari reports — and applies — gain control and noise
+ * suppression whatever the page asks for (WebKit bug 179411), and there is no
+ * switch. Seeing it said out loud is better than the app quietly scoring it.
+ */
+function paintMicDiagnostics() {
+  const mic = state.mic;
+  const nodes = document.querySelectorAll('.mic-diag');
+  if (!nodes.length) return;
+  if (!mic) {
+    nodes.forEach((node) => {
+      node.hidden = true;
+    });
+    return;
+  }
+  const granted = mic.settings || {};
+  const word = (value) =>
+    value == null ? t('mic.unknown') : value ? t('mic.on') : t('mic.off');
+  const text = t('mic.diag', {
+    rate: Math.round(mic.sampleRate || 0),
+    ec: word(granted.echoCancellation),
+    ns: word(granted.noiseSuppression),
+    agc: word(granted.autoGainControl),
+  });
+  nodes.forEach((node) => {
+    node.textContent = text;
+    node.hidden = false;
+  });
+}
+
+/**
+ * Coming back to a page iOS has interrupted.
+ *
+ * Locking the screen, taking a call or switching tabs moves an audio context to
+ * "interrupted", and it is not always restored on its own (WebKit bugs 273511 and
+ * 276016 — one of them leaves a context stuck there until the page is reloaded).
+ * Returning to the page is the one moment a resume is allowed, so take it; if the
+ * context will not come back, say so rather than pretending to listen.
+ */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !state.mic) return;
+  state.mic.wake().then((awake) => {
+    if (!awake) onMicStalled();
+  });
+});
 
 function micErrorMessage(err) {
   switch (err?.name) {
@@ -3117,9 +3296,27 @@ function micErrorMessage(err) {
  * between takes.
  */
 function routeFrame(frame) {
+  paintMicLevel(frame.rms);
   if (sight.phase !== 'idle' && sight.take) return ingestSightFrame(frame);
   if (state.take) return onFrame(frame);
   if (state.tune?.listening) return onTuneFrame(frame);
+}
+
+/**
+ * The little meters that say the microphone is alive.
+ *
+ * One frame arrives here whatever is listening, so this is the one place the
+ * level is painted — the scale take, the tuner and a sight-reading take all show
+ * the same bar, and a teacher can see the input move before they play.
+ */
+let levelSmooth = 0;
+
+function paintMicLevel(rms) {
+  levelSmooth = levelSmooth * 0.75 + (rms || 0) * 0.25;
+  const percent = Math.min(100, Math.sqrt(levelSmooth) * 340);
+  for (const meter of [el.levelBar, el.sightLevel]) {
+    if (meter && meter.firstElementChild) meter.firstElementChild.style.width = `${percent}%`;
+  }
 }
 
 /* ── Listening ────────────────────────────────────────────────────────── */
@@ -3136,11 +3333,12 @@ async function startListening() {
   // The microphone is opened once and kept for a whole mock audition, so the
   // audio context stays unlocked between takes (important on iOS). The tuner
   // uses the same stream object, so hand it back before listening for a take.
-  if (state.mic && state.micMode !== 'take') closeMic();
+  if (state.mic && (state.micMode !== 'take' || state.mic.stalled)) closeMic();
   if (!state.mic) {
     try {
       state.mic = await openMic(routeFrame);
       state.micMode = 'take';
+      paintMicDiagnostics();
     } catch (err) {
       state.phase = 'idle';
       el.startBtn.disabled = false;
@@ -3207,20 +3405,16 @@ function beginTake() {
   }
 }
 
-let levelSmooth = 0;
-
 function onFrame(frame) {
   const take = state.take;
   if (!take || take.done) return;
 
-  // A gentle mic-level indicator so it is obvious the app is hearing something.
+  // The meter is painted by routeFrame, which sees every frame — this only keeps
+  // the take's own peak, for the "was anything heard at all" question.
   take.peak = Math.max(take.peak || 0, frame.rms);
-  levelSmooth = levelSmooth * 0.75 + frame.rms * 0.25;
-  const level = Math.min(100, Math.sqrt(levelSmooth) * 340);
-  el.levelBar.firstElementChild.style.width = `${level}%`;
 
   if (!take.started) {
-    const strong = frame.rms > 0.007 && frame.clarity > 0.7;
+    const strong = frame.rms > strongLevel(state.mic?.floor) && frame.clarity > 0.7;
     take.strong = strong ? take.strong + 1 : 0;
     if (take.strong >= 3) {
       take.started = true;
@@ -3235,7 +3429,7 @@ function onFrame(frame) {
   const elapsed = Math.max(0, frame.t - take.t0);
   take.frames.push({ t: elapsed, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
 
-  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > 0.004;
+  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
   if (voiced) {
     take.lastVoiced = elapsed;
     const midiFloat = 69 + 12 * Math.log2(frame.freq / 440);
@@ -3866,6 +4060,9 @@ if (params.has('sightplay')) {
   // How many click nodes the run is still holding, so a suite can measure a leak
   // after leaving without an audio device.
   window.__assistClicks = () => assistClicks.length;
+  // What iOS does to a take when it takes the microphone away — the screen has
+  // to hand the buttons back and must not score the silence.
+  window.__micStalled = () => onMicStalled();
   // `warm` walks the microphone warm-up: the take arms with awaitWarm and the
   // first frame — held back here, the way a phone's capture path holds it — is
   // what starts the count-in (see startSightTake and ingestSightFrame).

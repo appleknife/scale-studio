@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611025800" />
+    <link rel="stylesheet" href="app.css?v=202611025900" />
   </head>
   <body>
     <div class="shell">
@@ -439,6 +439,10 @@
               under their own heading.
             </p>
             <p class="sight-status" id="sightStatus" role="status" aria-live="polite"></p>
+            <!-- Whether the microphone is actually hearing anything is not
+                 obvious on a phone, where the bottom of the device is doing the
+                 listening. The same meter the scales screen shows. -->
+            <div class="level sight-level" id="sightLevel" hidden aria-hidden="true"><span></span></div>
             <label class="volume" for="sightVolume">
               <span class="volume-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
@@ -485,6 +489,16 @@
                 into one; a bow change is heard only loosely.
               </li>
             </ul>
+            <p class="hear-ios" data-i18n="hear.ios">
+              On an iPhone or iPad, Safari applies its own processing to the microphone —
+              gain control, noise suppression and a filter that is not in the recording — and
+              a web page cannot switch it off. A native tuner can, which is why the same note
+              can seem quieter here. If notes go missing, keep the bottom microphone of the
+              device clear and play at a confident level.
+            </p>
+            <!-- Filled in the moment the microphone opens: what the browser actually
+                 granted, not what was asked for. -->
+            <p class="mic-diag" hidden></p>
           </details>
 
           <!-- The same needle the scale view shows, so a student reads one thing
@@ -836,6 +850,16 @@
                 into one; a bow change is heard only loosely.
               </li>
             </ul>
+            <p class="hear-ios" data-i18n="hear.ios">
+              On an iPhone or iPad, Safari applies its own processing to the microphone —
+              gain control, noise suppression and a filter that is not in the recording — and
+              a web page cannot switch it off. A native tuner can, which is why the same note
+              can seem quieter here. If notes go missing, keep the bottom microphone of the
+              device clear and play at a confident level.
+            </p>
+            <!-- Filled in the moment the microphone opens: what the browser actually
+                 granted, not what was asked for. -->
+            <p class="mic-diag" hidden></p>
           </details>
         </section>
 
@@ -1008,7 +1032,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611025800"></script>
+    <script type="module" src="src/app.js?v=202611025900"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.
