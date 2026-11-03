@@ -222,8 +222,16 @@ export function loopPasses({ at, want, offset, rate, loopStart, loopEnd, attack 
  * short note played from a sustained take is still cut, because a sustained
  * take has no ring to give: it would just be a long note in the wrong rhythm.
  */
-export function noteShape(sample, { staccato, legato, duration, written, rate, bufferSeconds }) {
-  const offset = (sample.skip || 0) + (legato ? 0.05 : 0);
+export function noteShape(sample, { staccato, legato, duration, written, rate, bufferSeconds, nextIn = Infinity }) {
+  // A slur take is a **pair** of notes: it starts on the note the teacher slurred
+  // *from* and lands on the one the bank files it under. Starting 50 ms into it
+  // was still inside that departure, so any slur landing on a pitch near a take's
+  // recorded departure played two notes at once — the real previous note still
+  // ringing, and a fragment of the take's own D or A underneath it. The landing
+  // begins where the take's loop begins (the capture tool marks it there), so a
+  // slurred note now starts exactly there and the departure is never heard.
+  const legatoStart = sample.style === 'slurhead' && sample.loopStart ? sample.loopStart : 0.05;
+  const offset = (sample.skip || 0) + (legato ? legatoStart : 0);
   const available = (bufferSeconds - offset) / rate;
   const shortTake = staccato && sample.style === 'staccato';
   // How long a short note may ring: its take, but never much past its own slot.
@@ -233,7 +241,14 @@ export function noteShape(sample, { staccato, legato, duration, written, rate, b
   // and started sounding like two long notes. One and a half times the written
   // length keeps the ring audible and the rhythm intact — a sixteenth gets 0.26 s
   // of your take's decay, a dotted eighth still gets all of it.
-  const room = Math.max(0.1, (written || duration) * 1.5);
+  // ... and never so long that it is still sounding when a *different* note
+  // arrives. Three hundredths past the next onset is enough for the decay to feel
+  // natural rather than chopped.
+  const room = Math.max(
+    0.1,
+    Math.min((written || duration) * 1.5, Number.isFinite(nextIn) ? nextIn + 0.03 : Infinity),
+  );
+
   const want = shortTake
     ? Math.max(0.08, Math.min(available - 0.015, room, 0.7))
     : Math.max(0.04, duration);
@@ -253,7 +268,7 @@ export function noteShape(sample, { staccato, legato, duration, written, rate, b
  */
 export function sampleVoice(ctx, destination, bank) {
   return {
-    play({ midi, at, duration, written, gain, ramp = 1, level = 'mf', legato = false, accent = false, staccato = false }) {
+    play({ midi, at, duration, written, gain, ramp = 1, level = 'mf', legato = false, accent = false, staccato = false, nextIn = Infinity, nextMidi = null }) {
       const sample = pickSample(bank.index, midi, { staccato, accent, legato, level });
       if (!sample) return false;
       const buffer = bank.buffers.get(sample.id);
@@ -292,6 +307,10 @@ export function sampleVoice(ctx, destination, bank) {
       // only louder, and a slur landing starts a little way into the take so it
       // has no attack of its own — that is the whole difference between a slur
       // and two notes.
+      // A ringing short note may run under the next one only when it is the same
+      // pitch: two different notes sounding together is not a ring, it is a
+      // mistake, and it is what "I can hear two notes at once" is.
+      const clashes = nextMidi != null && nextMidi !== midi;
       const { offset, want, attack, fade, shortTake } = noteShape(sample, {
         staccato,
         legato,
@@ -299,6 +318,7 @@ export function sampleVoice(ctx, destination, bank) {
         written,
         rate,
         bufferSeconds: buffer.duration,
+        nextIn: clashes ? nextIn : Infinity,
       });
       const release = fade;
       // `ramp` is where a hairpin has got to (1 with no hairpin); the absolute

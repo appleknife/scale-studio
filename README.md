@@ -964,6 +964,20 @@ Everything is held in the tab and handed back as one zip: 16-bit mono WAVs named
 take's pitch, style, level, length and peak. **Nothing is uploaded anywhere**, and
 closing the tab throws the takes away — download first.
 
+* **A slur take is two notes, and only the landing is played.** The teacher's slur
+  recordings are pairs — `D5-E5-slurhead` starts on D5 and lands on E5 — and the
+  sampler used to start 50 ms into one, which was still inside the departure. A
+  slur landing on E♭5 picks that take (a semitone away) and shifted both notes
+  down, so for a moment the departure sounded at the wrong pitch *under the real
+  previous note*: two notes at once. A slurred note now begins exactly where the
+  take's loop does, which is where the landing starts, and the departure is never
+  heard.
+* **A short note rings under its own pitch, not under someone else's.** A staccato
+  take is allowed to run past its written length — that is what made short notes
+  sound bowed rather than clipped — but the ring is now capped at the *next* note's
+  onset whenever that note is a different pitch. Same pitch keeps the full ring
+  (which is what a repeated note should sound like); a different one stops within
+  30 ms of arriving. `sampler.test.html` weighs both cases and every slur take.
 ## The recorded voice
 
 The first set of takes is recorded, measured and shipped: 36 files, 800 kB, in

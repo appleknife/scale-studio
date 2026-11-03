@@ -16,8 +16,8 @@
 // anything else changing: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611026800';
-import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611026800';
+import { makeHallIR } from './recorder.js?v=202611026900';
+import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611026900';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -370,8 +370,18 @@ export function createPlayer({ wet = 0.24, volume: start = 0.8 } = {}) {
       const voice = bowedVoice(ctx, gate);
       const sampled = bank ? sampleVoice(ctx, gate, bank) : null;
       const start = ctx.currentTime + 0.14;
-      for (const note of plan.notes) {
-        const when = { ...note, at: start + note.time };
+      for (let i = 0; i < plan.notes.length; i++) {
+        const note = plan.notes[i];
+        const next = plan.notes[i + 1];
+        const when = {
+          ...note,
+          at: start + note.time,
+          // How much room there is before the next note, and what it is: a short
+          // take may ring on *under its own pitch*, but ringing on under a
+          // different one is heard as two notes at once.
+          nextIn: next ? next.time - note.time : Infinity,
+          nextMidi: next ? next.midi : null,
+        };
         // A note the bank has no take for falls through to the synth, so a
         // half-loaded set is a slightly mixed voice rather than silence.
         if (!(sampled && sampled.play(when))) voice.play(when);

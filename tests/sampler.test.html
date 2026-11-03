@@ -24,7 +24,7 @@
         LEVEL_GAIN,
         LEVEL_TILT,
         BANK_GAIN,
-      } from '../src/sampler.js?v=202611026800';
+      } from '../src/sampler.js?v=202611026900';
 
       const problems = [];
       const log = [];
@@ -284,6 +284,79 @@
         check((LEVEL_TILT.f.highShelf || 0) > 0, 'the loud layer is not brightened');
       }
 
+
+      /* ── Slur takes are pairs, and only the landing is heard ─────────── */
+      //
+      // A slurhead take is a recording of *two* notes: the one the teacher
+      // slurred from and the one it lands on. Playing it 50 ms in still played
+      // the departure, so a slur landing on a pitch near a take's recorded
+      // departure — E flat above the D5→E5 take is exactly that — sounded two
+      // notes at once: the real previous note, still ringing, plus a fragment of
+      // the take's own. The landing begins where the take's loop does.
+      if (index) {
+        const slurs = index.samples.filter((s) => s.style === 'slurhead');
+        log.push(`slur takes: ${slurs.map((s) => s.id).join(', ')}`);
+        for (const sample of slurs) {
+          const shape = noteShape(sample, {
+            staccato: false,
+            legato: true,
+            duration: 0.6,
+            written: 0.6,
+            rate: 1,
+            bufferSeconds: 2,
+          });
+          const landing = sample.loopStart || 0.05;
+          check(
+            shape.offset >= landing - 1e-9,
+            `${sample.id}: a slurred note starts at ${shape.offset.toFixed(3)} s, inside the departure (landing at ${landing.toFixed(3)})`,
+          );
+        }
+
+        // The case the teacher heard: E♭5 lands a slur, and the nearest take is
+        // the D5→E5 one — a whole tone of departure above the D it was recorded
+        // from.
+        const eb = 75;
+        const sample = pickSample(index, eb, { legato: true, level: 'mf' });
+        check(Boolean(sample && sample.style === 'slurhead'), 'E flat did not land on a slur take');
+        if (sample) {
+          const shape = noteShape(sample, {
+            staccato: false,
+            legato: true,
+            duration: 0.6,
+            written: 0.6,
+            rate: rateFor(sample, eb),
+            bufferSeconds: 2,
+          });
+          log.push(
+            `E flat 5 slur: take ${sample.id} · starts ${shape.offset.toFixed(3)} s in · ` +
+              `landing at ${(sample.loopStart || 0).toFixed(3)} s · rate ${rateFor(sample, eb).toFixed(4)}`,
+          );
+          check(shape.offset >= (sample.loopStart || 0) - 1e-9, 'an E flat slur still starts in the departure');
+        }
+      }
+
+      /* ── A ring stops when the next note is a different pitch ───────── */
+      //
+      // A staccato take is allowed to ring out — that is what made the short
+      // notes sound like a violin rather than a click. But ringing *under a
+      // different note* is two notes at once, which is the other thing the
+      // teacher heard. It may ring under its own pitch, and it may not outlive
+      // the arrival of another.
+      if (index) {
+        const short = index.samples.find((s) => s.style === 'staccato');
+        if (short) {
+          const args = { staccato: true, legato: false, duration: 0.17, written: 0.17, rate: 1, bufferSeconds: 2 };
+          const underOther = noteShape(short, { ...args, nextIn: 0.17 });
+          const underSame = noteShape(short, { ...args, nextIn: Infinity });
+          log.push(
+            `ring: different pitch next (in 0.17 s) → ${underOther.want.toFixed(3)} s · ` +
+              `same pitch → ${underSame.want.toFixed(3)} s`,
+          );
+          check(underOther.want <= 0.21, `a short note rang ${underOther.want.toFixed(2)} s under a different pitch`);
+          check(underSame.want > underOther.want, 'a short note did not ring longer under its own pitch');
+          check(underSame.want <= 0.7, 'a short note rang longer than the 0.7 s cap');
+        }
+      }
       document.getElementById('report').textContent = problems.length
         ? `${problems.length} problems\n\n${[...new Set(problems)].join('\n')}\n\n${log.join('\n')}`
         : `SAMPLER OK\n${log.join('\n')}`;

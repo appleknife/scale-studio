@@ -1,23 +1,23 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026800';
-import { renderStaff } from './staff.js?v=202611026800';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026900';
+import { renderStaff } from './staff.js?v=202611026900';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611026800';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026800';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026800';
-import { generatePassage } from './sightreading.js?v=202611026800';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026800';
-import { renderScore } from './score.js?v=202611026800';
-import { summariseIntonation } from './intonation.js?v=202611026800';
-import * as Journal from './journal.js?v=202611026800';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026800';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026800';
+} from './pitch.js?v=202611026900';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026900';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026900';
+import { generatePassage } from './sightreading.js?v=202611026900';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026900';
+import { renderScore } from './score.js?v=202611026900';
+import { summariseIntonation } from './intonation.js?v=202611026900';
+import * as Journal from './journal.js?v=202611026900';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026900';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026900';
 import {
   STRINGS,
   FIFTHS,
@@ -26,7 +26,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611026800';
+} from './tuner.js?v=202611026900';
 
 const LANG = initLang();
 
