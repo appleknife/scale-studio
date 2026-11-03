@@ -1,23 +1,23 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037000';
-import { renderStaff } from './staff.js?v=202611037000';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037100';
+import { renderStaff } from './staff.js?v=202611037100';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611037000';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037000';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037000';
-import { generatePassage } from './sightreading.js?v=202611037000';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037000';
-import { renderScore } from './score.js?v=202611037000';
-import { summariseIntonation } from './intonation.js?v=202611037000';
-import * as Journal from './journal.js?v=202611037000';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037000';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037000';
+} from './pitch.js?v=202611037100';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037100';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037100';
+import { generatePassage } from './sightreading.js?v=202611037100';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037100';
+import { renderScore } from './score.js?v=202611037100';
+import { summariseIntonation } from './intonation.js?v=202611037100';
+import * as Journal from './journal.js?v=202611037100';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037100';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037100';
 import {
   STRINGS,
   FIFTHS,
@@ -26,7 +26,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611037000';
+} from './tuner.js?v=202611037100';
 
 const LANG = initLang();
 
@@ -3284,6 +3284,9 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
   const mic = {
     stream,
     ctx,
+    // Held here only so the source node lives as long as the microphone does; a
+    // node nothing references can be collected while the graph is still wanted.
+    source,
     settings,
     sampleRate: ctx.sampleRate,
     // Room noise, learned as the page runs — see nextFloor() in pitch.js.
@@ -3337,8 +3340,31 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
   const startedAt = performance.now();
   let still = 0;
   let silentTicks = 0;
+  let staleTicks = 0;
+  let wasStalled = false;
+  // A copy of the previous frame. A live microphone never delivers the same
+  // buffer twice, bit for bit — room noise alone sees to that — so an exact
+  // repeat means the graph has stopped rendering and the analyser is handing
+  // back its last block. That looks like a held note, not silence, which is why
+  // the zero check alone never caught it: the needle just froze.
+  const last = new Float32Array(analyser.fftSize);
+  const repeats = () => {
+    let sound = false;
+    for (let i = 0; i < buf.length; i += 1) {
+      if (buf[i] !== last[i]) return false;
+      if (buf[i] !== 0) sound = true;
+    }
+    // Exact zeros repeat too; those are silence, and the zero check below owns them.
+    return sound;
+  };
   const timer = setInterval(() => {
     if (ctx.state !== 'running') {
+      // Before calling it an interruption, give the context the two things that
+      // most often bring it back: a path to the destination, and a resume.
+      if (still === 5) {
+        ensurePulled();
+        ctx.resume().catch(() => {});
+      }
       // Reading an interrupted context yields the last buffer over and over —
       // which is worse than silence, because it looks like a held note. Half a
       // second of this is iOS reconfiguring the session around a new stream;
@@ -3346,13 +3372,28 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
       still += 1;
       if (still > 15 && !mic.stalled) {
         mic.stalled = true;
+        wasStalled = true;
         onMicStalled();
       }
       return;
     }
     still = 0;
     mic.stalled = false;
+    if (wasStalled) {
+      wasStalled = false;
+      onMicResumed(mic);
+    }
     analyser.getFloatTimeDomainData(buf);
+    if (repeats()) {
+      staleTicks += 1;
+      if (staleTicks > 10) ensurePulled();
+      // Report the stale frame as silence: the needle should fall back to idle,
+      // not keep pointing at a note that ended a while ago.
+      emit({ t: (performance.now() - startedAt) / 1000, freq: 0, clarity: 0, rms: 0 });
+      return;
+    }
+    staleTicks = 0;
+    last.set(buf);
     const { freq, clarity, rms } = detector.detect(buf);
     mic.floor = nextFloor(mic.floor, rms);
     if (rms === 0) {
@@ -3400,7 +3441,26 @@ function onMicStalled() {
   }
   if (state.tune?.listening) {
     state.tune.listening = false;
+    state.tune.cents = null;
+    paintNeedle();
     el.tuneStatus.textContent = t('mic.paused');
+    // A tap reopens the microphone from a fresh gesture, which is what iOS wants
+    // before it hands audio back. Without the button the dial just sat there.
+    el.tuneMicBtn.hidden = false;
+  }
+}
+
+/**
+ * The microphone came back on its own. A take that was running has already been
+ * closed without a score, so there is nothing to resume there — but the tuner
+ * only ever *listens*, and it should pick up again without asking.
+ */
+function onMicResumed(mic) {
+  if (state.mic !== mic) return;
+  if (state.tune && state.micMode === 'tune' && !state.tune.listening) {
+    state.tune.listening = true;
+    el.tuneMicBtn.hidden = true;
+    paintNeedle();
   }
 }
 
