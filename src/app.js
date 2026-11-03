@@ -1,23 +1,23 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037100';
-import { renderStaff } from './staff.js?v=202611037100';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037200';
+import { renderStaff } from './staff.js?v=202611037200';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611037100';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037100';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037100';
-import { generatePassage } from './sightreading.js?v=202611037100';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037100';
-import { renderScore } from './score.js?v=202611037100';
-import { summariseIntonation } from './intonation.js?v=202611037100';
-import * as Journal from './journal.js?v=202611037100';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037100';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037100';
+} from './pitch.js?v=202611037200';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037200';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037200';
+import { generatePassage } from './sightreading.js?v=202611037200';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037200';
+import { renderScore } from './score.js?v=202611037200';
+import { summariseIntonation } from './intonation.js?v=202611037200';
+import * as Journal from './journal.js?v=202611037200';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037200';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037200';
 import {
   STRINGS,
   FIFTHS,
@@ -26,7 +26,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611037100';
+} from './tuner.js?v=202611037200';
 
 const LANG = initLang();
 
@@ -3710,7 +3710,14 @@ function onFrame(frame) {
     take.lastMidi != null &&
     Math.round(take.lastMidi) === lastExpected;
 
-  if (silence > (nearEnd ? 1.3 : 3.0) || elapsed > 100) finishTake();
+  // How long a pause has to last before the take is called finished. These were
+  // 1.3 s near the end and 3 s anywhere else, and real playing beat both: a
+  // shift, a string crossing that loses the pitch for a moment, or a breath
+  // before the last note ended a take that was not over. nearEnd can also come
+  // true too early on two octaves, where the tonic sounds in the middle as well.
+  // A student who is done has the Finish button; one who is not should never
+  // be cut off, so the wait errs long.
+  if (silence > (nearEnd ? 4.0 : 8.0) || elapsed > 100) finishTake();
 }
 
 /**

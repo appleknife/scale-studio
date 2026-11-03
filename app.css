@@ -3479,3 +3479,26 @@ dialog .primary-btn {
   margin: 14px 0 0;
   padding: 0;
 }
+
+/* The finish button. A student holding a violin presses it with the bow hand,
+   often from a music stand an arm's length away, so it is big, solid, and the
+   one obvious thing on the card while a take is running. */
+.finish-btn {
+  width: 100%;
+  max-width: 320px;
+  min-height: 56px;
+  font-size: 17px;
+  font-weight: 600;
+  padding: 16px 28px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(47, 93, 78, 0.14), 0 10px 22px -14px rgba(47, 93, 78, 0.9);
+  touch-action: manipulation;
+}
+
+.finish-btn:hover {
+  filter: brightness(1.08);
+}
+
+.finish-btn:active {
+  transform: scale(0.98);
+}

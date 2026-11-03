@@ -891,7 +891,7 @@ export const STATIC = {
   'From memory': '背谱演奏',
   '1 oct': '1 个八度',
   '2 oct': '2 个八度',
-  'Finish early': '提前结束',
+  'I’m finished': '我拉完了',
   'in tune': '准',
   '♭ 50': '♭ 50',
   '50 ♯': '50 ♯',
