@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611037300" />
+    <link rel="stylesheet" href="app.css?v=202611037400" />
   </head>
   <body>
     <div class="shell">
@@ -809,8 +809,23 @@
           </div>
 
           <div class="staff-card" id="staffCard">
+            <div class="ink-tools" role="toolbar" aria-label="Marking tools" data-i18n-aria="aria.inkTools">
+              <button class="ink-btn" id="inkPen" type="button" aria-pressed="false">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17l1-4L13.5 3.5a2.1 2.1 0 0 1 3 3L7 16z M11.5 5.5l3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+                <span>Pen</span>
+              </button>
+              <button class="ink-btn" id="inkErase" type="button" aria-pressed="false">
+                <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="3 2.2"/><path d="M7 8l6 4M13 8l-6 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                <span>Erase</span>
+              </button>
+              <button class="ink-btn" id="inkUndo" type="button" disabled>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 5L3.5 9l4 4M4 9h8a4.5 4.5 0 0 1 0 9H9" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Undo</span>
+              </button>
+              <span class="ink-note" id="inkNote">Marks stay until you reload the page.</span>
+            </div>
             <div class="staff-scroll" id="staffHost"></div>
-            <p class="staff-hint">Swipe the staff to see every note →</p>
+            <p class="staff-hint" id="staffHint">Swipe the staff to see every note →</p>
           </div>
 
           <div class="memory-card" id="memoryCard" hidden>
@@ -1079,7 +1094,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611037300"></script>
+    <script type="module" src="src/app.js?v=202611037400"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

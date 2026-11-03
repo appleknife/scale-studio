@@ -1,23 +1,24 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037300';
-import { renderStaff } from './staff.js?v=202611037300';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037400';
+import { renderStaff } from './staff.js?v=202611037400';
+import { createInk } from './ink.js?v=202611037400';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611037300';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037300';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037300';
-import { generatePassage } from './sightreading.js?v=202611037300';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037300';
-import { renderScore } from './score.js?v=202611037300';
-import { summariseIntonation } from './intonation.js?v=202611037300';
-import * as Journal from './journal.js?v=202611037300';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037300';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037300';
+} from './pitch.js?v=202611037400';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037400';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037400';
+import { generatePassage } from './sightreading.js?v=202611037400';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037400';
+import { renderScore } from './score.js?v=202611037400';
+import { summariseIntonation } from './intonation.js?v=202611037400';
+import * as Journal from './journal.js?v=202611037400';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037400';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037400';
 import {
   STRINGS,
   FIFTHS,
@@ -26,7 +27,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611037300';
+} from './tuner.js?v=202611037400';
 
 const LANG = initLang();
 
@@ -176,6 +177,10 @@ const el = {
   scaleMeta: $('scaleMeta'),
   staffCard: $('staffCard'),
   staffHost: $('staffHost'),
+  staffHint: $('staffHint'),
+  inkPen: $('inkPen'),
+  inkErase: $('inkErase'),
+  inkUndo: $('inkUndo'),
   memoryCard: $('memoryCard'),
   memoryName: $('memoryName'),
   memoryMeta: $('memoryMeta'),
@@ -257,6 +262,9 @@ function devLog(stage, data = {}) {
   fetch('/result', { method: 'POST', body: JSON.stringify({ stage, ...data }) }).catch(() => {});
 }
 
+// One set of marks for the scale staff; the buttons follow its state.
+const ink = createInk({ onChange: (inkState) => paintInkTools(inkState) });
+
 const state = {
   mode: 'major',
   form: 'melodic',
@@ -308,6 +316,9 @@ const NOTE_VALUE_KEY = {
 /* ── Screens ──────────────────────────────────────────────────────────── */
 
 function showView(name) {
+  // Leaving the practice screen puts the pen down, so the next scale opens
+  // swipeable. The marks themselves stay with their scale.
+  if (name !== 'practice') ink.off();
   Object.entries(el.views).forEach(([key, node]) => {
     node.hidden = key !== name;
   });
@@ -3128,6 +3139,13 @@ function renderPractice() {
     fifths: scale.fifths,
     ariaLabel: t('aria.notation'),
   });
+  // Each layout is its own page of marks: the same key in one octave or with the
+  // other spelling puts its notes elsewhere, and ink written for one would sit
+  // on the wrong notes of the other.
+  ink.mount(
+    el.staffHost.querySelector('svg.staff'),
+    `${scale.title}|${scale.sequence.map((n) => n.name).join(' ')}`,
+  );
   el.memoryName.textContent = scale.title;
   el.memoryMeta.textContent = `${scale.meta} · ${scale.rangeText}`;
   el.spellingRow.hidden = Boolean(state.test) || scale.spellings.length < 2;
@@ -3173,6 +3191,26 @@ function setStatus(live, text) {
   el.listenStatus.classList.toggle('is-live', live);
   el.listenText.textContent = text;
   el.listenCard.classList.toggle('is-live', live);
+}
+
+/* ── Marks on the staff ────────────────────────────────────────────── */
+
+/**
+ * The pen, the box eraser and undo on the scale staff (see ink.js). The buttons
+ * say which tool is on, and on a phone the hint under the staff says how to get
+ * swiping back, because a finger that draws cannot also scroll.
+ */
+function paintInkTools({ tool, canUndo }) {
+  if (!el.inkPen) return;
+  el.inkPen.setAttribute('aria-pressed', String(tool === 'pen'));
+  el.inkErase.setAttribute('aria-pressed', String(tool === 'erase'));
+  el.inkUndo.disabled = !canUndo;
+  if (el.staffHint) {
+    el.staffHint.textContent = t(
+      tool === 'pen' ? 'ink.hint.pen' : tool === 'erase' ? 'ink.hint.erase' : 'ink.hint.swipe',
+    );
+    el.staffHint.classList.toggle('is-inking', Boolean(tool));
+  }
 }
 
 /* ── Microphone ───────────────────────────────────────────────────────── */
@@ -4122,6 +4160,19 @@ el.testResultBack.addEventListener('click', goHome);
 
 el.startBtn.addEventListener('click', startListening);
 el.stopBtn.addEventListener('click', finishTake);
+el.inkPen.addEventListener('click', () => ink.toggle('pen'));
+el.inkErase.addEventListener('click', () => ink.toggle('erase'));
+el.inkUndo.addEventListener('click', () => ink.undo());
+// Ctrl+Z / ⌘Z undoes a mark while the practice screen is showing — unless the
+// keyboard is busy in a text field, which has its own undo.
+document.addEventListener('keydown', (event) => {
+  if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== 'z') return;
+  if (el.views.practice?.hidden !== false) return;
+  if (event.target.closest?.('input, textarea, [contenteditable]')) return;
+  if (!ink.count && el.inkUndo.disabled) return;
+  event.preventDefault();
+  ink.undo();
+});
 
 el.retryBtn.addEventListener('click', () => {
   // Retrying a single scale is practice, even if it came from a mock audition.

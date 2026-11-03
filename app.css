@@ -3502,3 +3502,88 @@ dialog .primary-btn {
 .finish-btn:active {
   transform: scale(0.98);
 }
+
+/* ── Marks on the staff: pen, box eraser, undo ─────────────────────────── */
+
+.ink-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 8px 10px;
+}
+
+.ink-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ink-btn svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.ink-btn:hover:not(:disabled) {
+  border-color: #2d5fb4;
+  color: #2d5fb4;
+}
+
+/* The tool that is on reads as on: the pen's own blue, filled. */
+.ink-btn[aria-pressed='true'] {
+  color: #fff;
+  background: #2d5fb4;
+  border-color: #2d5fb4;
+}
+
+.ink-btn[aria-pressed='true']:hover {
+  color: #fff;
+}
+
+.ink-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ink-note {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* With a tool on, the staff takes the finger instead of scrolling. */
+.staff-scroll svg.is-inking {
+  touch-action: none;
+  cursor: crosshair;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.staff-hint.is-inking {
+  display: block;
+  color: #2d5fb4;
+}
+
+@media (max-width: 560px) {
+  .ink-note {
+    display: none;
+  }
+
+  .ink-btn {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
