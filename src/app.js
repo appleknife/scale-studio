@@ -1,22 +1,22 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026000';
-import { renderStaff } from './staff.js?v=202611026000';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026100';
+import { renderStaff } from './staff.js?v=202611026100';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611026000';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026000';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026000';
-import { generatePassage } from './sightreading.js?v=202611026000';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026000';
-import { renderScore } from './score.js?v=202611026000';
-import * as Journal from './journal.js?v=202611026000';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026000';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026000';
+} from './pitch.js?v=202611026100';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026100';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026100';
+import { generatePassage } from './sightreading.js?v=202611026100';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026100';
+import { renderScore } from './score.js?v=202611026100';
+import * as Journal from './journal.js?v=202611026100';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026100';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026100';
 import {
   STRINGS,
   FIFTHS,
@@ -24,7 +24,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611026000';
+} from './tuner.js?v=202611026100';
 
 const LANG = initLang();
 
@@ -3163,6 +3163,17 @@ async function openMic(emit) {
       clearInterval(timer);
       stream.getTracks().forEach((t) => t.stop());
       ctx.close().catch(() => {});
+      // Hand the audio session back. A page left in "play-and-record" can route
+      // its *playback* to the earpiece — quietly — until capture starts again
+      // (WebKit bug 218012, comment 49, seen on iOS 18.6), which is the example
+      // and the metronome coming out of the wrong place after a take.
+      if ('audioSession' in navigator) {
+        try {
+          navigator.audioSession.type = 'auto';
+        } catch {
+          /* older Safari — nothing to hand back */
+        }
+      }
     },
     /** Try to come back from an interruption — a call, a locked screen, a tab
      *  switch. iOS moves the context to "interrupted" and leaves it there. */

@@ -310,6 +310,27 @@ knowing before blaming the app — or a student.
   for ever ([WebKit 180522](https://bugs.webkit.org/show_bug.cgi?id=180522)).
   `openMic()` creates and resumes the context synchronously inside the click, before
   awaiting `getUserMedia`.
+* **The audio session is handed back when a take ends.** WebKit
+  [218012](https://bugs.webkit.org/show_bug.cgi?id=218012) is a long thread about
+  output volume collapsing when the microphone is captured; its latest comments
+  (iOS 18.6, 2026) describe the routing going wrong in a `play-and-record`
+  session — playback can go to the earpiece until capture begins again. So
+  `openMic()` sets `play-and-record` for the duration of a take and puts it back
+  to `auto` when the stream closes, or the example would come out of the wrong
+  place afterwards.
+* **Why AnalyserNode and a timer, and not an AudioWorklet.** A worklet would be
+  the tidier way to get continuous audio-thread frames on a desktop, and on iOS it
+  is not: [244203](https://bugs.webkit.org/show_bug.cgi?id=244203) reports dropped
+  samples from a worklet while the track says 44.1 kHz and the context says 48 kHz,
+  and [275801](https://bugs.webkit.org/show_bug.cgi?id=275801) and
+  [251091](https://bugs.webkit.org/show_bug.cgi?id=251091) are both "getUserMedia
+  plus `addModule` distorts all output" (the rendering quantum becomes 960 frames
+  while capturing instead of 128). The analyser path has none of that.
+* **Octave errors are handled by range, not by luck.** The YIN search is clamped
+  to the violin's own range (150–1800 Hz) before it starts, so the detector cannot
+  lock onto a harmonic outside it — the standard fix for the classic YIN failure
+  mode, and the reason a violin's strong second harmonic does not read an octave
+  high.
 * **What is on screen now:** the sight-reading screen has the same small input meter
   the scales screen has, so "is it hearing me?" has an answer before the first note;
   and "What it can and can't hear" now ends with the capture settings the browser

@@ -520,6 +520,23 @@ h3 {
   color: var(--ink-soft);
 }
 
+/* What a cent is, where the cents are: under the number itself, quiet enough to
+   ignore once it has been read once. */
+.cents-note {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+  text-align: left;
+}
+
+.cents-note strong {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
 .guide-card {
   background: var(--surface);
   border: 1px solid var(--line);
