@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611026100" />
+    <link rel="stylesheet" href="app.css?v=202611026300" />
   </head>
   <body>
     <div class="shell">
@@ -545,6 +545,18 @@
               </div>
             </div>
             <ul class="sight-parts" id="sightParts"></ul>
+            <!-- One stem per note, up for sharp and down for flat — the same
+                 picture the scale result draws, so a student reads one thing. -->
+            <div class="intonation" id="sightIntonation" hidden>
+              <h4 class="intonation-title" data-i18n="intonation.title">How far off, and which way</h4>
+              <p class="intonation-sum" id="sightIntonationSum"></p>
+              <div class="intonation-map" id="sightIntonationMap"></div>
+              <p class="intonation-legend" data-i18n="intonation.legend">
+                Up is sharp, down is flat, length is the amount. The shaded band is
+                within 15 cents — in tune by any ear — and a hollow ring is a note
+                the app did not hear.
+              </p>
+            </div>
             <ul class="sight-tips" id="sightTips"></ul>
             <div class="sight-actions">
               <button class="ghost-btn" id="sightAgain" type="button" data-i18n="Try again">Try again</button>
@@ -920,6 +932,20 @@
             </div>
           </div>
 
+          <!-- Colour says how far; this says which way. One stem per note, up
+               for sharp and down for flat, in the same order as the staff
+               above it. -->
+          <div class="staff-card intonation-card" id="resultIntonation" hidden>
+            <h3 class="card-title" data-i18n="intonation.title">How far off, and which way</h3>
+            <p class="intonation-sum" id="resultIntonationSum"></p>
+            <div class="intonation-map" id="resultIntonationMap"></div>
+            <p class="intonation-legend" data-i18n="intonation.legend">
+              Up is sharp, down is flat, length is the amount. The shaded band is
+              within 15 cents — in tune by any ear — and a hollow ring is a note
+              the app did not hear.
+            </p>
+          </div>
+
           <div class="tips" id="tips"></div>
 
           <div class="actions">
@@ -1050,7 +1076,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611026100"></script>
+    <script type="module" src="src/app.js?v=202611026300"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

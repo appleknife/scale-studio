@@ -280,6 +280,26 @@ export const S = {
   'update.ready': ['A newer version is ready.', '有新版本了。'],
   'update.reload': ['Reload', '刷新'],
   'update.later': ['Later', '稍后'],
+  'intonation.sum.clean': [
+    'All {n} notes sat within 15 cents of centre — in tune by any ear.',
+    '{n} 个音全部落在正中 15 音分以内——怎么听都是准的。',
+  ],
+  'intonation.sum.sharp': [
+    '{n} sat high; the rest are within 15 cents.',
+    '有 {n} 个偏高，其余都在 15 音分以内。',
+  ],
+  'intonation.sum.flat': [
+    '{n} sat low; the rest are within 15 cents.',
+    '有 {n} 个偏低，其余都在 15 音分以内。',
+  ],
+  'intonation.sum.both': [
+    '{sharp} sat high and {flat} sat low; the rest are centred.',
+    '{sharp} 个偏高、{flat} 个偏低，其余基本准。',
+  ],
+  'aria.intonation': [
+    'How far above or below centre each note sat, in cents',
+    '每个音偏高或偏低的音分数',
+  ],
   'sight.speedAria': ['Playback speed', '回放速度'],
 
   // ── Sight reading: listening ──
@@ -970,6 +990,9 @@ export const STATIC = {
     '<li><strong>力度、弓法、音色</strong>——听不出来。一支麦克风分不清渐强和加弓压，也分不清断弓和连弓。</li>' +
     '<li><strong>重复音</strong>——同一个音连着拉，可能会合成一个音；换弓的位置它只能大致听出来。</li>' +
     '<li><strong>音分</strong>——一个半音的百分之一，100 音分就是下一个音。10 音分以内怎么听都是准的，25 音分已经明显偏了，50 音分正好在两个音中间。</li>',
+  'intonation.title': '偏高还是偏低，差多少',
+  'intonation.legend':
+    '向上是偏高、向下是偏低，长短就是差多少；中间那条浅色带是 15 音分以内，怎么听都算准。空心圈表示应用没听到那个音。',
   'cents.note':
     '<strong>音分是什么。</strong>一个半音——一个指位、一个品格——等于 100 音分。相差 10 音分以内，怎么听都是准的；25 音分已经能明显听出偏了；50 音分正好到下一个音的正中间，应用就会开始把它当成那个音。',
   'hear.ios':

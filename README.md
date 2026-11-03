@@ -262,6 +262,19 @@ the scoring all follow from it.
   A take that sits entirely around 0.0045 — which is what an iPhone produces with
   gain control on — used to have the gate placed at 0.0068, *above its own notes*,
   and came back as "nothing heard" at the end of a perfectly good scale.
+* **How far off, and which way.** The staff shows *how far* — green, amber, red
+  per note — and this second picture, under it on both result screens, shows
+  *which way*. One stem per note on an axis of ±50 cents: up is sharp, down is
+  flat, the length is the amount, and the colour is the same three bands the staff
+  uses, so the two agree without a key. A hollow ring on the centre line is a note
+  the app did not hear — visibly not the same thing as a note that was played
+  perfectly in tune, which is what a missed note's 0 cents would otherwise look
+  like. Above the drawing a sentence counts it up ("5 sat high and 4 sat low; the
+  rest are centred"), and the shaded band is ±15 cents, the app's own definition
+  of in tune. A reading past the end of the axis gets a small chevron rather than
+  a stem that simply stops. Geometry lives in `src/intonation.js` and
+  `tests/intonation.test.html` weighs it: symmetry, clamping, the bands, which
+  notes count as heard, and that nothing is drawn outside the drawing.
 * **Note finding:** a note begins when a stable pitch appears and ends when the
   pitch moves or the sound stops. The first 20% and last 15% of each note are
   ignored so bow attacks do not distort the reading.
@@ -1176,6 +1189,10 @@ tests/sampler.test.html   the sample set and the voice's arithmetic: every whole
                       cent, articulation takes used when they are close enough,
                       and the dynamic ladder in order
 src/app.js            screens, microphone, results
+src/intonation.js     the note-by-note picture of intonation: the axis, the bands,
+                      and the stems that say which way a note was off
+tests/intonation.test.html  that picture's geometry: symmetry, clamping, which
+                      notes count as heard, and nothing drawn outside the drawing
 tests/dsp.test.html   synthesised-audio tests for the detector and scoring
 tests/sightreading.test.html  720 generated passages against the level rules
 tests/onset-probe.html  can a bow change be heard? (parameter sweep)

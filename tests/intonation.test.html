@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Intonation map test</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      pre {
+        background: #fffdfa;
+        border: 1px solid #e8dfd1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="out">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // The picture that says which way a note was off. Its geometry is pure, so
+      // it can be weighed here without a microphone or a browser layout: the
+      // axis, the clamping, which notes count as heard, and the sentence above
+      // the drawing.
+      import {
+        SPAN,
+        bandFor,
+        clampCents,
+        isHeard,
+        summariseIntonation,
+        yForCents,
+        renderIntonationMap,
+      } from '../src/intonation.js';
+
+      const problems = [];
+      const log = [];
+      const near = (a, b, slack = 0.51) => Math.abs(a - b) <= slack;
+
+      /* ── 1. The axis ────────────────────────────────────────────────── */
+      {
+        const opts = { height: 118 };
+        const middle = opts.height / 2;
+        // Up is sharp: a positive reading is drawn above the centre line.
+        if (!(yForCents(30, opts) < middle)) problems.push('a sharp note was not drawn above the line');
+        if (!(yForCents(-30, opts) > middle)) problems.push('a flat note was not drawn below the line');
+        if (!near(yForCents(0, opts), middle)) problems.push('zero cents is not on the centre line');
+        // Symmetry, so "a little sharp" and "a little flat" look alike.
+        const up = middle - yForCents(22, opts);
+        const down = yForCents(-22, opts) - middle;
+        if (!near(up, down, 0.01)) problems.push('sharp and flat are not drawn symmetrically');
+        // Length follows the amount, and the ends of the axis are the ends of the
+        // drawing — not off the edge of the viewBox.
+        const top = yForCents(SPAN, opts);
+        const bottom = yForCents(-SPAN, opts);
+        if (top < 1 || bottom > opts.height - 1) problems.push('the ends of the axis fall outside the drawing');
+        if (!(yForCents(40, opts) < yForCents(20, opts))) problems.push('a bigger reading is not drawn further out');
+        log.push(`axis: +50 at y${top.toFixed(1)} · 0 at y${middle} · −50 at y${bottom.toFixed(1)} (height ${opts.height})`);
+      }
+
+      /* ── 2. Clamping ────────────────────────────────────────────────── */
+      {
+        if (clampCents(80) !== SPAN) problems.push('a reading past the axis was not clamped');
+        if (clampCents(-80) !== -SPAN) problems.push('a flat reading past the axis was not clamped');
+        if (clampCents(NaN) !== 0) problems.push('a missing reading did not fall back to the centre');
+        const opts = { height: 118 };
+        if (!near(yForCents(120, opts), yForCents(SPAN, opts), 0.01))
+          problems.push('an off-the-scale reading is not drawn at the edge');
+      }
+
+      /* ── 3. The bands ───────────────────────────────────────────────── */
+      {
+        const cases = [
+          [0, 'centred'],
+          [14, 'centred'],
+          [16, 'close'],
+          [30, 'close'],
+          [31, 'off'],
+          [-44, 'off'],
+        ];
+        for (const [cents, key] of cases) {
+          if (bandFor(cents).key !== key) problems.push(`${cents} cents fell in "${bandFor(cents).key}", not "${key}"`);
+        }
+        // A missing reading is not "off" — it is the centre, and the band follows
+        // the number that is actually drawn.
+        if (bandFor(NaN).key !== 'centred') problems.push('a missing reading was banded as off');
+      }
+
+      /* ── 4. Heard, missed, and the sentence ─────────────────────────── */
+      {
+        const notes = [
+          { status: 'exact', cents: 6 },
+          { status: 'exact', cents: 34 },
+          { status: 'missed', cents: 0 },
+          { status: 'exact', cents: -40 },
+          { status: 'wrong', cents: -2 },
+        ];
+        const s = summariseIntonation(notes);
+        log.push(`summary: heard ${s.heard} · missed ${s.missed} · sharp ${s.sharp} · flat ${s.flat} · centred ${s.centred} · average ${s.average.toFixed(1)}`);
+        if (s.heard !== 4) problems.push(`heard ${s.heard} of 4`);
+        if (s.missed !== 1) problems.push(`missed ${s.missed} instead of 1`);
+        if (s.sharp !== 1) problems.push(`sharp ${s.sharp} instead of 1`);
+        if (s.flat !== 1) problems.push(`flat ${s.flat} instead of 1`);
+        if (s.centred !== 2) problems.push(`centred ${s.centred} instead of 2`);
+        if (!near(s.average, -0.5, 0.001)) problems.push(`average ${s.average} instead of -0.5`);
+        // A missed note carries cents 0 in the analysis, and must never be read
+        // as a perfectly tuned note.
+        if (isHeard({ status: 'missed', cents: 0 })) problems.push('a missed note counted as heard');
+        if (!isHeard({ status: 'exact', cents: 0 })) problems.push('a centred note did not count as heard');
+      }
+
+      /* ── 5. The drawing ─────────────────────────────────────────────── */
+      {
+        const notes = [
+          { status: 'exact', cents: 5 },
+          { status: 'exact', cents: 38 },
+          { status: 'missed', cents: 0 },
+          { status: 'exact', cents: -26 },
+          { status: 'exact', cents: 70 },
+        ];
+        const svg = renderIntonationMap(notes, { label: 'test' });
+        const count = (tag) => (svg.match(new RegExp(`<${tag}`, 'g')) || []).length;
+        log.push(
+          `drawing: ${svg.length} chars · stems ${count('line') - 2} · dots ${count('circle')} · ` +
+            `rings ${(svg.match(/intonation-missed/g) || []).length} · chevrons ${count('path')}`,
+        );
+        if (!svg.startsWith('<svg')) problems.push('no svg was produced');
+        if (!/role="img"/.test(svg)) problems.push('the drawing has no img role');
+        if (!/aria-label="test"/.test(svg)) problems.push('the drawing lost its label');
+        // Four heard notes get a stem and a dot each; the missed one gets a ring
+        // and neither.
+        const rings = (svg.match(/intonation-missed/g) || []).length;
+        if (rings !== 1) problems.push(`${rings} rings for one missed note`);
+        const dots = (svg.match(/class="intonation-dot"/g) || []).length;
+        if (dots !== 4) problems.push(`${dots} dots for four heard notes`);
+        // The reading past the axis gets a chevron saying so.
+        if (!/intonation-over/.test(svg)) problems.push('an off-the-scale reading has no chevron');
+        // Nothing may be drawn outside the viewBox.
+        for (const m of svg.matchAll(/cy="(-?\d+(?:\.\d+)?)"/g)) {
+          const y = Number(m[1]);
+          if (y < 0 || y > 118) problems.push(`a dot was drawn outside the drawing (y=${y})`);
+        }
+        if (renderIntonationMap([]) !== '') problems.push('an empty take drew something');
+      }
+
+      document.getElementById('out').textContent = problems.length
+        ? `INTONATION FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
+        : `INTONATION OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'INTONATION FAILED' : 'INTONATION OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'intonation', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

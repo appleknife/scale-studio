@@ -1,22 +1,23 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026100';
-import { renderStaff } from './staff.js?v=202611026100';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026300';
+import { renderStaff } from './staff.js?v=202611026300';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611026100';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026100';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026100';
-import { generatePassage } from './sightreading.js?v=202611026100';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026100';
-import { renderScore } from './score.js?v=202611026100';
-import * as Journal from './journal.js?v=202611026100';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026100';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026100';
+} from './pitch.js?v=202611026300';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026300';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026300';
+import { generatePassage } from './sightreading.js?v=202611026300';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026300';
+import { renderScore } from './score.js?v=202611026300';
+import { renderIntonationMap, summariseIntonation } from './intonation.js?v=202611026300';
+import * as Journal from './journal.js?v=202611026300';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026300';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026300';
 import {
   STRINGS,
   FIFTHS,
@@ -24,7 +25,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611026100';
+} from './tuner.js?v=202611026300';
 
 const LANG = initLang();
 
@@ -61,6 +62,9 @@ const el = {
   sightGrade: $('sightGrade'),
   sightLine: $('sightLine'),
   sightParts: $('sightParts'),
+  sightIntonation: $('sightIntonation'),
+  sightIntonationSum: $('sightIntonationSum'),
+  sightIntonationMap: $('sightIntonationMap'),
   sightTips: $('sightTips'),
   sightAgain: $('sightAgain'),
   sightNext: $('sightNext'),
@@ -197,10 +201,12 @@ const el = {
   resultSub: $('resultSub'),
   breakdown: $('breakdown'),
   resultStaff: $('resultStaff'),
+  resultIntonation: $('resultIntonation'),
+  resultIntonationSum: $('resultIntonationSum'),
+  resultIntonationMap: $('resultIntonationMap'),
   tips: $('tips'),
   retryBtn: $('retryBtn'),
   anotherBtn: $('anotherBtn'),
-
   drawBtn: $('drawBtn'),
   reels: $('reels'),
   beginBtn: $('beginBtn'),
@@ -1743,6 +1749,7 @@ function renderSightResult(result) {
     el.sightGrade.textContent = t('result.nothing.title');
     el.sightLine.textContent = t('result.nothing.body');
     el.sightParts.innerHTML = '';
+    paintIntonation(el.sightIntonation, el.sightIntonationSum, el.sightIntonationMap, []);
     el.sightTips.innerHTML = '';
     return;
   }
@@ -1760,12 +1767,24 @@ function renderSightResult(result) {
     [t('sight.partPulse'), pct(result.rhythm)],
     [
       t('sight.partStops'),
-      result.stops === 0 ? t('test.noStops') : t('test.stops', { n: result.stops }),
+      result.stops === 0
+        ? t('test.noStops')
+        : result.stops === 1
+          ? t('test.stopOne')
+          : t('test.stops', { n: result.stops }),
     ],
   ];
   el.sightParts.innerHTML = rows
     .map(([label, value]) => `<li><span>${label}</span><span>${value}</span></li>`)
     .join('');
+  // Where each note sat, and which way.
+  paintIntonation(
+    el.sightIntonation,
+    el.sightIntonationSum,
+    el.sightIntonationMap,
+    result.results,
+  );
+
 
   // A handful of kind, specific observations rather than a verdict, ordered by
   // what a teacher would say first: where it broke, then how fast it went, then
@@ -3528,6 +3547,33 @@ function onFrame(frame) {
  * sits. Shared by the scale take and the sight-reading take so a student reads
  * exactly the same thing in both places.
  */
+/**
+ * One note-by-note picture of intonation, or nothing when there is nothing to
+ * show. Shared by the scale result and the sight-reading result so a student
+ * reads the same thing in both places.
+ */
+function paintIntonation(card, sumEl, mapEl, notes) {
+  if (!card || !mapEl) return;
+  const ordered = notes || [];
+  const summary = summariseIntonation(ordered);
+  if (!summary.heard) {
+    card.hidden = true;
+    mapEl.innerHTML = '';
+    return;
+  }
+  card.hidden = false;
+  mapEl.innerHTML = renderIntonationMap(ordered, { label: t('aria.intonation') });
+  if (sumEl) sumEl.textContent = intonationLine(summary);
+}
+
+/** The sentence above the picture: counts of high, low and centred. */
+function intonationLine(summary) {
+  const { heard, sharp, flat } = summary;
+  if (!sharp && !flat) return t('intonation.sum.clean', { n: heard });
+  if (sharp && flat) return t('intonation.sum.both', { sharp, flat });
+  return sharp ? t('intonation.sum.sharp', { n: sharp }) : t('intonation.sum.flat', { n: flat });
+}
+
 function paintLiveRead(noteEl, centsEl, markerEl, midi, cents) {
   const name = NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
 
@@ -3736,6 +3782,14 @@ function renderResult(result) {
       colors: result.notes.map(noteColour),
       ariaLabel: t('aria.notation'),
     },
+  );
+  // How far each note sat, and which way — the same picture the sight-reading
+  // result draws.
+  paintIntonation(
+    el.resultIntonation,
+    el.resultIntonationSum,
+    el.resultIntonationMap,
+    result.notes,
   );
 
   if (result.tips.length) {
@@ -4149,9 +4203,15 @@ if (params.has('sightplay')) {
       startAssistedRun();
     }
   }
+  // ?sightplay=5&wobble — a take whose notes sit at a spread of cents, so the
+  // picture of "how far off, and which way" can be looked at (and screenshotted)
+  // without playing it.
+  const wobble = [34, -12, 4, -28, 18, -6, 8, -38, 22, -16];
   const offsets = params.has('detune')
     ? Object.fromEntries([...Array(64).keys()].map((k) => [k, 42]))
-    : {};
+    : params.has('wobble')
+      ? Object.fromEntries([...Array(64).keys()].map((k) => [k, wobble[k % wobble.length]]))
+      : {};
   // ?sightplay=5&soft — the same take through a phone's microphone: quiet, and
   // never quite certain of its own periodicity, which is what used to leave the
   // take waiting for a "confident" frame that never came.
