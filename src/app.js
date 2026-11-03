@@ -1,23 +1,23 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026300';
-import { renderStaff } from './staff.js?v=202611026300';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026700';
+import { renderStaff } from './staff.js?v=202611026700';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611026300';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026300';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026300';
-import { generatePassage } from './sightreading.js?v=202611026300';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026300';
-import { renderScore } from './score.js?v=202611026300';
-import { renderIntonationMap, summariseIntonation } from './intonation.js?v=202611026300';
-import * as Journal from './journal.js?v=202611026300';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026300';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026300';
+} from './pitch.js?v=202611026700';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026700';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026700';
+import { generatePassage } from './sightreading.js?v=202611026700';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026700';
+import { renderScore } from './score.js?v=202611026700';
+import { summariseIntonation } from './intonation.js?v=202611026700';
+import * as Journal from './journal.js?v=202611026700';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026700';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026700';
 import {
   STRINGS,
   FIFTHS,
@@ -25,7 +25,7 @@ import {
   centsFrom,
   nearestString,
   isInTune,
-} from './tuner.js?v=202611026300';
+} from './tuner.js?v=202611026700';
 
 const LANG = initLang();
 
@@ -78,6 +78,9 @@ const el = {
   statTabs: $('statTabs'),
   statSort: $('statSort'),
   statPanel: $('statPanel'),
+  statManage: $('statManage'),
+  statClear: $('statClear'),
+  statClearWarn: $('statClearWarn'),
   statNote: $('statNote'),
   logBannerText: $('logBannerText'),
   trackBack: $('trackBack'),
@@ -1283,12 +1286,19 @@ function renderSight() {
   // simply narrower, so every note lands about twice as big.
   const wide = (el.sightStaff.clientWidth || 0) >= NARROW_SCORE_BELOW;
   sight.perSystem = wide ? 4 : 2;
+  // A finished take leaves its intonation on the page: the same score, redrawn
+  // with one stem under every note (see renderScore's lane).
+  const cents =
+    sight.result && sight.result.results
+      ? sight.result.results.map((r) => (r.status === 'missed' ? null : r.cents))
+      : null;
   el.sightStaff.innerHTML = renderScore(passage, {
     tempoText: `${mark} = ${passage.tempo.bpm}`,
     tempoMark:
       passage.tempo.unit === 'h' ? { unit: 'h', bpm: passage.tempo.bpm } : null,
     ariaLabel: t('aria.score'),
     barsPerSystem: sight.perSystem,
+    intonation: cents,
   });
 
   [...el.sightLevels.querySelectorAll('button')].forEach((b) =>
@@ -1318,6 +1328,7 @@ function newPassage(level = sight.level, seed = null) {
   sight.passage = generatePassage({ level: sight.level, seed });
   sight.anchors = null;    // the drawing is about to be replaced
   sight.pickedBar = null;  // and a bar number means nothing on the next page
+  sight.result = null;     // nor does the last take's intonation lane
   playhead = null;
   stopSightTake(false);
   el.sightResult.hidden = true;
@@ -1342,6 +1353,11 @@ async function startSightTake(options = {}) {
   // take would follow them into the microphone.
   stopHearing();
   el.sightStart.disabled = true;
+  // A new take starts without the last one's lane under the notes.
+  if (sight.result) {
+    sight.result = null;
+    renderSight();
+  }
   el.sightStatus.textContent = t('sight.waitingMic');
   el.sightResult.hidden = true;
 
@@ -1743,13 +1759,15 @@ function finishSightTake() {
 function renderSightResult(result) {
   el.sightResult.hidden = false;
   el.sightStatus.textContent = '';
+  // Kept, so the score can carry the lane until the next passage replaces it.
+  sight.result = result;
 
   if (!result.heard || result.heard < 3) {
     el.sightPct.textContent = '–';
     el.sightGrade.textContent = t('result.nothing.title');
     el.sightLine.textContent = t('result.nothing.body');
     el.sightParts.innerHTML = '';
-    paintIntonation(el.sightIntonation, el.sightIntonationSum, el.sightIntonationMap, []);
+    paintIntonationLine(el.sightIntonationSum, []);
     el.sightTips.innerHTML = '';
     return;
   }
@@ -1777,13 +1795,9 @@ function renderSightResult(result) {
   el.sightParts.innerHTML = rows
     .map(([label, value]) => `<li><span>${label}</span><span>${value}</span></li>`)
     .join('');
-  // Where each note sat, and which way.
-  paintIntonation(
-    el.sightIntonation,
-    el.sightIntonationSum,
-    el.sightIntonationMap,
-    result.results,
-  );
+  // The picture is drawn with the notes; this is the count under it.
+  paintIntonationLine(el.sightIntonationSum, result.results);
+  renderSight();
 
 
   // A handful of kind, specific observations rather than a verdict, ordered by
@@ -2605,11 +2619,89 @@ function renderStats() {
       : `<p class="stat-empty">${t('stats.noneSight')}</p>`;
   }
 
+  if (statsView.tab === 'takes') {
+    // Every take, newest first, with the one thing that makes a row worth
+    // deleting: what it was, when, and what it scored.
+    const list = Journal.recentTakes(journal, { limit: 60 }).slice().reverse();
+    el.statPanel.innerHTML = list.length
+      ? `<ul class="take-list">${list.map(takeRow).join('')}</ul>`
+      : `<p class="stat-empty">${t('stats.noneTakes')}</p>`;
+  }
+
+  el.statManage.hidden = statsView.tab !== 'takes';
   el.statNote.textContent = ignored
     ? t(ignored === 1 ? 'stats.ignoredOne' : 'stats.ignored', { n: ignored })
     : '';
 }
 
+/** One row of the take list. */
+function takeRow(take) {
+  const card = take.kind === 'sight' ? null : MAJOR_KEYS.find((k) => k.id === take.id);
+  const what =
+    take.kind === 'sight'
+      ? t('stats.levelN', { n: take.level })
+      : card
+        ? card.variants.map((v) => v.name).join(' / ')
+        : t('stats.takeOther');
+  const when = new Date(take.at).toLocaleDateString(getLang() === 'zh' ? 'zh-CN' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+  const tags = [when];
+  if (take.assisted) tags.push(t('stats.withHelp'));
+  if (take.counted === false) tags.push(t('stats.ignoredTag'));
+  return `<li class="take-row">
+    <span class="take-what">
+      <strong>${what}</strong>
+      <span class="take-when">${tags.join(' · ')}</span>
+    </span>
+    <span class="take-score">${take.score}%</span>
+    <button class="take-del" type="button" data-del="${take.uid || take.at}"
+      aria-label="${t('stats.delete')}" title="${t('stats.delete')}">×</button>
+  </li>`;
+}
+
+
+/* ── Erasing ─────────────────────────────────────────────────────────── */
+
+el.statPanel.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-del]');
+  if (!btn) return;
+  // No confirmation: the row is one tap to delete and one to win back by
+  // playing, and a dialog on every accidental take would be worse than the
+  // mistake. The records derived from takes are rebuilt inside the journal.
+  if (!Journal.removeTake(journal, btn.dataset.del)) return;
+  saveJournal();
+  renderStats();
+  renderLogBanner();
+  if (!el.views.track.hidden) renderLog();
+});
+
+let clearArmed = false;
+function disarmClear() {
+  clearArmed = false;
+  el.statClear.textContent = t('stats.clear');
+  el.statClear.classList.remove('is-armed');
+  el.statClearWarn.hidden = true;
+}
+
+el.statClear.addEventListener('click', () => {
+  if (!clearArmed) {
+    // First tap arms it and says exactly what will go. The second one erases.
+    clearArmed = true;
+    el.statClear.textContent = t('stats.clearConfirm');
+    el.statClear.classList.add('is-armed');
+    el.statClearWarn.hidden = false;
+    el.statClearWarn.textContent = t('stats.clearWarn');
+    return;
+  }
+  disarmClear();
+  Journal.clearStats(journal);
+  saveJournal();
+  renderStats();
+  renderLogBanner();
+  if (!el.views.track.hidden) renderLog();
+});
 el.openStatsBtn.addEventListener('click', () => {
   cancelListening();
   showView('stats');
@@ -3543,30 +3635,19 @@ function onFrame(frame) {
 }
 
 /**
- * One live reading: the note name, the cents beside it, and where the needle
- * sits. Shared by the scale take and the sight-reading take so a student reads
- * exactly the same thing in both places.
+ * The count under the notes.
+ *
+ * The picture itself is drawn with the music — a lane under the staff, one stem
+ * per note — so all that is left to say here is the arithmetic: how many sat
+ * high, how many low, and how many were centred.
  */
-/**
- * One note-by-note picture of intonation, or nothing when there is nothing to
- * show. Shared by the scale result and the sight-reading result so a student
- * reads the same thing in both places.
- */
-function paintIntonation(card, sumEl, mapEl, notes) {
-  if (!card || !mapEl) return;
-  const ordered = notes || [];
-  const summary = summariseIntonation(ordered);
-  if (!summary.heard) {
-    card.hidden = true;
-    mapEl.innerHTML = '';
-    return;
-  }
-  card.hidden = false;
-  mapEl.innerHTML = renderIntonationMap(ordered, { label: t('aria.intonation') });
-  if (sumEl) sumEl.textContent = intonationLine(summary);
+function paintIntonationLine(sumEl, notes) {
+  if (!sumEl) return;
+  const summary = summariseIntonation(notes || []);
+  sumEl.textContent = summary.heard ? intonationLine(summary) : '';
 }
 
-/** The sentence above the picture: counts of high, low and centred. */
+/** The sentence under the notes: counts of high, low and centred. */
 function intonationLine(summary) {
   const { heard, sharp, flat } = summary;
   if (!sharp && !flat) return t('intonation.sum.clean', { n: heard });
@@ -3574,6 +3655,11 @@ function intonationLine(summary) {
   return sharp ? t('intonation.sum.sharp', { n: sharp }) : t('intonation.sum.flat', { n: flat });
 }
 
+/**
+ * One live reading: the note name, the cents beside it, and where the needle
+ * sits. Shared by the scale take and the sight-reading take so a student reads
+ * exactly the same thing in both places.
+ */
 function paintLiveRead(noteEl, centsEl, markerEl, midi, cents) {
   const name = NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
 
@@ -3781,16 +3867,10 @@ function renderResult(result) {
       fifths: scale.fifths,
       colors: result.notes.map(noteColour),
       ariaLabel: t('aria.notation'),
+      intonation: result.notes.map((note) => (note.status === 'missed' ? null : note.cents)),
     },
   );
-  // How far each note sat, and which way — the same picture the sight-reading
-  // result draws.
-  paintIntonation(
-    el.resultIntonation,
-    el.resultIntonationSum,
-    el.resultIntonationMap,
-    result.notes,
-  );
+  paintIntonationLine(el.resultIntonationSum, result.notes);
 
   if (result.tips.length) {
     el.tips.innerHTML = result.tips
@@ -4113,6 +4193,32 @@ renderWho();
 if (params.has('help')) el.helpDialog.showModal();
 if (params.has('draw')) drawThree();
 if (params.has('log')) openTrack();
+if (params.has('statsdemo')) {
+  // ?statsdemo seeds a few takes and opens the "Every take" tab, so the delete
+  // list can be looked at without playing anything.
+  const today = todayKey();
+  for (const [kind, id, level, score] of [
+    ['scale', 'G', '', 92],
+    ['scale', 'D', '', 78],
+    ['sight', '', '5', 84],
+    ['scale', 'A', '', 61],
+  ]) {
+    Journal.recordTake(journal, {
+      kind,
+      id,
+      level,
+      score,
+      key: today,
+      counted: true,
+      parts: { accuracy: score / 100, intonation: score / 100 },
+    });
+  }
+  Journal.logTake(journal, today, 'scales');
+  saveJournal();
+  showView('stats');
+  statsView.tab = 'takes';
+  renderStats();
+}
 if (params.has('sightdemo')) {
   openSight(Number(params.get('sightdemo')) || 5, params.has('seed') ? Number(params.get('seed')) : 7);
   renderSightResult(analyzeSightTake(sightDemoFrames(sight.passage), sight.passage));

@@ -6,10 +6,11 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611026300';
-import { CLEF_PATH } from './clef.js?v=202611026300';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611026700';
+import { CLEF_PATH } from './clef.js?v=202611026700';
+import { intonationLane } from './intonation.js?v=202611026700';
 
-import { beatLength } from './sightreading.js?v=202611026300';
+import { beatLength } from './sightreading.js?v=202611026700';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -479,10 +480,26 @@ function drawSystem(
   barFrom,
   barTo,
   top,
-  { timeSignature, tempoText, tempoMark = null, showTempo, final = false, width = WIDTH, ceiling = null },
+
+  {
+    timeSignature,
+    tempoText,
+    tempoMark = null,
+    showTempo,
+    final = false,
+    width = WIDTH,
+    ceiling = null,
+    // The intonation lane: cents per sounding note for the whole passage, and
+    // where this system starts in that list.
+    intonation = null,
+    intonationStart = 0,
+  },
 ) {
+
   const part = [];
   const bottom = top + 4 * LINE_GAP;
+  // Filled while the bars are drawn, used once below them.
+  const marks = [];
   // The highest point any *music* reaches in this system — heads, stems, beams,
   // flags, marks, slurs. The tempo mark is printed over the first bar, and a bar
   // that opens high would otherwise be drawn through it.
@@ -705,8 +722,19 @@ function drawSystem(
     for (const group of groups) {
       if (group.length > 1) for (const e of group) beamed.add(e);
     }
+
     const xs = positions(events, barX, beamed);
     const xOf = (event) => xs.get(event);
+
+    // Every note of the system, with where it was drawn, so the lane below can
+    // sit under the note it is about.
+    if (intonation) {
+      for (const event of events) {
+        if (event.rest || !event.note) continue;
+        const value = intonation[intonationStart + marks.length];
+        marks.push({ x: xs.get(event), cents: Number.isFinite(value) ? value : null });
+      }
+    }
 
     // Barlines go between bars, never in front of the first one. A line at the
     // opening of a system sits right after the clef and key signature and reads
@@ -1279,7 +1307,25 @@ function drawSystem(
     }
   }
 
-  return { markup: part.join(''), dynY: lastDynY, musicTop };
+
+  // The intonation lane, under this system's own notes. It goes below the
+  // dynamics so a crescendo's lettering never collides with it, and it returns
+  // its bottom so the spacing pass can leave room for it.
+  let laneBottom = null;
+  if (marks.length) {
+    const centre = Math.max(bottom + 26, lastDynY + 22);
+    const lane = intonationLane({
+      marks,
+      centre,
+      half: 20,
+      left: LEFT,
+      right: width - RIGHT,
+    });
+    part.push(lane.markup);
+    laneBottom = lane.bottom + 4;
+  }
+
+  return { markup: part.join(''), dynY: lastDynY, musicTop, laneBottom };
 }
 
 /**
@@ -1341,6 +1387,9 @@ export function renderScore(
     tempoMark = null,
     ariaLabel = 'Sight-reading passage',
     barsPerSystem = BARS_PER_SYSTEM,
+    // Cents per sounding note for the whole passage, or null. Each system draws
+    // the part of the lane that belongs to it, under its own notes.
+    intonation = null,
   } = {},
 ) {
   const narrow = barsPerSystem === 2;
@@ -1356,6 +1405,16 @@ export function renderScore(
    * staff and how far its dynamic marking hangs below — which is what the spacing
    * between systems has to hold.
    */
+  // Where this system's notes start in the intonation list: everything before it.
+  const startOf = (s) => {
+    if (!intonation) return 0;
+    let count = 0;
+    for (let bar = 0; bar < s * per; bar++) {
+      for (const event of passage.bars[bar] || []) if (!event.rest && event.note) count += 1;
+    }
+    return count;
+  };
+
   const draw = (s, top, ceiling) =>
     drawSystem(passage, s * per, (s + 1) * per, top, {
       width,
@@ -1365,6 +1424,8 @@ export function renderScore(
       showTempo: s === 0 && Boolean(tempoText || tempoMark),
       final: s === systems - 1,
       ceiling,
+      intonation,
+      intonationStart: startOf(s),
     });
 
   // ── how far apart the systems go ────────────────────────────────────────
@@ -1378,7 +1439,9 @@ export function renderScore(
   for (let s = 0; s < systems; s++) {
     const sys = draw(s, 0, measureCeiling);
     measured.push(sys);
-    measureCeiling = sys.dynY + 6;
+    // The lane hangs below the dynamics, so the next system has to clear that
+    // too — otherwise the lane would be drawn through the staff below it.
+    measureCeiling = (sys.laneBottom ?? sys.dynY) + 6;
   }
 
   // The first system normally sits at TOP_PAD. Music that reaches very high — a
@@ -1388,14 +1451,15 @@ export function renderScore(
   // reaches above that clamp is music drawn through the mark.
   const tops = [Math.max(TOP_PAD, 40 - measured[0].musicTop)];
   for (let s = 1; s < systems; s++) {
-    const below = measured[s - 1].dynY - staff; // the dynamic under the one above
+    // The lane under the system above is the lowest thing it puts on the page.
+    const below = (measured[s - 1].laneBottom ?? measured[s - 1].dynY) - staff;
     const above = -measured[s].musicTop; // the tallest music of this one
     tops.push(tops[s - 1] + Math.max(minPitch, staff + below + above + 10));
   }
 
   // Room under the last system for its dynamics and a low slur.
   const bottomPad = (narrow ? 40 : 78);
-  const lastBelow = measured[systems - 1].dynY - staff;
+  const lastBelow = (measured[systems - 1].laneBottom ?? measured[systems - 1].dynY) - staff;
   const height = tops[systems - 1] + staff + Math.max(bottomPad, lastBelow + 20);
 
   const parts = [

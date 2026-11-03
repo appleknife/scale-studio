@@ -16,8 +16,8 @@
 // anything else changing: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611026300';
-import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611026300';
+import { makeHallIR } from './recorder.js?v=202611026700';
+import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611026700';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -68,6 +68,30 @@ export const DYNAMIC_GAIN = { pp: 0.34, p: 0.46, mp: 0.58, mf: 0.72, f: 0.86, ff
  * attack), a staccato shortens the note, and a hairpin ramps the gain across the
  * notes it covers.
  */
+/**
+ * The dynamic whose printed level is closest to this gain.
+ *
+ * A sampled voice picks a *take* per dynamic, so a crescendo is best played by
+ * stepping the take up the ladder rather than by turning one take up: a p take at
+ * 1.9× its recorded level is louder than an f take, and sounds it. Naming the
+ * nearest rung keeps the gain asked of any take within a few per cent of the level
+ * it was recorded at, and the ladder is walked from p to f as the hairpin rises.
+ */
+const LADDER = ['p', 'mp', 'mf', 'f', 'ff'];
+
+function levelForGain(gain) {
+  let best = LADDER[0];
+  let away = Infinity;
+  for (const name of LADDER) {
+    const distance = Math.abs(DYNAMIC_GAIN[name] - gain);
+    if (distance < away) {
+      away = distance;
+      best = name;
+    }
+  }
+  return best;
+}
+
 export function schedule(passage, { rate = 1, fromBar = 0 } = {}) {
   const spq = secondsPerQuarter(passage.tempo) / rate;
   const base = DYNAMIC_GAIN[passage.dynamic] ?? DYNAMIC_GAIN.mf;
@@ -112,20 +136,28 @@ export function schedule(passage, { rate = 1, fromBar = 0 } = {}) {
         gain = base + (goal - base) * through;
       }
 
+      // Which take this note should be made of, when the voice has layers. It
+      // follows the loudness itself rather than the passage's opening marking: on
+      // a p → f crescendo it walks p → mp → mf → f, so each take plays near the
+      // level it was recorded at instead of one take being turned up 1.9× (which
+      // is what made some playbacks sound exaggerated).
+      const level = levelForGain(gain);
+
       const legato = Boolean(previous && previous.slurStart);
       if (event.mark === 'accent') gain *= 1.14;
       if (event.mark === 'staccato') duration *= 0.45;
 
+      const levelGain = DYNAMIC_GAIN[level] ?? base;
       notes.push({
         time,
         duration,
         midi: event.midi,
         gain,
-        // The printed dynamic, so a sampled voice can choose its layer; and the
-        // hairpin as a *ratio* rather than an absolute, because a sampled voice
-        // mixes its own levels and only needs to know where the ramp has got to.
-        level: passage.dynamic || 'mf',
-        ramp: base > 0 ? gain / base : 1,
+        // The printed dynamic of *this* note, so a sampled voice can choose its
+        // layer; and the hairpin as a ratio against that same dynamic, because a
+        // recorded take already carries its own level — 1 means "as recorded".
+        level,
+        ramp: levelGain > 0 ? gain / levelGain : 1,
         legato,
         accent: event.mark === 'accent',
         staccato: event.mark === 'staccato',

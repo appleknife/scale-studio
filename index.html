@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611026300" />
+    <link rel="stylesheet" href="app.css?v=202611026700" />
   </head>
   <body>
     <div class="shell">
@@ -545,18 +545,9 @@
               </div>
             </div>
             <ul class="sight-parts" id="sightParts"></ul>
-            <!-- One stem per note, up for sharp and down for flat — the same
-                 picture the scale result draws, so a student reads one thing. -->
-            <div class="intonation" id="sightIntonation" hidden>
-              <h4 class="intonation-title" data-i18n="intonation.title">How far off, and which way</h4>
-              <p class="intonation-sum" id="sightIntonationSum"></p>
-              <div class="intonation-map" id="sightIntonationMap"></div>
-              <p class="intonation-legend" data-i18n="intonation.legend">
-                Up is sharp, down is flat, length is the amount. The shaded band is
-                within 15 cents — in tune by any ear — and a hollow ring is a note
-                the app did not hear.
-              </p>
-            </div>
+            <!-- The lane is drawn under the page itself, above this card, one
+                 stem per note; this is the count that goes with it. -->
+            <p class="intonation-sum" id="sightIntonationSum"></p>
             <ul class="sight-tips" id="sightTips"></ul>
             <div class="sight-actions">
               <button class="ghost-btn" id="sightAgain" type="button" data-i18n="Try again">Try again</button>
@@ -590,6 +581,7 @@
             <div class="segmented" id="statTabs" role="tablist" aria-label="What to look at">
               <button type="button" role="tab" data-stat-tab="scale" aria-selected="true">Scales</button>
               <button type="button" role="tab" data-stat-tab="sight" aria-selected="false">Sight reading</button>
+              <button type="button" role="tab" data-stat-tab="takes" aria-selected="false">Every take</button>
             </div>
             <div class="segmented small" id="statSort" role="group" aria-label="Sort by">
               <button type="button" data-stat-sort="average" aria-selected="true">Average</button>
@@ -600,6 +592,22 @@
 
           <div class="stat-panel" id="statPanel"></div>
           <p class="stat-note" id="statNote"></p>
+
+          <!-- Erasing. Nothing here stops a student from deleting a bad take —
+               the log is theirs, and an accidental take (a sibling in the room, a
+               microphone pointed at the wrong thing) should be removable. The
+               clear-everything button asks twice, because that one is not undoable. -->
+          <div class="stat-manage" id="statManage" hidden>
+            <p class="stat-manage-note" data-i18n="stats.manageNote">
+              Deleting a take removes it from these numbers. It is your log, so
+              nothing here stops you — these buttons are for the take where a
+              brother shouted, or where the microphone heard the wrong thing.
+            </p>
+            <button class="danger-btn" id="statClear" type="button" data-i18n="stats.clear">
+              Clear all my stats
+            </button>
+            <p class="stat-manage-note" id="statClearWarn" hidden></p>
+          </div>
         </section>
 
         <!-- ── Practice log ────────────────────────────────────────────── -->
@@ -930,19 +938,14 @@
               <span><i class="sw off"></i> off</span>
               <span><i class="sw missed"></i> not heard</span>
             </div>
-          </div>
-
-          <!-- Colour says how far; this says which way. One stem per note, up
-               for sharp and down for flat, in the same order as the staff
-               above it. -->
-          <div class="staff-card intonation-card" id="resultIntonation" hidden>
-            <h3 class="card-title" data-i18n="intonation.title">How far off, and which way</h3>
+            <!-- Up is sharp, down is flat, length is the amount: the lane is
+                 drawn under the notes themselves (see staff.js). This is the
+                 count that goes with it. -->
             <p class="intonation-sum" id="resultIntonationSum"></p>
-            <div class="intonation-map" id="resultIntonationMap"></div>
             <p class="intonation-legend" data-i18n="intonation.legend">
-              Up is sharp, down is flat, length is the amount. The shaded band is
-              within 15 cents — in tune by any ear — and a hollow ring is a note
-              the app did not hear.
+              The lane under the notes: up is sharp, down is flat, length is the
+              amount. The shaded band is within 15 cents — in tune by any ear — and
+              a hollow ring is a note the app did not hear.
             </p>
           </div>
 
@@ -1076,7 +1079,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611026300"></script>
+    <script type="module" src="src/app.js?v=202611026700"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

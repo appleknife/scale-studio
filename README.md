@@ -166,6 +166,11 @@ three; pick V–VI on the picker and three scales are drawn. Before this the lev
 only reachable through the scales screen, so changing it meant leaving the audition,
 crossing the grid, and coming back.
 
+* **The draw is a promise, not a lottery.** At III–IV the audition is always one
+  two-octave scale and two one-octave ones — never two of the same size — because
+  that is what the Manual asks the adjudicator to choose, and the picker asks the
+  student to mark exactly two of their seven as the two-octave ones. `ui.test.html`
+  draws thirty sets and refuses any other shape.
 The draw is majors only, because that is what Levels 5–6 require, and it always
 uses the familiar spelling: **B**, **F♯**, **C♯** — never C♭, G♭ or D♭.
 
@@ -262,19 +267,15 @@ the scoring all follow from it.
   A take that sits entirely around 0.0045 — which is what an iPhone produces with
   gain control on — used to have the gate placed at 0.0068, *above its own notes*,
   and came back as "nothing heard" at the end of a perfectly good scale.
-* **How far off, and which way.** The staff shows *how far* — green, amber, red
-  per note — and this second picture, under it on both result screens, shows
-  *which way*. One stem per note on an axis of ±50 cents: up is sharp, down is
-  flat, the length is the amount, and the colour is the same three bands the staff
-  uses, so the two agree without a key. A hollow ring on the centre line is a note
-  the app did not hear — visibly not the same thing as a note that was played
-  perfectly in tune, which is what a missed note's 0 cents would otherwise look
-  like. Above the drawing a sentence counts it up ("5 sat high and 4 sat low; the
-  rest are centred"), and the shaded band is ±15 cents, the app's own definition
-  of in tune. A reading past the end of the axis gets a small chevron rather than
-  a stem that simply stops. Geometry lives in `src/intonation.js` and
-  `tests/intonation.test.html` weighs it: symmetry, clamping, the bands, which
-  notes count as heard, and that nothing is drawn outside the drawing.
+* **The intonation lane is drawn under the notes themselves.** Each note gets a
+  stem directly below it — up for sharp, down for flat, length for the amount,
+  colour for the same three bands the staff uses — so "which notes were off" is a
+  matter of looking up rather than counting columns. On a scale it hangs under the
+  note names; in a sight-reading passage every system carries its own, at its own
+  notes. A missed note is a hollow ring on the centre line, which is visibly not
+  the same as a note played perfectly in tune. A reading past the axis gets a
+  chevron rather than a stem that simply stops. `src/intonation.js` holds the
+  geometry and `tests/intonation.test.html` weighs it.
 * **Note finding:** a note begins when a stable pitch appears and ends when the
   pitch moves or the sound stops. The first 20% and last 15% of each note are
   ignored so bow attacks do not distort the reading.
@@ -737,6 +738,22 @@ believing it. Cropping the printed glyph and the render, scaling both to the sam
 height and putting them side by side settled every argument about these shapes;
 judging them from two separate screenshots did not.
 
+* **The log is the student's, so it can be edited.** *Every take* — a third tab on
+  the stats screen — lists the last sixty takes with a delete on each row, and a
+  *Clear all my stats* button that asks twice. Nothing guards against "cheating":
+  the log is a practice mirror, not a competition, and the take that needs
+  deleting is usually the one where a brother shouted or the microphone heard the
+  wrong thing. Deleting is honest underneath: the per-scale and per-level records
+  are *rebuilt* from the takes that remain rather than un-added one at a time, so
+  a best score never outlives the take that made it. The practice log's day stays
+  if anything else happened on it, and goes with the last take of that day.
+* **A hairpin moves the take, not just the gain.** A sampled voice picks a
+  recording per dynamic, so a p → f crescendo used to keep playing the *p* take and
+  turn it up to 1.9× its recorded level — louder than the f take, and heard as an
+  exaggerated volume. Each note now names the dynamic nearest its own loudness, so
+  the crescendo walks p → mp → mf → f and every take plays within a couple of per
+  cent of the level it was recorded at. `playback.test.html` weighs five hairpins
+  and refuses a peak above 1.2× a take.
 ## Practice log
 
 A fourth screen, reached from the home page, keeps a practice record on that device: a

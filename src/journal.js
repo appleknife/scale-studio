@@ -70,6 +70,9 @@ export function looksLikeTrial({ heard = 0, expected = 0, seconds = 0, score = 0
 export function recordTake(state, take) {
   if (!Array.isArray(state.takes)) state.takes = [];
   const entry = {
+    // A stable identity for this take, so one can be deleted later: two takes can
+    // share a timestamp to the millisecond, and a timestamp is not a key.
+    uid: take.uid || `${Date.now().toString(36)}-${(state.takes.length + 1).toString(36)}`,
     at: take.at || new Date().toISOString(),
     key: take.key || dayKey(),
     kind: take.kind || 'scale',
@@ -327,6 +330,71 @@ function remember(entry, key, score) {
   return entry.history;
 }
 
+/**
+ * Rebuilds the per-scale and per-level records from the takes that are left.
+ *
+ * Those records are derived data — a best, a dozen scores, the days a scale was
+ * played cleanly — so after a deletion there is nothing to un-add one by one:
+ * the honest thing is to work them out again from what remains. The practice log
+ * is *not* derived this way, because a day can also be logged by hand.
+ */
+function rebuildScores(state) {
+  state.scales = {};
+  state.sight = {};
+  for (const take of Array.isArray(state.takes) ? state.takes : []) {
+    if (take.counted === false) continue;
+    if (take.kind === 'sight') noteSight(state, take.level, take.key, take.score);
+    else if (take.kind === 'scale' && take.id) noteScale(state, take.id, take.key, take.score);
+  }
+}
+
+/**
+ * Removes one take — an accidental one, a test someone played, a take whose
+ * microphone heard the wrong instrument.
+ *
+ * The take goes, the scale and level records are rebuilt without it, and the day
+ * it was played stays if anything else happened on it. Deleting a take is not
+ * meant to rewrite the past, only to undo a mistake.
+ *
+ * @returns whether a take with that timestamp was there to remove.
+ */
+export function removeTake(state, uid) {
+  const list = Array.isArray(state.takes) ? state.takes : [];
+  // By uid; a record written before uids existed is matched by its timestamp.
+  const index = list.findIndex((take) => take && (take.uid === uid || take.at === uid));
+  if (index < 0) return false;
+  const [gone] = list.splice(index, 1);
+  rebuildScores(state);
+
+  const day = state.days && state.days[gone.key];
+  if (day) {
+    day.takes = Math.max(0, (day.takes || 0) - 1);
+    if (day.takes === 0) {
+      // The day was only there because of takes: drop the tags a take added, and
+      // the day itself if nothing else is on it.
+      day.tags = (day.tags || []).filter((tag) => tag !== 'scales' && tag !== 'sight');
+      if (!day.tags.length && !(day.hard || []).length) delete state.days[gone.key];
+    }
+  }
+  return true;
+}
+
+/**
+ * Erases this person's whole record: every take, every day, every best, the goal.
+ *
+ * Deliberately total, and deliberately theirs — the log is per person on a shared
+ * device, so one student starting again does not touch a sibling's. The app asks
+ * twice before doing it; nothing here asks anything.
+ */
+export function clearStats(state) {
+  state.takes = [];
+  state.days = {};
+  state.rests = [];
+  state.scales = {};
+  state.sight = {};
+  state.goal = null;
+  return state;
+}
 /**
  * How this take compares with the ones before it.
  *

@@ -32,7 +32,7 @@
         secondsPerQuarter,
         countInPlan,
         DYNAMIC_GAIN,
-      } from '../src/playback.js?v=202611026300';
+      } from '../src/playback.js?v=202611026700';
 
 
       const problems = [];
@@ -141,6 +141,36 @@
         const falling = schedule(swelling).notes.map((n) => n.gain);
         check(falling[0] > falling[1] && falling[1] > falling[2], `a decrescendo did not fall: ${falling.map((g) => g.toFixed(2)).join(', ')}`);
 
+
+
+        // A hairpin across dynamics changes the *take* as well as the gain, and
+        // the gain it asks for stays close to 1 of that take. The old version kept
+        // the opening dynamic's take and ramped it to 1.9× its recorded level on a
+        // p → f, which is the exaggerated volume a teacher heard.
+        const LADDER = ['p', 'mp', 'mf', 'f'];
+        for (const [from, to] of [['p', 'f'], ['f', 'p'], ['mp', 'mf'], ['p', 'mf'], ['f', 'mp']]) {
+          const rising = LADDER.indexOf(to) > LADDER.indexOf(from);
+          const arc = copy(fourQuarters);
+          arc.dynamic = from;
+          arc.swell = { bar: 0, kind: rising ? 'cresc' : 'dim', from: 0, to: 3, target: to };
+          const plan = schedule(arc);
+          const peak = Math.max(...plan.notes.map((n) => n.ramp));
+          const low = Math.min(...plan.notes.map((n) => n.ramp));
+          const levels = plan.notes.map((n) => n.level);
+          const gains = plan.notes.map((n) => n.gain);
+          log.push(`${from} → ${to}: takes ${levels.join(',')} · gain asked of each take ${low.toFixed(2)}–${peak.toFixed(2)}`);
+          if (peak > 1.2 || low < 0.8)
+            problems.push(`a ${from} → ${to} hairpin asks for ${low.toFixed(2)}–${peak.toFixed(2)}x of a take`);
+          if (levels[0] !== from)
+            problems.push(`a ${from} → ${to} hairpin started on a ${levels[0]} take`);
+          if (levels[levels.length - 1] !== to)
+            problems.push(`a ${from} → ${to} hairpin ended on a ${levels[levels.length - 1]} take`);
+          // The loudness itself still moves the right way: that is the point.
+          const moved = rising
+            ? gains[gains.length - 1] > gains[0]
+            : gains[gains.length - 1] < gains[0];
+          if (!moved) problems.push(`a ${from} → ${to} hairpin did not move the right way`);
+        }
         // Half speed doubles every time.
         const slow = schedule(fourQuarters, { rate: 0.5 });
         check(Math.abs(slow.notes[3].time - 6) < 1e-9, `at half speed the fourth note is at ${slow.notes[3].time} s, not 6`);

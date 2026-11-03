@@ -716,6 +716,19 @@ export const S = {
     '有 1 次被当作测试录音排除了（点了一下、咳嗽，或者刚开始就结束的）——上面的数字里没有它。',
   ],
   'stats.withHelp': ['With the clicks and the line', '开着节拍和指示线时'],
+  'stats.noneTakes': [
+    'Nothing here yet — every take you play is listed here with a delete beside it.',
+    '这里还没有记录——每拉一次都会出现在这里，旁边有删除按钮。',
+  ],
+  'stats.takeOther': ['a take', '一次练习'],
+  'stats.delete': ['Delete this take', '删除这一次'],
+  'stats.ignoredTag': ['not counted', '未计入'],
+  'stats.clear': ['Clear all my stats', '清空我的全部数据'],
+  'stats.clearConfirm': ['Tap again to erase everything', '再点一次，全部清除'],
+  'stats.clearWarn': [
+    'This removes every take, every day and every best under this name on this device. It cannot be undone.',
+    '这个名字下在这台设备上的每一次记录、每一天、每个最好成绩都会被删掉，无法恢复。',
+  ],
   'sight.assist': ['Assisted — count-in, clicks and the moving line', '辅助模式——预备拍、节拍和移动指示线'],
   'sight.assistCounting': ['Counting you in — {n}', '预备拍——{n}'],
   'log.win.total': ['{n} of {total} scales', '{n} / {total} 条音阶'],
@@ -1023,6 +1036,8 @@ export const STATIC = {
   'A scale counts as ready once you have played it cleanly on two different days.':
     '一条音阶在两个不同的日子都拉得干净，就算就绪。',
   'Practice log': '练习记录',
+  'stats.manageNote':
+    '删掉一次记录，它就不再参与这些数字。这是你自己的记录，所以这里不设限制——这些按钮是给“弟弟在旁边喊了一声”或者“麦克风听错了东西”的那种记录用的。',
   'Your stats': '我的数据',
   'Open the stats': '打开数据页',
   'What are we doing today?': '今天想做什么？',

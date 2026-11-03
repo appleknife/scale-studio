@@ -3317,37 +3317,14 @@ dialog .primary-btn {
 }
 
 /* ── Intonation: how far off, and which way ──────────────────────────── */
-//
-// One stem per note, up for sharp and down for flat, on an axis that runs half
-// a semitone either way. The shaded band is the app's own "in tune" (±15 cents),
-// so the picture and the staff above it agree without a key.
 
-.intonation-card {
-  padding-bottom: 14px;
-}
-
-.intonation-map {
-  padding: 4px 12px 0;
-  /* A phone shrinks this to a dotted line: 29 notes across 278px puts a dot at
-     two pixels. It keeps a floor width and swipes, the way the staff does. */
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.intonation-svg {
-  display: block;
-  width: 100%;
-  min-width: 560px;
-  height: auto;
-  overflow: visible;
-}
 
 .intonation-band {
-  fill: #eef4ef;
+  fill: #e7efe9;
 }
 
 .intonation-guide {
-  stroke: #dfd6c7;
+  stroke: #d6cabb;
   stroke-width: 1;
   stroke-dasharray: 3 4;
 }
@@ -3396,28 +3373,109 @@ dialog .primary-btn {
   color: var(--muted);
 }
 
-/* Inside the sight-reading result the map is a block of the card, not a card of
-   its own: same picture, one less border. */
-.intonation {
-  margin-top: 16px;
-  padding-top: 14px;
+
+
+/* ── Every take, and erasing ─────────────────────────────────────────── */
+//
+// The stats screen answers "how am I doing"; this tab answers "what exactly is
+// in the record", with a delete on each row. Deliberately unguarded: it is the
+// student's own log, and an accidental take should be removable.
+
+.take-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.take-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.take-what {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.take-what strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.take-when {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.take-score {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.take-del {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.take-del:hover,
+.take-del:focus-visible {
+  border-color: #d8b4ae;
+  color: #a4534a;
+  background: #fbf1ef;
+}
+
+.stat-manage {
+  margin-top: 22px;
+  padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 
-.intonation-title {
-  margin: 0 0 4px;
-  padding: 0;
-  font-family: var(--sans);
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.stat-manage-note {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.55;
   color: var(--muted);
 }
 
-.intonation .intonation-sum,
-.intonation .intonation-legend,
-.intonation .intonation-map {
-  padding-left: 0;
-  padding-right: 0;
+.danger-btn {
+  border: 1px solid #ddc3bd;
+  background: #fbf3f1;
+  color: #8d3f36;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.danger-btn.is-armed {
+  background: #a4534a;
+  border-color: #a4534a;
+  color: #fff;
+}
+
+/* Inside the sight-reading result the count is a line of its own under the
+   parts, not another row of them. */
+.sight-result .intonation-sum {
+  margin: 14px 0 0;
+  padding: 0;
 }

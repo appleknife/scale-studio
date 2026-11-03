@@ -3,7 +3,8 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202611026300';
+import { CLEF_PATH } from './clef.js?v=202611026700';
+import { intonationLane } from './intonation.js?v=202611026700';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -116,7 +117,16 @@ export function accidentalAt(alter, x, y, colour = INK, size = 1) {
 
 export function renderStaff(
   notes,
-  { fifths = 0, colors = null, labels = true, caption = '', ariaLabel = 'Scale notation' } = {},
+  {
+    fifths = 0,
+    colors = null,
+    labels = true,
+    caption = '',
+    ariaLabel = 'Scale notation',
+    // One entry per note: cents above or below centre, or null for a note that
+    // was not heard. Present only on the result screen.
+    intonation = null,
+  } = {},
 ) {
   const noteSpacing = 34;
   const leftPad = 18;
@@ -153,7 +163,11 @@ export function renderStaff(
   }
 
   const width = Math.max(520, cursor + 34);
-  const height = 196;
+  // A result screen asks for the intonation lane under the notes, which needs its
+  // own room below the note names: the drawing grows downwards, never sideways.
+  const lane = Boolean(intonation && intonation.length);
+  const laneTop = 196;
+  const height = lane ? laneTop + 62 : 196;
 
   const part = [];
   part.push(
@@ -228,14 +242,32 @@ export function renderStaff(
 
     if (labels) {
       part.push(
-        `<text class="staff-label" x="${x}" y="${height - 13}" text-anchor="middle" font-size="11">${note.letterName}${note.octave}</text>`,
+        `<text class="staff-label" x="${x}" y="${lane ? laneTop - 13 : height - 13}" text-anchor="middle" font-size="11">${note.letterName}${note.octave}</text>`,
       );
     }
   });
 
   if (caption) {
     part.push(
-      `<text x="${leftPad}" y="${height - 2}" font-size="9" fill="${MUTED}">${caption}</text>`,
+      `<text x="${leftPad}" y="${lane ? laneTop - 2 : height - 2}" font-size="9" fill="${MUTED}">${caption}</text>`,
+    );
+  }
+
+  // The intonation lane, under the note names and lined up with the noteheads
+  // above it: one stem per note, at that note's own x.
+  if (lane) {
+    const marks = notes.map((note, i) => ({
+      x: xs[i],
+      cents: Number.isFinite(intonation[i]) ? intonation[i] : null,
+    }));
+    part.push(
+      intonationLane({
+        marks,
+        centre: laneTop + 30,
+        half: 24,
+        left: leftPad,
+        right: width - leftPad,
+      }).markup,
     );
   }
 

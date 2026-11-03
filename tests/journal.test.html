@@ -506,6 +506,59 @@
         eq('and gains an array on the first take', old.takes.length, 1);
       }
 
+
+      /* ── Erasing: one take, then everything ────────────────────────── */
+      //
+      // The log is the student's, so a take can be deleted — an accidental one,
+      // a sibling, a microphone pointed at the wrong thing. What must not happen
+      // is a half-deletion: the take gone but its best score still standing.
+      {
+        const s = J.emptyState();
+        J.recordTake(s, { kind: 'scale', id: 'G', key: '2026-04-01', score: 88, counted: true });
+        J.noteScale(s, 'G', '2026-04-01', 88);
+        J.logTake(s, '2026-04-01', 'scales');
+        J.recordTake(s, { kind: 'scale', id: 'G', key: '2026-04-01', score: 95, counted: true });
+        J.noteScale(s, 'G', '2026-04-01', 95);
+        J.logTake(s, '2026-04-01', 'scales');
+        J.recordTake(s, { kind: 'sight', level: '5', key: '2026-04-02', score: 70, counted: true });
+        J.noteSight(s, '5', '2026-04-02', 70);
+
+        eq('three takes recorded', s.takes.length, 3);
+        eq('the best of the two G takes is 95', s.scales.G.best, 95);
+
+        // Delete the 95 take: the take goes, the best falls back to 88, and the
+        // day is still there (another take was played that day).
+        const at = s.takes[1].uid;
+        eq('deleting reports success', J.removeTake(s, at), true);
+        eq('two takes left', s.takes.length, 2);
+        eq('the best fell back to 88', s.scales.G.best, 88);
+        eq('the day stayed', Boolean(s.days['2026-04-01']), true);
+
+        // Delete the rest of that day: the day goes with the last take of it.
+        J.removeTake(s, s.takes[0].uid);
+        eq('the day went with its last take', Boolean(s.days['2026-04-01']), false);
+        eq('the scale record went too', Boolean(s.scales.G), false);
+
+        // A day with something else on it keeps it.
+        J.log(s, '2026-04-02', 'piece');
+        J.removeTake(s, s.takes[0].uid);
+        eq('a day with a piece on it stays', Boolean(s.days['2026-04-02']), true);
+        eq('and keeps the piece', s.days['2026-04-02'].tags.includes('piece'), true);
+        eq('but loses the take tag', s.days['2026-04-02'].tags.includes('sight'), false);
+        eq('the sight record is gone', Boolean(s.sight && s.sight['5']), false);
+
+        eq('deleting a take that is not there is harmless', J.removeTake(s, 'nope'), false);
+
+        // Clearing is total, and leaves the goal and the days empty.
+        J.recordTake(s, { kind: 'scale', id: 'D', key: '2026-04-03', score: 77 });
+        J.noteScale(s, 'D', '2026-04-03', 77);
+        J.setGoal(s, 'days', 4);
+        J.clearStats(s);
+        eq('clear: no takes', s.takes.length, 0);
+        eq('clear: no days', Object.keys(s.days).length, 0);
+        eq('clear: no scales', Object.keys(s.scales).length, 0);
+        eq('clear: no goal', s.goal, null);
+      }
       document.getElementById('report').textContent = problems.length
         ? `LOG FAILED\n${problems.join('\n')}`
         : 'LOG OK';
