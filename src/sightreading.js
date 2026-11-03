@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611037200';
-import { STAFF_GEOM } from './staff.js?v=202611037200';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611037300';
+import { STAFF_GEOM } from './staff.js?v=202611037300';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -124,9 +124,18 @@ const LEVELS = {
     steps: [1, 2, 3, 4, 5],
     maxSemis: 9,
     rhythms: {
-      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8]],
-      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8]],
-      '4/4': [[4, 4, 4, 4], [4, 2, 2, 4, 4], [8, 4, 4], [4, 4, 2, 2, 4]],
+      // One beat of four sixteenths, the figure level III introduced. Every
+      // passage at IV, V and VI carries exactly one (see `runGroups` below).
+      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [1, 1, 1, 1, 4]],
+      '3/4': [[4, 4, 4], [2, 2, 4, 4], [8, 4], [4, 8], [1, 1, 1, 1, 4, 4], [4, 1, 1, 1, 1, 4]],
+      '4/4': [
+        [4, 4, 4, 4],
+        [4, 2, 2, 4, 4],
+        [8, 4, 4],
+        [4, 4, 2, 2, 4],
+        [1, 1, 1, 1, 4, 4, 4],
+        [4, 4, 1, 1, 1, 1, 4],
+      ],
       '2/2': [
         [4, 4, 4, 4],
         [8, 4, 4],
@@ -147,6 +156,9 @@ const LEVELS = {
     tempo: { '2/2': { unit: 'h', bpm: 76 }, '*': { unit: 'q', bpm: 88 } },
     dynamics: ['mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
+    // Exactly one beat of four sixteenths per passage — never none, never a
+    // page of them. `second` is the chance of a second group.
+    runGroups: { second: 0 },
     rests: true,
     // The eighth rest arrives here, a level after the quarter and half.
     restKinds: ['quarter', 'half', 'eighth'],
@@ -163,7 +175,16 @@ const LEVELS = {
       // three sixteenths, and it beams with the sixteenth that completes its
       // beat. It is the one rhythm in the ladder that is easier to *mistime* than
       // to play, which is why the Manual saves it for the top levels.
-      '2/4': [[4, 4], [4, 2, 2], [2, 2, 4], [8], [2, 2, 2, 2], [4 / 3, 4 / 3, 4 / 3, 4], [3, 1, 4]],
+      '2/4': [
+        [4, 4],
+        [4, 2, 2],
+        [2, 2, 4],
+        [8],
+        [2, 2, 2, 2],
+        [4 / 3, 4 / 3, 4 / 3, 4],
+        [3, 1, 4],
+        [1, 1, 1, 1, 4],
+      ],
       '3/4': [
         [4, 4, 4],
         [2, 2, 4, 4],
@@ -172,6 +193,8 @@ const LEVELS = {
         [4 / 3, 4 / 3, 4 / 3, 4, 4],
         [3, 1, 4, 4],
         [4, 3, 1, 4],
+        [1, 1, 1, 1, 4, 4],
+        [4, 1, 1, 1, 1, 4],
       ],
       '4/4': [
         [4, 4, 4, 4],
@@ -181,9 +204,20 @@ const LEVELS = {
         [4 / 3, 4 / 3, 4 / 3, 4, 4, 4],
         [3, 1, 4, 4, 4],
         [4, 4, 3, 1, 4],
+        [1, 1, 1, 1, 4, 4, 4],
+        [4, 4, 1, 1, 1, 1, 4],
       ],
       '2/2': [[4, 4, 4, 4], [8, 4, 4], [6, 2, 4, 4], [4, 4, 6, 2], [8, 6, 2]],
-      '6/8': [[2, 2, 2, 6], [6, 2, 2, 2], [2, 2, 2, 2, 2, 2], [4, 2, 6], [3, 1, 2, 6]],
+      // In 6/8 the group is four sixteenths and an eighth: one dotted-quarter beat.
+      '6/8': [
+        [2, 2, 2, 6],
+        [6, 2, 2, 2],
+        [2, 2, 2, 2, 2, 2],
+        [4, 2, 6],
+        [3, 1, 2, 6],
+        [1, 1, 1, 1, 2, 6],
+        [6, 1, 1, 1, 1, 2],
+      ],
     },
     // 6/8 is marked in dotted quarters at both these levels; the Manual's
     // "eighth = 120" belongs to the simple metres, not to 6/8, where it would
@@ -192,6 +226,7 @@ const LEVELS = {
     tempo: { '6/8': { unit: 'qd', bpm: 60 } },
     dynamics: ['p', 'mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
+    runGroups: { second: 0 },
     rests: true,
     restKinds: ['quarter', 'half', 'eighth'],
     accidentals: 2,
@@ -261,6 +296,8 @@ const LEVELS = {
         [2, 2, 2, 4, 1, 1],
         [6, 2, 1, 1, 2],
         [3, 1, 2, 6],
+        [1, 1, 1, 1, 2, 6],
+        [6, 1, 1, 1, 1, 2],
       ],
     },
     // 6/8 is a dotted-quarter metre; ♪ = 120 in the Manual's list belongs to the
@@ -270,6 +307,8 @@ const LEVELS = {
     tempo: { '6/8': { unit: 'qd', bpm: 72 }, '4/4': { unit: 'q', bpm: 120 } },
     dynamics: ['p', 'mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
+    // One group, and now and then a second — never three or four.
+    runGroups: { second: 0.12 },
     rests: true,
     // The sixteenth rest belongs to the top level: it only makes sense inside a
     // run of sixteenths, and level VI is the one that has runs to break.
@@ -443,7 +482,19 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // fourth (which ends on a note to breathe on) and never the last — and the
   // pattern there is forced. A second run is still possible, at the same lean.
   const lean = spec.sixteenths ?? 1;
-  const runBar = lean < 1 ? pick(rng, [1, 2, 4, 5]) : -1;
+  // Levels IV–VI say exactly how many groups a passage has instead of leaning:
+  // one, and at VI now and then two. The bars are chosen up front, from the same
+  // four as level III, and every other bar draws from the plain patterns. Cut
+  // time is the exception — it has no sixteenths at all (see the filter above).
+  const counted = spec.runGroups && patterns.some(hasRunOfFour);
+  const runBarSet = new Set();
+  if (counted) {
+    const slots = [1, 2, 4, 5];
+    const want = 1 + (chance(rng, spec.runGroups.second) ? 1 : 0);
+    while (runBarSet.size < want) runBarSet.add(pick(rng, slots));
+  } else if (lean < 1) {
+    runBarSet.add(pick(rng, [1, 2, 4, 5]));
+  }
   for (let b = 0; b < BAR_COUNT; b++) {
     // Avoid the same bar twice in a row when there is a choice: eight identical
     // bars of half notes is not a sight-reading test, it is a warm-up.
@@ -461,7 +512,9 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     // every draw. Level III takes the run once in every passage, at the bar
     // chosen above.
     let pool_;
-    if (runBars === 0 && runs.length && lean < 1) {
+    if (counted) {
+      pool_ = plain.length ? plain : base;
+    } else if (runBars === 0 && runs.length && lean < 1) {
       pool_ = lean > 0 && chance(rng, lean) ? base : plain;
     } else if (runBars === 0) {
       pool_ = base.concat(runs, runs, runs, runs);
@@ -472,7 +525,7 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     }
 
     let pattern;
-    if (b === runBar && runBars === 0) {
+    if (runBarSet.has(b) && (counted || runBars === 0)) {
       const usable = (runs.length ? runs : patterns.filter(hasRunOfFour)).filter(
         (p) => p !== previous,
       );
@@ -1019,7 +1072,17 @@ export function generatePassage({ level = 5, seed = null } = {}) {
         // rests out first did exactly that, drawing a curve over a silence.
         const run = barEvents.slice(start, start + len);
         if (run.some((e) => e.rest || !e.note)) continue;
-        if (run.some((e) => e.slurStart || e.slurEnd)) continue;
+        // No note of the run may already be under a slur — not just its ends:
+        // a short run can sit wholly inside a longer slur without touching
+        // either end, and that printed as one curve nested inside another.
+        let under = false;
+        const covered = barEvents.map((e) => {
+          if (e.slurStart) under = true;
+          const was = under;
+          if (e.slurEnd) under = false;
+          return was;
+        });
+        if (covered.slice(start, start + len).some(Boolean)) continue;
         // A slur may not begin or end right beside a beamed group. Its curve is
         // drawn on the far side of its own stems, and a neighbouring group's beam
         // lies exactly across that path — the curve then threads the beam, which
