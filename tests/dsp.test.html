@@ -23,6 +23,7 @@
         strongLevel,
       } from '../src/pitch.js';
       import { analyzeTake } from '../src/analyze.js';
+      import { foldOctave } from '../src/tuner.js';
 
       const SR = 44100;
       const WINDOW = 2048;
@@ -308,6 +309,58 @@
         }
       }
 
+
+      /* ── J. The G string ─────────────────────────────────────────────── */
+      //
+      // The lowest string is the one a phone microphone struggles with: G3 is
+      // 196 Hz, the fundamental is weak through a small speaker-grade mic, and
+      // the second harmonic at 392 Hz is not. A detector can lock onto that
+      // harmonic and report a G played an octave high — which the tuner then
+      // showed as a needle pinned sharp, or as no string at all. The tuner folds
+      // an octave-high reading back onto the string, and listens with twice the
+      // window. This is that, measured on a signal shaped like the problem.
+      {
+        const G3 = 196.0;
+        const build = (samples, weakFundamental) => {
+          const x = new Float32Array(samples);
+          for (let i = 0; i < samples; i++) {
+            const t = i / SR;
+            const w = 2 * Math.PI * G3 * t;
+            const w2 = 2 * w;
+            const w3 = 3 * w;
+            // A violin's G with the fundamental rolled off by the microphone.
+            const fundamental = weakFundamental ? 0.05 : 0.8;
+            x[i] =
+              fundamental * Math.sin(w) +
+              1.0 * Math.sin(w2) +
+              0.35 * Math.sin(w3) +
+              0.12 * Math.sin(2 * Math.PI * 392.5 * t) * 0 +
+              (Math.random() - 0.5) * 0.01;
+          }
+          return x;
+        };
+
+        for (const weak of [false, true]) {
+          const short = new PitchDetector({ sampleRate: SR, bufferSize: 2048, minFreq: 150, maxFreq: 1800 });
+          const long = new PitchDetector({ sampleRate: SR, bufferSize: 4096, minFreq: 150, maxFreq: 1800 });
+          const a = short.detect(build(2048, weak));
+          const b = long.detect(build(4096, weak));
+          const foldedA = foldOctave(a.freq);
+          const foldedB = foldOctave(b.freq);
+          log.push(
+            `G3 (${weak ? 'fundamental rolled off' : 'full'}): 2048 window reads ${a.freq.toFixed(1)} Hz ` +
+              `(folded ${foldedA.toFixed(1)}) · 4096 reads ${b.freq.toFixed(1)} Hz (folded ${foldedB.toFixed(1)})`,
+          );
+          // Whatever the detector does, the tuner must end up on the G string.
+          if (Math.abs(foldedA - G3) > 1) problems.push(`the short window folded to ${foldedA.toFixed(1)} Hz, not 196`);
+          if (Math.abs(foldedB - G3) > 1) problems.push(`the long window folded to ${foldedB.toFixed(1)} Hz, not 196`);
+        }
+
+        // A fourth above must not be folded onto anything: only octaves fold.
+        if (Math.abs(foldOctave(392) - 196) > 0.5) problems.push('an octave-high G was not folded');
+        if (Math.abs(foldOctave(196) - 196) > 0.5) problems.push('a correct G was folded when it should not be');
+        if (Math.abs(foldOctave(440) - 440) > 0.5) problems.push('the A string was folded when it should not be');
+      }
       const payload = {
         problems,
         log: log.join('\n'),

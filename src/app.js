@@ -1,31 +1,32 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026700';
-import { renderStaff } from './staff.js?v=202611026700';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611026800';
+import { renderStaff } from './staff.js?v=202611026800';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611026700';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026700';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026700';
-import { generatePassage } from './sightreading.js?v=202611026700';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026700';
-import { renderScore } from './score.js?v=202611026700';
-import { summariseIntonation } from './intonation.js?v=202611026700';
-import * as Journal from './journal.js?v=202611026700';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026700';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026700';
+} from './pitch.js?v=202611026800';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611026800';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611026800';
+import { generatePassage } from './sightreading.js?v=202611026800';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611026800';
+import { renderScore } from './score.js?v=202611026800';
+import { summariseIntonation } from './intonation.js?v=202611026800';
+import * as Journal from './journal.js?v=202611026800';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611026800';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611026800';
 import {
   STRINGS,
   FIFTHS,
   stringById,
   centsFrom,
   nearestString,
+  foldOctave,
   isInTune,
-} from './tuner.js?v=202611026700';
+} from './tuner.js?v=202611026800';
 
 const LANG = initLang();
 
@@ -964,7 +965,8 @@ async function startTunerMic() {
   closeMic();
   let mic;
   try {
-    mic = await openMic(routeFrame);
+    // The tuner listens with the longer window: the G string needs the periods.
+    mic = await openMic(routeFrame, { window: 4096 });
   } catch (err) {
     // Leaving the tuner while the browser is still asking must not write to a
     // screen that is gone — that used to throw at a null `state.tune`.
@@ -997,7 +999,11 @@ function onTuneFrame(frame) {
   const tune = state.tune;
   if (!tune) return;
 
-  if (!frame.freq || frame.clarity < 0.55 || frame.rms < quietLevel(state.mic?.floor)) {
+  // The clarity bar is a little lower here than in a take. The tuner listens with
+  // a long window and through a phone microphone that rolls off the lowest
+  // string's fundamental, and a G3 reading can be a broad, shallow dip that a
+  // 0.55 bar throws away — which is what "it does not pick up my G" looks like.
+  if (!frame.freq || frame.clarity < 0.45 || frame.rms < quietLevel(state.mic?.floor)) {
     tune.silentFor += 1;
     if (tune.silentFor > 20 && tune.cents != null) {
       tune.cents = null;
@@ -1007,7 +1013,10 @@ function onTuneFrame(frame) {
   }
 
   tune.silentFor = 0;
-  const heard = nearestString(frame.freq) || stringById(tune.stringId);
+  // A low string read an octave high is folded back before anything else looks at
+  // it: the G string is the one this happens to, and its octave is not a string.
+  const freq = foldOctave(frame.freq);
+  const heard = nearestString(freq) || stringById(tune.stringId);
   if (heard.id !== tune.stringId) {
     tune.stringId = heard.id;
     tune.hold = 0;
@@ -1015,7 +1024,7 @@ function onTuneFrame(frame) {
     renderDial();
   }
 
-  tune.cents = centsFrom(frame.freq, heard.freq);
+  tune.cents = centsFrom(freq, heard.freq);
   tune.hold = isInTune(tune.cents, heard) ? tune.hold + 1 : 0;
   if (tune.hold >= 8 && !tune.tuned.has(heard.id)) {
     tune.tuned.add(heard.id);
@@ -3168,7 +3177,17 @@ function setStatus(live, text) {
 
 /* ── Microphone ───────────────────────────────────────────────────────── */
 
-async function openMic(emit) {
+/**
+ * Opens the microphone.
+ *
+ * `window` is how many samples the detector looks at. The take path uses 2048 —
+ * 43 ms at 48 kHz, which is 30 frames a second and plenty for anything above the
+ * open G. The tuner asks for 4096, because the lowest string is where the window
+ * matters: G3 is 196 Hz, so 2048 samples hold barely seven periods, and a phone
+ * microphone that rolls off the fundamental leaves a reading that wanders. At
+ * 4096 there are fourteen periods to agree on, and the reading settles.
+ */
+async function openMic(emit, { window = 2048 } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) {
     const err = new Error('no-media');
     err.name = 'InsecureContext';
@@ -3218,7 +3237,7 @@ async function openMic(emit) {
 
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
-  analyser.fftSize = 2048;
+  analyser.fftSize = window;
   analyser.smoothingTimeConstant = 0;
   source.connect(analyser);
 

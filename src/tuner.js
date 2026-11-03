@@ -28,6 +28,25 @@ export function centsFrom(freq, target) {
 }
 
 /**
+ * Fold a reading an octave high back onto the string it belongs to.
+ *
+ * The G string is where this matters. G3 is 196 Hz, its second harmonic at 392 is
+ * louder through a phone's microphone than the fundamental is, and a pitch
+ * detector can therefore lock onto the harmonic and report a G played a whole
+ * octave high — which the tuner then shows as a needle pinned sharp, or as
+ * another string entirely. A reading within a semitone of *twice* a string's
+ * frequency is folded back down, because an open string is the only thing this
+ * screen is asking about and nobody tunes a G by playing the octave above it.
+ */
+export function foldOctave(freq, strings = STRINGS) {
+  if (!Number.isFinite(freq) || freq <= 0) return freq;
+  for (const s of strings) {
+    if (Math.abs(centsFrom(freq, s.freq * 2)) <= 100) return s.freq;
+  }
+  return freq;
+}
+
+/**
  * Which open string is being played? Only close matches count, so a stopped
  * note in the middle of a scale does not masquerade as a string.
  */

@@ -115,6 +115,17 @@ does — so any automatic "is it pure?" judgement would cry wolf. Tick each pair
 once your ear is satisfied; the app's job here is only to keep the ritual in front of
 you.
 
+* **The G string gets the longest look.** The tuner listens with a 4096-sample
+  window rather than the take path's 2048: G3 is 196 Hz, so 2048 samples hold
+  barely seven periods and a phone microphone that rolls off the fundamental
+  leaves a reading that wanders or never clears the clarity bar. At 4096 there are
+  fourteen periods to agree on. The tuner's clarity bar is also a little lower
+  (0.45 rather than 0.55), because a weak fundamental makes a broad, shallow dip
+  rather than a sharp one. And a reading an octave high — the one failure a low
+  string invites — is folded back onto the string before anything else looks at
+  it: nobody tunes a G by playing the octave above it. `dsp.test.html` builds a
+  G3 with its fundamental rolled to a fifth of the second harmonic and checks both
+  windows still land on 196.
 ## Levels
 
 The level tabs on the chooser decide what "a scale" means for you, and they follow
