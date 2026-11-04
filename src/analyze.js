@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611037700';
-import { getLang, t } from './i18n.js?v=202611037700';
+import { median } from './pitch.js?v=202611047800';
+import { getLang, t } from './i18n.js?v=202611047800';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -218,6 +218,37 @@ export function segmentNotes(frames, options = {}) {
   return { notes, gate };
 }
 
+/**
+ * The top note played more than once in a row becomes one long note.
+ *
+ * Only the top note, only back to back, and only across a gap a re-bow or a
+ * breath could explain (under 1.5 s). A repeat anywhere else in the scale is
+ * still an extra note, and a long silence at the top is still a stop.
+ */
+export function foldTopRepeat(notes, topMidi) {
+  if (topMidi == null) return notes;
+  const out = [];
+  for (const note of notes) {
+    const prev = out[out.length - 1];
+    if (prev && prev.midi === topMidi && note.midi === topMidi && note.t0 - prev.t1 < 1.5) {
+      const frames = prev.frames + note.frames;
+      const pitch = (prev.pitch * prev.frames + note.pitch * note.frames) / frames;
+      out[out.length - 1] = {
+        ...prev,
+        t1: note.t1,
+        pitch,
+        cents: (pitch - prev.midi) * 100,
+        frames,
+        duration: note.t1 - prev.t0,
+        repeats: (prev.repeats || 0) + 1,
+      };
+      continue;
+    }
+    out.push(note);
+  }
+  return out;
+}
+
 function substitutionCost(detected, expected) {
   const diff = Math.abs(detected - expected);
   if (diff === 0) return 0;
@@ -290,7 +321,15 @@ export function analyzeTake(frames, expectedScale, options = {}) {
   const expected = expectedScale.sequence;
   const expectedMidi = expected.map((n) => n.midi);
 
-  const { notes, gate } = segmentNotes(frames, o);
+  const segmented = segmentNotes(frames, o);
+  const gate = segmented.gate;
+  // The top of the scale is where players stop to turn round: they hold it, and
+  // often play it twice — once at the top of the way up, once at the start of the
+  // way down — with a bow change or a lift between. Neither is a mistake, so a
+  // repeated top note is folded into one long one before anything is scored.
+  const topIndex = Math.min(expected.length - 1, (expectedScale.octaves || 2) * 7);
+  const topMidi = expectedMidi[topIndex];
+  const notes = foldTopRepeat(segmented.notes, topMidi);
   const { pairs, extras } = align(notes.map((n) => n.midi), expectedMidi);
   const octaveShift = detectOctaveShift(notes, expectedMidi);
 
@@ -353,6 +392,9 @@ export function analyzeTake(frames, expectedScale, options = {}) {
   // --- Steadiness ---------------------------------------------------------
   const iois = [];
   for (let k = 1; k < pairs.length; k++) {
+    // How long the top note was held is the player's choice, like a fermata, and
+    // says nothing about the pulse — so the gap that leaves it is not measured.
+    if (pairs[k - 1].e === topIndex) continue;
     if (pairs[k].e === pairs[k - 1].e + 1) {
       iois.push(notes[pairs[k].d].t0 - notes[pairs[k - 1].d].t0);
     }

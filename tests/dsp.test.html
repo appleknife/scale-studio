@@ -222,6 +222,38 @@
       if (short.stats.expected !== 15) problems.push(`one-octave scale has ${short.stats.expected} notes`);
       if (short.score < 90) problems.push(`one-octave take scored only ${short.score}`);
 
+      // H. The top note held and played again on the way down — a bow change or a
+      // small lift between — is how a lot of players turn round. It is not an
+      // extra note, not a stop, and not a wobble in the pulse.
+      for (const [label, scale] of [['two octaves', cMajor], ['one octave', cMajor1]]) {
+        const top = scale.octaves * 7;
+        const sequence = [...scale.sequence.slice(0, top + 1), ...scale.sequence.slice(top)];
+        const durations = sequence.map((_, i) => (i === top ? 1.4 : i === top + 1 ? 0.9 : 0.55));
+        const plain = label === 'two octaves' ? clean : short;
+        for (const lift of [0.05, 0.5]) {
+          const turned = run(`top note held and repeated (${label}, ${lift}s lift)`, scale, {
+            sequence,
+            durations,
+            gaps: { [top]: lift },
+            vibrato: 0.15,
+          });
+          if (turned.stats.extra) problems.push(`a repeated top note (${label}, ${lift}s) counted as an extra`);
+          if (turned.stats.stops) problems.push(`a repeated top note (${label}, ${lift}s) counted as a stop`);
+          if (turned.score < plain.score - 1) {
+            problems.push(`a repeated top note (${label}, ${lift}s) scored ${turned.score} against ${plain.score}`);
+          }
+          if (turned.tips.some((tip) => tip.kind === 'flow' || tip.kind === 'rhythm')) {
+            problems.push(`a repeated top note (${label}, ${lift}s) drew a flow or rhythm tip`);
+          }
+        }
+      }
+      // …but a repeat anywhere else is still an extra note.
+      {
+        const sequence = [...cMajor.sequence.slice(0, 6), ...cMajor.sequence.slice(5)];
+        const stutter = run('a note in the middle played twice', cMajor, { sequence, gaps: { 5: 0.3 }, vibrato: 0.15 });
+        if (stutter.stats.extra < 1) problems.push('a repeat in the middle of the scale was not noticed');
+      }
+
       // I. the same pitch sitting off all the way through: the one thing a
       // take can say that a score cannot — which finger to look at.
       {

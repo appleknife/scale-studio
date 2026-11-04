@@ -1,24 +1,24 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037700';
-import { renderStaff } from './staff.js?v=202611037700';
-import { createInk } from './ink.js?v=202611037700';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611047800';
+import { renderStaff } from './staff.js?v=202611047800';
+import { createInk } from './ink.js?v=202611047800';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611037700';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037700';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037700';
-import { generatePassage } from './sightreading.js?v=202611037700';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037700';
-import { renderScore } from './score.js?v=202611037700';
-import { summariseIntonation } from './intonation.js?v=202611037700';
-import * as Journal from './journal.js?v=202611037700';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037700';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037700';
+} from './pitch.js?v=202611047800';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611047800';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611047800';
+import { generatePassage } from './sightreading.js?v=202611047800';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611047800';
+import { renderScore } from './score.js?v=202611047800';
+import { summariseIntonation } from './intonation.js?v=202611047800';
+import * as Journal from './journal.js?v=202611047800';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611047800';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611047800';
 import {
   STRINGS,
   FIFTHS,
@@ -27,7 +27,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611037700';
+} from './tuner.js?v=202611047800';
 
 const LANG = initLang();
 
