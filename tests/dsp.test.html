@@ -322,6 +322,23 @@
         for (let i = 0; i < 200; i++) loud = nextFloor(loud, 0.08);
         if (loud > 0.0013) problems.push(`playing raised the noise floor to ${loud}`);
 
+        // Soft playing does not teach it either. A note that arrives at only two
+        // or three times the room's level — mf on a tablet across the room — used
+        // to pull the floor up, which put the next note within reach, until the
+        // floor sat on the violin and half a minute of playing read as silence.
+        {
+          let f = 0.0012;
+          for (let i = 0; i < 600; i++) f = nextFloor(f, 0.002);
+          const room = f;
+          for (let i = 0; i < 1000; i++) {
+            const level = 0.006 * (0.5 + ((Math.floor(i / 20) * 7919) % 100) / 100);
+            f = nextFloor(f, level, true);
+          }
+          log.push(`soft playing for 30 s: floor ${room.toFixed(5)} → ${f.toFixed(5)} · note line ${quietLevel(f).toFixed(5)}`);
+          if (f > room * 1.05) problems.push(`thirty seconds of soft playing raised the floor from ${room} to ${f}`);
+          if (quietLevel(f) > quietLevel(room) * 1.05) problems.push('soft playing raised the note line');
+        }
+
         // A loud room looks like the instrument to the estimator, so the line
         // stays where it is rather than chasing the noise — the pitch detector's
         // clarity gate is what keeps noise out, and this is the honest limit of

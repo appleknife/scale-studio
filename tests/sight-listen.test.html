@@ -453,11 +453,14 @@
       // the whole passage and records, at every step, which bar it is actually on
       // (read from the note it landed on, not from the clock), so a clock running
       // at the wrong speed cannot hide behind a plausible-looking picture.
-      for (const width of [400, 1100]) {
+      // Seed 5 is cut time, whose tempo mark draws a half note of its own: the line
+      // once counted it as a note, jumped back to the top-left after the first
+      // system and ran a note behind for the rest of the page.
+      for (const [width, seed] of [[400, 7], [1100, 7], [400, 5], [1100, 5]]) {
         const frame = document.createElement('iframe');
         frame.style.cssText =
           `position:fixed;left:-4000px;top:0;width:${width}px;height:900px;border:0`;
-        frame.src = '../index.html?sightwalk=5&seed=7';
+        frame.src = `../index.html?sightwalk=5&seed=${seed}`;
         document.body.appendChild(frame);
         await new Promise((r) => frame.addEventListener('load', r));
         const w = frame.contentWindow;
@@ -478,6 +481,15 @@
         if (bars.some((b, k) => k > 0 && b < bars[k - 1]))
           problems.push(`the line went backwards through the bars at ${width}px`);
         if (hidden.length) problems.push(`the line was invisible for ${hidden.length} steps at ${width}px`);
+        const jumps = steps.filter((st, k) => {
+          const prev = steps[k - 1];
+          if (!prev) return false;
+          if (st.y1 < prev.y1 - 1) return true; // back up to an earlier row
+          return Math.abs(st.y1 - prev.y1) < 1 && st.x < prev.x - 1; // back along a row
+        });
+        if (jumps.length) {
+          problems.push(`the line jumped backwards ${jumps.length} times at ${width}px (seed ${seed})`);
+        }
         // Two bars to a system is the phone's layout; four is the wide one.
         const systems = width < 560 ? 4 : 2;
         if (rows.length !== systems)

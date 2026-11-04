@@ -142,15 +142,23 @@ export class PitchDetector {
  * laptop, and a fixed 0.004 then reports "nothing heard".
  *
  * So the floor is *learned* instead. `nextFloor` tracks room noise — it follows
- * quiet frames down and up, but a loud frame does not raise it, because a loud
- * frame is the instrument. `quietLevel` is the line above that floor, and the
+ * quiet frames down and up, but a loud frame — or any frame with a pitch in it —
+ * does not raise it, because that frame is the instrument. `quietLevel` is the line above that floor, and the
  * two constants keep it inside a sane range: at the default floor of 0.0012 the
  * line lands on 0.0036, almost exactly the old 0.004, so a device that was
  * already working behaves the same.
  */
-export function nextFloor(floor, rms) {
+export function nextFloor(floor, rms, pitched = false) {
   const current = Number.isFinite(floor) && floor > 0 ? floor : 0.0012;
   const measured = Number.isFinite(rms) && rms > 0 ? rms : 0;
+  // A frame with a pitch in it is the instrument, however soft — room noise has
+  // no period. Letting soft notes teach the floor was a runaway: every note within
+  // three times the floor pulled it up, which brought the next note within three
+  // times of it too, until the floor sat on the violin itself and the playing
+  // read as silence. Twenty-odd seconds of mf on a tablet was enough, which is
+  // why a slowed-down sight-reading take used to end itself three quarters of
+  // the way through.
+  if (pitched) return current;
   // Only frames that could plausibly be room noise teach the estimate anything.
   if (measured > current * 3) return current;
   return current * 0.995 + measured * 0.005;

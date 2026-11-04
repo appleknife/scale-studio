@@ -1,24 +1,24 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611047800';
-import { renderStaff } from './staff.js?v=202611047800';
-import { createInk } from './ink.js?v=202611047800';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611047900';
+import { renderStaff } from './staff.js?v=202611047900';
+import { createInk } from './ink.js?v=202611047900';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611047800';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611047800';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611047800';
-import { generatePassage } from './sightreading.js?v=202611047800';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611047800';
-import { renderScore } from './score.js?v=202611047800';
-import { summariseIntonation } from './intonation.js?v=202611047800';
-import * as Journal from './journal.js?v=202611047800';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611047800';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611047800';
+} from './pitch.js?v=202611047900';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611047900';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611047900';
+import { generatePassage } from './sightreading.js?v=202611047900';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611047900';
+import { renderScore } from './score.js?v=202611047900';
+import { summariseIntonation } from './intonation.js?v=202611047900';
+import * as Journal from './journal.js?v=202611047900';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611047900';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611047900';
 import {
   STRINGS,
   FIFTHS,
@@ -27,7 +27,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611047800';
+} from './tuner.js?v=202611047900';
 
 const LANG = initLang();
 
@@ -1109,7 +1109,12 @@ function readyViolin() {
  * without the renderer having to report its own geometry.
  */
 function sightAnchors(passage, svg) {
-  const nodes = [...svg.querySelectorAll('ellipse, g.score-rest')];
+  // Only the music's own heads: the cut-time tempo mark draws a half note too, and
+  // counting it put the line one note behind for the rest of the page — it is
+  // drawn after the first system, so the line jumped back to the top-left there.
+  const nodes = [...svg.querySelectorAll('ellipse, g.score-rest')].filter(
+    (n) => !n.closest('.score-tempo-mark'),
+  );
   const lines = [...svg.querySelectorAll('g[stroke="#c3b49d"] line')].map((n) =>
     Number(n.getAttribute('y1')),
   );
@@ -1515,6 +1520,10 @@ function startAssistedRun() {
     take.counting = false;
     take.startAtNextFrame = true;
     take.assisted = true;
+    // Where the clicks say the passage ends, in seconds from the downbeat. Until
+    // then a short silence is a breath or a lost place, not the end of the take.
+    take.endsAt =
+      ((passage.bars.length * passage.perBar) / 4) * (secondsPerQuarter(passage.tempo) / sight.rate);
     el.sightStatus.textContent = t('sight.playing');
     runClickTrack(ctx, passage, plan);
     runAssistPlayhead(take, passage);
@@ -1748,7 +1757,11 @@ function ingestSightFrame(frame) {
   // frozen app. A student who *has* played is never cut off by this — it only
   // fires while nothing has sounded.
   const neverStarted = take.assisted && take.onsets === 0 && elapsed > 6;
-  if ((take.frames.length > 40 && quiet > (unfinished ? 4.5 : 2.2)) || neverStarted) {
+  // An assisted run is on a clock, so it knows whether the passage can be over:
+  // before the last bar's time is up only a long silence ends it.
+  const early = take.assisted && take.endsAt > 0 && elapsed < take.endsAt;
+  const wait = early ? 6 : unfinished ? 4.5 : 2.2;
+  if ((take.frames.length > 40 && quiet > wait) || neverStarted) {
     finishSightTake();
   }
 }
@@ -3462,7 +3475,8 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     staleTicks = 0;
     last.set(buf);
     const { freq, clarity, rms } = detector.detect(buf);
-    mic.floor = nextFloor(mic.floor, rms);
+    // Pitched frames are the violin, and must never teach the room's level.
+    mic.floor = nextFloor(mic.floor, rms, freq > 0 && clarity >= 0.5);
     if (rms === 0) {
       silentTicks += 1;
       if (silentTicks > 25) ensurePulled();
