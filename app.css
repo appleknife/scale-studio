@@ -32,11 +32,23 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* A double tap is two taps, never a zoom: an iPad zoomed in on a double tap
+     anywhere on the page, which is easy to do by accident between presses.
+     Pinching to zoom and scrolling both still work. */
+  touch-action: manipulation;
+  /* No rubber-band bounce: on an iPad a screen that already fits would still
+     slide under a finger (or the Pencil), which reads as the page "trying to
+     scroll" and swallows taps and strokes. A screen that is longer than the
+     display still scrolls normally. */
+  overscroll-behavior: none;
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
+  /* No min-height of 100vh: on iPad Safari 100vh is the height *without* the
+     toolbar, so a page that fitted was always a toolbar's height too tall and
+     scrolled for nothing. The background reaches the bottom on its own. */
+  overscroll-behavior: none;
   font-family: var(--sans);
   color: var(--ink);
   background: var(--paper);
@@ -1582,12 +1594,17 @@ h3 {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0 6px 4px;
+  /* A sideways swipe on the staff moves the staff, never the page behind it. */
+  overscroll-behavior-x: contain;
 }
 
+/* 620 rather than 740: on an iPad the card is a little narrower than 740, so
+   the staff could be swiped a few pixels sideways for nothing. It still
+   scrolls on a phone, where the notes would otherwise be too small to read. */
 .staff-scroll svg {
   display: block;
   width: 100%;
-  min-width: 740px;
+  min-width: 620px;
   height: auto;
 }
 
@@ -2133,7 +2150,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 0 46px;
+  padding: 8px 0 calc(16px + env(safe-area-inset-bottom, 0px));
   font-size: 11.5px;
   color: var(--muted);
   border-top: 1px solid var(--line);
@@ -2377,7 +2394,7 @@ dialog .primary-btn {
   }
 
   .staff-scroll svg {
-    min-width: 700px;
+    min-width: 620px;
   }
 
   .staff-hint {
@@ -3591,4 +3608,25 @@ dialog .primary-btn {
     flex: 1 1 0;
     justify-content: center;
   }
+}
+
+/* Taps are taps: no double-tap zoom and no tap delay on anything pressable, so
+   a quick second press on an iPad is a second press, not a zoom. */
+button,
+a,
+label,
+summary,
+input,
+select,
+[role='tab'],
+.chip,
+.key-card,
+.pick-chip {
+  touch-action: manipulation;
+}
+
+/* Long-pressing the music should not bring up the callout or a selection. */
+.staff-scroll svg,
+.score {
+  -webkit-touch-callout: none;
 }

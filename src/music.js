@@ -4,7 +4,7 @@
 // than raw MIDI numbers, so the staff can be drawn with the right accidentals
 // and the app can show enharmonic spellings (F♯ / G♭, C♯ / D♭, B / C♭).
 
-import { getLang, t } from './i18n.js?v=202611047900';
+import { getLang, t } from './i18n.js?v=202611048200';
 
 export const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const LETTER_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
@@ -55,8 +55,11 @@ export function makeNote(letter, alter, octave) {
 // the lowest one available on the instrument in first position.
 // ---------------------------------------------------------------------------
 
-function variant(name, letter, alter, fifths, octave) {
-  return { name, letter, alter, fifths, octave };
+// `oneOctave`, where given, is the starting octave for the one-octave form
+// (Levels I–IV). A few keys sit better an octave up when there is only one
+// octave to play: A major from the open A string rather than from the G string.
+function variant(name, letter, alter, fifths, octave, oneOctave = null) {
+  return { name, letter, alter, fifths, octave, oneOctave };
 }
 
 // Ordered the way a violinist meets them — by where the scale starts on the
@@ -66,7 +69,7 @@ function variant(name, letter, alter, fifths, octave) {
 export const MAJOR_KEYS = [
   { id: 'G', variants: [variant('G', 4, 0, 1, 3)] },
   { id: 'Ab', variants: [variant('A\u266D', 5, -1, -4, 3)] },
-  { id: 'A', variants: [variant('A', 5, 0, 3, 3)] },
+  { id: 'A', variants: [variant('A', 5, 0, 3, 3, 4)] },
   { id: 'Bb', variants: [variant('B\u266D', 6, -1, -2, 3)] },
   { id: 'B', variants: [variant('B', 6, 0, 5, 3), variant('C\u266D', 0, -1, -7, 4)] },
   { id: 'C', variants: [variant('C', 0, 0, 0, 4)] },
@@ -116,7 +119,8 @@ function buildAscending(tonic, sig, form, octaves) {
 
 export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melodic', octaves = 2) {
   const v = card.variants[Math.min(variantIndex, card.variants.length - 1)];
-  const tonic = { letter: v.letter, alter: v.alter, octave: v.octave };
+  const start = octaves === 1 && v.oneOctave != null ? v.oneOctave : v.octave;
+  const tonic = { letter: v.letter, alter: v.alter, octave: start };
   const sig = keySignature(v.fifths);
   const up = buildAscending(tonic, sig, mode === 'minor' ? form : 'major', octaves);
   const down =

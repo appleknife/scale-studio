@@ -126,6 +126,14 @@ export function createInk({ onChange = () => {} } = {}) {
     current.strokes.forEach(drawStroke);
   }
 
+  // iPad Safari does not always honour `touch-action: none` on an SVG, and with
+  // the Pencil it can start scrolling the page under a stroke. Cancelling the
+  // touch itself is the one thing it always obeys — but only while a tool is on,
+  // so with the pen down the staff swipes as before.
+  function holdStill(event) {
+    if (tool && event.cancelable) event.preventDefault();
+  }
+
   function wanted(event) {
     if (!tool || !svg) return false;
     if (event.pointerType === 'pen') stylusSeen = true;
@@ -246,6 +254,8 @@ export function createInk({ onChange = () => {} } = {}) {
         svg.removeEventListener('pointermove', move);
         svg.removeEventListener('pointerup', up);
         svg.removeEventListener('pointercancel', cancel);
+        svg.removeEventListener('touchstart', holdStill);
+        svg.removeEventListener('touchmove', holdStill);
       }
       gesture = null;
       svg = staffSvg || null;
@@ -262,6 +272,8 @@ export function createInk({ onChange = () => {} } = {}) {
       svg.addEventListener('pointermove', move);
       svg.addEventListener('pointerup', up);
       svg.addEventListener('pointercancel', cancel);
+      svg.addEventListener('touchstart', holdStill, { passive: false });
+      svg.addEventListener('touchmove', holdStill, { passive: false });
       svg.classList.toggle('is-inking', Boolean(tool));
       svg.dataset.tool = tool || '';
       redraw();
