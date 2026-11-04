@@ -250,6 +250,23 @@
         // A copy taken before the log existed merges into an empty log cleanly.
         const fresh = J.merge(J.emptyState(), back.state);
         eq('an empty target takes the whole copy', J.totalDays(fresh), 1);
+
+        // Loading a copy must never cost the stats screen anything: the takes, the
+        // sight-reading bests, the goal and the audition level all survive, and a
+        // take present on both sides is kept once.
+        const mine = J.emptyState();
+        J.recordTake(mine, { uid: 'a1', at: '2026-03-10T10:00:00Z', key: '2026-03-10', kind: 'scale', id: 'G', score: 88 });
+        J.noteSight(mine, 5, '2026-03-10', 81);
+        J.setGoal(mine, 'days', 3);
+        J.setAudition(mine, '3-4');
+        const theirs = JSON.parse(JSON.stringify(mine));
+        J.recordTake(theirs, { uid: 'b2', at: '2026-03-12T10:00:00Z', key: '2026-03-12', kind: 'sight', level: 6, score: 70 });
+        const joined = J.merge(mine, theirs);
+        eq('takes survive a load', joined.takes.map((t) => t.uid), ['a1', 'b2']);
+        eq('and a load of the same copy adds none', J.merge(mine, mine).takes.length, 1);
+        eq('sight bests survive a load', joined.sight[5].best, 81);
+        eq('the goal survives a load', J.goalKey(joined.goal), 'days:3');
+        eq('the audition level survives a load', J.auditionLevel(joined), '3-4');
       }
 
       /* ── more than one name ───────────────────────────────────────── */

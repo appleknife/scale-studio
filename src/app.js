@@ -1,24 +1,24 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037400';
-import { renderStaff } from './staff.js?v=202611037400';
-import { createInk } from './ink.js?v=202611037400';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611037500';
+import { renderStaff } from './staff.js?v=202611037500';
+import { createInk } from './ink.js?v=202611037500';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611037400';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037400';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037400';
-import { generatePassage } from './sightreading.js?v=202611037400';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037400';
-import { renderScore } from './score.js?v=202611037400';
-import { summariseIntonation } from './intonation.js?v=202611037400';
-import * as Journal from './journal.js?v=202611037400';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037400';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037400';
+} from './pitch.js?v=202611037500';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611037500';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611037500';
+import { generatePassage } from './sightreading.js?v=202611037500';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611037500';
+import { renderScore } from './score.js?v=202611037500';
+import { summariseIntonation } from './intonation.js?v=202611037500';
+import * as Journal from './journal.js?v=202611037500';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611037500';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611037500';
 import {
   STRINGS,
   FIFTHS,
@@ -27,7 +27,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611037400';
+} from './tuner.js?v=202611037500';
 
 const LANG = initLang();
 
@@ -249,6 +249,14 @@ const el = {
   updateBtn: $('updateBtn'),
   updateLater: $('updateLater'),
 };
+
+/**
+ * Which request for the microphone is the current one. Leaving a screen while
+ * the browser is still asking bumps it, so the answer — which can come seconds
+ * later — is closed instead of starting a take on a screen nobody is looking at
+ * (and, for a scale, jumping to a result page out of nowhere).
+ */
+let micTicket = 0;
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 52;
 const params = new URLSearchParams(location.search);
@@ -687,7 +695,9 @@ async function beginTest() {
 }
 
 function nextTestScale() {
-  if (!state.test) return;
+  // Only from the pause between scales: leaving the screen in that second and a
+  // half used to bring the next scale up — armed, with no microphone — anyway.
+  if (!state.test || state.phase !== 'between') return;
   state.test.index += 1;
   state.scale = state.test.scales[state.test.index];
   renderPractice();
@@ -974,6 +984,7 @@ function openTuner(withMic = true) {
 async function startTunerMic() {
   if (!state.tune) return;
   closeMic();
+  const ticket = micTicket;
   let mic;
   try {
     // The tuner listens with the longer window: the G string needs the periods.
@@ -981,13 +992,13 @@ async function startTunerMic() {
   } catch (err) {
     // Leaving the tuner while the browser is still asking must not write to a
     // screen that is gone — that used to throw at a null `state.tune`.
-    if (!state.tune) return;
+    if (!state.tune || ticket !== micTicket) return;
     state.tune.listening = false;
     el.tuneMicBtn.hidden = false;
     el.tuneStatus.textContent = micErrorMessage(err);
     return;
   }
-  if (!state.tune) {
+  if (!state.tune || ticket !== micTicket) {
     // The student walked away while the microphone was opening. Hand it back, or
     // it stays open (and the recording light stays on) behind a screen nobody is
     // looking at.
@@ -1002,6 +1013,7 @@ async function startTunerMic() {
 }
 
 function closeTuner() {
+  micTicket += 1;
   closeMic();
   state.tune = null;
 }
@@ -1383,11 +1395,22 @@ async function startSightTake(options = {}) {
 
   if (state.mic && (state.micMode !== 'take' || state.mic.stalled)) closeMic();
   if (!state.mic) {
+    const ticket = micTicket;
     try {
-      state.mic = await openMic(routeFrame);
+      const mic = await openMic(routeFrame);
+      if (ticket !== micTicket) {
+        mic.close();
+        el.sightStart.disabled = false;
+        return;
+      }
+      state.mic = mic;
       state.micMode = 'take';
       paintMicDiagnostics();
     } catch (err) {
+      if (ticket !== micTicket) {
+        el.sightStart.disabled = false;
+        return;
+      }
       el.sightStart.disabled = false;
       el.sightStatus.textContent = micErrorMessage(err);
       return;
@@ -2093,7 +2116,11 @@ function todayKey() {
 
 function keyName(id) {
   const card = MAJOR_KEYS.find((k) => k.id === id);
-  return card ? card.variants[0].name : id;
+  if (card) return card.variants[0].name;
+  // A minor key is kept as "Gm"; say it the way the grid does.
+  const minor = MINOR_KEYS.find((k) => k.id === id);
+  if (minor) return `${minor.variants[0].name}${getLang() === 'zh' ? '小调' : ' minor'}`;
+  return id;
 }
 
 function saveJournal() {
@@ -2662,7 +2689,9 @@ function takeRow(take) {
       ? t('stats.levelN', { n: take.level })
       : card
         ? card.variants.map((v) => v.name).join(' / ')
-        : t('stats.takeOther');
+        : MINOR_KEYS.some((k) => k.id === take.id)
+          ? keyName(take.id)
+          : t('stats.takeOther');
   const when = new Date(take.at).toLocaleDateString(getLang() === 'zh' ? 'zh-CN' : 'en-US', {
     month: 'short',
     day: 'numeric',
@@ -3474,6 +3503,8 @@ function onMicStalled() {
     el.startBtn.hidden = false;
     el.startBtn.disabled = false;
     el.startBtn.textContent = t('btn.startListening');
+    el.live.hidden = true;
+    el.levelBar.hidden = true;
     setStatus(false, t('mic.paused'));
     el.listenHint.textContent = t('mic.pausedHint');
   }
@@ -3613,11 +3644,18 @@ async function startListening() {
   // uses the same stream object, so hand it back before listening for a take.
   if (state.mic && (state.micMode !== 'take' || state.mic.stalled)) closeMic();
   if (!state.mic) {
+    const ticket = micTicket;
     try {
-      state.mic = await openMic(routeFrame);
+      const mic = await openMic(routeFrame);
+      if (ticket !== micTicket) {
+        mic.close();
+        return;
+      }
+      state.mic = mic;
       state.micMode = 'take';
       paintMicDiagnostics();
     } catch (err) {
+      if (ticket !== micTicket) return;
       state.phase = 'idle';
       el.startBtn.disabled = false;
       el.startBtn.textContent = t('btn.startListening');
@@ -3665,8 +3703,7 @@ function beginTake() {
   setTimeout(() => {
     const take = state.take;
     if (state.phase === 'armed' && take && !take.started && (take.peak || 0) < 0.002) {
-      el.listenHint.textContent =
-        'No sound is reaching the app yet — check which microphone this site is allowed to use, and that it is not muted.';
+      el.listenHint.textContent = t('hint.noSound');
     }
   }, 4500);
 
@@ -3676,8 +3713,7 @@ function beginTake() {
     setTimeout(() => {
       const take = state.take;
       if (state.phase === 'armed' && take && !take.started) {
-        el.listenHint.textContent =
-          'Take your time. When you are done for now, press “End audition” above.';
+        el.listenHint.textContent = t('hint.takeYourTime');
       }
     }, 45000);
   }
@@ -3814,9 +3850,12 @@ function finishTake() {
   el.levelBar.hidden = true;
 
   const result = analyzeTake(take.frames, state.scale);
+  // The scale's own key, not state.cardId: a mock audition never sets that, so
+  // every audition take used to be filed under whatever was practised last.
+  const cardId = state.scale.cardId || state.cardId;
   // Before the take is logged: the comparison is against what came before it.
-  result.compared = Journal.compareTake(Journal.scaleEntry(journal, state.cardId), result.score);
-  noteTake('scales', state.cardId, result.score, {
+  result.compared = Journal.compareTake(Journal.scaleEntry(journal, cardId), result.score);
+  noteTake('scales', cardId, result.score, {
     parts: {
       accuracy: result.components.accuracy,
       intonation: result.components.intonation,
@@ -3891,6 +3930,9 @@ function closeMic() {
   }
 }
 
+/** The scale the result screen is about — Try again plays this one. */
+let lastResultScale = null;
+
 function noteColour(entry) {
   if (entry.status !== 'exact') return '#c2b7a6';
   const c = Math.abs(entry.cents);
@@ -3917,6 +3959,7 @@ function compareLine(compared) {
 
 function renderResult(result) {
   const scale = result.scale;
+  lastResultScale = scale;
   showView('result');
 
   el.resultEyebrow.textContent = t('eyebrow.result', { title: scale.title, o: scale.octaves });
@@ -4135,7 +4178,12 @@ el.spellingRow.addEventListener('click', (event) => {
 // A scale take goes back to the grid it came from; the menu is one step above it.
 el.backBtn.addEventListener('click', openScales);
 el.brandHome.addEventListener('click', goHome);
-el.resultBack.addEventListener('click', openScales);
+// Opened from the audition summary, Back goes back to that summary; otherwise
+// to the grid the take came from.
+el.resultBack.addEventListener('click', () => {
+  if (state.test && state.test.results.length && state.phase === 'idle') showView('test-result');
+  else openScales();
+});
 el.anotherBtn.addEventListener('click', openScales);
 el.openScalesBtn.addEventListener('click', openScales);
 el.scalesBack.addEventListener('click', goHome);
@@ -4175,10 +4223,18 @@ document.addEventListener('keydown', (event) => {
 });
 
 el.retryBtn.addEventListener('click', () => {
-  // Retrying a single scale is practice, even if it came from a mock audition.
+  // Retrying a single scale is practice, even if it came from a mock audition —
+  // and it is the scale on the result screen. Opened from the audition summary
+  // that is not the last one played, and the practice screen still had the
+  // audition's layout (no notation, no octave switch) until it was redrawn.
+  const scale = lastResultScale || state.scale;
   state.test = null;
   el.testBar.hidden = true;
-  resetListenUI();
+  if (scale.mode && scale.mode !== state.mode) setMode(scale.mode);
+  state.scale = scale;
+  if (scale.cardId) state.cardId = scale.cardId;
+  state.variantIndex = scale.variantIndex || 0;
+  renderPractice();
   showView('practice');
   startListening();
 });
@@ -4240,6 +4296,7 @@ startOffline({ onUpdateReady: () => { el.updateNote.hidden = false; } });
 paintOffline();
 
 function cancelListening() {
+  micTicket += 1;
   if (state.mic) {
     state.mic.close();
     state.mic = null;

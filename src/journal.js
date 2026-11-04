@@ -859,10 +859,46 @@ export function merge(into, other) {
     out.scales[id] = {
       days: [...new Set([...(mine.days || []), ...(entry.days || [])])],
       best: Math.max(mine.best || 0, entry.best || 0),
+      history: joinHistory(mine.history, entry.history),
     };
   }
 
+  // Everything else the log holds comes along too. This used to stop at the
+  // days and the scales, and because the result *replaces* the log, loading a
+  // copy — even a copy of the very same log — wiped every take on the stats
+  // screen, the sight-reading bests, the goal and the audition level.
+  out.sight = { ...(into.sight || {}) };
+  for (const [level, entry] of Object.entries((other && other.sight) || {})) {
+    const mine = out.sight[level] || { best: 0, history: [] };
+    out.sight[level] = {
+      best: Math.max(mine.best || 0, (entry && entry.best) || 0),
+      history: joinHistory(mine.history, entry && entry.history),
+    };
+  }
+
+  const seen = new Set();
+  const takes = [];
+  for (const take of [...(into.takes || []), ...((other && other.takes) || [])]) {
+    if (!take || typeof take !== 'object') continue;
+    const id = take.uid || take.at;
+    if (id && seen.has(id)) continue;
+    if (id) seen.add(id);
+    takes.push(take);
+  }
+  takes.sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')));
+  out.takes = takes.slice(-TAKES_KEPT);
+
+  out.goal = into.goal || (other && other.goal) || null;
+  const audition = into.audition || (other && other.audition);
+  if (audition) out.audition = audition;
+
   return out;
+}
+
+/** This device's history for a record, or the copy's when this one has none. */
+function joinHistory(mine, theirs) {
+  if (Array.isArray(mine) && mine.length) return mine.slice(-HISTORY);
+  return Array.isArray(theirs) ? theirs.slice(-HISTORY) : [];
 }
 
 /** How many days the log has an entry for — the number a copy is worth. */
