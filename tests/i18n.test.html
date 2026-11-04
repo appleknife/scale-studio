@@ -105,10 +105,39 @@ function load(url, ms) {
     found.forEach((text) => lines.push(`     ${text.slice(0, 140)}`));
   }
   lines.unshift(total === 0 ? 'I18N OK — nothing left in English' : `I18N: ${total} untranslated`);
+
+  // ── the keys themselves ──────────────────────────────────────────────
+  //
+  // Walking the screens only catches strings that are on screen at the moment
+  // the audit looks. Two bugs lived past it for exactly that reason: the week
+  // sheet's "takes" label asked for a key the table never had (so the literal
+  // `log.win.takesLabel` was rendered), and the sight-reading Finish button
+  // carried `data-i18n="Finish"` with no entry, so it stayed English on a
+  // Chinese screen — the button is only visible during a take, and the audit
+  // never starts one. So the table is checked directly, against the pages and
+  // against every literal key the app asks for.
+  const keyProblems = [];
+  try {
+    const { S, STATIC } = await import('../src/i18n.js');
+    const html = await (await fetch('../index.html')).text();
+    const declared = [...new Set([...html.matchAll(/data-i18n(?:-aria)?="([^"]+)"/g)].map((m) => m[1]))];
+    const missingStatic = declared.filter((k) => !(k in STATIC) && !(k in S));
+    const appSrc = await (await fetch('../src/app.js')).text();
+    const literals = [...new Set([...appSrc.matchAll(/\bt\('([A-Za-z][\w.-]*)'/g)].map((m) => m[1]))];
+    const missingKeys = literals.filter((k) => !(k in S));
+    if (missingStatic.length) keyProblems.push(`✗ index.html asks for ${missingStatic.join(', ')} — no translation`);
+    if (missingKeys.length) keyProblems.push(`✗ app.js asks for ${missingKeys.join(', ')} — no entry in S`);
+    lines.push(`keys: ${declared.length} declared in index.html, ${literals.length} literals in app.js, ` +
+      `${missingStatic.length + missingKeys.length} missing`);
+  } catch (err) {
+    keyProblems.push(`✗ could not read the translation tables: ${err.message}`);
+  }
+  keyProblems.forEach((line) => lines.push(line));
   out.textContent = lines.join('\n');
-  document.title = total === 0 ? 'I18N OK' : 'I18N FAIL';
+  const failed = total > 0 || keyProblems.length > 0;
+  document.title = failed ? 'I18N FAIL' : 'I18N OK';
   const report = {
-    problems: total === 0 ? [] : lines.filter((l) => l.startsWith('✗') || l.startsWith('     ')),
+    problems: failed ? lines.filter((l) => l.startsWith('✗') || l.startsWith('     ')) : [],
     log: lines.join('\n'),
   };
   fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'i18n', ...report }) }).catch(() => {});

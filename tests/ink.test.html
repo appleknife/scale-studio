@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Ink test</title>
+    <style>
+      body { font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; margin: 20px; background: #faf7f1; color: #221e19; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; white-space: pre-wrap; }
+      iframe { position: fixed; left: -4000px; top: 0; width: 1100px; height: 900px; border: 0; }
+    </style>
+  </head>
+  <body>
+    <pre id="out">running…</pre>
+    <iframe id="frame" title="app under test"></iframe>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // The pen, the box eraser and undo on the scale staff.
+      //
+      // This is the one feature in the app that is pure pointer handling, so
+      // nothing else touches it: a bug here is silent until a teacher tries to
+      // write a fingering. The events are synthesized in the staff's own
+      // coordinate space, which is exactly what a real pointer produces.
+      const problems = [];
+      const log = [];
+      const check = (ok, message) => {
+        if (!ok) problems.push(message);
+        return ok;
+      };
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      const frame = document.getElementById('frame');
+      const loaded = new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }));
+      frame.src = '../index.html#major/G';
+      await loaded;
+      const d = frame.contentDocument;
+      const w = frame.contentWindow;
+      await wait(600);
+
+      const svg = () => d.querySelector('#staffHost svg.staff');
+      const paths = () => d.querySelectorAll('#staffHost .ink-layer path');
+      const hint = () => d.getElementById('staffHint').textContent.trim();
+
+      const point = (fx, fy) => {
+        const box = svg().getBoundingClientRect();
+        return { clientX: box.left + box.width * fx, clientY: box.top + box.height * fy };
+      };
+      let pointerId = 20;
+      // One pointer id per gesture, the way a real pointer behaves: the down, the
+      // moves and the up all carry the same id, and the next stroke gets a new one.
+      const nextPointer = () => {
+        pointerId += 1;
+      };
+      const send = (type, at) =>
+        svg().dispatchEvent(
+          new w.PointerEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            pointerId,
+            pointerType: 'mouse',
+            button: 0,
+            buttons: 1,
+            ...at,
+          }),
+        );
+      const stroke = async () => {
+        nextPointer();
+        send('pointerdown', point(0.3, 0.4));
+        send('pointermove', point(0.38, 0.44));
+        send('pointermove', point(0.46, 0.4));
+        send('pointerup', point(0.46, 0.4));
+        await wait(40);
+      };
+
+      /* ── 1. The pen draws ───────────────────────────────────────────── */
+      {
+        check(Boolean(svg()), 'the practice screen has no staff');
+        d.getElementById('inkPen').click();
+        await wait(40);
+        check(d.getElementById('inkPen').getAttribute('aria-pressed') === 'true', 'the pen did not light up');
+        check(svg().classList.contains('is-inking'), 'the staff was not handed to the pen');
+        check(!hint().includes('Swipe'), `the hint still says to swipe while the pen is on: "${hint()}"`);
+        await stroke();
+        const drawn = paths();
+        check(drawn.length === 1, `${drawn.length} strokes after one stroke`);
+        check(Boolean(drawn[0] && (drawn[0].getAttribute('d') || '').includes('M')), 'the stroke has no path');
+        check(!d.getElementById('inkUndo').disabled, 'undo was not offered after a stroke');
+        log.push(`pen: 1 stroke drawn (${paths()[0] ? paths()[0].getAttribute('d').length : 0} chars)`);
+      }
+
+      /* ── 2. Undo takes the stroke back ──────────────────────────────── */
+      {
+        d.getElementById('inkUndo').click();
+        await wait(40);
+        check(paths().length === 0, `${paths().length} strokes left after undo`);
+        check(d.getElementById('inkUndo').disabled, 'undo stayed offered with nothing to undo');
+        log.push('undo: stroke removed, button disabled');
+      }
+
+      /* ── 3. Box-erase, and undo of the erase ────────────────────────── */
+      {
+        await stroke();
+        check(paths().length === 1, 'the second stroke did not land');
+        d.getElementById('inkErase').click();
+        await wait(40);
+        nextPointer();
+        send('pointerdown', point(0.25, 0.3));
+        send('pointermove', point(0.6, 0.55));
+        send('pointerup', point(0.6, 0.55));
+        await wait(40);
+        check(paths().length === 0, `the box erase left ${paths().length} strokes`);
+        d.getElementById('inkUndo').click();
+        await wait(40);
+        check(paths().length === 1, `undoing the erase restored ${paths().length} strokes, not 1`);
+        log.push('erase: box removed the stroke; undo put it back');
+      }
+
+      /* ── 4. A tap erases what is under it ───────────────────────────── */
+      {
+        d.getElementById('inkErase').click(); // still on from above? toggles off then on
+        d.getElementById('inkErase').click();
+        await wait(40);
+        nextPointer();
+        send('pointerdown', point(0.36, 0.42));
+        send('pointerup', point(0.36, 0.42));
+        await wait(40);
+        check(paths().length === 0, `${paths().length} strokes left after a tap erase`);
+        d.getElementById('inkUndo').click();
+        await wait(40);
+        log.push(`tap erase: ${paths().length === 1 ? 'removed and undone' : `left ${paths().length}`}`);
+        check(paths().length === 1, 'undo after a tap erase did not restore the stroke');
+      }
+
+      /* ── 4b. A lost pointerup does not wedge the pen ────────────────── */
+      //
+      // The system taking a pointer away — or a browser that never delivers the
+      // up to the staff — used to leave the gesture half-finished, and every
+      // later stroke was ignored by "if (gesture) return": a pen that quietly
+      // stopped working until the screen was redrawn. The end of a gesture is
+      // heard on the window as well, so this is the backstop.
+      {
+        d.getElementById('inkPen').click();
+        await wait(40);
+        nextPointer();
+        send('pointerdown', point(0.3, 0.5));
+        send('pointermove', point(0.34, 0.52));
+        // The up lands on the page, not on the staff.
+        d.body.dispatchEvent(
+          new w.PointerEvent('pointerup', {
+            bubbles: true,
+            pointerId,
+            pointerType: 'mouse',
+            button: 0,
+            clientX: 0,
+            clientY: 0,
+          }),
+        );
+        await wait(40);
+        const before = paths().length;
+        await stroke();
+        check(
+          paths().length === before + 1,
+          `after a lost pointerup the pen drew ${paths().length - before} of 1 new strokes`,
+        );
+        log.push(`lost pointerup: pen still draws (${paths().length} strokes on the page)`);
+        // Take the two extra strokes back off, and put the pen down, so the rest
+        // of the test starts from one mark on the page and no tool on the staff.
+        d.getElementById('inkUndo').click();
+        await wait(30);
+        d.getElementById('inkUndo').click();
+        await wait(30);
+        check(paths().length === 1, `cleanup left ${paths().length} strokes, not 1`);
+        d.getElementById('inkPen').click();
+        await wait(30);
+      }
+
+      /* ── 5. Every scale is its own page ─────────────────────────────── */
+      {
+        d.getElementById('brandHome').click();
+        await wait(80);
+        d.getElementById('openScalesBtn').click();
+        await wait(80);
+        d.querySelector('.key-card[data-id="D"]').click();
+        await wait(200);
+        check(paths().length === 0, `D major started with ${paths().length} of G's marks on it`);
+        d.getElementById('brandHome').click();
+        await wait(80);
+        d.getElementById('openScalesBtn').click();
+        await wait(80);
+        d.querySelector('.key-card[data-id="G"]').click();
+        await wait(200);
+        check(paths().length === 1, `G major came back with ${paths().length} strokes, not 1`);
+        log.push('pages: G kept its mark, D did not inherit it');
+      }
+
+      /* ── 6. Leaving puts the tool down, and Ctrl+Z undoes ───────────── */
+      {
+        d.getElementById('inkPen').click();
+        await wait(40);
+        d.getElementById('brandHome').click();
+        await wait(120);
+        check(svg().dataset.tool === '', `leaving left the tool set to "${svg().dataset.tool}"`);
+        check(hint().includes('Swipe'), `the hint did not go back to swiping: "${hint()}"`);
+
+        d.getElementById('openScalesBtn').click();
+        await wait(80);
+        d.querySelector('.key-card[data-id="G"]').click();
+        await wait(200);
+        d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
+        await wait(60);
+        check(paths().length === 0, `Ctrl+Z left ${paths().length} strokes`);
+        log.push('leaving: tool cleared, hint restored · Ctrl+Z undid the last mark');
+      }
+
+      document.getElementById('out').textContent = problems.length
+        ? `INK FAILED\n${problems.map((p) => `· ${p}`).join('\n')}\n\n${log.join('\n')}`
+        : `INK OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'INK FAILED' : 'INK OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'ink', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

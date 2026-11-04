@@ -173,7 +173,12 @@ h3 {
 }
 
 .view {
-  animation: rise 0.45s cubic-bezier(0.22, 0.7, 0.3, 1) both;
+  /* No fill mode on purpose. `both` holds the from-state — opacity 0 — and an
+     entrance animation that never runs then leaves the whole screen invisible:
+     a page opened in a background tab, a print, a headless render. The natural
+     state has to be the visible one, and this animation only ever adds polish
+     to it. */
+  animation: rise 0.45s cubic-bezier(0.22, 0.7, 0.3, 1);
 }
 
 @keyframes rise {

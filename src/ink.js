@@ -88,6 +88,17 @@ export function createInk({ onChange = () => {} } = {}) {
 
   const notify = () => onChange({ tool, canUndo: Boolean(current && current.history.length) });
 
+  // The end of a gesture is heard on the window as well as on the staff. Capture
+  // normally delivers pointerup to the SVG wherever the finger goes, but when it
+  // does not — an older browser, a pointer the system takes away, a stylus lifted
+  // off the glass — the gesture stayed half-finished and every later stroke was
+  // ignored ("if (gesture) return"), which looks exactly like a pen that has
+  // stopped working until the screen is redrawn.
+  const onWindowUp = (event) => up(event);
+  const onWindowCancel = (event) => cancel(event);
+  window.addEventListener('pointerup', onWindowUp);
+  window.addEventListener('pointercancel', onWindowCancel);
+
   function toPoint(event) {
     const ctm = svg.getScreenCTM();
     if (!ctm) return null;

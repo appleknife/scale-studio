@@ -252,6 +252,30 @@ the scoring all follow from it.
 
 ---
 
+### Writing on the staff
+
+A teacher writes on the music — a fingering over a shift, a circle round the note
+that keeps going sharp — so the practice screen's staff takes a pen, a box eraser
+and undo ([`src/ink.js`](src/ink.js)). The ink is drawn *inside* the staff's own
+SVG in its viewBox units, so it scrolls with the notes on a phone and stays sharp at
+any size; each scale layout (key, octaves, spelling) is its own page, and the marks
+are gone when the page is reloaded — nothing is stored or uploaded. While a tool is
+on, the staff no longer swipes (a finger that draws cannot also scroll), and the
+hint under it says how to get swiping back. With an Apple Pencil about, resting
+palms are ignored.
+
+Two things there are less obvious than they look:
+
+* **The end of a gesture is heard on the window as well as on the staff.** Capture
+  normally delivers `pointerup` to the SVG wherever the finger goes; when it does
+  not — an older browser, a pointer the system takes away — the gesture stayed
+  half-finished and every later stroke was ignored by `if (gesture) return`, which
+  looks exactly like a pen that has stopped working until the screen is redrawn.
+* **`tests/ink.test.html` draws with synthesized pointer events**, erases, undoes,
+  drops a pointerup on the page on purpose, and checks that each scale keeps its
+  own page of marks. It is the only feature in the app that is pure pointer
+  handling, so nothing else exercises it.
+
 ## How it listens
 
 * **Pitch detection:** YIN (cumulative mean normalized difference) over a 2048-sample
@@ -1200,6 +1224,15 @@ without translating anything. Scale names stay in letters (C大调, F♯大调) 
 in Chinese music teaching. The wording of the tuner section in particular should be
 read over by a native speaker before it goes to a parent — the terminology (弦轴,
 微调器, 纯五度) is standard, but the sentences were written by a non-native hand.
+
+
+**The keys are checked, not just the screens.** Walking each screen in Chinese
+only finds the strings that are on screen at the moment the audit looks, and a bug
+lived past it for exactly that reason: the practice log's week sheet asked for a
+key the table had never carried, so the literal `log.win.takesLabel` was rendered
+as the label under "Days practiced". `i18n.test.html` now also compares the tables
+directly — every `data-i18n` in `index.html`, and every literal key the app asks
+`t()` for, against the English table — and fails with the missing key named.
 
 ## Files
 

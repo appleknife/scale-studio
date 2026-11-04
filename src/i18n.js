@@ -686,6 +686,7 @@ export const S = {
   'log.win.ready1': ['1 scale ready', '1 条音阶就绪'],
   'log.win.readyN': ['{n} scales ready', '{n} 条音阶就绪'],
   'log.win.readyNone': ['not yet — two clean days makes one', '还没有——两个干净的日子才算一条'],
+  'log.win.takesLabel': ['Takes', '练习次数'],
   // ── Your stats ──
   'stats.takes': ['takes counted', '计入的次数'],
   'stats.thisWeek': ['days this week', '本周天数'],
