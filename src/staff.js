@@ -3,8 +3,8 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202611048200';
-import { intonationLane } from './intonation.js?v=202611048200';
+import { CLEF_PATH } from './clef.js?v=202611068300';
+import { intonationLane } from './intonation.js?v=202611068300';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;

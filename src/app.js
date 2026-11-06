@@ -1,24 +1,24 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611048200';
-import { renderStaff } from './staff.js?v=202611048200';
-import { createInk } from './ink.js?v=202611048200';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068300';
+import { renderStaff } from './staff.js?v=202611068300';
+import { createInk } from './ink.js?v=202611068300';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611048200';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611048200';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611048200';
-import { generatePassage } from './sightreading.js?v=202611048200';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611048200';
-import { renderScore } from './score.js?v=202611048200';
-import { summariseIntonation } from './intonation.js?v=202611048200';
-import * as Journal from './journal.js?v=202611048200';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611048200';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611048200';
+} from './pitch.js?v=202611068300';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068300';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068300';
+import { generatePassage } from './sightreading.js?v=202611068300';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068300';
+import { renderScore } from './score.js?v=202611068300';
+import { summariseIntonation } from './intonation.js?v=202611068300';
+import * as Journal from './journal.js?v=202611068300';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068300';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068300';
 import {
   STRINGS,
   FIFTHS,
@@ -27,7 +27,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611048200';
+} from './tuner.js?v=202611068300';
 
 const LANG = initLang();
 
@@ -345,6 +345,8 @@ function cardById(id) {
 
 function renderGrid() {
   const cards = cardList();
+  // Today's practice, lit on the cards: which keys were played, and how often.
+  const today = Journal.takesOnDay(journal, todayKey());
   el.grid.innerHTML = cards
     .map((card) => {
       const scale = buildScale(card, 0, state.mode, state.form);
@@ -354,8 +356,14 @@ function renderGrid() {
         scale.fifths === 0
           ? ''
           : (scale.fifths > 0 ? '\u266F' : '\u266D').repeat(Math.abs(scale.fifths));
+      const times = today.get(card.id) || 0;
+      const badge = times
+        ? `<span class="key-today" aria-hidden="true">×${times}</span>
+          <span class="visually-hidden">${times === 1 ? t('card.today.one') : t('card.today', { n: times })}</span>`
+        : '';
       return `
-        <button class="key-card" type="button" data-id="${card.id}">
+        <button class="key-card${times ? ' is-practised' : ''}" type="button" data-id="${card.id}">
+          ${badge}
           <span class="key-name">${names}${suffix}</span>
           <span class="sig-glyphs" aria-hidden="true">${glyphs || '&nbsp;'}</span>
           <span class="key-sub">${t('card.sub', {
@@ -3170,6 +3178,9 @@ function goHome() {
 /** The grid's own screen: reached from the menu, and where a take goes back to. */
 function openScales() {
   cancelListening();
+  // The cards light up with today's takes, so they are drawn fresh each visit —
+  // and after midnight they start the new day dark.
+  renderGrid();
   showView('scales');
 }
 

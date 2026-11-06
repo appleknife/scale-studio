@@ -106,6 +106,20 @@ export function recentTakes(state, { kind = null, limit = TAKES_KEPT, counted = 
   return filtered.slice(-limit);
 }
 
+/**
+ * How many times each scale was played on one day, for the lit cards on the
+ * scales grid. Only counted takes: a false start — a tap, a cough, a take
+ * abandoned at the first bar — is a test run and lights nothing.
+ */
+export function takesOnDay(state, key = dayKey()) {
+  const counts = new Map();
+  for (const take of recentTakes(state, { kind: 'scale', counted: true })) {
+    if (take.key !== key || !take.id) continue;
+    counts.set(take.id, (counts.get(take.id) || 0) + 1);
+  }
+  return counts;
+}
+
 /** How many takes were set aside as test runs. */
 export function trialsIgnored(state) {
   const all = Array.isArray(state.takes) ? state.takes : [];

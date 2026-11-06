@@ -155,6 +155,8 @@ export const S = {
   'key.flat': ['{n} flat', '{n} 个降号'],
   'key.flats': ['{n} flats', '{n} 个降号'],
   'card.sub': ['{key} · {o} octaves', '{key} · {o} 个八度'],
+  'card.today': ['Played {n} times today', '今天练了 {n} 次'],
+  'card.today.one': ['Played once today', '今天练了 1 次'],
 
   'status.ready': ['Ready when you are', '准备好了就开始'],
   'status.listening': ['Listening — play whenever you are ready', '正在聆听——随时开始'],
