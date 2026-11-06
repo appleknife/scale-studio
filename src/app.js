@@ -1,26 +1,26 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068500';
-import { renderStaff } from './staff.js?v=202611068500';
-import { createInk } from './ink.js?v=202611068500';
-import { createPetRoom } from './petroom.js?v=202611068500';
-import { createBuddy } from './buddy.js?v=202611068500';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068600';
+import { renderStaff } from './staff.js?v=202611068600';
+import { createInk } from './ink.js?v=202611068600';
+import { createPetRoom } from './petroom.js?v=202611068600';
+import { createBuddy } from './buddy.js?v=202611068600';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611068500';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068500';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068500';
-import { generatePassage } from './sightreading.js?v=202611068500';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068500';
-import { renderScore } from './score.js?v=202611068500';
-import { summariseIntonation } from './intonation.js?v=202611068500';
-import * as Journal from './journal.js?v=202611068500';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068500';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068500';
+} from './pitch.js?v=202611068600';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068600';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068600';
+import { generatePassage } from './sightreading.js?v=202611068600';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068600';
+import { renderScore } from './score.js?v=202611068600';
+import { summariseIntonation } from './intonation.js?v=202611068600';
+import * as Journal from './journal.js?v=202611068600';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068600';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068600';
 import {
   STRINGS,
   FIFTHS,
@@ -29,7 +29,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611068500';
+} from './tuner.js?v=202611068600';
 
 const LANG = initLang();
 
@@ -169,6 +169,8 @@ const el = {
   twoOctRow: $('twoOctRow'),
 
   langBtn: $('langBtn'),
+  themeBtn: $('themeBtn'),
+  themeLabel: $('themeLabel'),
   tuneBtn: $('tuneBtn'),
   tuneBack: $('tuneBack'),
   tuneMicBtn: $('tuneMicBtn'),
@@ -4215,6 +4217,48 @@ el.modeTabs.addEventListener('click', (event) => {
 });
 
 el.langBtn.addEventListener('click', () => setLang(LANG === 'zh' ? 'en' : 'zh'));
+
+// ── Light and dark ─────────────────────────────────────────────────────────
+// The page starts in the device's own mode (the little script in <head> sets
+// it before anything is drawn). Pressing the button picks one and keeps it;
+// until then, the page follows the device as it changes, at sunset and all.
+const THEME_KEY = 'scaleStudio.theme';
+const darkQuery = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+
+function savedTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function applyTheme(theme) {
+  const dark = theme === 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  // The button offers the other one.
+  el.themeLabel.textContent = dark ? t('theme.toLight') : t('theme.toDark');
+  el.themeBtn.setAttribute('aria-pressed', String(dark));
+  el.themeBtn.setAttribute('aria-label', t('theme.aria'));
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', dark ? '#191714' : '#faf7f1');
+}
+
+applyTheme(document.documentElement.dataset.theme);
+el.themeBtn.addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    /* kept for this visit */
+  }
+  applyTheme(next);
+});
+if (darkQuery && darkQuery.addEventListener) {
+  darkQuery.addEventListener('change', (e) => {
+    if (!savedTheme()) applyTheme(e.matches ? 'dark' : 'light');
+  });
+}
 if (LANG === 'zh') {
   el.langBtn.textContent = 'English';
   applyStatic();

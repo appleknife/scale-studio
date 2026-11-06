@@ -9,6 +9,17 @@
       content="A listening scale trainer for violin students preparing for NYSSMA Levels I–VI."
     />
     <meta name="theme-color" content="#faf7f1" />
+    <!-- Light or dark before the first paint, so a dark room never flashes white:
+         the saved choice, or else whatever the device is set to. -->
+    <script>
+      try {
+        var saved = localStorage.getItem('scaleStudio.theme');
+        var dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    </script>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232f5d4e'/%3E%3Ccircle cx='13' cy='22' r='4' fill='%23faf7f1'/%3E%3Crect x='15.4' y='8' width='1.8' height='14' fill='%23faf7f1'/%3E%3Cpath d='M17.2 8c3.4.6 5.4 2.4 5.4 5.2' stroke='%23faf7f1' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"
@@ -20,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611068500" />
+    <link rel="stylesheet" href="app.css?v=202611068600" />
   </head>
   <body>
     <div class="shell">
@@ -37,6 +48,11 @@
           </span>
         </button>
         <div class="topbar-actions">
+          <button class="ghost-btn theme-btn" id="themeBtn" type="button" aria-pressed="false">
+            <svg class="theme-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.6A6.5 6.5 0 0 1 7.4 4.5a6.5 6.5 0 1 0 8.1 8.1z" fill="currentColor"/></svg>
+            <svg class="theme-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6" fill="currentColor"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 2.2v2M10 15.8v2M2.2 10h2M15.8 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14.1 5.9l1.4-1.4"/></g></svg>
+            <span class="theme-label" id="themeLabel">Dark</span>
+          </button>
           <button class="ghost-btn" id="langBtn" type="button">中文</button>
           <button class="ghost-btn" id="tuneBtn" type="button">Tuner</button>
           <button class="ghost-btn" id="helpBtn" type="button">How it works</button>
@@ -1124,7 +1140,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611068500"></script>
+    <script type="module" src="src/app.js?v=202611068600"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

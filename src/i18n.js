@@ -231,6 +231,9 @@ export const S = {
   'pet.toast.for': ['for {name}', '送给{name}'],
   'pet.toast.warm': ['The egg got warmer', '蛋更暖和了'],
   'pet.toast.room': ['for the pet room', '存进宠物小屋'],
+  'theme.toDark': ['Dark', '深色'],
+  'theme.toLight': ['Light', '浅色'],
+  'theme.aria': ['Night mode', '夜间模式'],
   'card.today': ['Played {n} times today', '今天练了 {n} 次'],
   'card.today.one': ['Played once today', '今天练了 1 次'],
 
@@ -941,6 +944,7 @@ export const S = {
 
 export const STATIC = {
   /* chrome */
+  'Dark': '深色',
   'Pet room': '宠物小屋',
   'New': '新',
   'Hatch a pet and look after it. Every scale you play earns notes for snacks and toys.': '孵一只小宠物，好好照顾它。每拉一条音阶都能赚音符，换点心和玩具。',

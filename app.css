@@ -22,6 +22,78 @@
   --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 }
 
+/* Night mode. The same names, darker values: everything drawn from the tokens
+   follows. The music itself stays on light paper (see .staff-card below) — black
+   notes on a cream page read best, at night too. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #191714;
+  --surface: #23201c;
+  --ink: #f2ece2;
+  --ink-soft: #d3cabd;
+  --muted: #a1978a;
+  --line: #36312a;
+  --line-strong: #4b443a;
+  --accent: #4a8a74;
+  --accent-2: #6fa794;
+  --accent-wash: #1e2d27;
+  --gold: #d7aa62;
+  --gold-wash: #2c2518;
+  --rose: #e2907f;
+  --rose-wash: #34221e;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 24px -18px rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 30px 70px -40px rgba(0, 0, 0, 0.8);
+}
+
+:root[data-theme='dark'] body {
+  background-image:
+    radial-gradient(1100px 520px at 12% -12%, #26221d 0%, rgba(38, 34, 29, 0) 62%),
+    radial-gradient(900px 480px at 92% 4%, #201d19 0%, rgba(32, 29, 25, 0) 60%);
+}
+
+/* Light paper for the music, in either mode: the staff cards keep the day
+   palette for everything inside them. */
+:root[data-theme='dark'] .staff-card,
+:root[data-theme='dark'] .score-card {
+  --paper: #f6f1e7;
+  --surface: #fbf7ef;
+  --ink: #221e19;
+  --ink-soft: #4d463e;
+  --muted: #7d756a;
+  --line: #e3d9c9;
+  --line-strong: #d3c6b1;
+  --accent: #2f5d4e;
+  --accent-2: #44796a;
+  --accent-wash: #e6eee8;
+  --gold: #b0843f;
+  --gold-wash: #f6eedc;
+  --rose: #a4534a;
+  --rose-wash: #f6e7e3;
+  color: var(--ink);
+  background: var(--surface);
+  border-color: #3d3730;
+}
+
+.theme-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.theme-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.theme-sun,
+:root[data-theme='dark'] .theme-moon {
+  display: none;
+}
+
+:root[data-theme='dark'] .theme-sun {
+  display: inline;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -4677,4 +4749,110 @@ select,
   .pet-buddy * {
     animation: none !important;
   }
+}
+
+/* ── Night mode: the few colours written out by hand ───────────────────── */
+
+:root[data-theme='dark'] .ghost-btn,
+:root[data-theme='dark'] .notice {
+  background: rgba(35, 32, 28, 0.75);
+}
+
+:root[data-theme='dark'] .segmented,
+:root[data-theme='dark'] .spelling {
+  background: #2c2823;
+}
+
+:root[data-theme='dark'] .segmented button[aria-selected='true'] {
+  background: #423b33;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme='dark'] .menu-tile.is-primary,
+:root[data-theme='dark'] .test-banner,
+:root[data-theme='dark'] .sight-banner {
+  background: linear-gradient(180deg, #24302a 0%, var(--surface) 100%);
+  border-color: #34483e;
+}
+
+:root[data-theme='dark'] .menu-tile:hover {
+  border-color: #5a5146;
+}
+
+:root[data-theme='dark'] .menu-pet {
+  background: linear-gradient(135deg, #2b2520 0%, #30232a 100%);
+  border-color: #4a3640;
+}
+
+:root[data-theme='dark'] .pair,
+:root[data-theme='dark'] .pair-tick {
+  background: var(--surface);
+}
+
+:root[data-theme='dark'] .stat-th {
+  background: #2a2621;
+}
+
+:root[data-theme='dark'] .reel-window::before {
+  background: linear-gradient(to bottom, var(--surface), rgba(35, 32, 28, 0));
+}
+
+:root[data-theme='dark'] .reel-window::after {
+  background: linear-gradient(to top, var(--surface), rgba(35, 32, 28, 0));
+}
+
+:root[data-theme='dark'] .ts-bar,
+:root[data-theme='dark'] .level,
+:root[data-theme='dark'] .metric-bar,
+:root[data-theme='dark'] .goal-track,
+:root[data-theme='dark'] .week-grid .day,
+:root[data-theme='dark'] .tuner {
+  background: #34302a;
+}
+
+:root[data-theme='dark'] .log-warn {
+  background: #2e2619;
+}
+
+:root[data-theme='dark'] .take-del:focus-visible,
+:root[data-theme='dark'] .danger-btn {
+  background: #36231f;
+}
+
+:root[data-theme='dark'] .chip[aria-pressed='true'] {
+  border-color: #3f5c4f;
+}
+
+:root[data-theme='dark'] .key-card.is-practised {
+  border-color: #3f5c4f;
+}
+
+:root[data-theme='dark'] .tray-item.is-fav {
+  background: #2d2718;
+  border-color: #6b5426;
+}
+
+:root[data-theme='dark'] .tray-item.is-out {
+  border-color: #3f5c4f;
+}
+
+:root[data-theme='dark'] .pet-bubble,
+:root[data-theme='dark'] .pet-bubble::after {
+  background: #fffaf2;
+  color: #221e19;
+}
+
+:root[data-theme='dark'] .pet-toast {
+  background: #2a2621;
+  border-color: #4a3f36;
+}
+
+:root[data-theme='dark'] .pet-name-row input {
+  background: var(--surface);
+}
+
+/* The pet room is a lit room at night too — just a little softer. */
+:root[data-theme='dark'] .pet-stage {
+  border-color: #3d3730;
+  filter: brightness(0.92);
 }
