@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611068300" />
+    <link rel="stylesheet" href="app.css?v=202611068400" />
   </head>
   <body>
     <div class="shell">
@@ -110,7 +110,34 @@
                 Your own records: best scores, what is improving, days played.
               </span>
             </button>
+            <button class="menu-tile menu-pet" id="openPetBtn" type="button">
+              <span class="menu-pet-art" id="menuPetArt" aria-hidden="true"></span>
+              <span class="menu-title">Pet room <span class="menu-new">New</span></span>
+              <span class="menu-sub">
+                Hatch a pet and look after it. Every scale you play earns notes for snacks and toys.
+              </span>
+            </button>
           </div>
+        </section>
+
+        <!-- ── Pet room ────────────────────────────────────────────────── -->
+        <section class="view" id="view-pet" hidden>
+          <button class="back-btn" id="petBack" type="button">
+            <span aria-hidden="true">←</span> Menu
+          </button>
+          <div class="pet-top">
+            <div class="intro">
+              <h1 id="petTitle"></h1>
+              <p id="petLead"></p>
+            </div>
+            <div class="pet-notes" id="petNotes"></div>
+          </div>
+          <div class="pet-stage">
+            <svg class="pet-room" id="petRoom" viewBox="0 0 400 300" role="img" aria-labelledby="petTitle"></svg>
+            <div class="pet-bubble" id="petBubble" hidden></div>
+          </div>
+          <div class="pet-panel" id="petPanel"></div>
+          <p class="pet-foot" id="petFoot"></p>
         </section>
 
         <!-- ── Scales ──────────────────────────────────────────────────── -->
@@ -1094,7 +1121,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611068300"></script>
+    <script type="module" src="src/app.js?v=202611068400"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.
@@ -1121,5 +1148,6 @@
         }
       }, 1200);
     </script>
-  </body>
+    <div class="pet-toast" id="petToast" role="status" aria-live="polite" hidden></div>
+</body>
 </html>

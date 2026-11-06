@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>pet room test</title>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // The pet room's promises, checked: notes only from counted takes, a soft
+      // daily cap, a bonus for a new key, three takes to hatch, nothing ever lost
+      // by staying away, and a room for each name.
+      import * as P from '../src/pet.js';
+
+      const problems = [];
+      const log = [];
+      const eq = (label, got, want) => {
+        const ok = JSON.stringify(got) === JSON.stringify(want);
+        if (!ok) problems.push(`${label}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+      };
+
+      // Earning
+      {
+        const p = P.emptyPet();
+        const first = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' });
+        eq('first take of the day: take + new key + first-of-day', first.amount, 3 + 2 + 5);
+        const again = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' });
+        eq('the same key again: just the take', again.amount, 3);
+        const d = P.earn(p, { kind: 'scale', id: 'D', dayKey: '2026-11-06' });
+        eq('a new key today: a little more', d.amount, 5);
+        const sight = P.earn(p, { kind: 'sight', dayKey: '2026-11-06' });
+        eq('the first sight reading of the day earns the new-key bonus', sight.amount, 5);
+        const sight2 = P.earn(p, { kind: 'sight', dayKey: '2026-11-06' });
+        eq('a second sight reading is a plain take', sight2.amount, 3);
+        const tomorrow = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-07' });
+        eq('a new day starts the bonuses again', tomorrow.amount, 10);
+      }
+
+      // The cap: forty takes in a day earn a lot less than forty times three.
+      {
+        const p = P.emptyPet();
+        let total = 0;
+        for (let i = 0; i < 40; i += 1) total += P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' }).amount;
+        log.push(`forty takes of one scale in a day: ${total} notes`);
+        if (total > P.DAILY_CAP + 30) problems.push(`the daily cap let ${total} notes through`);
+        const after = P.earn(p, { kind: 'scale', id: 'D', dayKey: '2026-11-06' }).amount;
+        eq('past the cap a take still earns a little', after, P.EARN.afterCap);
+      }
+
+      // Eggs and hatching
+      {
+        const p = P.emptyPet();
+        eq('an unknown animal is not an egg', P.chooseEgg(p, 'dragon'), false);
+        eq('a cat egg can be chosen', P.chooseEgg(p, 'cat'), true);
+        eq('not ready before practice', P.readyToHatch(p), false);
+        for (let i = 0; i < P.HATCH_TAKES - 1; i += 1) P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' });
+        eq('not ready one take short', P.readyToHatch(p), false);
+        const last = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' });
+        eq('the last take warms the egg', last.warmed, true);
+        eq('ready after three', P.readyToHatch(p), true);
+        eq('it hatches', P.hatch(p), true);
+        eq('into the chosen animal', p.pet.species, 'cat');
+        eq('the egg is gone', p.egg, null);
+        eq('a second egg cannot be chosen', P.chooseEgg(p, 'dog'), false);
+        eq('an empty name is refused', P.name(p, '   '), false);
+        eq('a name is kept', P.name(p, 'Mochi') && p.pet.name, 'Mochi');
+      }
+
+      // Feeding: never possible to owe, never harmful to skip
+      {
+        const p = P.emptyPet();
+        P.chooseEgg(p, 'dog');
+        for (let i = 0; i < 3; i += 1) P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' });
+        const now = Date.UTC(2026, 10, 6, 12);
+        P.hatch(p, now);
+        const notes = p.notes;
+        const snack = P.feed(p, 'treat', now);
+        eq("the dog's favourite is a bone", snack && snack.look, 'bone');
+        eq('a snack costs its price', p.notes, notes - snack.cost);
+        p.notes = 0;
+        eq('no notes, no snack — and no debt', P.feed(p, 'cake', now), null);
+        eq('notes never go below zero', p.notes, 0);
+        const month = now + 30 * 24 * 3600 * 1000;
+        eq('a month away: still there, just peckish', [Boolean(p.pet), P.fullness(p, month), P.wantsSnack(p, month)], [true, 0, true]);
+        P.visit(p, now);
+        const back = P.visit(p, month);
+        eq('coming back after a month is a welcome', back.longAway, true);
+      }
+
+      // Decorations
+      {
+        const p = P.emptyPet();
+        p.notes = 100;
+        eq('buy a rug', P.buy(p, 'rug'), true);
+        eq('it is put out at once', P.isPlaced(p, 'rug'), true);
+        eq('it cannot be bought twice', P.buy(p, 'rug'), false);
+        P.place(p, 'rug');
+        eq('it can be put away', P.isPlaced(p, 'rug'), false);
+        P.buy(p, 'wall-mint');
+        P.buy(p, 'wall-dots');
+        eq('one wallpaper at a time', [P.isPlaced(p, 'wall-mint'), P.isPlaced(p, 'wall-dots')], [false, true]);
+        p.notes = 3;
+        eq('too few notes, no lamp', P.buy(p, 'lamp'), false);
+      }
+
+      // Each name has its own room, and a broken store is a fresh room
+      {
+        const mem = new Map();
+        const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+        const a = P.emptyPet();
+        a.notes = 42;
+        P.savePet('alice', a, storage);
+        eq('alice keeps her notes', P.loadPet('alice', storage).notes, 42);
+        eq('bob starts with none', P.loadPet('bob', storage).notes, 0);
+        mem.set(P.storageKey('carol'), '{nope');
+        eq('a broken store is a fresh room', P.loadPet('carol', storage).notes, 0);
+      }
+
+      document.getElementById('report').textContent = problems.length
+        ? `PET FAILED\n${problems.join('\n')}\n\n${log.join('\n')}`
+        : `PET OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'PET FAILED' : 'PET OK';
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'pet', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

@@ -1,24 +1,25 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068300';
-import { renderStaff } from './staff.js?v=202611068300';
-import { createInk } from './ink.js?v=202611068300';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068400';
+import { renderStaff } from './staff.js?v=202611068400';
+import { createInk } from './ink.js?v=202611068400';
+import { createPetRoom } from './petroom.js?v=202611068400';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611068300';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068300';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068300';
-import { generatePassage } from './sightreading.js?v=202611068300';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068300';
-import { renderScore } from './score.js?v=202611068300';
-import { summariseIntonation } from './intonation.js?v=202611068300';
-import * as Journal from './journal.js?v=202611068300';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068300';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068300';
+} from './pitch.js?v=202611068400';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068400';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068400';
+import { generatePassage } from './sightreading.js?v=202611068400';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068400';
+import { renderScore } from './score.js?v=202611068400';
+import { summariseIntonation } from './intonation.js?v=202611068400';
+import * as Journal from './journal.js?v=202611068400';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068400';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068400';
 import {
   STRINGS,
   FIFTHS,
@@ -27,7 +28,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611068300';
+} from './tuner.js?v=202611068400';
 
 const LANG = initLang();
 
@@ -46,7 +47,12 @@ const el = {
     'test-draw': $('view-test-draw'),
     'test-pick': $('view-test-pick'),
     'test-result': $('view-test-result'),
+    pet: $('view-pet'),
   },
+  openPetBtn: $('openPetBtn'),
+  petBack: $('petBack'),
+  menuPetArt: $('menuPetArt'),
+  petToast: $('petToast'),
   openSightBtn: $('openSightBtn'),
   sightBack: $('sightBack'),
   sightNewBtn: $('sightNewBtn'),
@@ -258,6 +264,9 @@ const el = {
  */
 let micTicket = 0;
 
+/** The pet room's controller, made once the logs are loaded (see below). */
+let petRoom = null;
+
 const RING_CIRCUMFERENCE = 2 * Math.PI * 52;
 const params = new URLSearchParams(location.search);
 // Development helpers (undocumented): ?demo renders a sample result,
@@ -327,6 +336,10 @@ function showView(name) {
   // Leaving the practice screen puts the pen down, so the next scale opens
   // swipeable. The marks themselves stay with their scale.
   if (name !== 'practice') ink.off();
+  // The pet only lives while its room is on screen: no timers running behind
+  // a scale take.
+  if (name !== 'pet' && petRoom) petRoom.stop();
+  if (name === 'choose') paintMenuPet();
   Object.entries(el.views).forEach(([key, node]) => {
     node.hidden = key !== name;
   });
@@ -2114,6 +2127,51 @@ el.sightLevels.addEventListener('click', (event) => {
 const journalStore = Journal.loadStore();
 let activeProfile = Journal.active(journalStore);
 let journal = activeProfile.state;
+
+// The pet room. Each name on the device has its own pet; the room asks whose
+// is on screen each time, so switching names switches pets.
+petRoom = createPetRoom({
+  els: {
+    svg: $('petRoom'),
+    notes: $('petNotes'),
+    panel: $('petPanel'),
+    foot: $('petFoot'),
+    bubble: $('petBubble'),
+    title: $('petTitle'),
+    lead: $('petLead'),
+  },
+  profileId: () => activeProfile.id,
+  onPractise: () => openScales(),
+  demo: params.get('pet') === 'demo',
+});
+
+function openPet() {
+  cancelListening();
+  showView('pet');
+  petRoom.open();
+}
+
+/** The menu tile wears the pet's own face once there is one. */
+function paintMenuPet() {
+  if (el.menuPetArt) el.menuPetArt.innerHTML = petRoom ? petRoom.portrait() : '';
+}
+
+let toastTimer = 0;
+/** "+5 ♪" after a counted take: the pet noticed. */
+function petToast(amount, warmed) {
+  if (!amount || !el.petToast) return;
+  const name = petRoom.name();
+  const line = warmed ? t('pet.toast.warm') : name ? t('pet.toast.for', { name: esc(name) }) : t('pet.toast.room');
+  el.petToast.innerHTML = `${petRoom.portrait()}<span class="pet-toast-n">+${amount} ♪</span><span class="pet-toast-line">${line}</span>`;
+  el.petToast.hidden = false;
+  el.petToast.classList.remove('is-in');
+  void el.petToast.offsetWidth;
+  el.petToast.classList.add('is-in');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.petToast.hidden = true;
+  }, 3200);
+}
 const recorder = { live: null, takes: [], playing: null };
 // Set when the browser refuses to write. The screen says so rather than letting
 // a whole term's log disappear at the next reload without a word.
@@ -2809,6 +2867,11 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
   );
 
   if (counted) Journal.logTake(journal, today, tag);
+  // Real practice earns notes for the pet room; a false start earns nothing.
+  if (counted && (tag === 'scales' || tag === 'sight')) {
+    const earned = petRoom.earnTake({ kind: tag === 'sight' ? 'sight' : 'scale', id: cardId || '', dayKey: today });
+    petToast(earned.amount, earned.warmed);
+  }
   if (cardId && counted) Journal.noteScale(journal, cardId, today, score);
   // Sight reading is filed per level, not per passage: a level VI page is a
   // level VI page whatever it happens to be in.
@@ -4410,6 +4473,10 @@ renderLogBanner();
 renderWho();
 
 if (params.has('help')) el.helpDialog.showModal();
+if (params.has('pet')) openPet();
+el.openPetBtn.addEventListener('click', openPet);
+el.petBack.addEventListener('click', goHome);
+paintMenuPet();
 if (params.has('draw')) drawThree();
 if (params.has('log')) openTrack();
 if (params.has('statsdemo')) {
