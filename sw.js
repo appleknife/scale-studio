@@ -21,7 +21,7 @@
 // — the publish routine does both from one number. Without that, a student keeps
 // whatever was cached the first time, which is the same stale-code trap the
 // stamps exist to avoid.
-const VERSION = '202611068600';
+const VERSION = '202611068700';
 const SHELL = 'scale-studio-shell-' + VERSION;
 const SAMPLES = 'scale-studio-samples-' + VERSION;
 
@@ -65,7 +65,12 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(SHELL)
-      .then((cache) => cache.addAll(BASE))
+      // Fresh from the server, never the browser's HTTP cache: GitHub Pages lets
+      // a file be cached for ten minutes, so a version published soon after the
+      // last one used to be installed with the *previous* version's code inside
+      // it — a new page with nothing behind its new buttons, until the next
+      // update came along.
+      .then((cache) => cache.addAll(BASE.map((path) => new Request(path, { cache: 'reload' }))))
       .catch(() => {
         /* a shell file failed to fetch — leave the old cache alone */
       }),
@@ -102,6 +107,22 @@ self.addEventListener('fetch', (event) => {
     // of the download: cache first, and only fetched when something needs them.
     event.respondWith(
       caches.open(SAMPLES).then((cache) => fresh(cache, request)),
+    );
+    return;
+  }
+
+  // A file stamped for a different version than this cache holds belongs to a
+  // newer page. That happens because the page itself is refreshed in the
+  // background (below) before this worker has handed over: the new page then
+  // asked for its new code and styles, and — matched by name — got this cache's
+  // old ones. A new button with no code behind it. Such a file comes from the
+  // network instead, and only falls back to the old copy when offline.
+  const stamp = url.searchParams.get('v');
+  if (stamp && stamp !== VERSION) {
+    event.respondWith(
+      fetch(request).catch(() =>
+        caches.open(SHELL).then((cache) => cache.match(request, { ignoreSearch: true })),
+      ),
     );
     return;
   }

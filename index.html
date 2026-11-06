@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611068600" />
+    <link rel="stylesheet" href="app.css?v=202611068700" />
   </head>
   <body>
     <div class="shell">
@@ -1140,7 +1140,42 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611068600"></script>
+    <script type="module" src="src/app.js?v=202611068700"></script>
+    <!-- A page newer than its code heals itself. If this page arrived ahead of
+         its own scripts (an update caught halfway, with the old code still
+         answering), the waiting version is taken and the page reloads — once. -->
+    <script>
+      (function () {
+        var V = '202611068700';
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;
+            try {
+              if (sessionStorage.getItem('scaleStudio.healed') === V) return;
+              sessionStorage.setItem('scaleStudio.healed', V);
+            } catch (e) {}
+            navigator.serviceWorker.getRegistration().then(function (reg) {
+              if (!reg) return;
+              var take = function (worker) {
+                navigator.serviceWorker.addEventListener('controllerchange', function () {
+                  location.reload();
+                }, { once: true });
+                worker.postMessage({ type: 'take-over' });
+              };
+              if (reg.waiting) return take(reg.waiting);
+              reg.update().then(function () {
+                var w = reg.installing || reg.waiting;
+                if (!w) return;
+                if (w.state === 'installed') return take(w);
+                w.addEventListener('statechange', function () {
+                  if (w.state === 'installed') take(w);
+                });
+              });
+            });
+          }, 2500);
+        });
+      })();
+    </script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

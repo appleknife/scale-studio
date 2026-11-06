@@ -1,26 +1,30 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068600';
-import { renderStaff } from './staff.js?v=202611068600';
-import { createInk } from './ink.js?v=202611068600';
-import { createPetRoom } from './petroom.js?v=202611068600';
-import { createBuddy } from './buddy.js?v=202611068600';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068700';
+import { renderStaff } from './staff.js?v=202611068700';
+import { createInk } from './ink.js?v=202611068700';
+import { createPetRoom } from './petroom.js?v=202611068700';
+import { createBuddy } from './buddy.js?v=202611068700';
+
+// Which version this code is: the page checks it against its own, and an update
+// caught halfway (new page, old code) heals itself. See the end of index.html.
+window.__scaleStudioVersion = '202611068700';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611068600';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068600';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068600';
-import { generatePassage } from './sightreading.js?v=202611068600';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068600';
-import { renderScore } from './score.js?v=202611068600';
-import { summariseIntonation } from './intonation.js?v=202611068600';
-import * as Journal from './journal.js?v=202611068600';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068600';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068600';
+} from './pitch.js?v=202611068700';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068700';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068700';
+import { generatePassage } from './sightreading.js?v=202611068700';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068700';
+import { renderScore } from './score.js?v=202611068700';
+import { summariseIntonation } from './intonation.js?v=202611068700';
+import * as Journal from './journal.js?v=202611068700';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068700';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068700';
 import {
   STRINGS,
   FIFTHS,
@@ -29,7 +33,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611068600';
+} from './tuner.js?v=202611068700';
 
 const LANG = initLang();
 
