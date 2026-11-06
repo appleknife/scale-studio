@@ -1888,7 +1888,8 @@ h3 {
 
 .result-head {
   display: grid;
-  grid-template-columns: auto 1fr;
+  /* The third column is the pet, when there is one; hidden, it takes none. */
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 30px;
   margin: 6px 0 26px;
@@ -4532,5 +4533,148 @@ select,
 @media (max-width: 460px) {
   .pet-tray {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── The listening buddy ──────────────────────────────────────────────── */
+
+.listen-card {
+  position: relative;
+}
+
+.pet-buddy {
+  width: 76px;
+  height: 74px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pet-buddy[hidden] {
+  display: none;
+}
+
+#listenBuddy {
+  position: absolute;
+  top: -38px;
+  right: 16px;
+  z-index: 2;
+}
+
+.pet-buddy.is-inline {
+  width: 58px;
+  height: 56px;
+  margin: -10px 0;
+}
+
+.pet-buddy.is-result {
+  flex: none;
+  align-self: flex-end;
+  margin-left: auto;
+  width: 96px;
+  height: 92px;
+}
+
+.buddy-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.buddy-body {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transition: transform 0.25s ease;
+}
+
+/* Listening: leaning in, head on one side, swaying with the music. */
+.pet-buddy.is-listening .buddy-body {
+  animation: buddy-sway 1.6s ease-in-out infinite;
+}
+
+.pet-buddy.is-listening .pet-head {
+  transform: rotate(-8deg);
+  transition: transform 0.3s ease;
+}
+
+.pet-buddy.is-listening .pet-tail {
+  animation-duration: 0.9s;
+}
+
+@keyframes buddy-sway {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}
+
+.pet-buddy.is-bop .buddy-svg {
+  transform: translateY(-3px) scale(1.04, 0.97);
+  transition: transform 0.08s ease-out;
+}
+
+.buddy-svg {
+  transition: transform 0.16s ease-in;
+}
+
+.pet-buddy.is-hop .buddy-svg {
+  animation: pet-hop 0.6s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+.pet-buddy.is-curious .buddy-body {
+  transform: rotate(10deg);
+}
+
+.pet-buddy.is-egg.is-listening .buddy-body {
+  animation: egg-shake 0.9s ease-in-out infinite;
+}
+
+.buddy-note,
+.buddy-heart {
+  animation: buddy-float 1.5s ease-out forwards;
+}
+
+@keyframes buddy-float {
+  0% {
+    transform: translateY(0) scale(0.5);
+    opacity: 0;
+  }
+  20% {
+    transform: translateY(-6px) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-34px) translateX(6px) scale(0.9);
+    opacity: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  #listenBuddy {
+    top: -30px;
+    right: 8px;
+    width: 62px;
+    height: 60px;
+  }
+
+  .result-head {
+    position: relative;
+  }
+
+  .pet-buddy.is-result {
+    position: absolute;
+    top: 18px;
+    right: 0;
+    width: 72px;
+    height: 70px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-buddy * {
+    animation: none !important;
   }
 }

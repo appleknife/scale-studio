@@ -20,7 +20,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611068400" />
+    <link rel="stylesheet" href="app.css?v=202611068500" />
   </head>
   <body>
     <div class="shell">
@@ -464,6 +464,7 @@
             <!-- Assistance is the default: a count-in, the clicks and the line. This
                  switch turns it *off*, for a run that feels like the audition —
                  nothing to follow but the page. -->
+            <div class="pet-buddy is-inline" id="sightBuddy" hidden aria-hidden="true"></div>
             <label class="assist-toggle">
               <input type="checkbox" id="sightAssist" />
               <span>Test — no clicks, no line, just the page</span>
@@ -862,6 +863,7 @@
           </div>
 
           <div class="listen-card" id="listenCard">
+            <div class="pet-buddy" id="listenBuddy" hidden aria-hidden="true"></div>
             <div class="listen-top">
               <div class="listen-left">
                 <div class="status" id="listenStatus">
@@ -966,6 +968,7 @@
               <p class="result-line" id="resultLine"></p>
               <p class="result-sub" id="resultSub"></p>
             </div>
+            <div class="pet-buddy is-result" id="resultBuddy" hidden aria-hidden="true"></div>
           </div>
 
           <div class="breakdown" id="breakdown"></div>
@@ -1121,7 +1124,7 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611068400"></script>
+    <script type="module" src="src/app.js?v=202611068500"></script>
     <script>
       // If the app never boots — usually because the file was opened directly —
       // say so instead of leaving an empty page on screen.

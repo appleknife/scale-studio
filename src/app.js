@@ -1,25 +1,26 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068400';
-import { renderStaff } from './staff.js?v=202611068400';
-import { createInk } from './ink.js?v=202611068400';
-import { createPetRoom } from './petroom.js?v=202611068400';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068500';
+import { renderStaff } from './staff.js?v=202611068500';
+import { createInk } from './ink.js?v=202611068500';
+import { createPetRoom } from './petroom.js?v=202611068500';
+import { createBuddy } from './buddy.js?v=202611068500';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611068400';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068400';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068400';
-import { generatePassage } from './sightreading.js?v=202611068400';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068400';
-import { renderScore } from './score.js?v=202611068400';
-import { summariseIntonation } from './intonation.js?v=202611068400';
-import * as Journal from './journal.js?v=202611068400';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068400';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068400';
+} from './pitch.js?v=202611068500';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068500';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068500';
+import { generatePassage } from './sightreading.js?v=202611068500';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068500';
+import { renderScore } from './score.js?v=202611068500';
+import { summariseIntonation } from './intonation.js?v=202611068500';
+import * as Journal from './journal.js?v=202611068500';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068500';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068500';
 import {
   STRINGS,
   FIFTHS,
@@ -28,7 +29,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611068400';
+} from './tuner.js?v=202611068500';
 
 const LANG = initLang();
 
@@ -266,6 +267,10 @@ let micTicket = 0;
 
 /** The pet room's controller, made once the logs are loaded (see below). */
 let petRoom = null;
+/** The small pets that listen beside the music (see createBuddy, below). */
+let listenBuddy = null;
+let sightBuddy = null;
+let resultBuddy = null;
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 52;
 const params = new URLSearchParams(location.search);
@@ -1392,6 +1397,7 @@ function newPassage(level = sight.level, seed = null) {
   el.sightResult.hidden = true;
   el.sightStatus.textContent = '';
   renderSight();
+  sightBuddy?.refresh();
 }
 
 function openSight(level = sight.level, seed = null) {
@@ -1637,6 +1643,7 @@ function runAssistPlayhead(take, passage) {
  */
 function armSightTake(options = {}) {
   sight.phase = 'armed';
+  sightBuddy?.listen(true);
   sight.take = {
     frames: [],
     started: false,
@@ -1758,7 +1765,10 @@ function ingestSightFrame(frame) {
   const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
   if (voiced) {
     take.lastVoiced = elapsed;
-    if (!take.voiced) take.onsets += 1;
+    if (!take.voiced) {
+      take.onsets += 1;
+      sightBuddy?.note();
+    }
     if (take.live) updateSightLive(take, frame.freq);
   }
   take.voiced = voiced;
@@ -1790,6 +1800,7 @@ function ingestSightFrame(frame) {
 function stopSightTake(analyse = true) {
   if (sight.phase === 'idle' && !sight.take) return;
   const take = sight.take;
+  sightBuddy?.listen(false);
   sight.phase = 'idle';
   sight.take = null;
   el.sightStop.hidden = true;
@@ -1824,6 +1835,8 @@ function stopSightTake(analyse = true) {
       // the wheels on is not the same claim as one without.
       assisted: Boolean(take.assisted),
     });
+    if (lastTakeCounted) sightBuddy?.cheer();
+    else sightBuddy?.curious();
   } else {
     el.sightStatus.textContent = '';
   }
@@ -2128,6 +2141,25 @@ const journalStore = Journal.loadStore();
 let activeProfile = Journal.active(journalStore);
 let journal = activeProfile.state;
 
+/**
+ * The pet is kept under the name's id, and on a new device that id is made
+ * fresh on every load until the log is first saved — which used to be the
+ * first take. An egg chosen before then was lost on a reload. So the first
+ * time the pet room keeps anything, the log is saved too.
+ */
+let profileSaved = false;
+function petProfileId() {
+  if (!profileSaved) {
+    profileSaved = true;
+    try {
+      if (!localStorage.getItem('scale-studio.journal.v2')) Journal.saveStore(journalStore);
+    } catch {
+      /* storage blocked: the pet lives for this visit, like the log */
+    }
+  }
+  return activeProfile.id;
+}
+
 // The pet room. Each name on the device has its own pet; the room asks whose
 // is on screen each time, so switching names switches pets.
 petRoom = createPetRoom({
@@ -2140,10 +2172,23 @@ petRoom = createPetRoom({
     title: $('petTitle'),
     lead: $('petLead'),
   },
-  profileId: () => activeProfile.id,
+  profileId: () => petProfileId(),
   onPractise: () => openScales(),
   demo: params.get('pet') === 'demo',
 });
+
+// The pet, small, beside the music: it listens while you play. One on the
+// scale card, one by the sight-reading controls, one on the result page.
+listenBuddy = createBuddy($('listenBuddy'), { profileId: () => activeProfile.id });
+sightBuddy = createBuddy($('sightBuddy'), { profileId: () => activeProfile.id });
+resultBuddy = createBuddy($('resultBuddy'), { profileId: () => activeProfile.id });
+
+
+listenBuddy.refresh();
+sightBuddy.refresh();
+
+/** Whether the last take filed was a real one (and not a false start). */
+let lastTakeCounted = false;
 
 function openPet() {
   cancelListening();
@@ -2856,7 +2901,7 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
   // that it happened, but it is not allowed to tick the day, move a best score,
   // or reach the averages. The child's own numbers should only ever reflect
   // playing.
-  const counted = !(
+  const counted = (lastTakeCounted = !(
     details &&
     Journal.looksLikeTrial({
       heard: details.heard,
@@ -2864,7 +2909,7 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
       seconds: details.seconds,
       score,
     })
-  );
+  ));
 
   if (counted) Journal.logTake(journal, today, tag);
   // Real practice earns notes for the pet room; a false start earns nothing.
@@ -3249,6 +3294,7 @@ function openScales() {
 
 function renderPractice() {
   const scale = state.scale;
+  listenBuddy?.refresh();
   el.scaleTitle.textContent = scale.title;
   el.scaleMeta.textContent = scale.meta;
   el.staffHost.innerHTML = renderStaff(scale.sequence, {
@@ -3759,6 +3805,7 @@ async function startListening() {
 /** Arm the app for one take. The take starts on the student's first note. */
 function beginTake() {
   state.phase = 'armed';
+  listenBuddy?.listen(true);
   devLog('beginTake', { index: state.test ? state.test.index : -1 });
   state.take = {
     frames: [],
@@ -3862,6 +3909,7 @@ function onFrame(frame) {
     if (take.lastMidi == null || Math.abs(midiFloat - take.lastMidi) > 0.7) {
       take.noteCount += 1;
       take.lastMidi = midiFloat;
+      listenBuddy?.note();
     }
   }
 
@@ -3974,6 +4022,10 @@ function finishTake() {
     }
 
     if (state.test.index < state.test.scales.length - 1) {
+      // Between audition scales the score stays hidden, but the pet can still
+      // be pleased you played one.
+      if (lastTakeCounted) listenBuddy?.cheer();
+      else listenBuddy?.curious();
       state.phase = 'between';
       state.take = null;
       setStatus(false, t('status.scaleDone', { n: state.test.index + 1 }));
@@ -3991,7 +4043,11 @@ function finishTake() {
   closeMic();
   el.startBtn.hidden = false;
   setStatus(false, t('status.finished'));
+  listenBuddy?.listen(false);
   renderResult(result);
+  resultBuddy?.refresh();
+  // A beat after the page arrives, so the hop is seen.
+  setTimeout(() => (lastTakeCounted ? resultBuddy?.cheer() : resultBuddy?.curious()), 450);
 
   if (DEV) {
     // Lets the headless test harness read what the app actually computed.
@@ -4385,6 +4441,7 @@ paintOffline();
 
 function cancelListening() {
   micTicket += 1;
+  listenBuddy?.listen(false);
   if (state.mic) {
     state.mic.close();
     state.mic = null;
