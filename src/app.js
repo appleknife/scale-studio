@@ -1,30 +1,30 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068700';
-import { renderStaff } from './staff.js?v=202611068700';
-import { createInk } from './ink.js?v=202611068700';
-import { createPetRoom } from './petroom.js?v=202611068700';
-import { createBuddy } from './buddy.js?v=202611068700';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068800';
+import { renderStaff } from './staff.js?v=202611068800';
+import { createInk } from './ink.js?v=202611068800';
+import { createPetRoom } from './petroom.js?v=202611068800';
+import { createBuddy } from './buddy.js?v=202611068800';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611068700';
+window.__scaleStudioVersion = '202611068800';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611068700';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068700';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068700';
-import { generatePassage } from './sightreading.js?v=202611068700';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068700';
-import { renderScore } from './score.js?v=202611068700';
-import { summariseIntonation } from './intonation.js?v=202611068700';
-import * as Journal from './journal.js?v=202611068700';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068700';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068700';
+} from './pitch.js?v=202611068800';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068800';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068800';
+import { generatePassage } from './sightreading.js?v=202611068800';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068800';
+import { renderScore } from './score.js?v=202611068800';
+import { summariseIntonation } from './intonation.js?v=202611068800';
+import * as Journal from './journal.js?v=202611068800';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068800';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068800';
 import {
   STRINGS,
   FIFTHS,
@@ -33,7 +33,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611068700';
+} from './tuner.js?v=202611068800';
 
 const LANG = initLang();
 
@@ -119,6 +119,15 @@ const el = {
   recBtn: $('recBtn'),
   recStatus: $('recStatus'),
   logWarn: $('logWarn'),
+  whoDialog: $('whoDialog'),
+  whoTitle: $('whoTitle'),
+  whoSearch: $('whoSearch'),
+  whoList: $('whoList'),
+  whoAdd: $('whoAdd'),
+  whoAddInput: $('whoAddInput'),
+  whoAddBtn: $('whoAddBtn'),
+  whoNote: $('whoNote'),
+  whoClose: $('whoClose'),
   logStatus: $('logStatus'),
   whoChips: $('whoChips'),
   homeWho: $('homeWho'),
@@ -2256,8 +2265,105 @@ function keyName(id) {
 function saveJournal() {
   storageBlocked = !Journal.saveStore(journalStore);
   if (el.logWarn) el.logWarn.hidden = !storageBlocked;
+  if (Journal.lastTrim()) spaceTrimmed = true;
   renderLogBanner();
 }
+
+/** Whether a save this visit had to trim old take records to fit. */
+let spaceTrimmed = false;
+
+// ── Everyone on the device ─────────────────────────────────────────────────
+
+/** "Practised today", "Last practised 3 Nov", or "Not yet". */
+function lastPractisedLine(profile) {
+  const key = Journal.lastPractised(profile);
+  if (!key) return t('who.never');
+  if (key === todayKey()) return t('who.today');
+  const [y, m, d] = key.split('-').map(Number);
+  const date = new Date(y, m - 1, d).toLocaleDateString(getLang() === 'zh' ? 'zh-CN' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+  return t('who.last', { date });
+}
+
+function paintWhoList() {
+  const query = el.whoSearch.value.trim().toLowerCase();
+  const locale = getLang() === 'zh' ? 'zh-CN' : 'en-US';
+  const people = journalStore.profiles
+    .filter((p) => !query || displayName(p).toLowerCase().includes(query))
+    .sort((a, b) => displayName(a).localeCompare(displayName(b), locale, { sensitivity: 'base' }));
+  el.whoList.innerHTML = people.length
+    ? people
+        .map(
+          (p) => `<li><button class="who-item" type="button" data-who="${esc(p.id)}" ${
+            p.id === activeProfile.id ? 'aria-current="true"' : ''
+          }>
+            <span class="who-name">${esc(displayName(p))}</span>
+            <span class="who-meta">${esc(lastPractisedLine(p))}</span>
+            ${p.id === activeProfile.id ? '<span class="who-tick" aria-hidden="true">✓</span>' : ''}
+          </button></li>`,
+        )
+        .join('')
+    : `<li class="who-empty">${t('who.none')}</li>`;
+  const count = journalStore.profiles.length;
+  const full = count >= Journal.MAX_PROFILES;
+  el.whoAdd.hidden = full;
+  el.whoNote.textContent = [
+    full ? t('who.full', { max: Journal.MAX_PROFILES }) : count > 10 ? t('who.count', { n: count, max: Journal.MAX_PROFILES }) : '',
+    spaceTrimmed ? t('who.room') : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function openWhoDialog() {
+  el.whoTitle.textContent = t('who.title');
+  el.whoSearch.placeholder = t('who.search');
+  el.whoAddInput.placeholder = t('who.newName');
+  el.whoAddBtn.textContent = t('log.add');
+  el.whoClose.textContent = t('who.done');
+  el.whoSearch.value = '';
+  // A search box for a long list; a short one is read at a glance.
+  el.whoSearch.hidden = journalStore.profiles.length <= 8;
+  paintWhoList();
+  if (!el.whoDialog.open) el.whoDialog.showModal();
+  if (!el.whoSearch.hidden && !matchMedia('(pointer: coarse)').matches) el.whoSearch.focus();
+}
+
+el.whoSearch.addEventListener('input', paintWhoList);
+el.whoClose.addEventListener('click', () => el.whoDialog.close());
+el.whoList.addEventListener('click', (event) => {
+  const b = event.target.closest('[data-who]');
+  if (!b) return;
+  switchProfile(b.dataset.who);
+  el.whoDialog.close();
+});
+el.whoAdd.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const value = el.whoAddInput.value.trim();
+  if (!value) {
+    el.whoAddInput.focus();
+    return;
+  }
+  const before = journalStore.profiles.length;
+  const profile = Journal.addProfile(journalStore, value);
+  if (!profile) {
+    el.whoNote.textContent = journalStore.profiles.length >= Journal.MAX_PROFILES ? t('who.full', { max: Journal.MAX_PROFILES }) : t('log.nameTaken');
+    return;
+  }
+  // A name already on the list is simply switched to.
+  journalStore.current = profile.id;
+  Journal.touchProfile(journalStore, profile.id);
+  activeProfile = profile;
+  journal = profile.state;
+  saveJournal();
+  el.whoAddInput.value = '';
+  renderWho();
+  if (!el.views.track.hidden) renderLog();
+  el.whoDialog.close();
+  void before;
+});
 
 /** The one-line summary on the home card. */
 function renderLogBanner() {
@@ -2394,6 +2500,35 @@ function renderRecList() {
 }
 
 /** The names row and the manage list — one source, so they cannot disagree. */
+/** Up to this many names, the row shows them all; past it, the row is short. */
+const WHO_ROW_MAX = 6;
+
+/**
+ * The chips for a names row. A family fits on one row, so it shows everyone. A
+ * studio does not: the row then shows whoever is on, the few used most recently,
+ * and "Everyone (n)", which opens the full, searchable list.
+ */
+function whoChipsMarkup(full) {
+  const all = journalStore.profiles;
+  const chip = (profile) =>
+    `<button class="chip" type="button" data-who="${esc(profile.id)}" ` +
+    `aria-pressed="${profile.id === activeProfile.id}">${esc(displayName(profile))}</button>`;
+  if (all.length <= WHO_ROW_MAX) {
+    return (
+      all.map(chip).join('') +
+      (full ? '' : `<button class="chip add-chip" type="button" data-who-add="1">${t('log.addName')}</button>`)
+    );
+  }
+  const recent = all
+    .filter((p) => p.id !== activeProfile.id)
+    .sort((a, b) => (b.used || 0) - (a.used || 0))
+    .slice(0, WHO_ROW_MAX - 2);
+  return (
+    [activeProfile, ...recent].map(chip).join('') +
+    `<button class="chip add-chip" type="button" data-who-all="1">${t('who.all', { n: all.length })}</button>`
+  );
+}
+
 function renderWho() {
   const full = journalStore.profiles.length >= Journal.MAX_PROFILES;
   const multiple = journalStore.profiles.length > 1;
@@ -2403,30 +2538,14 @@ function renderWho() {
   // second name existed made the feature undiscoverable — which is exactly what
   // the teacher reported.
   el.homeWho.hidden = false;
-  el.homeWhoChips.innerHTML =
-    journalStore.profiles
-      .map(
-        (profile) =>
-          `<button class="chip" type="button" data-who="${esc(profile.id)}" ` +
-          `aria-pressed="${profile.id === activeProfile.id}">${esc(displayName(profile))}</button>`,
-      )
-      .join('') +
-    (full
-      ? ''
-      : `<button class="chip add-chip" type="button" data-who-add="1">${t('log.addName')}</button>`);
+  el.homeWhoChips.innerHTML = whoChipsMarkup(full);
   el.homeWho.classList.toggle('is-single', !multiple);
+  // Each name has its own pet: the menu tile and the little listeners follow.
+  paintMenuPet();
+  listenBuddy?.refresh();
+  sightBuddy?.refresh();
 
-  el.whoChips.innerHTML =
-    journalStore.profiles
-      .map(
-        (profile) =>
-          `<button class="chip" type="button" data-who="${esc(profile.id)}" ` +
-          `aria-pressed="${profile.id === activeProfile.id}">${esc(displayName(profile))}</button>`,
-      )
-      .join('') +
-    (full
-      ? ''
-      : `<button class="chip add-chip" type="button" data-who-add="1">${t('log.addName')}</button>`);
+  el.whoChips.innerHTML = whoChipsMarkup(full);
 
   const alone = journalStore.profiles.length < 2;
   el.nameList.innerHTML = journalStore.profiles
@@ -2975,6 +3094,7 @@ function switchProfile(id) {
   if (!next || next.id === activeProfile.id) return;
   Journal.saveStore(journalStore);
   journalStore.current = next.id;
+  Journal.touchProfile(journalStore, next.id);
   activeProfile = next;
   journal = next.state;
   closeNameForm();
@@ -2989,6 +3109,10 @@ function switchProfile(id) {
 // name from here has to take the parent to the form, which lives in the log — so
 // it opens the log first rather than leaving a form on a screen that has none.
 el.homeWho.addEventListener('click', (event) => {
+  if (event.target.closest('[data-who-all]')) {
+    openWhoDialog();
+    return;
+  }
   if (event.target.closest('[data-who-add]')) {
     openTrack();
     openNameForm({ kind: 'add' });
@@ -2999,6 +3123,10 @@ el.homeWho.addEventListener('click', (event) => {
 });
 
 el.whoChips.addEventListener('click', (event) => {
+  if (event.target.closest('[data-who-all]')) {
+    openWhoDialog();
+    return;
+  }
   if (event.target.closest('[data-who-add]')) {
     openNameForm({ kind: 'add' });
     return;

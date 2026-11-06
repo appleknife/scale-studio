@@ -576,6 +576,54 @@
         eq('clear: no scales', Object.keys(s.scales).length, 0);
         eq('clear: no goal', s.goal, null);
       }
+      // A studio on one device: sixty names fit, the sixty-first does not.
+      {
+        const store = { v: 2, current: null, profiles: [] };
+        let added = 0;
+        for (let i = 0; i < 61; i += 1) if (J.addProfile(store, `Student ${i}`)) added += 1;
+        eq('a device holds sixty names', added, J.MAX_PROFILES);
+        eq('…and says no to the sixty-first', J.addProfile(store, 'One more'), null);
+        eq('a name already there is switched to, even when full', Boolean(J.addProfile(store, 'student 3')), true);
+      }
+
+      // Storage running out: the oldest take records go, across everyone, and
+      // every name keeps at least its floor. Days and bests are untouched.
+      {
+        const store = { v: 2, current: null, profiles: [] };
+        for (let n = 0; n < 4; n += 1) {
+          const p = J.addProfile(store, `Kid ${n}`);
+          for (let i = 0; i < 300; i += 1) {
+            const day = `2026-0${1 + Math.floor(i / 40)}-${String(1 + (i % 28)).padStart(2, '0')}`;
+            J.recordTake(p.state, { kind: 'scale', id: 'G', key: day, at: `${day}T1${n}:00:00Z`, score: 80, parts: { accuracy: 0.912345678 } });
+            J.noteScale(p.state, 'G', day, 80 + (i % 10));
+          }
+        }
+        const daysBefore = store.profiles.map((p) => Object.keys(p.state.days).length);
+        const bestBefore = store.profiles.map((p) => p.state.scales.G.best);
+        let room = 0;
+        const size = JSON.stringify(store).length;
+        const tiny = {
+          setItem(k, v) {
+            if (v.length > size * 0.55) throw new Error('QuotaExceededError');
+            room = v.length;
+          },
+          getItem() {
+            return null;
+          },
+        };
+        eq('a full device still saves', J.saveStore(store, tiny), true);
+        log.push(`storage squeeze: ${size} → ${room} characters, ${J.lastTrim()} take records trimmed`);
+        eq('it trimmed something', J.lastTrim() > 0, true);
+        eq('every name keeps its floor', store.profiles.every((p) => p.state.takes.length >= J.TAKES_FLOOR), true);
+        eq('days practised are untouched', store.profiles.map((p) => Object.keys(p.state.days).length), daysBefore);
+        eq('best scores are untouched', store.profiles.map((p) => p.state.scales.G.best), bestBefore);
+        const oldest = store.profiles.map((p) => p.state.takes[0].key);
+        eq('the newest takes are the ones kept', oldest.every((k) => k > '2026-01-28'), true);
+        eq('take parts are kept to three decimals', store.profiles[0].state.takes[0].parts.accuracy, 0.912);
+        const never = { setItem() { throw new Error('QuotaExceededError'); }, getItem() { return null; } };
+        eq('when even the floor will not fit, the save says so', J.saveStore(store, never), false);
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `LOG FAILED\n${problems.join('\n')}`
         : 'LOG OK';

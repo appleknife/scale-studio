@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611068700" />
+    <link rel="stylesheet" href="app.css?v=202611068800" />
   </head>
   <body>
     <div class="shell">
@@ -1079,6 +1079,19 @@
       <button class="link-btn" id="updateLater" type="button" data-i18n="update.later">Later</button>
     </div>
 
+    <!-- Everyone on this device: a studio's worth of names, searchable. -->
+    <dialog class="who-dialog" id="whoDialog" aria-labelledby="whoTitle">
+      <h2 id="whoTitle"></h2>
+      <input class="who-search" id="whoSearch" type="search" autocomplete="off" spellcheck="false" />
+      <ul class="who-list" id="whoList"></ul>
+      <form class="who-add" id="whoAdd">
+        <input id="whoAddInput" type="text" maxlength="24" autocomplete="off" spellcheck="false" />
+        <button class="primary-btn" id="whoAddBtn" type="submit"></button>
+      </form>
+      <p class="who-note" id="whoNote"></p>
+      <div class="who-foot"><button class="quiet-btn" id="whoClose" type="button"></button></div>
+    </dialog>
+
     <dialog id="helpDialog" aria-labelledby="helpTitle">
       <h2 id="helpTitle">How the score works</h2>
       <p data-i18n="help.intro">
@@ -1140,13 +1153,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611068700"></script>
+    <script type="module" src="src/app.js?v=202611068800"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611068700';
+        var V = '202611068800';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;

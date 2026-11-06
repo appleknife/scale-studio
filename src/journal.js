@@ -26,8 +26,15 @@ export const RESTS_PER_WEEK = 2;
 const KEY = 'scale-studio.journal.v1';
 const STORE_KEY = 'scale-studio.journal.v2';
 
-/** How many names one device holds. A family is three; eight is generous. */
-export const MAX_PROFILES = 8;
+/**
+ * How many names one device holds. A family is three — but a teacher's iPad
+ * carries a studio, so the cap is a studio's worth. Storage, not the count, is
+ * the real limit, and saveStore makes room when it runs short (see below).
+ */
+export const MAX_PROFILES = 60;
+
+/** Takes always kept per name, however tight storage gets. */
+export const TAKES_FLOOR = 60;
 
 export function emptyState() {
   return { v: 1, days: {}, rests: [], plan: '', scales: {}, goal: null, takes: [] };
@@ -79,7 +86,11 @@ export function recordTake(state, take) {
     id: take.id || '',
     level: take.level || '',
     score: Math.round(take.score || 0),
-    parts: take.parts || null,
+    // Three decimals is plenty for a bar on a chart, and a take with all its
+    // digits is a third longer — which matters once a studio shares one device.
+    parts: take.parts
+      ? Object.fromEntries(Object.entries(take.parts).map(([k, v]) => [k, Math.round(v * 1000) / 1000]))
+      : null,
     bpm: take.bpm || 0,
     heard: take.heard || 0,
     expected: take.expected || 0,
@@ -689,6 +700,7 @@ export function makeProfile(name = '', state = emptyState()) {
   return {
     id: `p${Date.now().toString(36)}${seq}`,
     name: String(name || '').trim().slice(0, 24),
+    used: Date.now(),
     state,
   };
 }
@@ -778,6 +790,7 @@ export function loadStore(storage = globalThis.localStorage) {
           profiles: parsed.profiles.map((p) => ({
             id: p.id || makeProfile().id,
             name: String(p.name || '').slice(0, 24),
+            used: Number(p.used) || 0,
             state: { ...emptyState(), ...(p.state || {}) },
           })),
         };
@@ -795,13 +808,65 @@ export function loadStore(storage = globalThis.localStorage) {
   return store;
 }
 
+/** How many take records the last save had to trim to fit (0 if none). */
+let trimmedOnSave = 0;
+export function lastTrim() {
+  return trimmedOnSave;
+}
+
+/**
+ * Saves every name's log. If the device's storage is full — a studio of
+ * students, months of takes — the oldest take records are trimmed, across
+ * everyone, until it fits. Days practised, best scores and each scale's recent
+ * history live elsewhere in the log and are never touched, and every name keeps
+ * at least TAKES_FLOOR takes. Only if even that will not fit does the save fail.
+ */
 export function saveStore(store, storage = globalThis.localStorage) {
-  try {
-    storage.setItem(STORE_KEY, JSON.stringify(store));
-    return true;
-  } catch {
-    return false;
+  trimmedOnSave = 0;
+  for (let round = 0; round < 12; round += 1) {
+    try {
+      storage.setItem(STORE_KEY, JSON.stringify(store));
+      return true;
+    } catch {
+      const removed = makeRoom(store);
+      if (!removed) return false;
+      trimmedOnSave += removed;
+    }
   }
+  return false;
+}
+
+/**
+ * Trims about a sixth of the take records that can be trimmed, oldest first,
+ * whoever they belong to. Returns how many went.
+ */
+export function makeRoom(store) {
+  const spare = [];
+  for (const profile of store.profiles) {
+    const takes = (profile.state && profile.state.takes) || [];
+    for (let i = 0; i < takes.length - TAKES_FLOOR; i += 1) spare.push({ profile, take: takes[i] });
+  }
+  if (!spare.length) return 0;
+  spare.sort((a, b) => String(a.take.at || '').localeCompare(String(b.take.at || '')));
+  const cut = spare.slice(0, Math.max(1, Math.ceil(spare.length / 6)));
+  const gone = new Set(cut.map((c) => c.take));
+  for (const profile of store.profiles) {
+    if (profile.state && profile.state.takes) profile.state.takes = profile.state.takes.filter((t) => !gone.has(t));
+  }
+  return cut.length;
+}
+
+/** Marks a name as just used, so the short row on the home screen shows it. */
+export function touchProfile(store, id, now = Date.now()) {
+  const profile = store.profiles.find((p) => p.id === id);
+  if (profile) profile.used = now;
+  return Boolean(profile);
+}
+
+/** The last day this name practised, as a day key, or '' for never. */
+export function lastPractised(profile) {
+  const days = Object.keys((profile && profile.state && profile.state.days) || {});
+  return days.length ? days.sort().pop() : '';
 }
 
 /* ── Copies ────────────────────────────────────────────────────────────── */
