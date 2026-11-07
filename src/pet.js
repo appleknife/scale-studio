@@ -15,11 +15,35 @@
 //
 // Each student name on the device has its own pet, kept in its own slot in
 // localStorage. Nothing leaves the device.
+//
+// Growing up and collecting (v2). The shape follows what the research on
+// rewards and children says:
+//   - a pet grows from *practising* — counted takes — never from scores, so the
+//     pet is never a payment for playing well (performance-contingent rewards
+//     are the ones that wear down a child's own wish to play);
+//   - baby → kid → grown, GROW_TAKES takes a stage, and nothing goes backwards;
+//   - a grown pet means a new egg may be chosen, and that egg arrives already a
+//     little warm (people finish a card that starts with a stamp in it faster);
+//   - the pet book records every animal hatched, and now and then a hatchling
+//     is a rare colour. It is never promised or announced beforehand: an
+//     unexpected reward is a surprise, not a wage;
+//   - every pet is kept. Grown friends wait in the pet book and any of them
+//     can come back into the room.
 
 export const SPECIES = ['dog', 'cat', 'hamster', 'chicken', 'fish'];
 
 /** Counted takes it takes to hatch an egg: the first session ends with a pet. */
 export const HATCH_TAKES = 3;
+
+/** Counted takes from one stage to the next: baby → kid → grown, about a week. */
+export const GROW_TAKES = 15;
+export const STAGES = ['baby', 'kid', 'grown'];
+
+/** How often a hatchling turns out to be a rare colour. */
+export const RARE_CHANCE = 1 / 8;
+
+/** The warmth a second (third, …) egg starts with: it is never a cold start. */
+export const NEXT_EGG_WARMTH = 1;
 
 /** Notes a day before takes start earning only a little. */
 export const DAILY_CAP = 60;
@@ -70,7 +94,7 @@ const HUNGER_PER_DAY = 35;
 
 export function emptyPet() {
   return {
-    v: 1,
+    v: 2,
     notes: 0,
     egg: null, // { species, warmth }
     pet: null, // { species, name, born, fullness, fedAt, snacks }
@@ -80,7 +104,31 @@ export function emptyPet() {
     day: { key: '', earned: 0, keys: [], sight: false, any: false },
     lastSeen: 0,
     totalEarned: 0,
+    friends: [], // grown (or set-aside) pets, waiting in the pet book
+    dex: {}, // { [species]: { plain: n, rare: n } } — every hatch, ever
   };
+}
+
+/**
+ * Brings an older save up to date. A pet hatched before pets grew starts as a
+ * kid rather than shrinking back to a baby, and goes into the pet book.
+ */
+function upgrade(p) {
+  if (!Array.isArray(p.friends)) p.friends = [];
+  if (!p.dex || typeof p.dex !== 'object') p.dex = {};
+  if (p.pet) {
+    if (!Number.isFinite(p.pet.growth)) p.pet.growth = GROW_TAKES;
+    if (!p.pet.variant) p.pet.variant = 'plain';
+    if (!p.pet.seen) p.pet.seen = stageOf(p.pet);
+    if (!(p.dex[p.pet.species] && p.dex[p.pet.species][p.pet.variant])) note(p, p.pet);
+  }
+  p.v = 2;
+  return p;
+}
+
+function note(p, animal) {
+  const entry = (p.dex[animal.species] = p.dex[animal.species] || { plain: 0, rare: 0 });
+  entry[animal.variant] = (entry[animal.variant] || 0) + 1;
 }
 
 export function storageKey(profileId) {
@@ -93,13 +141,13 @@ export function loadPet(profileId, storage = globalThis.localStorage) {
     if (!raw) return emptyPet();
     const parsed = JSON.parse(raw);
     const base = emptyPet();
-    return {
+    return upgrade({
       ...base,
       ...parsed,
       day: { ...base.day, ...(parsed.day || {}) },
       owned: Array.isArray(parsed.owned) ? parsed.owned : [],
       placed: Array.isArray(parsed.placed) ? parsed.placed : [],
-    };
+    });
   } catch {
     return emptyPet();
   }
@@ -147,7 +195,86 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
     pet.egg.warmth += 1;
     warmed = true;
   }
-  return { amount, warmed, bonus };
+  // The pet in the room grows with every counted take, whatever it scored.
+  let grew = null;
+  if (pet.pet && pet.pet.name) {
+    const before = stageOf(pet.pet);
+    pet.pet.growth = (pet.pet.growth || 0) + 1;
+    const after = stageOf(pet.pet);
+    if (after !== before) grew = after;
+  }
+  return { amount, warmed, bonus, grew };
+}
+
+/* ── Growing ───────────────────────────────────────────────────────────── */
+
+export function stageOf(animal) {
+  if (!animal) return null;
+  const g = Number.isFinite(animal.growth) ? animal.growth : GROW_TAKES;
+  return STAGES[Math.min(STAGES.length - 1, Math.floor(g / GROW_TAKES))];
+}
+
+/** Takes done and needed for the next stage, or null once grown. */
+export function growthToNext(animal) {
+  if (!animal || stageOf(animal) === 'grown') return null;
+  const g = animal.growth || 0;
+  return { done: g % GROW_TAKES, need: GROW_TAKES, next: STAGES[Math.floor(g / GROW_TAKES) + 1] };
+}
+
+/**
+ * A stage reached since the room last showed it, for the celebration — and
+ * marks it shown. Null when there is nothing new.
+ */
+export function unseenGrowth(pet) {
+  if (!pet.pet) return null;
+  const now = stageOf(pet.pet);
+  if (pet.pet.seen === now) return null;
+  pet.pet.seen = now;
+  return now;
+}
+
+/** Every pet the student has: the one in the room first, then the pet book's. */
+export function allPets(pet) {
+  return (pet.pet ? [pet.pet] : []).concat(pet.friends || []);
+}
+
+/** A new egg may be chosen once there is no one left still growing up. */
+export function canChooseNextEgg(pet) {
+  return Boolean(pet.pet) && !pet.egg && allPets(pet).every((a) => stageOf(a) === 'grown');
+}
+
+/**
+ * The next egg: the pet in the room goes to the pet book (it is kept, and can
+ * come back any time) and the egg takes its place in the nest, already warm.
+ */
+export function chooseNextEgg(pet, species) {
+  if (!canChooseNextEgg(pet) || !SPECIES.includes(species)) return false;
+  pet.friends.unshift(pet.pet);
+  pet.pet = null;
+  pet.egg = { species, warmth: NEXT_EGG_WARMTH };
+  return true;
+}
+
+/** Brings a pet from the pet book into the room; the one there takes its place. */
+export function switchTo(pet, index) {
+  if (pet.egg || !Array.isArray(pet.friends)) return false;
+  const friend = pet.friends[index];
+  if (!friend) return false;
+  pet.friends.splice(index, 1);
+  if (pet.pet) pet.friends.splice(index, 0, pet.pet);
+  pet.pet = friend;
+  return true;
+}
+
+/** Hatches and species seen, for the pet book's count. */
+export function dexCount(pet) {
+  let found = 0;
+  for (const species of SPECIES) {
+    const e = (pet.dex || {})[species];
+    if (e && e.plain) found += 1;
+    if (e && e.rare) found += 1;
+  }
+  return { found, total: SPECIES.length * 2 };
 }
 
 export function chooseEgg(pet, species) {
@@ -160,7 +287,7 @@ export function readyToHatch(pet) {
   return Boolean(pet.egg && !pet.pet && pet.egg.warmth >= HATCH_TAKES);
 }
 
-export function hatch(pet, now = Date.now()) {
+export function hatch(pet, now = Date.now(), roll = Math.random()) {
   if (!readyToHatch(pet)) return false;
   pet.pet = {
     species: pet.egg.species,
@@ -169,8 +296,13 @@ export function hatch(pet, now = Date.now()) {
     fullness: 70,
     fedAt: now,
     snacks: 0,
+    growth: 0,
+    seen: 'baby',
+    variant: roll < RARE_CHANCE ? 'rare' : 'plain',
   };
   pet.egg = null;
+  if (!pet.dex) pet.dex = {};
+  note(pet, pet.pet);
   return true;
 }
 

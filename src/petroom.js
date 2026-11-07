@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611079200';
+import * as Pet from './pet.js?v=202611079300';
 import {
   petMarkup,
   eggMarkup,
@@ -26,9 +26,11 @@ import {
   ballMarkup,
   itemIcon,
   petIcon,
+  petSilhouette,
+  STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611079200';
-import { t } from './i18n.js?v=202611079200';
+} from './petart.js?v=202611079300';
+import { t } from './i18n.js?v=202611079300';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -82,7 +84,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   let pos = { x: 210, y: FLOOR_Y };
   let facing = 1; // 1 = as drawn, -1 = mirrored
   let lastTouch = Date.now();
-  let tray = null; // 'feed' | 'decorate' | null
+  let tray = null; // 'feed' | 'decorate' | 'pets' | null
+  let choosing = false; // picking the next egg, with a grown pet in the room
+  let renaming = false;
   let picked = null; // the egg being considered
   let ball = null; // { x, y } while a ball is out
   let busy = false; // a scripted moment (eating, hatching) is playing
@@ -110,7 +114,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     layers.fx = node('g', { class: 'room-fx', 'pointer-events': 'none' });
     svg.append(layers.room, layers.stage, layers.fx);
 
-    if (pet.pet) {
+    if (pet.pet && !choosing) {
       if (pet.placed.includes('ball') && !isFish()) {
         ball = ball || { x: 250, y: FLOOR_Y - 8 };
         layers.ball = node('g', { class: 'ball-pos', transform: `translate(${ball.x} ${ball.y})` }, ballMarkup());
@@ -121,7 +125,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       }
       layers.petPos = node('g', { class: 'pet-pos' });
       layers.petFlip = node('g', { class: 'pet-flip' });
-      layers.pet = node('g', { class: 'pet-hit', role: 'button', tabindex: '0', 'aria-label': t('pet.aria.pat', { name: pet.pet.name || t(`pet.kind.${pet.pet.species}`) }) }, petMarkup(pet.pet.species));
+      layers.pet = node('g', { class: 'pet-hit', role: 'button', tabindex: '0', 'aria-label': t('pet.aria.pat', { name: pet.pet.name || t(`pet.kind.${pet.pet.species}`) }) }, petMarkup(pet.pet.species, pet.pet.variant));
       layers.petFlip.append(layers.pet);
       layers.petPos.append(layers.petFlip);
       layers.stage.append(layers.petPos);
@@ -143,7 +147,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   function placePet() {
     if (!layers.petPos) return;
-    const s = isFish() ? FISH_SCALE : PET_SCALE;
+    // Smaller while it is young; the feet (or the fish's middle) stay put.
+    const s = (isFish() ? FISH_SCALE : PET_SCALE) * (STAGE_SCALE[Pet.stageOf(pet.pet)] || 1);
     // The box's feet are at (50, 96); the fish's middle at (50, 50).
     const ax = 50 * s;
     const ay = (isFish() ? 50 : 96) * s;
@@ -301,7 +306,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   }
 
   function wander() {
-    if (!pet.pet || busy) return;
+    if (!pet.pet || choosing) return;
+    if (busy) {
+      later(wander, 2000);
+      return;
+    }
     const quiet = Date.now() - lastTouch;
     const hour = new Date().getHours();
     if (mode !== 'sleep' && (quiet > SLEEP_AFTER || ((hour >= 21 || hour < 6) && quiet > 15000))) {
@@ -315,6 +324,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         say(`${t('pet.wish')} ${foodIcon(Pet.snackFor(pet.pet.species, 'treat').look)}`, 2600);
       } else if (roll < 0.8) {
         hop();
+      } else if (roll < 0.88 && pet.pet.variant === 'rare') {
+        // A rare one shimmers now and then, just a little.
+        sparkles(pos.x, pos.y - (isFish() ? 10 : 36), 6);
       }
     }
     later(wander, rand(3200, 6500));
@@ -422,8 +434,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   function confirmEgg() {
     if (!picked) return;
-    Pet.chooseEgg(pet, picked);
+    if (choosing) Pet.chooseNextEgg(pet, picked);
+    else Pet.chooseEgg(pet, picked);
     picked = null;
+    choosing = false;
+    tray = null;
     save();
     drawRoom();
     paintPanel();
@@ -459,7 +474,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       later(() => {
         hearts(4);
         hop();
-        say(t('pet.born'), 2600);
+        // A rare colour is never promised: this is the first anyone hears of it.
+        const rare = pet.pet && pet.pet.variant === 'rare';
+        if (rare) sparkles(pos.x, pos.y - 40, 16);
+        say(t(rare ? 'pet.rare.say' : 'pet.born'), rare ? 3200 : 2600);
         setMode('idle');
         paintPanel();
       }, 900);
@@ -554,7 +572,14 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   function paintPanel() {
     paintHead();
     const p = els.panel;
-    if (!pet.pet && !pet.egg) {
+    if (choosing) {
+      p.innerHTML = `
+        <p class="pet-prompt">${picked ? esc(t(`pet.hint.${picked}`)) : t('pet.next.ask', { name: esc(pet.pet.name) })}</p>
+        <div class="pet-actions">
+          <button class="primary-btn" type="button" data-act="egg" ${picked ? '' : 'disabled'}>${t('pet.choose.btn')}</button>
+          <button class="quiet-btn" type="button" data-act="unchoose">${t('pet.next.cancel')}</button>
+        </div>`;
+    } else if (!pet.pet && !pet.egg) {
       p.innerHTML = `
         <p class="pet-prompt">${picked ? esc(t(`pet.hint.${picked}`)) : t('pet.choose')}</p>
         <div class="pet-actions">
@@ -567,30 +592,101 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         <div class="pet-warmth"><span class="warm-dots" aria-hidden="true">${dots}</span>
           <span>${t('pet.egg.warm', { n: w, total: Pet.HATCH_TAKES })}</span></div>
         <p class="pet-prompt">${t('pet.egg.howto')}</p>
-        <div class="pet-actions"><button class="primary-btn" type="button" data-act="practise">${t('pet.practise')}</button></div>`;
-    } else if (!pet.pet.name) {
+        <div class="pet-actions"><button class="primary-btn" type="button" data-act="practise">${t('pet.practise')}</button></div>
+        ${(pet.friends || []).length ? `<div class="pet-tabs"><button class="pet-tab" type="button" data-tray="pets" aria-selected="${tray === 'pets'}">${t('pet.tab.pets')}</button></div>${tray === 'pets' ? petsTray() : ''}` : ''}`;
+    } else if (!pet.pet.name || renaming) {
       const names = NAMES[pet.pet.species] || NAMES.cat;
+      const current = renaming ? pet.pet.name : '';
       p.innerHTML = `
         <form class="pet-name" data-act="name">
-          <label class="pet-prompt" for="petNameInput">${t('pet.name.ask')}</label>
+          <label class="pet-prompt" for="petNameInput">${t(renaming ? 'pet.rename.ask' : 'pet.name.ask')}</label>
           <div class="pet-name-row">
-            <input id="petNameInput" maxlength="18" autocomplete="off" placeholder="${esc(names[0])}" />
+            <input id="petNameInput" maxlength="18" autocomplete="off" value="${esc(current)}" placeholder="${esc(names[0])}" />
             <button class="primary-btn" type="submit">${t('pet.name.ok')}</button>
           </div>
           <div class="chip-row">${names.map((n) => `<button class="chip" type="button" data-name="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+          ${renaming ? `<button class="link-btn" type="button" data-act="unrename">${t('pet.rename.cancel')}</button>` : ''}
         </form>`;
     } else {
       p.innerHTML = `
+        ${growthRow()}
         <div class="pet-tabs" role="tablist">
           <button class="pet-tab" type="button" role="tab" data-tray="feed" aria-selected="${tray === 'feed'}">${t('pet.feed')}</button>
           <button class="pet-tab" type="button" role="tab" data-tray="decorate" aria-selected="${tray === 'decorate'}">${t('pet.decorate')}</button>
+          <button class="pet-tab" type="button" role="tab" data-tray="pets" aria-selected="${tray === 'pets'}">${t('pet.tab.pets')}</button>
         </div>
         ${tray === 'feed' ? feedTray() : ''}
-        ${tray === 'decorate' ? decorTray() : ''}`;
+        ${tray === 'decorate' ? decorTray() : ''}
+        ${tray === 'pets' ? petsTray() : ''}`;
     }
     els.foot.innerHTML = `${t('pet.foot')}${
       demo ? ` <button class="link-btn" type="button" data-act="demo">${t('pet.demo')}</button>` : ''
     }`;
+  }
+
+  /** Where the pet is in growing up, its name to change, and — once grown — the next egg. */
+  function growthRow() {
+    const a = pet.pet;
+    const stage = Pet.stageOf(a);
+    const left = Pet.growthToNext(a);
+    const name = esc(a.name);
+    let body;
+    if (left) {
+      const pct = Math.round((left.done / left.need) * 100);
+      body = `<div class="grow-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${left.need}" aria-valuenow="${left.done}">
+          <span class="grow-fill" style="width:${pct}%"></span></div>
+        <span class="grow-text">${t(left.next === 'kid' ? 'pet.grow.toKid' : 'pet.grow.toGrown', { done: left.done, need: left.need, name })}</span>`;
+    } else if (Pet.canChooseNextEgg(pet)) {
+      body = `<span class="grow-text is-grown">${t('pet.grown', { name })}</span>
+        <button class="primary-btn small" type="button" data-act="choose-next">${t('pet.next.btn')}</button>`;
+    } else {
+      body = `<span class="grow-text is-grown">${t('pet.grown', { name })}</span>
+        <span class="grow-text">${t('pet.next.wait')}</span>`;
+    }
+    return `<div class="pet-grow">
+        <div class="grow-head"><span class="grow-stage is-${stage}">${t(`pet.stage.${stage}`)}</span>
+          <button class="link-btn" type="button" data-act="rename">✎ ${t('pet.rename')}</button></div>
+        ${body}
+      </div>`;
+  }
+
+  /** Every pet the student has, and the pet book: who has been found so far. */
+  function petsTray() {
+    const yours = Pet.allPets(pet);
+    const egg = Boolean(pet.egg);
+    const list = yours
+      .map((a, i) => {
+        const here = i === 0 && Boolean(pet.pet);
+        const index = pet.pet ? i - 1 : i;
+        const action = here
+          ? `<span class="tray-cost">${t('pet.here')}</span>`
+          : egg
+            ? `<span class="tray-cost">${t('pet.bring.egg')}</span>`
+            : `<span class="tray-cost is-act">${t('pet.bring')}</span>`;
+        return `<button class="tray-item pet-card${here ? ' is-out' : ''}${a.variant === 'rare' ? ' is-rare' : ''}" type="button" ${here || egg ? 'disabled' : `data-friend="${index}"`}>
+          ${petIcon(a.species, '', a.variant)}
+          <span class="tray-name">${esc(a.name || t(`pet.kind.${a.species}`))}</span>
+          <span class="tray-stage">${t(`pet.stage.${Pet.stageOf(a)}`)}</span>
+          ${action}</button>`;
+      })
+      .join('');
+    const { found, total } = Pet.dexCount(pet);
+    const book = Pet.SPECIES.map((species) => {
+      const e = (pet.dex || {})[species] || {};
+      const plain = e.plain
+        ? petIcon(species, t(`pet.kind.${species}`))
+        : petSilhouette(species);
+      const rare = e.rare
+        ? petIcon(species, t('pet.rare.label'), 'rare')
+        : `<span class="dex-mystery" aria-label="${t('pet.unknown')}">?</span>`;
+      return `<div class="dex-card">
+          <div class="dex-pair"><span class="dex-slot${e.plain ? ' is-found' : ''}">${plain}</span><span class="dex-slot is-rare-slot${e.rare ? ' is-found' : ''}">${rare}</span></div>
+          <span class="tray-name${e.plain || e.rare ? ' is-kind' : ''}">${e.plain || e.rare ? t(`pet.kind.${species}`) : t('pet.unknown')}</span></div>`;
+    }).join('');
+    return `<p class="pet-sub">${t('pet.yours')}</p>
+      <div class="pet-tray is-pets">${list}</div>
+      <p class="pet-sub">${t('pet.book', { found, total })}</p>
+      <div class="pet-dex">${book}</div>`;
   }
 
   function feedTray() {
@@ -624,6 +720,24 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     if (!b) return;
     if (b.dataset.act === 'egg') confirmEgg();
     else if (b.dataset.act === 'practise') onPractise();
+    else if (b.dataset.act === 'choose-next') {
+      choosing = true;
+      picked = null;
+      drawRoom();
+      paintPanel();
+    } else if (b.dataset.act === 'unchoose') {
+      choosing = false;
+      picked = null;
+      drawRoom();
+      paintPanel();
+    } else if (b.dataset.act === 'rename') {
+      renaming = true;
+      paintPanel();
+      els.panel.querySelector('#petNameInput')?.select();
+    } else if (b.dataset.act === 'unrename') {
+      renaming = false;
+      paintPanel();
+    } else if (b.dataset.friend != null) switchPet(Number(b.dataset.friend));
     else if (b.dataset.name) {
       const input = els.panel.querySelector('#petNameInput');
       if (input) input.value = b.dataset.name;
@@ -640,7 +754,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const value = (input && input.value.trim()) || (input && input.placeholder) || '';
     if (Pet.name(pet, value)) {
       save();
-      tray = 'feed';
+      tray = renaming ? tray : 'feed';
+      renaming = false;
       paintPanel();
       hearts(4);
       hop();
@@ -657,7 +772,13 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       save();
       paintNotes();
       if (Pet.readyToHatch(pet)) runHatch();
-      else {
+      else if (pet.pet && Pet.stageOf(pet.pet) !== pet.pet.seen) {
+        const grew = Pet.unseenGrowth(pet);
+        save();
+        drawRoom();
+        paintPanel();
+        celebrateGrowth(grew);
+      } else {
         if (pet.egg) {
           drawRoom();
           wobbleEgg(true);
@@ -666,6 +787,36 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       }
     }
   });
+
+  // ── Switching and growing ──────────────────────────────────────────────
+
+  function switchPet(index) {
+    if (busy || !Pet.switchTo(pet, index)) return;
+    save();
+    mode = 'idle';
+    pos = isFish() ? { x: 200, y: 164 } : { x: 210, y: FLOOR_Y };
+    drawRoom();
+    paintPanel();
+    hearts(3);
+    hop();
+    say(t('pet.back', { name: esc(pet.pet.name) }), 2400);
+  }
+
+  /** A stage reached while the room was closed: shown once, the next time it opens. */
+  function celebrateGrowth(stage) {
+    busy = true;
+    later(() => {
+      sparkles(pos.x, pos.y - (isFish() ? 10 : 40), 16);
+      hearts(5);
+      hop();
+      setMode('happy');
+      say(t(stage === 'grown' ? 'pet.grew.grown' : 'pet.grew.kid'), 3000);
+      later(() => {
+        busy = false;
+        setMode('idle');
+      }, 1800);
+    }, 600);
+  }
 
   // ── Earning ────────────────────────────────────────────────────────────
 
@@ -687,6 +838,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     pet = Pet.loadPet(profileId());
     running = true;
     picked = null;
+    choosing = false;
+    renaming = false;
     tray = pet.pet && pet.pet.name ? tray || null : null;
     const { longAway } = Pet.visit(pet);
     save();
@@ -701,7 +854,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       lastTouch = Date.now();
       blinkLoop();
       later(wander, 1800);
-      if (longAway && pet.pet.name) {
+      const grew = Pet.unseenGrowth(pet);
+      if (grew) {
+        save();
+        celebrateGrowth(grew);
+      } else if (longAway && pet.pet.name) {
         later(() => {
           walkTo(isFish() ? 200 : 210, pos.y, () => {
             setMode('happy');
@@ -731,7 +888,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     /** The pet's portrait (or its egg), for the toast. */
     portrait() {
       const p = Pet.loadPet(profileId());
-      if (p.pet) return petIcon(p.pet.species);
+      if (p.pet) return petIcon(p.pet.species, '', p.pet.variant);
       if (p.egg) return `<svg class="pet-icon" viewBox="14 18 72 82" aria-hidden="true">${eggMarkup(p.egg.species, Math.min(3, p.egg.warmth))}</svg>`;
       return '';
     },

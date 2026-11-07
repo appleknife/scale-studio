@@ -1,15 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611079200';
-import { renderStaff } from './staff.js?v=202611079200';
-import { createInk } from './ink.js?v=202611079200';
-import { createFollower } from './follow.js?v=202611079200';
-import { createPetRoom } from './petroom.js?v=202611079200';
-import { createBuddy } from './buddy.js?v=202611079200';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611079300';
+import { renderStaff } from './staff.js?v=202611079300';
+import { createInk } from './ink.js?v=202611079300';
+import { createFollower } from './follow.js?v=202611079300';
+import { createPetRoom } from './petroom.js?v=202611079300';
+import { createBuddy } from './buddy.js?v=202611079300';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611079200';
+window.__scaleStudioVersion = '202611079300';
 import {
   PitchDetector,
   midiToFreq,
@@ -17,16 +17,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611079200';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611079200';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611079200';
-import { generatePassage } from './sightreading.js?v=202611079200';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611079200';
-import { renderScore } from './score.js?v=202611079200';
-import { summariseIntonation } from './intonation.js?v=202611079200';
-import * as Journal from './journal.js?v=202611079200';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611079200';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611079200';
+} from './pitch.js?v=202611079300';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611079300';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611079300';
+import { generatePassage } from './sightreading.js?v=202611079300';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611079300';
+import { renderScore } from './score.js?v=202611079300';
+import { summariseIntonation } from './intonation.js?v=202611079300';
+import * as Journal from './journal.js?v=202611079300';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611079300';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611079300';
 import {
   STRINGS,
   FIFTHS,
@@ -35,7 +35,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611079200';
+} from './tuner.js?v=202611079300';
 
 const LANG = initLang();
 
@@ -2258,10 +2258,16 @@ let toastTimer = 0;
  * "+5 ♪" after a counted take: the pet noticed. A scale not yet played today
  * gets more: a bonus line, the total counting up, and a burst of notes.
  */
-function petToast(amount, warmed, bonus = 0, kind = 'scale') {
+function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null) {
   if (!amount || !el.petToast) return;
   const name = petRoom.name();
-  const line = warmed ? t('pet.toast.warm') : name ? t('pet.toast.for', { name: esc(name) }) : t('pet.toast.room');
+  const line = grew
+    ? t(grew === 'grown' ? 'pet.toast.grewUp' : 'pet.toast.grew', { name: esc(name) })
+    : warmed
+      ? t('pet.toast.warm')
+      : name
+        ? t('pet.toast.for', { name: esc(name) })
+        : t('pet.toast.room');
   const extra = bonus
     ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : 'pet.toast.newScale', { n: bonus })}</span>`
     : '';
@@ -3124,7 +3130,7 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
   // Real practice earns notes for the pet room; a false start earns nothing.
   if (counted && (tag === 'scales' || tag === 'sight')) {
     const earned = petRoom.earnTake({ kind: tag === 'sight' ? 'sight' : 'scale', id: cardId || '', dayKey: today });
-    petToast(earned.amount, earned.warmed, earned.bonus, tag === 'sight' ? 'sight' : 'scale');
+    petToast(earned.amount, earned.warmed, earned.bonus, tag === 'sight' ? 'sight' : 'scale', earned.grew);
   }
   if (cardId && counted) Journal.noteScale(journal, cardId, today, score);
   // Sight reading is filed per level, not per passage: a level VI page is a

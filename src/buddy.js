@@ -12,8 +12,8 @@
 // It never judges a score, never sulks, and stays out of the way: decorative to
 // a screen reader, and absent entirely for a student who has no pet or egg.
 
-import { loadPet } from './pet.js?v=202611079200';
-import { petMarkup, eggMarkup, HEART } from './petart.js?v=202611079200';
+import { loadPet } from './pet.js?v=202611079300';
+import { petMarkup, eggMarkup, HEART } from './petart.js?v=202611079300';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -32,7 +32,7 @@ export function createBuddy(host, { profileId }) {
     let inner = '';
     if (pet.pet) {
       kind = 'pet';
-      inner = `<g class="buddy-body">${petMarkup(pet.pet.species)}</g>`;
+      inner = `<g class="buddy-body">${petMarkup(pet.pet.species, pet.pet.variant)}</g>`;
     } else if (pet.egg) {
       kind = 'egg';
       inner = `<g class="buddy-body">${eggMarkup(pet.egg.species, Math.min(3, pet.egg.warmth))}</g>`;

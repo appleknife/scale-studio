@@ -51,6 +51,54 @@
         eq('past the cap a new key still earns its bonus', fresh.amount, P.EARN.afterCap + P.EARN.newKey);
       }
 
+      // Growing up, the pet book, the next egg and switching
+      {
+        const p = P.emptyPet();
+        P.chooseEgg(p, 'cat');
+        for (let i = 0; i < P.HATCH_TAKES; i += 1) P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' });
+        P.hatch(p, 0, 0.9);
+        eq('a hatchling is a baby', P.stageOf(p.pet), 'baby');
+        eq('a high roll is the plain colour', p.pet.variant, 'plain');
+        eq('the pet book has it', P.dexCount(p), { found: 1, total: 10 });
+        eq('no growing before it has a name', P.earn(p, { kind: 'scale', id: 'D', dayKey: '2026-11-06' }).grew, null);
+        eq('…and its growth did not move', p.pet.growth, 0);
+        P.name(p, 'Mochi');
+        const stages = [];
+        for (let i = 0; i < 2 * P.GROW_TAKES; i += 1) {
+          const r = P.earn(p, { kind: 'scale', id: 'G', dayKey: `2026-11-${10 + (i % 9)}` });
+          if (r.grew) stages.push(`${i + 1}:${r.grew}`);
+        }
+        eq('kid, then grown, a stage every GROW_TAKES takes', stages, [`${P.GROW_TAKES}:kid`, `${2 * P.GROW_TAKES}:grown`]);
+        eq('the room celebrates a stage once', [P.unseenGrowth(p), P.unseenGrowth(p)], ['grown', null]);
+        eq('a grown pet may have a new egg', P.canChooseNextEgg(p), true);
+        eq('not a made-up animal', P.chooseNextEgg(p, 'dragon'), false);
+        eq('a dog egg next', P.chooseNextEgg(p, 'dog'), true);
+        eq('it starts already warm', p.egg.warmth, P.NEXT_EGG_WARMTH);
+        eq('Mochi waits in the pet book', p.friends.map((f) => f.name), ['Mochi']);
+        eq('no switching while an egg is in the nest', P.switchTo(p, 0), false);
+        while (!P.readyToHatch(p)) P.earn(p, { kind: 'scale', id: 'A', dayKey: '2026-11-20' });
+        P.hatch(p, 0, 0); // a roll of 0 is always rare
+        eq('a low roll is the rare colour', p.pet.variant, 'rare');
+        eq('two found now', P.dexCount(p).found, 2);
+        P.name(p, 'Biscuit');
+        eq('no third egg while the puppy is still growing', P.canChooseNextEgg(p), false);
+        eq('Mochi comes back into the room', P.switchTo(p, 0) && p.pet.name, 'Mochi');
+        eq('the puppy waits in the book', p.friends.map((f) => f.name), ['Biscuit']);
+        eq('still no new egg: the puppy is not grown', P.canChooseNextEgg(p), false);
+        eq('Mochi can be renamed', P.name(p, 'Mochi Two') && p.pet.name, 'Mochi Two');
+        P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-21' });
+        eq('only the pet in the room grows', p.friends[0].growth, 0);
+
+        // A save from before pets grew: kept, as a kid, and in the pet book.
+        const storage = new Map();
+        const store = { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) };
+        store.setItem(P.storageKey('old'), JSON.stringify({ v: 1, notes: 9, pet: { species: 'fish', name: 'Fin', born: 0, fullness: 50, fedAt: 0, snacks: 2 } }));
+        const old = P.loadPet('old', store);
+        eq('an old pet is a kid, not a baby again', P.stageOf(old.pet), 'kid');
+        eq('…plain, and in the pet book', [old.pet.variant, P.dexCount(old).found], ['plain', 1]);
+        eq('…with no celebration owed', P.unseenGrowth(old), null);
+      }
+
       // Eggs and hatching
       {
         const p = P.emptyPet();

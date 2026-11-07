@@ -27,6 +27,16 @@ const PALETTE = {
   fish: { body: '#ff9e69', dark: '#b9542a', fin: '#ffc79d', scale: '#ffbe93' },
 };
 
+// The rare colours: a hatchling now and then comes out in one of these. Same
+// shapes, same keys — only the paint differs.
+const RARE = {
+  cat: { body: '#d9cff0', dark: '#6d5c94', stripe: '#bba9e0', belly: '#f8f5ff', inner: '#f3a9c4' },
+  dog: { body: '#d6e8f7', dark: '#47678a', ear: '#8fb2d6', spot: '#b4d0ea', snout: '#f7fbff' },
+  hamster: { body: '#f6f1ea', dark: '#8b7d6b', belly: '#ffffff', inner: '#f6a7a0' },
+  chicken: { body: '#d3ecff', dark: '#4a78a8', wing: '#acd2fa', comb: '#f2665c', beak: '#f7a234' },
+  fish: { body: '#8fd3ff', dark: '#2e7bb0', fin: '#c8ebff', scale: '#b8e3ff' },
+};
+
 const eyes = (lx, rx, y, r = 4.3) => `
   <g class="pet-eyes">
     <circle cx="${lx}" cy="${y}" r="${r}" fill="${INK}"/>
@@ -184,17 +194,26 @@ const SHAPES = {
   },
 };
 
-/** One pet, in its own 100 × 100 box. */
-export function petMarkup(species) {
+/** One pet, in its own 100 × 100 box. `variant` is 'plain' or 'rare'. */
+export function petMarkup(species, variant = 'plain') {
   const draw = SHAPES[species] || SHAPES.cat;
-  return `<g class="pet pet-${species}">${draw(PALETTE[species] || PALETTE.cat)}</g>`;
+  const paint = (variant === 'rare' ? RARE : PALETTE)[species] || PALETTE.cat;
+  return `<g class="pet pet-${species}${variant === 'rare' ? ' is-rare' : ''}">${draw(paint)}</g>`;
 }
 
 /** A pet's portrait, as a whole small SVG — for buttons, the toast and the corner buddy. */
-export function petIcon(species, label = '') {
+export function petIcon(species, label = '', variant = 'plain') {
   const role = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
-  return `<svg class="pet-icon" viewBox="0 6 100 94" ${role}>${petMarkup(species)}</svg>`;
+  return `<svg class="pet-icon" viewBox="0 6 100 94" ${role}>${petMarkup(species, variant)}</svg>`;
 }
+
+/** A pet not yet found, for the pet book: its outline, filled in one flat colour. */
+export function petSilhouette(species) {
+  return `<svg class="pet-icon is-unknown" viewBox="0 6 100 94" aria-hidden="true"><g class="pet-shadow">${petMarkup(species)}</g></svg>`;
+}
+
+/** How big each stage stands, against the grown-up size. */
+export const STAGE_SCALE = { baby: 0.66, kid: 0.83, grown: 1 };
 
 // ── Eggs ──────────────────────────────────────────────────────────────────
 

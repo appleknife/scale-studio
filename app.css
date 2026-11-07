@@ -3944,8 +3944,14 @@ select,
 
 .pet-name {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   gap: 10px;
+}
+
+.pet-name-row .primary-btn {
+  flex-shrink: 0;
+  padding-inline: 16px;
 }
 
 .pet-name-row {
@@ -3967,13 +3973,14 @@ select,
 
 .pet-tabs {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .pet-tab {
-  min-width: 132px;
+  min-width: 96px;
   padding: 12px 20px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
@@ -3987,6 +3994,169 @@ select,
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+
+/* Growing up: the stage, a bar to the next one, and the name to change. */
+.pet-grow {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: 0 auto 14px;
+  max-width: 440px;
+  text-align: center;
+}
+
+.grow-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.grow-stage {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font: 700 12.5px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #fdeee6;
+  color: #c4684a;
+}
+
+.grow-stage.is-kid {
+  background: #eaf4ee;
+  color: #3f7d63;
+}
+
+.grow-stage.is-grown {
+  background: #fff3d6;
+  color: #b07a12;
+}
+
+.grow-bar {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: #f3ece2;
+  overflow: hidden;
+}
+
+.grow-fill {
+  display: block;
+  height: 100%;
+  min-width: 12px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffc58f, #ff8f7a);
+  transition: width 0.6s ease;
+}
+
+.grow-text {
+  font: 500 14px/1.35 var(--sans);
+  color: var(--ink-soft);
+}
+
+.grow-text.is-grown {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pet-sub {
+  margin: 14px 0 8px;
+  font: 700 13px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+}
+
+.pet-tray.is-pets {
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+}
+
+.pet-card .pet-icon {
+  width: 56px;
+  height: 54px;
+}
+
+.tray-item.pet-card:disabled {
+  opacity: 1;
+}
+
+.dex-card .tray-name.is-kind {
+  text-transform: capitalize;
+}
+
+.pet-card.is-rare {
+  border-color: #c9b8f0;
+  background: linear-gradient(160deg, #fbf8ff, #f1ecff);
+}
+
+.tray-stage {
+  font: 600 11.5px var(--sans);
+  color: var(--muted);
+}
+
+.tray-cost.is-act {
+  color: var(--accent);
+}
+
+/* The pet book: each animal, and beside it the rare colour — a ? until found. */
+.pet-dex {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dex-card {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  border: 1px dashed var(--line-strong);
+  background: var(--surface);
+}
+
+.dex-pair {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.dex-slot .pet-icon {
+  width: 40px;
+  height: 38px;
+}
+
+.dex-slot.is-rare-slot .pet-icon {
+  width: 30px;
+  height: 29px;
+}
+
+.pet-icon.is-unknown .pet-shadow * {
+  fill: #e2d9cc !important;
+  stroke: #e2d9cc !important;
+}
+
+.dex-mystery {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #f5f0ff, #e7defd);
+  color: #8b74c9;
+  font: 700 14px var(--sans);
+}
+
+.primary-btn.small {
+  padding: 9px 18px;
+  font-size: 15px;
+}
+
+@media (max-width: 560px) {
+  .pet-dex {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .pet-tray {
@@ -4943,6 +5113,40 @@ select,
 :root[data-theme='dark'] .pet-toast {
   background: #2a2621;
   border-color: #4a3f36;
+}
+
+:root[data-theme='dark'] .grow-bar {
+  background: #3a342d;
+}
+
+:root[data-theme='dark'] .grow-stage {
+  background: #3a2a24;
+  color: #f0a58a;
+}
+
+:root[data-theme='dark'] .grow-stage.is-kid {
+  background: #24352d;
+  color: #8fd0b0;
+}
+
+:root[data-theme='dark'] .grow-stage.is-grown {
+  background: #3a3020;
+  color: #f2c766;
+}
+
+:root[data-theme='dark'] .pet-card.is-rare {
+  background: #2a2638;
+  border-color: #5a4c86;
+}
+
+:root[data-theme='dark'] .pet-icon.is-unknown .pet-shadow * {
+  fill: #4a433b !important;
+  stroke: #4a433b !important;
+}
+
+:root[data-theme='dark'] .dex-mystery {
+  background: #2f2a40;
+  color: #b7a6ea;
 }
 
 :root[data-theme='dark'] .pet-name-row input {
