@@ -23,17 +23,19 @@
       {
         const p = P.emptyPet();
         const first = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' });
-        eq('first take of the day: take + new key + first-of-day', first.amount, 3 + 2 + 5);
+        eq('first take of the day: take + new key + first-of-day', first.amount, 3 + 4 + 5);
+        eq('…and the new-key part is reported as the bonus', first.bonus, 4);
         const again = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' });
         eq('the same key again: just the take', again.amount, 3);
         const d = P.earn(p, { kind: 'scale', id: 'D', dayKey: '2026-11-06' });
-        eq('a new key today: a little more', d.amount, 5);
+        eq('a new key today: a bonus on top', d.amount, 7);
         const sight = P.earn(p, { kind: 'sight', dayKey: '2026-11-06' });
-        eq('the first sight reading of the day earns the new-key bonus', sight.amount, 5);
+        eq('the first sight reading of the day earns the new-key bonus', sight.amount, 7);
         const sight2 = P.earn(p, { kind: 'sight', dayKey: '2026-11-06' });
         eq('a second sight reading is a plain take', sight2.amount, 3);
+        eq('…with no bonus', sight2.bonus, 0);
         const tomorrow = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-07' });
-        eq('a new day starts the bonuses again', tomorrow.amount, 10);
+        eq('a new day starts the bonuses again', tomorrow.amount, 12);
       }
 
       // The cap: forty takes in a day earn a lot less than forty times three.
@@ -43,8 +45,10 @@
         for (let i = 0; i < 40; i += 1) total += P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' }).amount;
         log.push(`forty takes of one scale in a day: ${total} notes`);
         if (total > P.DAILY_CAP + 30) problems.push(`the daily cap let ${total} notes through`);
-        const after = P.earn(p, { kind: 'scale', id: 'D', dayKey: '2026-11-06' }).amount;
+        const after = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-06' }).amount;
         eq('past the cap a take still earns a little', after, P.EARN.afterCap);
+        const fresh = P.earn(p, { kind: 'scale', id: 'D', dayKey: '2026-11-06' });
+        eq('past the cap a new key still earns its bonus', fresh.amount, P.EARN.afterCap + P.EARN.newKey);
       }
 
       // Eggs and hatching

@@ -4131,6 +4131,87 @@ select,
   color: var(--ink-soft);
 }
 
+.pet-toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pet-toast-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.pet-toast.has-bonus {
+  border-radius: 22px;
+  border-color: #f0c98a;
+  box-shadow: 0 0 0 4px rgba(240, 190, 100, 0.18), 0 14px 30px -16px rgba(60, 40, 20, 0.55);
+}
+
+.pet-toast.has-bonus.is-in {
+  animation-duration: 4.2s;
+}
+
+.pet-toast-bonus {
+  font: 700 13px var(--sans);
+  color: #c47f17;
+  letter-spacing: 0.01em;
+  animation: bonus-in 0.5s 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@keyframes bonus-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.8);
+  }
+}
+
+.pet-toast-n {
+  display: inline-block;
+}
+
+.pet-toast-n.is-pop {
+  animation: count-pop 0.18s ease-out;
+}
+
+@keyframes count-pop {
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+/* Notes bursting out of the toast when a new scale earns its bonus. */
+.note-burst {
+  position: fixed;
+  z-index: 51;
+  pointer-events: none;
+  font: 700 20px var(--sans);
+  transform: translate(-50%, -50%);
+  animation: note-burst 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@keyframes note-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) - 30px)) rotate(var(--spin)) scale(1.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-toast-bonus,
+  .pet-toast-n.is-pop {
+    animation: none;
+  }
+}
+
 /* The pets' moving parts. Every part scales and turns about its own box. */
 .pet .pet-bob,
 .pet .pet-head,

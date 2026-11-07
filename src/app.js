@@ -1,15 +1,15 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611079100';
-import { renderStaff } from './staff.js?v=202611079100';
-import { createInk } from './ink.js?v=202611079100';
-import { createFollower } from './follow.js?v=202611079100';
-import { createPetRoom } from './petroom.js?v=202611079100';
-import { createBuddy } from './buddy.js?v=202611079100';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611079200';
+import { renderStaff } from './staff.js?v=202611079200';
+import { createInk } from './ink.js?v=202611079200';
+import { createFollower } from './follow.js?v=202611079200';
+import { createPetRoom } from './petroom.js?v=202611079200';
+import { createBuddy } from './buddy.js?v=202611079200';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611079100';
+window.__scaleStudioVersion = '202611079200';
 import {
   PitchDetector,
   midiToFreq,
@@ -17,16 +17,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611079100';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611079100';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611079100';
-import { generatePassage } from './sightreading.js?v=202611079100';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611079100';
-import { renderScore } from './score.js?v=202611079100';
-import { summariseIntonation } from './intonation.js?v=202611079100';
-import * as Journal from './journal.js?v=202611079100';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611079100';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611079100';
+} from './pitch.js?v=202611079200';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611079200';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611079200';
+import { generatePassage } from './sightreading.js?v=202611079200';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611079200';
+import { renderScore } from './score.js?v=202611079200';
+import { summariseIntonation } from './intonation.js?v=202611079200';
+import * as Journal from './journal.js?v=202611079200';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611079200';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611079200';
 import {
   STRINGS,
   FIFTHS,
@@ -35,7 +35,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611079100';
+} from './tuner.js?v=202611079200';
 
 const LANG = initLang();
 
@@ -2254,12 +2254,22 @@ function paintMenuPet() {
 }
 
 let toastTimer = 0;
-/** "+5 ♪" after a counted take: the pet noticed. */
-function petToast(amount, warmed) {
+/**
+ * "+5 ♪" after a counted take: the pet noticed. A scale not yet played today
+ * gets more: a bonus line, the total counting up, and a burst of notes.
+ */
+function petToast(amount, warmed, bonus = 0, kind = 'scale') {
   if (!amount || !el.petToast) return;
   const name = petRoom.name();
   const line = warmed ? t('pet.toast.warm') : name ? t('pet.toast.for', { name: esc(name) }) : t('pet.toast.room');
-  el.petToast.innerHTML = `${petRoom.portrait()}<span class="pet-toast-n">+${amount} ♪</span><span class="pet-toast-line">${line}</span>`;
+  const extra = bonus
+    ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : 'pet.toast.newScale', { n: bonus })}</span>`
+    : '';
+  el.petToast.innerHTML =
+    `${petRoom.portrait()}<span class="pet-toast-text"><span class="pet-toast-top">` +
+    `<span class="pet-toast-n">+${bonus ? amount - bonus : amount} ♪</span>` +
+    `<span class="pet-toast-line">${line}</span></span>${extra}</span>`;
+  el.petToast.classList.toggle('has-bonus', Boolean(bonus));
   el.petToast.hidden = false;
   el.petToast.classList.remove('is-in');
   void el.petToast.offsetWidth;
@@ -2267,7 +2277,44 @@ function petToast(amount, warmed) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     el.petToast.hidden = true;
-  }, 3200);
+    document.querySelectorAll('.note-burst').forEach((n) => n.remove());
+  }, bonus ? 4200 : 3200);
+
+  if (!bonus) return;
+  // Once the toast has landed, the total counts up by the bonus and notes burst
+  // out of it. Reduced motion keeps the count and the line, without the burst.
+  const counter = el.petToast.querySelector('.pet-toast-n');
+  const from = amount - bonus;
+  setTimeout(() => {
+    let shown = from;
+    const step = setInterval(() => {
+      shown += 1;
+      counter.textContent = `+${shown} ♪`;
+      counter.classList.remove('is-pop');
+      void counter.offsetWidth;
+      counter.classList.add('is-pop');
+      if (shown >= amount) clearInterval(step);
+    }, 110);
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const box = counter.getBoundingClientRect();
+    const glyphs = ['♪', '♫', '♩', '♬'];
+    for (let i = 0; i < 12; i++) {
+      const n = document.createElement('span');
+      n.className = 'note-burst';
+      n.textContent = glyphs[i % glyphs.length];
+      const angle = -Math.PI / 2 + (i / 11 - 0.5) * Math.PI * 1.15;
+      const dist = 60 + Math.random() * 50;
+      n.style.left = `${box.left + box.width / 2}px`;
+      n.style.top = `${box.top + box.height / 2}px`;
+      n.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+      n.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+      n.style.setProperty('--spin', `${(Math.random() - 0.5) * 90}deg`);
+      n.style.animationDelay = `${i * 25}ms`;
+      n.style.color = ['#e0708a', '#e8a33d', '#4f9a7c', '#6a7fd0'][i % 4];
+      document.body.appendChild(n);
+      n.addEventListener('animationend', () => n.remove());
+    }
+  }, 450);
 }
 const recorder = { live: null, takes: [], playing: null };
 // Set when the browser refuses to write. The screen says so rather than letting
@@ -3077,7 +3124,7 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
   // Real practice earns notes for the pet room; a false start earns nothing.
   if (counted && (tag === 'scales' || tag === 'sight')) {
     const earned = petRoom.earnTake({ kind: tag === 'sight' ? 'sight' : 'scale', id: cardId || '', dayKey: today });
-    petToast(earned.amount, earned.warmed);
+    petToast(earned.amount, earned.warmed, earned.bonus, tag === 'sight' ? 'sight' : 'scale');
   }
   if (cardId && counted) Journal.noteScale(journal, cardId, today, score);
   // Sight reading is filed per level, not per passage: a level VI page is a

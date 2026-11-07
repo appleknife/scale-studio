@@ -9,8 +9,9 @@
 //   - nothing is lost by staying away, and there is no streak to break;
 //   - notes come only from real practice (counted takes — a tap or a false start
 //     earns nothing), with a soft daily cap so playing G major forty times is
-//     not a strategy. A key not yet played today earns a little more than a
-//     repeat, which nudges a student round all their keys.
+//     not a strategy. A key not yet played today earns a bonus on top, shown
+//     with its own little celebration, which nudges a student round all their
+//     keys. The bonus is paid even past the cap: there are only so many keys.
 //
 // Each student name on the device has its own pet, kept in its own slot in
 // localStorage. Nothing leaves the device.
@@ -25,7 +26,7 @@ export const DAILY_CAP = 60;
 
 export const EARN = {
   take: 3, // every counted take
-  newKey: 2, // a scale not yet played today, or the first sight reading of the day
+  newKey: 4, // a scale not yet played today, or the first sight reading of the day
   firstOfDay: 5, // the first counted take of the day
   afterCap: 1, // what a take still earns once the day's cap is reached
 };
@@ -114,23 +115,26 @@ export function savePet(profileId, pet, storage = globalThis.localStorage) {
 
 /**
  * A counted take earns notes. `kind` is 'scale' or 'sight'; `id` is the scale's
- * key for a scale. Returns what was earned (and whether the egg warmed).
+ * key for a scale. Returns what was earned in all, the part of it that was the
+ * new-key bonus, and whether the egg warmed.
  */
 export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
   if (pet.day.key !== dayKey) {
     pet.day = { key: dayKey, earned: 0, keys: [], sight: false, any: false };
   }
   const day = pet.day;
-  let amount;
+  const fresh = (kind === 'scale' && id && !day.keys.includes(id)) || (kind === 'sight' && !day.sight);
+  // The new-key bonus stands apart from the cap, so it can be shown on its own.
+  const bonus = fresh ? EARN.newKey : 0;
+  let base;
   if (day.earned >= DAILY_CAP) {
-    amount = EARN.afterCap;
+    base = EARN.afterCap;
   } else {
-    amount = EARN.take;
-    if (!day.any) amount += EARN.firstOfDay;
-    if (kind === 'scale' && id && !day.keys.includes(id)) amount += EARN.newKey;
-    if (kind === 'sight' && !day.sight) amount += EARN.newKey;
-    amount = Math.min(amount, DAILY_CAP - day.earned + EARN.afterCap);
+    base = EARN.take;
+    if (!day.any) base += EARN.firstOfDay;
+    base = Math.min(base, DAILY_CAP - day.earned + EARN.afterCap);
   }
+  const amount = base + bonus;
   day.any = true;
   if (kind === 'scale' && id && !day.keys.includes(id)) day.keys.push(id);
   if (kind === 'sight') day.sight = true;
@@ -143,7 +147,7 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
     pet.egg.warmth += 1;
     warmed = true;
   }
-  return { amount, warmed };
+  return { amount, warmed, bonus };
 }
 
 export function chooseEgg(pet, species) {
