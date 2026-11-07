@@ -170,6 +170,26 @@ export function quietLevel(floor) {
   return Math.min(0.012, Math.max(0.0016, current * 3));
 }
 
+/**
+ * The level a frame has to clear to be *heard*, given how clear its pitch is.
+ *
+ * `quietLevel` is a loudness line, and loudness is the wrong thing to lean on
+ * when the violin is across the room: every doubling of the distance halves
+ * the level, and a student four or five feet from the phone sat right on the
+ * line. But loudness was only ever standing in for "is this the instrument",
+ * and a clean, periodic waveform answers that better — room noise, a fan, the
+ * rustle of a page have no steady period, so their clarity never gets near
+ * 0.75. So a frame whose pitch is that clear only has to clear half the line
+ * (never under 0.0008, about where a quiet room's own hiss sits). That is
+ * 6 dB, roughly twice the distance. A frame with a muddier pitch still has to
+ * clear the full line, exactly as before.
+ */
+export const CLEAR_PITCH = 0.75;
+export function hearLevel(floor, clarity = 0) {
+  const line = quietLevel(floor);
+  return clarity >= CLEAR_PITCH ? Math.max(0.0008, line * 0.5) : line;
+}
+
 /** The level a frame has to clear to *start* a take — a confident note. */
 export function strongLevel(floor) {
   return Math.min(0.026, quietLevel(floor) * 2.2);

@@ -1,31 +1,32 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611079000';
-import { renderStaff } from './staff.js?v=202611079000';
-import { createInk } from './ink.js?v=202611079000';
-import { createFollower } from './follow.js?v=202611079000';
-import { createPetRoom } from './petroom.js?v=202611079000';
-import { createBuddy } from './buddy.js?v=202611079000';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611079100';
+import { renderStaff } from './staff.js?v=202611079100';
+import { createInk } from './ink.js?v=202611079100';
+import { createFollower } from './follow.js?v=202611079100';
+import { createPetRoom } from './petroom.js?v=202611079100';
+import { createBuddy } from './buddy.js?v=202611079100';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611079000';
+window.__scaleStudioVersion = '202611079100';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
+  hearLevel,
   strongLevel,
-} from './pitch.js?v=202611079000';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611079000';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611079000';
-import { generatePassage } from './sightreading.js?v=202611079000';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611079000';
-import { renderScore } from './score.js?v=202611079000';
-import { summariseIntonation } from './intonation.js?v=202611079000';
-import * as Journal from './journal.js?v=202611079000';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611079000';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611079000';
+} from './pitch.js?v=202611079100';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611079100';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611079100';
+import { generatePassage } from './sightreading.js?v=202611079100';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611079100';
+import { renderScore } from './score.js?v=202611079100';
+import { summariseIntonation } from './intonation.js?v=202611079100';
+import * as Journal from './journal.js?v=202611079100';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611079100';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611079100';
 import {
   STRINGS,
   FIFTHS,
@@ -34,7 +35,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611079000';
+} from './tuner.js?v=202611079100';
 
 const LANG = initLang();
 
@@ -1103,7 +1104,7 @@ function onTuneFrame(frame) {
   // a long window and through a phone microphone that rolls off the lowest
   // string's fundamental, and a G3 reading can be a broad, shallow dip that a
   // 0.55 bar throws away — which is what "it does not pick up my G" looks like.
-  if (!frame.freq || frame.clarity < 0.45 || frame.rms < quietLevel(state.mic?.floor)) {
+  if (!frame.freq || frame.clarity < 0.45 || frame.rms < hearLevel(state.mic?.floor, frame.clarity)) {
     tune.silentFor += 1;
     if (tune.silentFor > 20 && tune.cents != null) {
       tune.cents = null;
@@ -1784,7 +1785,7 @@ function ingestSightFrame(frame) {
   }
 
   if (!take.started) {
-    const heard = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
+    const heard = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > hearLevel(state.mic?.floor, frame.clarity);
     // The needle answers while the app is still deciding, exactly as it does on a
     // scale take — otherwise a test run shows "—" for however long the start rule
     // takes to be satisfied.
@@ -1813,7 +1814,7 @@ function ingestSightFrame(frame) {
   const elapsed = Math.max(0, frame.t - take.t0);
   take.frames.push({ t: elapsed, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
 
-  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
+  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > hearLevel(state.mic?.floor, frame.clarity);
   if (voiced) {
     take.lastVoiced = elapsed;
     if (!take.voiced) {
@@ -4134,7 +4135,7 @@ function onFrame(frame) {
   // the take's own peak, for the "was anything heard at all" question.
   take.peak = Math.max(take.peak || 0, frame.rms);
 
-  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > quietLevel(state.mic?.floor);
+  const voiced = frame.freq > 0 && frame.clarity > 0.5 && frame.rms > hearLevel(state.mic?.floor, frame.clarity);
 
   // The needle answers the bow from the first frame, not from the first *scored*
   // note. A student watching for the app to hear them was looking at "—" for

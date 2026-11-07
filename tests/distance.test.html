@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Distance</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      pre {
+        background: #fffdfa;
+        border: 1px solid #e8dfd1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // How far from the microphone can the student stand?
+      //
+      // The teacher's own recorded takes are stitched into a scale, then turned
+      // down the way distance turns them down (every halving of the level is
+      // about a doubling of the distance) and laid over a quiet room's hiss.
+      // Each level is run through the same detector, noise floor and scoring the
+      // app uses, and the room on its own is run too: whatever the app hears in
+      // an empty room it would hear with nobody playing.
+      import { MAJOR_KEYS, buildScale } from '../src/music.js';
+      import { PitchDetector, nextFloor, quietLevel, hearLevel } from '../src/pitch.js';
+      import { analyzeTake } from '../src/analyze.js';
+      import { loadBank, pickSample, rateFor } from '../src/sampler.js';
+
+      const SR = 44100;
+      const WINDOW = 2048;
+      const HOP = Math.round(SR * 0.03);
+      const NOTE = 0.5;
+      const LEAD = 1.5; // seconds of room before the first note, as when a take starts
+      const problems = [];
+      const log = [];
+
+      // A seeded generator: the room is the same room on every run.
+      let seed = 7;
+      const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+      async function render(scale) {
+        const probe = new OfflineAudioContext(1, SR, SR);
+        const bank = await loadBank(probe, '../samples/');
+        const seconds = LEAD + scale.sequence.length * NOTE + 1;
+        const ctx = new OfflineAudioContext(1, Math.ceil(seconds * SR), SR);
+        scale.sequence.forEach((note, i) => {
+          const sample = pickSample(bank.index, note.midi);
+          const src = ctx.createBufferSource();
+          src.buffer = bank.buffers.get(sample.id);
+          src.playbackRate.value = rateFor(sample, note.midi);
+          const g = ctx.createGain();
+          const at = LEAD + i * NOTE;
+          g.gain.setValueAtTime(0, at);
+          g.gain.linearRampToValueAtTime(1, at + 0.02);
+          g.gain.setValueAtTime(1, at + NOTE - 0.06);
+          g.gain.linearRampToValueAtTime(0, at + NOTE - 0.01);
+          src.connect(g).connect(ctx.destination);
+          src.start(at);
+          src.stop(at + NOTE);
+        });
+        return (await ctx.startRendering()).getChannelData(0);
+      }
+
+      /** The take as the app sees it: frames, the learned floor, what it hears live. */
+      function listen(signal) {
+        const det = new PitchDetector({ sampleRate: SR, bufferSize: WINDOW });
+        let floor = 0.0012;
+        const frames = [];
+        let heardOld = 0;
+        let heardNew = 0;
+        for (let at = 0; at + WINDOW <= signal.length; at += HOP) {
+          const { freq, clarity, rms } = det.detect(signal.subarray(at, at + WINDOW));
+          floor = nextFloor(floor, rms, freq > 0 && clarity >= 0.5);
+          const t = at / SR;
+          if (freq > 0 && clarity > 0.5 && rms > quietLevel(floor)) heardOld++;
+          if (freq > 0 && clarity > 0.5 && rms > hearLevel(floor, clarity)) heardNew++;
+          if (t >= LEAD - 0.1) frames.push({ t: t - (LEAD - 0.1), freq, clarity, rms });
+        }
+        return { frames, heardOld, heardNew, floor };
+      }
+
+      function room(length, level) {
+        const out = new Float32Array(length);
+        // White hiss plus a low hum, both at roughly `level` rms.
+        for (let i = 0; i < length; i++) {
+          out[i] = (rand() - 0.5) * 2 * level * 1.7 + level * 0.6 * Math.sin((2 * Math.PI * 120 * i) / SR);
+        }
+        return out;
+      }
+
+      try {
+        const ROOM = 0.0006;
+        for (const [id, reg] of [['A', 'low'], ['D', null], ['G', 'high']]) {
+          const scale = buildScale(MAJOR_KEYS.find((c) => c.id === id), 0, 'major', 'melodic', 1, reg);
+          const violin = await render(scale);
+          const peak = violin.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+          const noise = room(violin.length, ROOM);
+          log.push(`${scale.title} ${scale.rangeText}`);
+          const scores = [];
+          // Level relative to playing right by the phone (≈ 0.08 rms at the peak).
+          for (const away of [1, 2, 4, 8, 12, 16, 24]) {
+            const gain = 0.25 / peak / away;
+            const mix = violin.map((v, i) => v * gain + noise[i]);
+            const { frames, heardOld, heardNew } = listen(mix);
+            const r = analyzeTake(frames, scale);
+            scores.push(r.score);
+            log.push(
+              `  ${String(away).padStart(2)}× as far: heard live ${heardOld} → ${heardNew} frames · score ${r.score}% (${r.stats.heard}/${r.stats.expected} notes)`,
+            );
+            if (heardNew < heardOld) problems.push(`${scale.title} at ${away}×: the new line heard less than the old`);
+          }
+          if (scores[0] < 95 || scores[1] < 95 || scores[2] < 95)
+            problems.push(`${scale.title}: close-up scores dropped (${scores.slice(0, 3).join(', ')})`);
+        }
+
+        // The room alone, quiet and noisy: nothing may be heard, live or scored.
+        for (const level of [0.0006, 0.002, 0.006]) {
+          const noise = room(SR * 8, level);
+          const { frames, heardNew } = listen(noise);
+          const scale = buildScale(MAJOR_KEYS.find((c) => c.id === 'D'), 0, 'major', 'melodic', 1);
+          const r = analyzeTake(frames, scale);
+          log.push(`empty room at ${level}: heard live ${heardNew} frames · scored notes ${r.stats.heard}`);
+          if (heardNew > 2 || r.stats.heard > 0) problems.push(`an empty room at ${level} was heard as playing`);
+        }
+      } catch (err) {
+        problems.push('exception: ' + err.message);
+      }
+
+      const ok = !problems.length;
+      document.getElementById('report').textContent = `${ok ? 'DISTANCE OK' : 'DISTANCE FAILED\n' + problems.join('\n')}\n\n${log.join('\n')}`;
+      document.title = ok ? 'DISTANCE OK' : 'DISTANCE FAILED';
+    </script>
+  </body>
+</html>
