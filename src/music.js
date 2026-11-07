@@ -4,7 +4,7 @@
 // than raw MIDI numbers, so the staff can be drawn with the right accidentals
 // and the app can show enharmonic spellings (F♯ / G♭, C♯ / D♭, B / C♭).
 
-import { getLang, t } from './i18n.js?v=202611078900';
+import { getLang, t } from './i18n.js?v=202611079000';
 
 export const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const LETTER_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
@@ -58,11 +58,13 @@ export function makeNote(letter, alter, octave) {
 // `oneOctave`, where given, is the starting octave for the one-octave form
 // (Levels I–IV). A few keys sit better an octave up when there is only one
 // octave to play: A major from the open A string rather than from the G string.
-// Teachers ask for both, though, so where `oneOctave` differs from `octave` the
-// one-octave scale can start from either: 'high' (the default, `oneOctave`) or
-// 'low' (`octave`, the same tonic the two-octave scale starts from).
-function variant(name, letter, alter, fifths, octave, oneOctave = null) {
-  return { name, letter, alter, fifths, octave, oneOctave };
+//
+// `also`, where given, is a second one-octave start that is just as usual, so
+// the student may play either: G from the open G or from the D string, A from
+// the G string or the open A. The practice screen offers both as Low and High,
+// and a mock audition accepts whichever octave was played.
+function variant(name, letter, alter, fifths, octave, oneOctave = null, also = null) {
+  return { name, letter, alter, fifths, octave, oneOctave, also };
 }
 
 // Ordered the way a violinist meets them — by where the scale starts on the
@@ -70,9 +72,9 @@ function variant(name, letter, alter, fifths, octave, oneOctave = null) {
 // first position. The old order was the circle of fifths, which is a theorist's
 // order rather than a player's.
 export const MAJOR_KEYS = [
-  { id: 'G', variants: [variant('G', 4, 0, 1, 3)] },
+  { id: 'G', variants: [variant('G', 4, 0, 1, 3, null, 4)] },
   { id: 'Ab', variants: [variant('A\u266D', 5, -1, -4, 3)] },
-  { id: 'A', variants: [variant('A', 5, 0, 3, 3, 4)] },
+  { id: 'A', variants: [variant('A', 5, 0, 3, 3, 4, 3)] },
   { id: 'Bb', variants: [variant('B\u266D', 6, -1, -2, 3)] },
   { id: 'B', variants: [variant('B', 6, 0, 5, 3), variant('C\u266D', 0, -1, -7, 4)] },
   { id: 'C', variants: [variant('C', 0, 0, 0, 4)] },
@@ -122,11 +124,13 @@ function buildAscending(tonic, sig, form, octaves) {
 
 export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melodic', octaves = 2, register = null) {
   const v = card.variants[Math.min(variantIndex, card.variants.length - 1)];
-  // Two starting octaves to choose from, or none: only a one-octave scale whose
-  // usual start sits above the two-octave one.
-  const choosable = octaves === 1 && v.oneOctave != null && v.oneOctave !== v.octave;
-  const reg = choosable ? (register === 'low' ? 'low' : 'high') : null;
-  const start = octaves === 1 && v.oneOctave != null && reg !== 'low' ? v.oneOctave : v.octave;
+  // The usual one-octave start, and the other one where there is a choice.
+  const usual = octaves === 1 && v.oneOctave != null ? v.oneOctave : v.octave;
+  const choosable = octaves === 1 && v.also != null && v.also !== usual;
+  const low = choosable ? Math.min(usual, v.also) : usual;
+  const high = choosable ? Math.max(usual, v.also) : usual;
+  const start = !choosable ? usual : register === 'low' ? low : register === 'high' ? high : usual;
+  const reg = choosable ? (start === low ? 'low' : 'high') : null;
   const tonic = { letter: v.letter, alter: v.alter, octave: start };
   const sig = keySignature(v.fifths);
   const up = buildAscending(tonic, sig, mode === 'minor' ? form : 'major', octaves);
@@ -172,8 +176,8 @@ export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melod
     // when there is nothing to choose.
     registers: choosable
       ? [
-          { id: 'low', from: makeNote(v.letter, v.alter, v.octave).name },
-          { id: 'high', from: makeNote(v.letter, v.alter, v.oneOctave).name },
+          { id: 'low', from: makeNote(v.letter, v.alter, low).name },
+          { id: 'high', from: makeNote(v.letter, v.alter, high).name },
         ]
       : [],
     meta: t(`meta.${octaves === 1 ? 1 : 2}`, { o: octaves, n: sequence.length }),

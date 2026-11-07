@@ -1,31 +1,31 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611078900';
-import { renderStaff } from './staff.js?v=202611078900';
-import { createInk } from './ink.js?v=202611078900';
-import { createFollower } from './follow.js?v=202611078900';
-import { createPetRoom } from './petroom.js?v=202611078900';
-import { createBuddy } from './buddy.js?v=202611078900';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611079000';
+import { renderStaff } from './staff.js?v=202611079000';
+import { createInk } from './ink.js?v=202611079000';
+import { createFollower } from './follow.js?v=202611079000';
+import { createPetRoom } from './petroom.js?v=202611079000';
+import { createBuddy } from './buddy.js?v=202611079000';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611078900';
+window.__scaleStudioVersion = '202611079000';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611078900';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611078900';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611078900';
-import { generatePassage } from './sightreading.js?v=202611078900';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611078900';
-import { renderScore } from './score.js?v=202611078900';
-import { summariseIntonation } from './intonation.js?v=202611078900';
-import * as Journal from './journal.js?v=202611078900';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611078900';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611078900';
+} from './pitch.js?v=202611079000';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611079000';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611079000';
+import { generatePassage } from './sightreading.js?v=202611079000';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611079000';
+import { renderScore } from './score.js?v=202611079000';
+import { summariseIntonation } from './intonation.js?v=202611079000';
+import * as Journal from './journal.js?v=202611079000';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611079000';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611079000';
 import {
   STRINGS,
   FIFTHS,
@@ -34,7 +34,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611078900';
+} from './tuner.js?v=202611079000';
 
 const LANG = initLang();
 
@@ -4258,7 +4258,25 @@ function finishTake() {
   el.live.hidden = true;
   el.levelBar.hidden = true;
 
-  const result = analyzeTake(take.frames, state.scale);
+  let result = analyzeTake(take.frames, state.scale);
+  // In a mock audition a one-octave G or A may be played from either octave:
+  // score the take against both and keep whichever the student actually played.
+  if (state.test && state.scale.registers?.length === 2) {
+    const other = buildScale(
+      state.scale.card,
+      state.scale.variantIndex,
+      state.scale.mode,
+      state.scale.form || 'melodic',
+      1,
+      state.scale.register === 'low' ? 'high' : 'low',
+    );
+    const alt = analyzeTake(take.frames, other);
+    if (alt.score > result.score) {
+      result = alt;
+      state.scale = other;
+      state.test.scales[state.test.index] = other;
+    }
+  }
   // The scale's own key, not state.cardId: a mock audition never sets that, so
   // every audition take used to be filed under whatever was practised last.
   const cardId = state.scale.cardId || state.cardId;

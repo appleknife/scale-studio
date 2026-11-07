@@ -152,6 +152,17 @@
         check('re-bowed note is not news', r.wrong.length === 0 && r.pos === exp.length, describe(r));
       }
 
+      // 10. One-octave G and A may start from either octave (practice offers
+      // both; a mock audition accepts both). Other keys have one start.
+      {
+        const range = (id, reg) =>
+          buildScale(MAJOR_KEYS.find((c) => c.id === id), 0, 'major', 'melodic', 1, reg).rangeText;
+        check('G one octave: low by default, high on offer', range('G') === 'G3 – G4' && range('G', 'high') === 'G4 – G5', `${range('G')} / ${range('G', 'high')}`);
+        check('A one octave: high by default, low on offer', range('A') === 'A4 – A5' && range('A', 'low') === 'A3 – A4', `${range('A')} / ${range('A', 'low')}`);
+        const d = buildScale(MAJOR_KEYS.find((c) => c.id === 'D'), 0, 'major', 'melodic', 1, 'low');
+        check('D one octave has no choice', d.registers.length === 0 && d.rangeText === 'D4 – D5', d.rangeText);
+      }
+
       const ok = !problems.length;
       document.getElementById('report').textContent = `${ok ? 'FOLLOW OK' : 'FOLLOW FAILED'}\n${log.join('\n')}`;
       document.title = ok ? 'FOLLOW OK' : 'FOLLOW FAILED';
