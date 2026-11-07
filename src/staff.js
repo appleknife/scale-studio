@@ -3,8 +3,8 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202611078800';
-import { intonationLane } from './intonation.js?v=202611078800';
+import { CLEF_PATH } from './clef.js?v=202611078900';
+import { intonationLane } from './intonation.js?v=202611078900';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -237,7 +237,7 @@ export function renderStaff(
 
     // Note head
     part.push(
-      `<ellipse cx="${x}" cy="${y}" rx="5.7" ry="4.2" fill="${color}" transform="rotate(-18 ${x} ${y})"/>`,
+      `<ellipse class="staff-head" data-i="${i}" data-stem="${stemUp ? 'up' : 'down'}" cx="${x}" cy="${y}" rx="5.7" ry="4.2" fill="${color}" transform="rotate(-18 ${x} ${y})"/>`,
     );
 
     if (labels) {

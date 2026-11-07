@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Live follower</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      pre {
+        background: #fffdfa;
+        border: 1px solid #e8dfd1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // The follower keeps place in a scale while it is played and reports a
+      // wrong note with the way the written one lies. Each case below is a
+      // take written as notes (midi, seconds held), turned into 30 ms frames
+      // with a little vibrato, the way the microphone hands them over.
+      import { MAJOR_KEYS, buildScale } from '../src/music.js';
+      import { createFollower } from '../src/follow.js';
+
+      const FRAME = 0.03;
+      const problems = [];
+      const log = [];
+
+      const scaleOf = (id, octaves = 1, register = null) =>
+        buildScale(MAJOR_KEYS.find((c) => c.id === id), 0, 'major', 'melodic', octaves, register).sequence.map(
+          (n) => n.midi,
+        );
+
+      // notes: [midi | null (silence), seconds]
+      function run(expected, notes) {
+        const events = [];
+        const f = createFollower(expected, (e) => events.push(e));
+        let t = 0;
+        for (const [midi, secs] of notes) {
+          const n = Math.max(1, Math.round(secs / FRAME));
+          for (let i = 0; i < n; i++) {
+            const wobble = midi == null ? null : midi + 0.12 * Math.sin(i * 0.9);
+            f.frame(t, wobble);
+            t += FRAME;
+          }
+        }
+        return { events, wrong: events.filter((e) => e.type === 'wrong'), pos: f.position };
+      }
+
+      const played = (expected, secs = 0.3) => expected.map((m) => [m, secs]);
+
+      function check(name, ok, detail) {
+        log.push(`${ok ? '✓' : '✗'} ${name}${detail ? ' — ' + detail : ''}`);
+        if (!ok) problems.push(name + (detail ? ': ' + detail : ''));
+      }
+
+      const describe = (r) => r.wrong.map((e) => `${e.index}${e.dir === 'up' ? '↑' : '↓'}`).join(' ') || 'none';
+
+      // 1. A clean scale: no marks, and the place reaches the end.
+      for (const [id, oct] of [['D', 1], ['A', 1], ['G', 2], ['Bb', 2]]) {
+        const exp = scaleOf(id, oct);
+        const r = run(exp, played(exp));
+        check(`clean ${id} ${oct} oct`, r.wrong.length === 0 && r.pos === exp.length, `marks ${describe(r)}, pos ${r.pos}/${exp.length}`);
+      }
+
+      // 2. D major with F natural for F♯ on the way up: one ↑ on the F♯.
+      {
+        const exp = scaleOf('D'); // D4 E4 F#4 G4 ...
+        const notes = played(exp);
+        notes[2] = [exp[2] - 1, 0.3];
+        const r = run(exp, notes);
+        check('flat third marked up', r.wrong.length === 1 && r.wrong[0].index === 2 && r.wrong[0].dir === 'up', describe(r));
+        check('…and the place carries on', r.pos === exp.length, `pos ${r.pos}`);
+      }
+
+      // 3. A sharp note on the way down: ↓.
+      {
+        const exp = scaleOf('C'); // 15 notes; index 10 is F4 on the way down
+        const notes = played(exp);
+        notes[10] = [exp[10] + 1, 0.3];
+        const r = run(exp, notes);
+        check('sharp note on the way down marked down', r.wrong.length === 1 && r.wrong[0].index === 10 && r.wrong[0].dir === 'down', describe(r));
+      }
+
+      // 4. Wrong, then put right: the follower reports the right note at the same index.
+      {
+        const exp = scaleOf('D');
+        const notes = played(exp);
+        notes.splice(2, 0, [exp[2] - 1, 0.3]);
+        const r = run(exp, notes);
+        const fixed = r.events.findIndex((e) => e.type === 'right' && e.index === 2);
+        const wrongFirst = r.events.findIndex((e) => e.type === 'wrong' && e.index === 2);
+        check('a corrected note clears', wrongFirst >= 0 && fixed > wrongFirst, describe(r));
+      }
+
+      // 5. A skipped note is not a wrong note.
+      {
+        const exp = scaleOf('G', 2);
+        const notes = played(exp);
+        notes.splice(5, 1);
+        const r = run(exp, notes);
+        check('skipped note leaves no mark', r.wrong.length === 0 && r.pos === exp.length, describe(r));
+      }
+
+      // 6. Shift slides and bow-change blips (40 ms) are not judged.
+      {
+        const exp = scaleOf('A', 1, 'low');
+        const notes = [];
+        exp.forEach((m, i) => {
+          notes.push([m, 0.3]);
+          if (i < exp.length - 1) notes.push([m + (exp[i + 1] > m ? 1 : -1) * 0.5 + 3, 0.04], [null, 0.03]);
+        });
+        const r = run(exp, notes);
+        check('blips between notes ignored', r.wrong.length === 0 && r.pos === exp.length, describe(r));
+      }
+
+      // 7. A tracker octave slip held for a while is not marked.
+      {
+        const exp = scaleOf('E');
+        const notes = played(exp);
+        notes[4] = [exp[4] + 12, 0.3];
+        const r = run(exp, notes);
+        check('octave slip not marked', r.wrong.length === 0, describe(r));
+      }
+
+      // 8. Two wrong notes in a row, each a try at its own note.
+      {
+        const exp = scaleOf('E'); // E F# G# A B ...
+        const notes = played(exp);
+        notes[1] = [exp[1] - 1, 0.3]; // F instead of F#
+        notes[2] = [exp[2] - 1, 0.3]; // G instead of G#
+        const r = run(exp, notes);
+        check(
+          'two wrong in a row land on their own notes',
+          r.wrong.length === 2 && r.wrong[0].index === 1 && r.wrong[1].index === 2 && r.wrong.every((w) => w.dir === 'up'),
+          describe(r),
+        );
+        check('…and the place carries on', r.pos === exp.length, `pos ${r.pos}`);
+      }
+
+      // 9. A re-bowed note (same pitch, a gap between) does not move the place on.
+      {
+        const exp = scaleOf('D');
+        const notes = played(exp).flatMap((n, i) => (i === 3 ? [n, [null, 0.08], n] : [n]));
+        const r = run(exp, notes);
+        check('re-bowed note is not news', r.wrong.length === 0 && r.pos === exp.length, describe(r));
+      }
+
+      const ok = !problems.length;
+      document.getElementById('report').textContent = `${ok ? 'FOLLOW OK' : 'FOLLOW FAILED'}\n${log.join('\n')}`;
+      document.title = ok ? 'FOLLOW OK' : 'FOLLOW FAILED';
+    </script>
+  </body>
+</html>

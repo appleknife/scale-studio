@@ -1,30 +1,31 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611078800';
-import { renderStaff } from './staff.js?v=202611078800';
-import { createInk } from './ink.js?v=202611078800';
-import { createPetRoom } from './petroom.js?v=202611078800';
-import { createBuddy } from './buddy.js?v=202611078800';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611078900';
+import { renderStaff } from './staff.js?v=202611078900';
+import { createInk } from './ink.js?v=202611078900';
+import { createFollower } from './follow.js?v=202611078900';
+import { createPetRoom } from './petroom.js?v=202611078900';
+import { createBuddy } from './buddy.js?v=202611078900';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611078800';
+window.__scaleStudioVersion = '202611078900';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611078800';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611078800';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611078800';
-import { generatePassage } from './sightreading.js?v=202611078800';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611078800';
-import { renderScore } from './score.js?v=202611078800';
-import { summariseIntonation } from './intonation.js?v=202611078800';
-import * as Journal from './journal.js?v=202611078800';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611078800';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611078800';
+} from './pitch.js?v=202611078900';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611078900';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611078900';
+import { generatePassage } from './sightreading.js?v=202611078900';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611078900';
+import { renderScore } from './score.js?v=202611078900';
+import { summariseIntonation } from './intonation.js?v=202611078900';
+import * as Journal from './journal.js?v=202611078900';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611078900';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611078900';
 import {
   STRINGS,
   FIFTHS,
@@ -33,7 +34,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611078800';
+} from './tuner.js?v=202611078900';
 
 const LANG = initLang();
 
@@ -3514,6 +3515,92 @@ function applyNotationVisibility() {
   el.notationBtn.setAttribute('aria-pressed', String(!state.showNotation));
 }
 
+/* ── Live marks: a wrong note gets an arrow toward the written one ─────── */
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const WRONG = '#a4534a';
+
+function followLayer(create = true) {
+  const svg = el.staffHost.querySelector('svg.staff');
+  if (!svg) return null;
+  let layer = svg.querySelector('g.staff-follow');
+  if (!layer && create) {
+    layer = document.createElementNS(SVG_NS, 'g');
+    layer.setAttribute('class', 'staff-follow');
+    layer.setAttribute('aria-hidden', 'true');
+    svg.appendChild(layer);
+  }
+  return layer;
+}
+
+function clearFollowMarks() {
+  const svg = el.staffHost.querySelector('svg.staff');
+  if (!svg) return;
+  followLayer(false)?.remove();
+  svg.querySelectorAll('ellipse.staff-head.is-wrong').forEach((head) => {
+    head.classList.remove('is-wrong');
+    head.setAttribute('fill', head.dataset.fill);
+  });
+}
+
+/**
+ * One event from the follower. A wrong note: tint the head that was due and
+ * put an arrow on the side away from its stem — above if the stem hangs down,
+ * below if it points up — pointing the way the written note lies. Put right
+ * afterwards, the mark comes off; played past, it stays as a record.
+ */
+function paintFollow(event) {
+  const svg = el.staffHost.querySelector('svg.staff');
+  const head = svg?.querySelector(`ellipse.staff-head[data-i="${event.index}"]`);
+  if (!head) return;
+  const layer = followLayer();
+  layer.querySelector(`[data-i="${event.index}"]`)?.remove();
+
+  if (event.type === 'right') {
+    if (head.classList.contains('is-wrong')) {
+      head.classList.remove('is-wrong');
+      head.setAttribute('fill', head.dataset.fill);
+    }
+    return;
+  }
+
+  const x = Number(head.getAttribute('cx'));
+  const y = Number(head.getAttribute('cy'));
+  if (!head.classList.contains('is-wrong')) head.dataset.fill = head.getAttribute('fill');
+  head.classList.add('is-wrong');
+  head.setAttribute('fill', WRONG);
+
+  // The arrow sits on the side away from the stem, 9 units off the head, 17 long.
+  const above = head.dataset.stem === 'down';
+  const near = above ? y - 9 : y + 9;
+  const far = above ? near - 17 : near + 17;
+  const top = Math.min(near, far);
+  const bottom = Math.max(near, far);
+  const up = event.dir === 'up';
+  const tip = up ? top : bottom;
+  const tail = up ? bottom : top;
+  const back = up ? 6 : -6; // from the tip back toward the tail
+  const g = document.createElementNS(SVG_NS, 'g');
+  g.setAttribute('class', `follow-arrow is-${event.dir}`);
+  g.dataset.i = String(event.index);
+  g.innerHTML =
+    `<line x1="${x}" y1="${tail}" x2="${x}" y2="${tip + back * 0.7}" stroke="${WRONG}" stroke-width="2.4" stroke-linecap="round"/>` +
+    `<path d="M ${x - 5} ${tip + back} L ${x} ${tip} L ${x + 5} ${tip + back} Z" fill="${WRONG}" stroke="${WRONG}" stroke-width="1.2" stroke-linejoin="round"/>`;
+  layer.appendChild(g);
+  revealOnStaff(x, svg);
+}
+
+/** On a phone the staff scrolls: bring a fresh mark into view if it is off-screen. */
+function revealOnStaff(x, svg) {
+  const host = el.staffHost;
+  if (host.scrollWidth <= host.clientWidth + 2) return;
+  const px = (x / svg.viewBox.baseVal.width) * svg.getBoundingClientRect().width;
+  const left = host.scrollLeft;
+  if (px < left + 24 || px > left + host.clientWidth - 24) {
+    host.scrollTo({ left: Math.max(0, px - host.clientWidth / 2), behavior: 'smooth' });
+  }
+}
+
 function resetListenUI() {
   el.listenCard.classList.remove('is-live');
   el.listenStatus.classList.remove('is-live');
@@ -3995,7 +4082,14 @@ function beginTake() {
     lastMidi: null,
     done: false,
     peak: 0,
+    // Keeps place in the scale as it is played, and marks a wrong note on the
+    // staff with which way the written one lies.
+    follow: createFollower(
+      state.scale.sequence.map((n) => n.midi),
+      paintFollow,
+    ),
   };
+  clearFollowMarks();
 
   setStatus(true, t('status.listening'));
   el.listenHint.textContent = state.test ? t('hint.beginTest') : t('hint.playing');
@@ -4080,6 +4174,7 @@ function onFrame(frame) {
 
   const elapsed = Math.max(0, frame.t - take.t0);
   take.frames.push({ t: elapsed, freq: frame.freq, clarity: frame.clarity, rms: frame.rms });
+  take.follow?.frame(elapsed, voiced ? 69 + 12 * Math.log2(frame.freq / 440) : null);
 
   if (voiced) {
     take.lastVoiced = elapsed;

@@ -3682,6 +3682,23 @@ dialog .primary-btn {
   color: var(--muted);
 }
 
+/* A wrong note's arrow arrives with a small nudge in the way it points. */
+.follow-arrow {
+  animation: follow-in-up 0.22s ease-out;
+}
+.follow-arrow.is-down {
+  animation-name: follow-in-down;
+}
+@keyframes follow-in-up {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@keyframes follow-in-down {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .follow-arrow { animation: none; }
+}
+
 /* With a tool on, the staff takes the finger instead of scrolling. */
 .staff-scroll svg.is-inking {
   touch-action: none;
