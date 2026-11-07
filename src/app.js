@@ -1,30 +1,30 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611068800';
-import { renderStaff } from './staff.js?v=202611068800';
-import { createInk } from './ink.js?v=202611068800';
-import { createPetRoom } from './petroom.js?v=202611068800';
-import { createBuddy } from './buddy.js?v=202611068800';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611078800';
+import { renderStaff } from './staff.js?v=202611078800';
+import { createInk } from './ink.js?v=202611078800';
+import { createPetRoom } from './petroom.js?v=202611078800';
+import { createBuddy } from './buddy.js?v=202611078800';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611068800';
+window.__scaleStudioVersion = '202611078800';
 import {
   PitchDetector,
   midiToFreq,
   nextFloor,
   quietLevel,
   strongLevel,
-} from './pitch.js?v=202611068800';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611068800';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611068800';
-import { generatePassage } from './sightreading.js?v=202611068800';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611068800';
-import { renderScore } from './score.js?v=202611068800';
-import { summariseIntonation } from './intonation.js?v=202611068800';
-import * as Journal from './journal.js?v=202611068800';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611068800';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611068800';
+} from './pitch.js?v=202611078800';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611078800';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611078800';
+import { generatePassage } from './sightreading.js?v=202611078800';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611078800';
+import { renderScore } from './score.js?v=202611078800';
+import { summariseIntonation } from './intonation.js?v=202611078800';
+import * as Journal from './journal.js?v=202611078800';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611078800';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611078800';
 import {
   STRINGS,
   FIFTHS,
@@ -33,7 +33,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611068800';
+} from './tuner.js?v=202611078800';
 
 const LANG = initLang();
 
@@ -208,6 +208,7 @@ const el = {
   memoryMeta: $('memoryMeta'),
   notationBtn: $('notationBtn'),
   spellingRow: $('spellingRow'),
+  registerRow: $('registerRow'),
   backBtn: $('backBtn'),
 
   listenCard: $('listenCard'),
@@ -302,11 +303,45 @@ function devLog(stage, data = {}) {
 // One set of marks for the scale staff; the buttons follow its state.
 const ink = createInk({ onChange: (inkState) => paintInkTools(inkState) });
 
+const REGISTER_KEY = 'scaleStudio.registers';
+
+function loadRegisters() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(REGISTER_KEY) || '{}');
+    return saved && typeof saved === 'object' ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRegisters() {
+  try {
+    localStorage.setItem(REGISTER_KEY, JSON.stringify(state.registers));
+  } catch {
+    /* private mode — the choice lasts until the page closes */
+  }
+}
+
+/** The scale the practice screen shows, built from everything chosen on it. */
+function practiceScale() {
+  return buildScale(
+    cardById(state.cardId),
+    state.variantIndex,
+    state.mode,
+    state.form,
+    state.practiceOctaves,
+    state.registers[state.cardId],
+  );
+}
+
 const state = {
   mode: 'major',
   form: 'melodic',
   cardId: 'C',
   variantIndex: 0,
+  // Which octave a one-octave scale starts from, per card, where there is a
+  // choice (A major: the G string or the open A). Missing means the default.
+  registers: loadRegisters(),
   scale: null,
   phase: 'idle', // idle | requesting | armed | taking | finishing | between
   take: null,
@@ -3398,7 +3433,7 @@ function openScale(cardId, variantIndex = 0) {
   el.testBar.hidden = true;
   state.cardId = cardId;
   state.variantIndex = variantIndex;
-  state.scale = buildScale(cardById(cardId), variantIndex, state.mode, state.form, state.practiceOctaves);
+  state.scale = practiceScale();
   state.phase = 'idle';
   renderPractice();
   showView('practice');
@@ -3449,6 +3484,15 @@ function renderPractice() {
     b.setAttribute('aria-selected', String(Number(b.dataset.oct) === scale.octaves)),
   );
   el.octaveTabs.hidden = Boolean(state.test);
+  // One octave of A can start on the G string or the open A; both are asked for.
+  const regs = scale.registers || [];
+  el.registerRow.hidden = Boolean(state.test) || regs.length < 2;
+  el.registerRow.innerHTML = regs
+    .map(
+      (r) =>
+        `<button type="button" data-register="${r.id}" aria-pressed="${r.id === scale.register}" title="${t('reg.title', { from: r.from })}">${t(`reg.${r.id}`, { name: scale.name })}</button>`,
+    )
+    .join('');
   applyNotationVisibility();
   if (scale.spellings.length > 1) {
     el.spellingRow.innerHTML = scale.spellings
@@ -4436,13 +4480,7 @@ el.octaveTabs.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-oct]');
   if (!btn) return;
   state.practiceOctaves = Number(btn.dataset.oct);
-  state.scale = buildScale(
-    cardById(state.cardId),
-    state.variantIndex,
-    state.mode,
-    state.form,
-    state.practiceOctaves,
-  );
+  state.scale = practiceScale();
   renderPractice();
 });
 
@@ -4485,13 +4523,16 @@ el.spellingRow.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-variant]');
   if (!btn) return;
   state.variantIndex = Number(btn.dataset.variant);
-  state.scale = buildScale(
-    cardById(state.cardId),
-    state.variantIndex,
-    state.mode,
-    state.form,
-    state.practiceOctaves,
-  );
+  state.scale = practiceScale();
+  renderPractice();
+});
+
+el.registerRow.addEventListener('click', (event) => {
+  const btn = event.target.closest('button[data-register]');
+  if (!btn || !state.scale) return;
+  state.registers[state.cardId] = btn.dataset.register;
+  saveRegisters();
+  state.scale = practiceScale();
   renderPractice();
 });
 

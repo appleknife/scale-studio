@@ -4,7 +4,7 @@
 // than raw MIDI numbers, so the staff can be drawn with the right accidentals
 // and the app can show enharmonic spellings (F♯ / G♭, C♯ / D♭, B / C♭).
 
-import { getLang, t } from './i18n.js?v=202611068800';
+import { getLang, t } from './i18n.js?v=202611078800';
 
 export const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const LETTER_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
@@ -58,6 +58,9 @@ export function makeNote(letter, alter, octave) {
 // `oneOctave`, where given, is the starting octave for the one-octave form
 // (Levels I–IV). A few keys sit better an octave up when there is only one
 // octave to play: A major from the open A string rather than from the G string.
+// Teachers ask for both, though, so where `oneOctave` differs from `octave` the
+// one-octave scale can start from either: 'high' (the default, `oneOctave`) or
+// 'low' (`octave`, the same tonic the two-octave scale starts from).
 function variant(name, letter, alter, fifths, octave, oneOctave = null) {
   return { name, letter, alter, fifths, octave, oneOctave };
 }
@@ -117,9 +120,13 @@ function buildAscending(tonic, sig, form, octaves) {
   return notes;
 }
 
-export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melodic', octaves = 2) {
+export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melodic', octaves = 2, register = null) {
   const v = card.variants[Math.min(variantIndex, card.variants.length - 1)];
-  const start = octaves === 1 && v.oneOctave != null ? v.oneOctave : v.octave;
+  // Two starting octaves to choose from, or none: only a one-octave scale whose
+  // usual start sits above the two-octave one.
+  const choosable = octaves === 1 && v.oneOctave != null && v.oneOctave !== v.octave;
+  const reg = choosable ? (register === 'low' ? 'low' : 'high') : null;
+  const start = octaves === 1 && v.oneOctave != null && reg !== 'low' ? v.oneOctave : v.octave;
   const tonic = { letter: v.letter, alter: v.alter, octave: start };
   const sig = keySignature(v.fifths);
   const up = buildAscending(tonic, sig, mode === 'minor' ? form : 'major', octaves);
@@ -160,6 +167,15 @@ export function buildScale(card, variantIndex = 0, mode = 'major', form = 'melod
     sequence,
     rangeText: `${sequence[0].name} – ${sequence[octaves * 7].name}`,
     octaves,
+    register: reg,
+    // The two starts on offer, low first, as note names ('A3', 'A4'); empty
+    // when there is nothing to choose.
+    registers: choosable
+      ? [
+          { id: 'low', from: makeNote(v.letter, v.alter, v.octave).name },
+          { id: 'high', from: makeNote(v.letter, v.alter, v.oneOctave).name },
+        ]
+      : [],
     meta: t(`meta.${octaves === 1 ? 1 : 2}`, { o: octaves, n: sequence.length }),
     card,
   };

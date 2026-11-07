@@ -735,6 +735,10 @@ export const S = {
   'tuner.pairHint': ['tune {tune} to {base}', '{tune} 对 {base}'],
 
   'oct.short': ['{n} oct', '{n} 个八度'],
+  'reg.low': ['Low {name}', '低音 {name}'],
+  'reg.high': ['High {name}', '高音 {name}'],
+  'reg.title': ['Starts on {from}', '从 {from} 开始'],
+  'aria.register': ['Starting octave', '起始八度'],
 
   /* screen-reader labels (also used by [data-i18n-aria] in the HTML) */
   'aria.back': ['Back to scale list', '回到音阶列表'],
