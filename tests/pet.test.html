@@ -99,6 +99,43 @@
         eq('…with no celebration owed', P.unseenGrowth(old), null);
       }
 
+      // Feeding: a growth boost on a fed day, and tricks from favourite snacks
+      {
+        const p = P.emptyPet();
+        P.chooseEgg(p, 'dog');
+        for (let i = 0; i < P.HATCH_TAKES; i += 1) P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-12-01' });
+        P.hatch(p, 0, 0.9);
+        P.name(p, 'Biscuit');
+        p.notes = 500;
+        const day = '2026-12-02';
+        const g0 = p.pet.growth;
+        P.earn(p, { kind: 'scale', id: 'G', dayKey: day });
+        eq('unfed: a take grows it by one (no penalty)', p.pet.growth - g0, 1);
+        const meal = P.feed(p, 'berry', Date.now(), day);
+        eq('the first snack of the day starts the boost', meal.boostStarted, true);
+        eq('five boosted takes on offer', P.boostLeft(p, day), P.FED_BOOST);
+        let boosted = 0;
+        for (let i = 0; i < P.FED_BOOST + 3; i += 1) if (P.earn(p, { kind: 'scale', id: 'G', dayKey: day }).boosted) boosted += 1;
+        eq('only FED_BOOST takes are doubled', boosted, P.FED_BOOST);
+        eq('growth: 1 + 5×2 + 3', p.pet.growth - g0, 1 + 2 * P.FED_BOOST + 3);
+        eq('a second snack the same day adds no more boost', [P.feed(p, 'cookie', Date.now(), day).boostStarted, P.boostLeft(p, day)], [false, 0]);
+        eq('the next day starts unboosted', P.boostLeft(p, '2026-12-03'), 0);
+
+        const learned = [];
+        for (let i = 0; i < P.TRICK_EVERY * P.TRICKS.length + 3; i += 1) {
+          const m = P.feed(p, 'treat', Date.now(), day);
+          if (m.learned) learned.push(m.learned);
+        }
+        eq('a trick every TRICK_EVERY favourite snacks, in order', learned, P.TRICKS);
+        eq('it knows them all', P.tricksOf(p.pet), P.TRICKS);
+        eq('no next trick once all are learned', P.toNextTrick(p.pet), null);
+        const plainSnacks = P.emptyPet();
+        plainSnacks.pet = { species: 'cat', name: 'M', growth: 0, favs: 0 };
+        plainSnacks.notes = 100;
+        for (let i = 0; i < 10; i += 1) P.feed(plainSnacks, 'berry', Date.now(), day);
+        eq('ordinary snacks teach no tricks', P.tricksOf(plainSnacks.pet), []);
+      }
+
       // Eggs and hatching
       {
         const p = P.emptyPet();

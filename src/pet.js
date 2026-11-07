@@ -45,6 +45,16 @@ export const RARE_CHANCE = 1 / 8;
 /** The warmth a second (third, …) egg starts with: it is never a cold start. */
 export const NEXT_EGG_WARMTH = 1;
 
+/**
+ * Feeding has an effect, and only a good one (a pet that wasn't fed grows at the
+ * normal speed — there is no penalty to fear):
+ *   - fed today: the next FED_BOOST takes today count double towards growing;
+ *   - its favourite snack, every TRICK_EVERY times, teaches it a trick.
+ */
+export const FED_BOOST = 5;
+export const TRICK_EVERY = 5;
+export const TRICKS = ['spin', 'jump', 'dance', 'roll'];
+
 /** Notes a day before takes start earning only a little. */
 export const DAILY_CAP = 60;
 
@@ -195,15 +205,45 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
     pet.egg.warmth += 1;
     warmed = true;
   }
-  // The pet in the room grows with every counted take, whatever it scored.
+  // The pet in the room grows with every counted take, whatever it scored — and
+  // twice as fast for a few takes on a day it has been fed.
   let grew = null;
+  let boosted = false;
   if (pet.pet && pet.pet.name) {
     const before = stageOf(pet.pet);
-    pet.pet.growth = (pet.pet.growth || 0) + 1;
+    boosted = boostLeft(pet, dayKey) > 0;
+    if (boosted) pet.pet.boost = { day: dayKey, used: (pet.pet.boost?.day === dayKey ? pet.pet.boost.used : 0) + 1 };
+    pet.pet.growth = (pet.pet.growth || 0) + (boosted ? 2 : 1);
     const after = stageOf(pet.pet);
     if (after !== before) grew = after;
   }
-  return { amount, warmed, bonus, grew };
+  return { amount, warmed, bonus, grew, boosted };
+}
+
+/** The local calendar day, as the journal writes it. */
+export function dayKeyOf(ms = Date.now()) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Double-growth takes left today: FED_BOOST on a day it was fed, less those used. */
+export function boostLeft(pet, dayKey = dayKeyOf()) {
+  const a = pet.pet;
+  if (!a || a.fedDay !== dayKey || stageOf(a) === 'grown') return 0;
+  const used = a.boost && a.boost.day === dayKey ? a.boost.used : 0;
+  return Math.max(0, FED_BOOST - used);
+}
+
+/** The tricks a pet knows, in the order it learned them. */
+export function tricksOf(animal) {
+  if (!animal) return [];
+  return TRICKS.slice(0, Math.min(TRICKS.length, Math.floor((animal.favs || 0) / TRICK_EVERY)));
+}
+
+/** Favourite snacks still to go before the next trick, or null when it knows them all. */
+export function toNextTrick(animal) {
+  if (!animal || tricksOf(animal).length >= TRICKS.length) return null;
+  return { done: (animal.favs || 0) % TRICK_EVERY, need: TRICK_EVERY };
 }
 
 /* ── Growing ───────────────────────────────────────────────────────────── */
@@ -333,7 +373,7 @@ export function snackFor(species, snackId) {
   return { ...snack, look, favourite: Boolean(snack.special) };
 }
 
-export function feed(pet, snackId, now = Date.now()) {
+export function feed(pet, snackId, now = Date.now(), dayKey = dayKeyOf(now)) {
   if (!pet.pet) return null;
   const snack = snackFor(pet.pet.species, snackId);
   if (!snack || pet.notes < snack.cost) return null;
@@ -341,7 +381,17 @@ export function feed(pet, snackId, now = Date.now()) {
   pet.pet.fullness = Math.min(100, fullness(pet, now) + snack.fill);
   pet.pet.fedAt = now;
   pet.pet.snacks = (pet.pet.snacks || 0) + 1;
-  return snack;
+  // The first snack of the day switches on the growth boost for today.
+  const boostStarted = pet.pet.fedDay !== dayKey && stageOf(pet.pet) !== 'grown';
+  pet.pet.fedDay = dayKey;
+  let learned = null;
+  if (snack.favourite) {
+    const before = tricksOf(pet.pet).length;
+    pet.pet.favs = (pet.pet.favs || 0) + 1;
+    const now2 = tricksOf(pet.pet);
+    if (now2.length > before) learned = now2[now2.length - 1];
+  }
+  return { ...snack, learned, boostStarted };
 }
 
 export function buy(pet, itemId) {

@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611079300';
+import * as Pet from './pet.js?v=202611079400';
 import {
   petMarkup,
   eggMarkup,
@@ -29,8 +29,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611079300';
-import { t } from './i18n.js?v=202611079300';
+} from './petart.js?v=202611079400';
+import { t } from './i18n.js?v=202611079400';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -367,12 +367,36 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       say(t('pet.say.yawn'));
       return;
     }
+    // A pet that knows tricks shows one off now and then when patted.
+    const known = Pet.tricksOf(pet.pet);
+    if (known.length && Math.random() < 0.45) {
+      doTrick(pick(known));
+      return;
+    }
     setMode('happy');
     hop();
     hearts(3);
     if (isFish()) bubbles();
     say(t(pick(SOUNDS[pet.pet.species])));
     later(() => mode === 'happy' && setMode('idle'), 1500);
+  }
+
+  /** One trick: the whole pet moves (spin, jump, dance or roll), then hearts. */
+  function doTrick(id, line = t('pet.trick.watch')) {
+    if (!layers.pet) return;
+    setMode('happy');
+    const g = layers.pet;
+    for (const tr of Pet.TRICKS) g.classList.remove(`trick-${tr}`);
+    void g.getBoundingClientRect();
+    g.classList.add(`trick-${id}`);
+    say(line, 2000);
+    setTimeout(() => {
+      g.classList.remove(`trick-${id}`);
+      if (!running) return;
+      hearts(3);
+      sparkles(pos.x, pos.y - (isFish() ? 10 : 36), 6);
+      later(() => mode === 'happy' && setMode('idle'), 900);
+    }, 1150);
   }
 
   function kickBall() {
@@ -530,7 +554,19 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       setMode('happy');
       hop();
       hearts(snack.favourite ? 5 : 3);
-      say(t(snack.favourite ? 'pet.say.favourite' : 'pet.say.yum'));
+      if (snack.learned) {
+        // A new trick, learned from its favourite snack: shown off at once.
+        say(t('pet.trick.learned', { trick: t(`pet.trick.${snack.learned}`) }), 2400);
+        later(() => doTrick(snack.learned, t('pet.trick.tada')), 2200);
+        paintPanel();
+        return;
+      }
+      if (snack.boostStarted) {
+        sparkles(pos.x, pos.y - (isFish() ? 10 : 36), 10);
+        say(t('pet.boost.say'), 2600);
+      } else {
+        say(t(snack.favourite ? 'pet.say.favourite' : 'pet.say.yum'));
+      }
       later(() => mode === 'happy' && setMode('idle'), 1600);
     }, 600 + bites.length * 650);
   }
@@ -635,7 +671,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       const pct = Math.round((left.done / left.need) * 100);
       body = `<div class="grow-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${left.need}" aria-valuenow="${left.done}">
           <span class="grow-fill" style="width:${pct}%"></span></div>
-        <span class="grow-text">${t(left.next === 'kid' ? 'pet.grow.toKid' : 'pet.grow.toGrown', { done: left.done, need: left.need, name })}</span>`;
+        <span class="grow-text">${t(left.next === 'kid' ? 'pet.grow.toKid' : 'pet.grow.toGrown', { done: left.done, need: left.need, name })}</span>
+        ${Pet.boostLeft(pet) ? `<span class="grow-boost">⚡ ${t('pet.boost.left', { n: Pet.boostLeft(pet), name })}</span>` : ''}`;
     } else if (Pet.canChooseNextEgg(pet)) {
       body = `<span class="grow-text is-grown">${t('pet.grown', { name })}</span>
         <button class="primary-btn small" type="button" data-act="choose-next">${t('pet.next.btn')}</button>`;
@@ -666,7 +703,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         return `<button class="tray-item pet-card${here ? ' is-out' : ''}${a.variant === 'rare' ? ' is-rare' : ''}" type="button" ${here || egg ? 'disabled' : `data-friend="${index}"`}>
           ${petIcon(a.species, '', a.variant)}
           <span class="tray-name">${esc(a.name || t(`pet.kind.${a.species}`))}</span>
-          <span class="tray-stage">${t(`pet.stage.${Pet.stageOf(a)}`)}</span>
+          <span class="tray-stage">${t(`pet.stage.${Pet.stageOf(a)}`)}${Pet.tricksOf(a).length ? ` · ★ ${Pet.tricksOf(a).length}` : ''}</span>
           ${action}</button>`;
       })
       .join('');
@@ -699,7 +736,27 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         <span class="tray-name">${t(`pet.food.${snack.look}`)}${snack.favourite ? ` <span class="fav-star" aria-label="${t('pet.fav')}">★</span>` : ''}</span>
         <span class="tray-cost">♪ ${s.cost}</span></button>`;
     }).join('')}</div>
+    ${feedInfo()}
     <p class="pet-note">${t('pet.feed.note', { name: esc(pet.pet.name) })}</p>`;
+  }
+
+  /** What snacks do: today's growth boost, and how close the next trick is. */
+  function feedInfo() {
+    const a = pet.pet;
+    const name = esc(a.name);
+    const left = Pet.boostLeft(pet);
+    const grown = Pet.stageOf(a) === 'grown';
+    const boost = grown
+      ? ''
+      : a.fedDay === Pet.dayKeyOf()
+        ? `<li>⚡ ${left ? t('pet.boost.left', { n: left, name }) : t('pet.boost.used', { name })}</li>`
+        : `<li>⚡ ${t('pet.boost.offer', { n: Pet.FED_BOOST, name })}</li>`;
+    const next = Pet.toNextTrick(a);
+    const fav = t(`pet.food.${Pet.snackFor(a.species, 'treat').look}`);
+    const trick = next
+      ? `<li>★ ${t('pet.trick.progress', { done: next.done, need: next.need, fav, name })}</li>`
+      : `<li>★ ${t('pet.trick.all', { name })}</li>`;
+    return `<ul class="feed-info">${boost}${trick}</ul>`;
   }
 
   function decorTray() {
