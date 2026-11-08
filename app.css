@@ -5416,12 +5416,12 @@ select,
 }
 
 .sprint-colhead {
-  font: 700 15px var(--sans);
+  font: 700 22px var(--sans);
   fill: var(--muted);
 }
 
 .sprint-name {
-  font: 600 9.5px var(--sans);
+  font: 700 12px var(--sans);
   fill: #c9bfb1;
 }
 

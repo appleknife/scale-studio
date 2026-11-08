@@ -46,9 +46,9 @@ export function displayName(id) {
 
 /**
  * Every row of the picker, low to high: one row per staff position, with the
- * natural, the sharp and the flat on it. E♯, B♯, F♭ and C♭ are left out — they
- * are real, but no student reading at these levels meets them — and so is
- * anything outside G3–F6 (G♭3 sounds below the open G).
+ * natural, the sharp and the flat on it — E♯, B♯, F♭ and C♭ included, so every
+ * column is complete. Only what sounds outside G3–F6 is left out: G♭3 is below
+ * the open G, F♯6 above the top F.
  */
 export function rows() {
   const out = [];
@@ -59,7 +59,6 @@ export function rows() {
     const lo = midiOf(LOW.letter, 0, LOW.octave);
     const hi = midiOf(HIGH.letter, 0, HIGH.octave);
     const cell = (alter) => {
-      if ((alter === 1 && (letter === 'E' || letter === 'B')) || (alter === -1 && (letter === 'F' || letter === 'C'))) return null;
       const midi = midiOf(letter, alter, octave);
       if (midi < lo || midi > hi) return null;
       return { id: noteId(letter, alter, octave), letter, alter, octave, midi };

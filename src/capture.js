@@ -9,7 +9,7 @@
 //
 // Nothing here touches the DOM, so `tests/capture.test.html` can weigh it.
 
-import { makeNote } from './music.js?v=202611089700';
+import { makeNote } from './music.js?v=202611089800';
 
 /* ── What to record ───────────────────────────────────────────────────── */
 

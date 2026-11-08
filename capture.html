@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Scale Studio — the playback voice</title>
-    <link rel="stylesheet" href="app.css?v=202611089700" />
+    <link rel="stylesheet" href="app.css?v=202611089800" />
     <link rel="icon" href="icons/icon-192.png" />
     <style>
       /* A tool page, so it borrows the app's paper and ink and adds only what a
@@ -332,7 +332,7 @@
     </div>
 
     <script type="module">
-      import { renderBar } from './src/score.js?v=202611089700';
+      import { renderBar } from './src/score.js?v=202611089800';
       import {
         STAGES,
         buildTakes,
@@ -340,7 +340,7 @@
         trimTake,
         makeZip,
         openInput,
-      } from './src/capture.js?v=202611089700';
+      } from './src/capture.js?v=202611089800';
 
       const takes = buildTakes();
       const held = new Map(); // id → { wav, seconds, peak }

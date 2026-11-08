@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611089700';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611089700';
-import { CLEF_PATH } from './clef.js?v=202611089700';
-import { hearLevel } from './pitch.js?v=202611089700';
-import { t } from './i18n.js?v=202611089700';
+import * as Sprint from './sprint.js?v=202611089800';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611089800';
+import { CLEF_PATH } from './clef.js?v=202611089800';
+import { hearLevel } from './pitch.js?v=202611089800';
+import { t } from './i18n.js?v=202611089800';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -76,45 +76,46 @@ export function createSprintView(deps) {
   /* ── The picker ──────────────────────────────────────────────────────── */
 
   // The staff, zoomed: a step (line to space) is STEP units, and every row of
-  // sprint.rows() is one step, low G at the bottom to the top F.
+  // sprint.rows() is one step, low G at the bottom to the top F. Heads and signs
+  // are drawn at the staff's own proportions — a head is most of a space tall.
   const ROWS = Sprint.rows();
-  const STEP = 15;
-  const TOP = 32;
-  const COLS = { natural: 150, sharp: 240, flat: 320 };
-  const WIDTH = 370;
-  // Neighbouring notes are a step apart, closer than a head is tall, so they are
-  // set the way a printed cluster is: line notes a little left, space notes a
-  // little right. Every head stands clear, and so does every finger.
-  const zig = (i) => ((i - 5) % 2 === 0 ? -9 : 9);
-  const HEIGHT = TOP + (ROWS.length - 1) * STEP + 34;
+  const STEP = 14;
+  const GAP = 2 * STEP;
+  const TOP = 40;
+  const COLS = { natural: 140, sharp: 285, flat: 400 };
+  const WIDTH = 440;
+  const HEIGHT = TOP + (ROWS.length - 1) * STEP + 40;
+  const HEAD_RX = 0.52 * GAP;
+  const HEAD_RY = 0.37 * GAP;
+  const SIGN = 1.3; // accidentalAt's size, against its own 11-unit space
   const yOfRow = (i) => TOP + (ROWS.length - 1 - i) * STEP;
-  const isLine = (i) => (i - 5) % 2 === 0; // E4 is row 5, on the bottom line
   const STAFF_ROWS = [5, 7, 9, 11, 13];
   const LEDGERS = [3, 1, 15, 17, 19];
+  // Neighbouring notes are a step apart, closer than a head is tall, so they are
+  // set the way a printed cluster is: line notes left, space notes right. Their
+  // signs take three places in turn, so no two neighbours' signs touch.
+  const zig = (i) => ((i - 5) % 2 === 0 ? -1 : 1) * (HEAD_RX + 0.5);
+  const signX = (col, i) => col - HEAD_RX * 2 - 9 - (i % 3) * 15;
 
   function pickerSvg() {
     const parts = [];
-    // Staff lines across the whole width, ledger stubs at each column.
-    for (const i of STAFF_ROWS) parts.push(`<line x1="16" x2="${WIDTH - 10}" y1="${yOfRow(i)}" y2="${yOfRow(i)}" stroke="#bfb3a3" stroke-width="1.3"/>`);
+    for (const i of STAFF_ROWS) parts.push(`<line x1="16" x2="${WIDTH - 8}" y1="${yOfRow(i)}" y2="${yOfRow(i)}" stroke="#bfb3a3" stroke-width="1.5"/>`);
     for (const i of LEDGERS) {
       for (const x of Object.values(COLS)) {
-        parts.push(`<line x1="${x - 24}" x2="${x + 24}" y1="${yOfRow(i)}" y2="${yOfRow(i)}" stroke="#cfc5b7" stroke-width="1.3"/>`);
+        parts.push(`<line x1="${x - HEAD_RX * 2 - 5}" x2="${x + HEAD_RX * 2 + 5}" y1="${yOfRow(i)}" y2="${yOfRow(i)}" stroke="#cfc5b7" stroke-width="1.5"/>`);
       }
     }
-    // The clef, scaled to this staff (its spiral on the G line, row 7).
-    const gap = 2 * STEP;
-    const h = gap * 7.1;
+    // The clef, scaled to this staff (its spiral on the G line).
+    const h = GAP * 7.1;
     const sc = h / STAFF_GEOM.CLEF_BBOX.h;
-    const clefTop = yOfRow(5) - gap - h * 0.615;
+    const clefTop = yOfRow(5) - GAP - h * 0.615;
     parts.push(
-      `<g transform="translate(${22 - STAFF_GEOM.CLEF_BBOX.x * sc} ${clefTop - STAFF_GEOM.CLEF_BBOX.y * sc}) scale(${sc})"><path d="${CLEF_PATH}" fill="#bfb3a3"/></g>`,
+      `<g transform="translate(${18 - STAFF_GEOM.CLEF_BBOX.x * sc} ${clefTop - STAFF_GEOM.CLEF_BBOX.y * sc}) scale(${sc})"><path d="${CLEF_PATH}" fill="#bfb3a3"/></g>`,
     );
-    // Column heads.
-    const heads = { natural: t('sprint.col.natural'), sharp: '♯', flat: '♭' };
+    const heads = { natural: t('sprint.col.natural'), sharp: '\u266F', flat: '\u266D' };
     for (const [k, x] of Object.entries(COLS)) {
-      parts.push(`<text x="${x}" y="14" text-anchor="middle" class="sprint-colhead">${heads[k]}</text>`);
+      parts.push(`<text x="${k === 'natural' ? x : x - 20}" y="18" text-anchor="middle" class="sprint-colhead">${heads[k]}</text>`);
     }
-    // The notes.
     ROWS.forEach((row, i) => {
       for (const kind of ['natural', 'sharp', 'flat']) {
         const n = row[kind];
@@ -124,10 +125,10 @@ export function createSprintView(deps) {
         const y = yOfRow(i);
         const fill = on ? ON : GREY;
         parts.push(`<g class="sprint-cell${on ? ' is-on' : ''}" data-id="${n.id}">`);
-        if (n.alter) parts.push(accidentalAt(n.alter, x - 17, y, fill, 0.78));
-        parts.push(`<ellipse cx="${x}" cy="${y}" rx="8" ry="6" transform="rotate(-18 ${x} ${y})" fill="${fill}"/>`);
+        if (n.alter) parts.push(accidentalAt(n.alter, signX(COLS[kind], i), y, fill, SIGN));
+        parts.push(`<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" transform="rotate(-20 ${x} ${y})" fill="${fill}"/>`);
         if (kind === 'natural') {
-          parts.push(`<text x="${COLS.natural + 24}" y="${y + 3.5}" class="sprint-name${on ? ' is-on' : ''}">${n.letter}${n.octave}</text>`);
+          parts.push(`<text x="${COLS.natural + 2 * HEAD_RX + 9}" y="${y + 4.5}" class="sprint-name${on ? ' is-on' : ''}">${n.letter}${n.octave}</text>`);
         }
         parts.push('</g>');
       }
@@ -173,15 +174,7 @@ export function createSprintView(deps) {
       const box = svg.getBoundingClientRect();
       const sx = ((ev.clientX - box.left) / box.width) * WIDTH;
       const sy = ((ev.clientY - box.top) / box.height) * HEIGHT;
-      let kind = null;
-      let best = 40;
-      for (const [k, x] of Object.entries(COLS)) {
-        const d = Math.abs(sx - (x - (k === 'natural' ? 0 : 6)));
-        if (d < best) {
-          best = d;
-          kind = k;
-        }
-      }
+      const kind = sx < 215 ? 'natural' : sx < 335 ? 'sharp' : 'flat';
       if (!kind) return null;
       const i = Math.round((TOP + (ROWS.length - 1) * STEP - sy) / STEP);
       const row = ROWS[i];
