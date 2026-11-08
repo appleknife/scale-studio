@@ -336,6 +336,39 @@
         }
       }
 
+
+      // The metres each level may print, as the NYSSMA violin criteria give them:
+      // 2/4 and 4/4 at I, 3/4 added at II, cut time at IV, 6/8 at V — and level VI
+      // adds keys and syncopation but no metre, so it keeps V's five. Pinned like
+      // the tempo table, because the thing an app for an audition must not do is
+      // invent a metre the student will never be handed: 5/4 and 7/4 appear in the
+      // same criteria document, in the clarinet, trumpet and snare-drum rows.
+      const METRES = {
+        1: ['2/4', '4/4'],
+        2: ['2/4', '3/4', '4/4'],
+        3: ['2/4', '3/4', '4/4'],
+        4: ['2/4', '3/4', '4/4', '2/2'],
+        5: ['2/4', '3/4', '4/4', '2/2', '6/8'],
+        6: ['2/4', '3/4', '4/4', '2/2', '6/8'],
+      };
+      for (const level of SIGHT_LEVELS) {
+        const spec = levelSpec(level);
+        const want = METRES[level];
+        const got = spec.meters.slice().sort().join(' ');
+        if (got !== want.slice().sort().join(' ')) {
+          problems.push(`level ${level}: metres are ${got}, and the Manual's are ${want.join(' ')}`);
+        }
+        // And every metre it is allowed must actually turn up.
+        const seen = new Set();
+        for (let seed = 0; seed < 200; seed++) {
+          const p = generatePassage({ level, seed });
+          if (p) seen.add(p.meter);
+        }
+        if (seen.size !== want.length) {
+          problems.push(`level ${level}: drew ${seen.size} of its ${want.length} metres in 200 passages`);
+        }
+      }
+      log.push(`metres per level: ${SIGHT_LEVELS.map((l) => l + '→' + levelSpec(l).meters.length).join(' · ')}`);
       // Level I should actually use all three note values, not just quarters.
       {
         const counts = {};

@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611090000';
-import { STAFF_GEOM } from './staff.js?v=202611090000';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611090100';
+import { STAFF_GEOM } from './staff.js?v=202611090100';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -233,10 +233,7 @@ const LEVELS = {
   },
   6: {
     keys: ['D', 'G', 'C', 'F', 'A', 'Bb', 'Eb', 'E', 'Ab'],
-    meters: ['2/4', '3/4', '4/4', '2/2', '6/8', '5/4'],
-    // 5/4 is on the real level VI test, but it is the odd one out: it comes up
-    // in about one passage in eight rather than one in six.
-    meterWeights: { '5/4': 0.7 },
+    meters: ['2/4', '3/4', '4/4', '2/2', '6/8'],
     range: [55, 89],
     steps: [1, 2, 3, 4, 5, 6, 7],
     maxSemis: 12,
@@ -290,26 +287,6 @@ const LEVELS = {
         [4, 2, 2, 4, 4],
         [4 / 3, 4 / 3, 4 / 3, 4, 8],
       ],
-      // Five beats, felt as 3 + 2 or 2 + 3. The patterns lean on a half or a
-      // dotted half to make that grouping audible, and keep the busy beats few:
-      // a bar of five is hard enough to count without a page of sixteenths.
-      '5/4': [
-        [4, 4, 4, 4, 4],
-        [8, 4, 4, 4],
-        [4, 4, 4, 8],
-        [8, 4, 8],
-        [12, 4, 4],
-        [4, 4, 12],
-        [12, 8],
-        [8, 12],
-        [4, 2, 2, 4, 8],
-        [2, 2, 4, 4, 8],
-        [4, 4, 2, 2, 8],
-        [8, 2, 2, 4, 4],
-        [1, 1, 1, 1, 4, 4, 8],
-        [4, 4, 1, 1, 1, 1, 8],
-        [3, 1, 4, 4, 8],
-      ],
       '6/8': [
         [2, 2, 2, 6],
         [6, 2, 2, 2],
@@ -327,8 +304,6 @@ const LEVELS = {
     // simple metres. In 6/8 it would come out at 40 beats a minute, slower than
     // any printed example. Only what changes is listed: 4/4 goes up to 120 and
     // 6/8 takes its own marking, while the rest carry on from level V at 88.
-    // 5/4 is not listed: it keeps ♩ = 88 from the simple metres, not 4/4's 120.
-    // Five to a bar is harder to keep count of, so it is not asked at speed.
     tempo: { '6/8': { unit: 'qd', bpm: 72 }, '4/4': { unit: 'q', bpm: 120 } },
     dynamics: ['p', 'mp', 'mf', 'f'],
     marks: ['staccato', 'accent'],
@@ -477,12 +452,6 @@ const FIGURES = {
     dottedHalf: [[12, 4], [4, 12]],
     whole: [[16]],
   },
-  '5/4': {
-    eighthSixteenths: [[2, 1, 1, 4, 4, 8], [4, 4, 2, 1, 1, 8]],
-    sixteenthsEighth: [[1, 1, 2, 4, 4, 8], [4, 1, 1, 2, 4, 8]],
-    dottedHalf: [[12, 4, 4], [4, 4, 12], [12, 8]],
-    whole: [[16, 4], [4, 16]],
-  },
   // In 6/8 the beat is a dotted quarter: the figure and an eighth fill it.
   '6/8': {
     eighthSixteenths: [[2, 1, 1, 2, 6]],
@@ -508,15 +477,7 @@ export function generatePassage({ level = 5, seed = null } = {}) {
 
   const keyId = pick(rng, spec.keys);
   const key = MAJOR_KEYS.find((k) => k.id === keyId);
-  const meter = spec.meterWeights
-    ? (() => {
-        const w = spec.meters.map((m) => spec.meterWeights[m] ?? 1);
-        let roll = rng() * w.reduce((a, b) => a + b, 0);
-        for (let i = 0; i < w.length; i++) if ((roll -= w[i]) <= 0) return spec.meters[i];
-        return spec.meters[spec.meters.length - 1];
-      })()
-    : pick(rng, spec.meters);
-  const pool = poolFor(key, spec.range);
+  const meter = pick(rng, spec.meters);  const pool = poolFor(key, spec.range);
   if (pool.length < 6) return null;
 
   const perBar = barLength(meter);
@@ -679,7 +640,7 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // appeared, and levels drew kinds they were never meant to have.
   // From level IV a half rest is placed on purpose now and then (where the metre
   // has room for one); the ordinary draw rarely chose one.
-  const allowsHalfRest = ['3/4', '4/4', '2/2', '5/4'].includes(meter);
+  const allowsHalfRest = ['3/4', '4/4', '2/2'].includes(meter);
   let wantHalfRest = level >= 4 && allowsHalfRest && (spec.restKinds || []).includes('half') && chance(rng, FIGURE_CHANCE.halfRest);
   if (wantHalfRest) {
     const lastBar = bars[bars.length - 1];
@@ -733,7 +694,7 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     // A half rest needs a bar of two-beat groups to sit in: in 2/4 it would be a
     // whole-bar rest (drawn as a whole rest, not this glyph), and in 6/8 the beat
     // is a dotted quarter, so neither takes one.
-    const allowsHalf = ['3/4', '4/4', '2/2', '5/4'].includes(meter);
+    const allowsHalf = ['3/4', '4/4', '2/2'].includes(meter);
     // Which kinds this level is allowed to draw at all. The teacher's rule: level
     // III has quarter and half rests only; the eighth rest arrives at IV, and the
     // sixteenth rest belongs to level VI alone. A weight of zero simply keeps a

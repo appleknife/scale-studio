@@ -616,6 +616,17 @@ without being harder to read. Both the table in `src/sightreading.js` and the
 filter's comment say so, so a later tidy-up does not "fix" the speed to match the
 quarter pulse.
 
+**The metres are the Manual's, level by level.** 2/4 and 4/4 at level I, 3/4 added
+at II, cut time at IV, 6/8 at V — and level VI adds keys and syncopation but no
+metre, so it keeps V's five. The same criteria document does list 5/4 and 7/4, but
+in the clarinet, trumpet and snare-drum rows; a build of this app carried 5/4 at
+level VI for a day, and the teacher confirmed it does not come up for violin. It is
+gone, and `sightreading.test.html` now pins each level's list — and draws 200
+passages a level to check every allowed metre turns up — so a metre cannot drift
+back in without a decision. The reason the pin matters: the one thing an app for an
+audition must not do is teach a student to expect something they will never be
+handed.
+
 ### Drawing the notation
 
 Everything on the page is drawn by hand in `src/score.js`, and the glyphs that gave
