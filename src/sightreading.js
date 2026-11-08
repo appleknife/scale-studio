@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611079400';
-import { STAFF_GEOM } from './staff.js?v=202611079400';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611089500';
+import { STAFF_GEOM } from './staff.js?v=202611089500';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -421,6 +421,45 @@ function chooseStep(rng, allowed, directionBias, lastStep) {
 
 const BAR_COUNT = 8;
 
+// ── Figures every passage from level IV up should show ───────────────────
+//
+// The teacher's list. Left to the draw, these turned up too rarely to practise:
+//   - an eighth and two sixteenths, and two sixteenths and an eighth, in one
+//     beat: one of each, almost every passage (cut time has no sixteenths);
+//   - a dotted half note: at least one, most of the time;
+//   - a whole note: now and then, rarely;
+//   - a half rest: at least one, now and then (see the rests below).
+// Each is a whole bar's pattern, placed in a bar of its own before the rest of
+// the rhythm is drawn. Durations are in sixteenths: 2 + 1 + 1 is one beat.
+const FIGURE_CHANCE = { eighthSixteenths: 0.95, sixteenthsEighth: 0.95, dottedHalf: 0.8, whole: 0.08, halfRest: 0.35 };
+const FIGURES = {
+  '2/4': {
+    eighthSixteenths: [[2, 1, 1, 4], [4, 2, 1, 1]],
+    sixteenthsEighth: [[1, 1, 2, 4], [4, 1, 1, 2]],
+  },
+  '3/4': {
+    eighthSixteenths: [[2, 1, 1, 4, 4], [4, 2, 1, 1, 4]],
+    sixteenthsEighth: [[1, 1, 2, 4, 4], [4, 1, 1, 2, 4]],
+    dottedHalf: [[12]],
+  },
+  '4/4': {
+    eighthSixteenths: [[2, 1, 1, 4, 4, 4], [4, 4, 2, 1, 1, 4]],
+    sixteenthsEighth: [[1, 1, 2, 4, 4, 4], [4, 1, 1, 2, 4, 4]],
+    dottedHalf: [[12, 4], [4, 12]],
+    whole: [[16]],
+  },
+  '2/2': {
+    dottedHalf: [[12, 4], [4, 12]],
+    whole: [[16]],
+  },
+  // In 6/8 the beat is a dotted quarter: the figure and an eighth fill it.
+  '6/8': {
+    eighthSixteenths: [[2, 1, 1, 2, 6]],
+    sixteenthsEighth: [[1, 1, 2, 2, 6]],
+    dottedHalf: [[12]],
+  },
+};
+
 /** The marking ladder, soft to loud. Used to turn a ramp towards its next rung. */
 const DYNAMIC_ORDER = ['pp', 'p', 'mp', 'mf', 'f', 'ff'];
 
@@ -495,6 +534,35 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   } else if (lean < 1) {
     runBarSet.add(pick(rng, [1, 2, 4, 5]));
   }
+  // The teacher's figures, from level IV up, each in a bar of its own. The long
+  // notes go where a phrase breathes — bar 4 or the last bar — and the beat
+  // figures anywhere but the last bar, which has to close on a note that holds.
+  const figureBars = new Map();
+  const figureKinds = new Set(); // which figures this passage carries
+  if (level >= 4) {
+    const table = FIGURES[meter] || {};
+    const free = (b) => !runBarSet.has(b) && !figureBars.has(b);
+    const place = (kind, prefer, others) => {
+      const choices = table[kind];
+      if (!choices || !chance(rng, FIGURE_CHANCE[kind])) return;
+      let bars_ = prefer.filter(free);
+      if (!bars_.length) bars_ = others.filter(free);
+      // the last bar must end on something long enough to hold
+      let usable = choices;
+      const at = bars_.length ? pick(rng, bars_) : -1;
+      if (at < 0) return;
+      if (at === BAR_COUNT - 1) usable = choices.filter((c) => c[c.length - 1] >= 6);
+      else if (at === BAR_COUNT / 2 - 1) usable = choices.filter((c) => c[c.length - 1] >= 4);
+      if (!usable.length) return;
+      figureBars.set(at, pick(rng, usable));
+      figureKinds.add(kind);
+    };
+    place('whole', [BAR_COUNT - 1, BAR_COUNT / 2 - 1], []);
+    place('dottedHalf', [BAR_COUNT - 1, BAR_COUNT / 2 - 1], [0, 2, 5, 6]);
+    place('eighthSixteenths', [0, 1, 2, 4, 5, 6], [3]);
+    place('sixteenthsEighth', [0, 1, 2, 4, 5, 6], [3]);
+  }
+
   for (let b = 0; b < BAR_COUNT; b++) {
     // Avoid the same bar twice in a row when there is a choice: eight identical
     // bars of half notes is not a sight-reading test, it is a warm-up.
@@ -524,8 +592,8 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       pool_ = base;
     }
 
-    let pattern;
-    if (runBarSet.has(b) && (counted || runBars === 0)) {
+    let pattern = figureBars.get(b);
+    if (!pattern && runBarSet.has(b) && (counted || runBars === 0)) {
       const usable = (runs.length ? runs : patterns.filter(hasRunOfFour)).filter(
         (p) => p !== previous,
       );
@@ -549,8 +617,10 @@ export function generatePassage({ level = 5, seed = null } = {}) {
 
     const events = [];
     let start = 0;
+    const figure = figureBars.has(b);
     pattern.forEach((dur, i) => {
-      events.push({ start, dur, rest: false, midi: null, note: null });
+      // `keep`: a figure the teacher asked for is never silenced by a rest.
+      events.push({ start, dur, rest: false, midi: null, note: null, keep: figure });
       start += dur;
     });
     // guard against a typo in the table: a bar that does not add up is a bug
@@ -569,6 +639,39 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // where it breaks the beam. The old chooser took the first short slot it found in
   // one middle bar, which was nearly always an eighth — quarter rests hardly ever
   // appeared, and levels drew kinds they were never meant to have.
+  // From level IV a half rest is placed on purpose now and then (where the metre
+  // has room for one); the ordinary draw rarely chose one.
+  const allowsHalfRest = meter === '3/4' || meter === '4/4' || meter === '2/2';
+  let wantHalfRest = level >= 4 && allowsHalfRest && (spec.restKinds || []).includes('half') && chance(rng, FIGURE_CHANCE.halfRest);
+  if (wantHalfRest) {
+    const lastBar = bars[bars.length - 1];
+    const candidates = [];
+    bars.forEach((events, b) =>
+      events.forEach((e) => {
+        if (e.dur === 8 && !e.keep && e !== bars[0][0] && e !== lastBar[lastBar.length - 1]) candidates.push(e);
+      }),
+    );
+    if (!candidates.length) {
+      // No half note to silence: give a plain middle bar a half note to rest on.
+      const plainBars = [1, 2, 5, 6].filter((b) => !figureBars.has(b) && !runBarSet.has(b));
+      const half = (spec.rhythms[meter] || []).filter((p) => p.includes(8) && p.every((d) => d >= 2 || !cutTime));
+      if (plainBars.length && half.length) {
+        const b = pick(rng, plainBars);
+        let start = 0;
+        bars[b] = pick(rng, half).map((dur) => {
+          const e = { start, dur, rest: false, midi: null, note: null, keep: false };
+          start += dur;
+          return e;
+        });
+        candidates.push(...bars[b].filter((e) => e.dur === 8));
+      }
+    }
+    if (candidates.length) {
+      pick(rng, candidates).rest = true;
+      figureKinds.add('halfRest');
+    } else wantHalfRest = false;
+  }
+
   if (spec.rests && chance(rng, 0.6)) {
     // A bar never opens a passage or closes it with a silence: the first note and
     // the cadence have to sound. Any other slot may go quiet, including the first
@@ -576,7 +679,7 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     const firstSlot = bars[0][0];
     const lastBar = bars[bars.length - 1];
     const lastSlot = lastBar[lastBar.length - 1];
-    const free = (e) => e !== firstSlot && e !== lastSlot;
+    const free = (e) => e !== firstSlot && e !== lastSlot && !e.keep && !e.rest;
 
     const slotsOf = (test) => {
       const out = [];

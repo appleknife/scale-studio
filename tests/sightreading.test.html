@@ -240,6 +240,67 @@
 
       log.push(`passages generated: ${checked}`);
 
+      // The teacher's figures from level IV up: an eighth and two sixteenths and
+      // the reverse in a beat (almost every passage, never in cut time), a dotted
+      // half most of the time where the metre holds one, a whole note rarely,
+      // and a half rest now and then.
+      {
+        const N = 400;
+        const has = (bars, test) => bars.some((events) => events.some((e, i) => test(e, i, events)));
+        const beatStart = (e, beat) => Math.abs(e.start / beat - Math.round(e.start / beat)) < 1e-6;
+        const es = (e, i, ev) => !e.rest && e.dur === 2 && ev[i + 1]?.dur === 1 && ev[i + 2]?.dur === 1 && !ev[i + 1].rest && !ev[i + 2].rest;
+        const se = (e, i, ev) => !e.rest && e.dur === 1 && ev[i + 1]?.dur === 1 && ev[i + 2]?.dur === 2 && !ev[i + 1].rest && !ev[i + 2].rest && (i === 0 || ev[i - 1].dur !== 1);
+        for (const level of [4, 5, 6]) {
+          const tally = { passages: 0, es: 0, se: 0, dhEligible: 0, dh: 0, wholeEligible: 0, whole: 0, hrEligible: 0, hr: 0, cutWithFigure: 0 };
+          for (let seed = 1; seed <= N; seed++) {
+            const p = generatePassage({ level, seed: seed * 7919 + level });
+            if (!p) continue;
+            tally.passages++;
+            const simple = p.meter !== '2/2';
+            if (simple) {
+              if (has(p.bars, (e, i, ev) => es(e, i, ev) && beatStart(e, p.meter === '6/8' ? 6 : 4))) tally.es++;
+              if (has(p.bars, (e, i, ev) => se(e, i, ev) && beatStart(e, p.meter === '6/8' ? 6 : 4))) tally.se++;
+            } else if (has(p.bars, (e, i, ev) => es(e, i, ev) || se(e, i, ev))) tally.cutWithFigure++;
+            if (p.meter !== '2/4') {
+              tally.dhEligible++;
+              if (has(p.bars, (e) => !e.rest && e.dur === 12)) tally.dh++;
+            }
+            if (p.meter === '4/4' || p.meter === '2/2') {
+              tally.wholeEligible++;
+              if (has(p.bars, (e) => !e.rest && e.dur === 16)) tally.whole++;
+            }
+            if (['3/4', '4/4', '2/2'].includes(p.meter)) {
+              tally.hrEligible++;
+              if (has(p.bars, (e) => e.rest && e.dur === 8)) tally.hr++;
+            }
+            // every bar still adds up
+            p.bars.forEach((ev, b) => {
+              const sum = ev.reduce((a, e) => a + e.dur, 0);
+              if (Math.abs(sum - p.perBar) > 0.01) problems.push(`level ${level} seed ${p.seed}: bar ${b + 1} adds to ${sum}`);
+            });
+            const last = p.bars[p.bars.length - 1];
+            if (last[last.length - 1].rest) problems.push(`level ${level} seed ${p.seed}: closes on a rest`);
+          }
+          const simpleCount = (() => { let n = 0; for (let seed = 1; seed <= N; seed++) { const p = generatePassage({ level, seed: seed * 7919 + level }); if (p && p.meter !== '2/2') n++; } return n; })();
+          const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+          const r = {
+            es: pct(tally.es, simpleCount),
+            se: pct(tally.se, simpleCount),
+            dh: pct(tally.dh, tally.dhEligible),
+            whole: pct(tally.whole, tally.wholeEligible),
+            hr: pct(tally.hr, tally.hrEligible),
+          };
+          log.push(`level ${level}: eighth+16ths ${r.es}% · 16ths+eighth ${r.se}% · dotted half ${r.dh}% · whole ${r.whole}% · half rest ${r.hr}%`);
+          if (r.es < 88) problems.push(`level ${level}: eighth + two sixteenths in only ${r.es}% of passages`);
+          if (r.se < 88) problems.push(`level ${level}: two sixteenths + eighth in only ${r.se}% of passages`);
+          if (r.dh < 70) problems.push(`level ${level}: a dotted half in only ${r.dh}% of passages that can hold one`);
+          if (r.whole < 3 || r.whole > 20) problems.push(`level ${level}: whole notes in ${r.whole}% of passages (want rare, not never)`);
+          if (r.hr < 20 || r.hr > 70) problems.push(`level ${level}: half rests in ${r.hr}% of passages (want now and then)`);
+          if (tally.cutWithFigure) problems.push(`level ${level}: sixteenth figures in cut time`);
+        }
+      }
+
+
       // The tempo each level prints, as the Manual gives it. Three of these have
       // been corrected from the printed page, so the table is pinned here: an
       // accidental edit should fail the suite rather than ship.

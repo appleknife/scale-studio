@@ -426,8 +426,28 @@
           // this measures.
           const accBoxes = [...svg.querySelectorAll('g.score-acc')].map((n) => box(n));
           accidentals += accBoxes.length;
+          // A sloped beam's box is a whole triangle of white beside the beam, and
+          // a sign under a rising beam sits in that white without touching it. So
+          // beams are measured by their own outline, where the sign stands.
+          const beamPaths = [...svg.querySelectorAll('path.score-beam')];
+          const beamSet = new Set(beamPaths);
+          const otherInk = inkNodes.filter((n) => !beamSet.has(n)).map((n) => box(n));
+          const beamHit = (a) =>
+            beamPaths.find((n) => {
+              const pts = (n.getAttribute('d').match(/-?[\d.]+/g) || []).map(Number);
+              if (pts.length < 8) return false;
+              const xs = [pts[0], pts[2], pts[4], pts[6]];
+              const ys = [pts[1], pts[3], pts[5], pts[7]];
+              const lo = Math.max(a.x0, Math.min(...xs));
+              const hi = Math.min(a.x1, Math.max(...xs));
+              if (lo > hi) return false;
+              // top edge (points 0→1) and bottom edge (3→2), at both ends of the overlap
+              const yAt = (i, j, x) => ys[i] + ((ys[j] - ys[i]) * (x - xs[i])) / (xs[j] - xs[i] || 1);
+              const tops = [yAt(0, 1, lo), yAt(0, 1, hi), yAt(3, 2, lo), yAt(3, 2, hi)];
+              return Math.max(...tops) >= a.y0 && Math.min(...tops) <= a.y1;
+            });
           for (const a of accBoxes) {
-            const bad = ink.find((b) => overlap(a, b));
+            const bad = otherInk.find((b) => overlap(a, b)) || (beamHit(a) && box(beamHit(a)));
             if (bad) {
               accidentalHits.push(
                 `L${level} seed ${seed}: accidental at ${a.x0.toFixed(0)},${a.y0.toFixed(0)} runs into ink at ${bad.x0.toFixed(0)},${bad.y0.toFixed(0)}`,
