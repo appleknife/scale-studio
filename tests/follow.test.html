@@ -166,6 +166,12 @@
       const ok = !problems.length;
       document.getElementById('report').textContent = `${ok ? 'FOLLOW OK' : 'FOLLOW FAILED'}\n${log.join('\n')}`;
       document.title = ok ? 'FOLLOW OK' : 'FOLLOW FAILED';
+      // The suite runner reads this file, not the page — a test that only writes
+      // to the screen can never fail a run.
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'follow', problems, log: log.join('\n') }, null, 2),
+      });
     </script>
   </body>
 </html>

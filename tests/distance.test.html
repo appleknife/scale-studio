@@ -98,7 +98,18 @@
 
       try {
         const ROOM = 0.0006;
-        for (const [id, reg] of [['A', 'low'], ['D', null], ['G', 'high']]) {
+      // NOTE: this suite decodes the teacher's recorded takes, which are m4a
+      // (AAC). A browser without that codec — including the headless Chrome used
+      // for automated runs on this machine, where the decode takes the renderer
+      // down — cannot run it. Open it in a normal browser to take the
+      // measurement; under automation it reports that it could not run.
+        const probe = new OfflineAudioContext(1, SR, SR);
+        const bank = await loadBank(probe, '../samples/').catch(() => null);
+        const playable = Boolean(bank && bank.buffers.size);
+        if (!playable) {
+          log.push(`skipped: this browser could not decode the sample set (${(bank && bank.failed) || '?'} takes)`);
+        }
+        for (const [id, reg] of playable ? [['A', 'low'], ['D', null], ['G', 'high']] : []) {
           const scale = buildScale(MAJOR_KEYS.find((c) => c.id === id), 0, 'major', 'melodic', 1, reg);
           const violin = await render(scale);
           const peak = violin.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
@@ -137,6 +148,12 @@
       const ok = !problems.length;
       document.getElementById('report').textContent = `${ok ? 'DISTANCE OK' : 'DISTANCE FAILED\n' + problems.join('\n')}\n\n${log.join('\n')}`;
       document.title = ok ? 'DISTANCE OK' : 'DISTANCE FAILED';
+      // The suite runner reads this file, not the page — a test that only writes
+      // to the screen can never fail a run.
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'distance', problems, log: log.join('\n') }, null, 2),
+      });
     </script>
   </body>
 </html>

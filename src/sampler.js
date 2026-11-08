@@ -118,11 +118,55 @@ export function emptyBank() {
   return { index: { samples: [] }, buffers: new Map(), base: 'samples/' };
 }
 
+/** How long one take is given to decode before it is left out of the bank. */
+const DECODE_MS = 8000;
+
+function decodeOne(ctx, bytes) {
+  return new Promise((resolve, reject) => {
+    // Safari's decodeAudioData returns a promise; the older callback form exists
+    // in the same browsers, so both are wired up and the first answer wins.
+    const timer = setTimeout(() => reject(new Error('decode timed out')), DECODE_MS);
+    const settle = (fn) => (value) => {
+      clearTimeout(timer);
+      fn(value);
+    };
+    const done = ctx.decodeAudioData(bytes, settle(resolve), settle(reject));
+    if (done && typeof done.then === 'function') done.then(settle(resolve), settle(reject));
+  });
+}
+
 /**
  * Loads the index, then every take. The whole set is under a megabyte, so it is
  * fetched once and kept: a passage uses maybe eight of the takes, but it is the
  * ones it does not use that make the next passage free.
  */
+/**
+ * Can this browser decode the recorded takes at all?
+ *
+ * They are m4a (AAC), which every mainstream browser decodes and some Chromium
+ * builds do not. Asking first matters because the failure is not clean: a
+ * browser without the codec can leave decodeAudioData unsettled for ever, and on
+ * one build here it takes the page down with it. The app is better off knowing
+ * to use the synthesiser than finding out that way.
+ */
+export async function canDecodeTakes() {
+  if (!navigator.mediaCapabilities?.decodingInfo) return true; // old browser: try it
+  try {
+    const info = await navigator.mediaCapabilities.decodingInfo({
+      type: 'file',
+      audio: {
+        contentType: 'audio/mp4; codecs="mp4a.40.2"',
+        channels: 1,
+        samplerate: 44100,
+        bitrate: 96000,
+      },
+    });
+    return Boolean(info && info.supported);
+  } catch {
+    return true; // it could not answer; let the decode try
+  }
+}
+
 export async function loadBank(ctx, base = 'samples/', bank = emptyBank()) {
   bank.base = base.endsWith('/') ? base : `${base}/`;
   if (!bank.index.samples.length) {
@@ -130,18 +174,32 @@ export async function loadBank(ctx, base = 'samples/', bank = emptyBank()) {
     if (!response.ok) throw new Error(`samples: ${response.status}`);
     bank.index = await response.json();
   }
+  if (!(await canDecodeTakes())) {
+    // No AAC decoder: hand back the index and no buffers, so every note falls
+    // through to the synthesiser instead of crashing the page trying to decode.
+    bank.failed = bank.index.samples.length;
+    bank.noCodec = true;
+    return bank;
+  }
   const pending = bank.index.samples.filter((s) => !bank.buffers.has(s.id));
   await Promise.all(
     pending.map(async (sample) => {
       const response = await fetch(bank.base + sample.file, { cache: 'force-cache' });
       if (!response.ok) throw new Error(`sample: ${sample.file}`);
       const bytes = await response.arrayBuffer();
-      const buffer = await new Promise((resolve, reject) => {
-        // Safari's decodeAudioData returns a promise; the older callback form
-        // exists in the same browsers, so the promise is simply awaited.
-        const done = ctx.decodeAudioData(bytes, resolve, reject);
-        if (done && typeof done.then === 'function') done.then(resolve, reject);
-      });
+      let buffer;
+      try {
+        buffer = await decodeOne(ctx, bytes);
+      } catch {
+        // A browser without the AAC decoder does not always *reject* — some
+        // leave decodeAudioData unsettled for ever — and one take like that used
+        // to hold the whole bank waiting, so the recorded violin never arrived
+        // at all. A take that cannot be decoded is left out instead: the note it
+        // would have covered falls through to the synthesiser, which is the
+        // fallback a missing take already uses.
+        bank.failed = (bank.failed || 0) + 1;
+        return;
+      }
       bank.buffers.set(sample.id, buffer);
     }),
   );
