@@ -1,15 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611089600';
-import { renderStaff } from './staff.js?v=202611089600';
-import { createInk } from './ink.js?v=202611089600';
-import { createFollower } from './follow.js?v=202611089600';
-import { createPetRoom } from './petroom.js?v=202611089600';
-import { createBuddy } from './buddy.js?v=202611089600';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611089700';
+import { renderStaff } from './staff.js?v=202611089700';
+import { createInk } from './ink.js?v=202611089700';
+import { createFollower } from './follow.js?v=202611089700';
+import { createPetRoom } from './petroom.js?v=202611089700';
+import { createBuddy } from './buddy.js?v=202611089700';
+import { createSprintView } from './sprintview.js?v=202611089700';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611089600';
+window.__scaleStudioVersion = '202611089700';
 import {
   PitchDetector,
   midiToFreq,
@@ -17,16 +18,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611089600';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611089600';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611089600';
-import { generatePassage } from './sightreading.js?v=202611089600';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611089600';
-import { renderScore } from './score.js?v=202611089600';
-import { summariseIntonation } from './intonation.js?v=202611089600';
-import * as Journal from './journal.js?v=202611089600';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611089600';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611089600';
+} from './pitch.js?v=202611089700';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611089700';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611089700';
+import { generatePassage } from './sightreading.js?v=202611089700';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611089700';
+import { renderScore } from './score.js?v=202611089700';
+import { summariseIntonation } from './intonation.js?v=202611089700';
+import * as Journal from './journal.js?v=202611089700';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611089700';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611089700';
 import {
   STRINGS,
   FIFTHS,
@@ -35,7 +36,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611089600';
+} from './tuner.js?v=202611089700';
 
 const LANG = initLang();
 
@@ -55,7 +56,9 @@ const el = {
     'test-pick': $('view-test-pick'),
     'test-result': $('view-test-result'),
     pet: $('view-pet'),
+    sprint: $('view-sprint'),
   },
+  openSprintBtn: $('openSprintBtn'),
   openPetBtn: $('openPetBtn'),
   petBack: $('petBack'),
   menuPetArt: $('menuPetArt'),
@@ -285,6 +288,7 @@ let micTicket = 0;
 
 /** The pet room's controller, made once the logs are loaded (see below). */
 let petRoom = null;
+let sprintView = null;
 /** The small pets that listen beside the music (see createBuddy, below). */
 let listenBuddy = null;
 let sightBuddy = null;
@@ -396,6 +400,8 @@ function showView(name) {
   // The pet only lives while its room is on screen: no timers running behind
   // a scale take.
   if (name !== 'pet' && petRoom) petRoom.stop();
+  // Note Sprint lets go of the microphone the moment its screen goes.
+  if (name !== 'sprint' && sprintView) sprintView.stop();
   if (name === 'choose') paintMenuPet();
   Object.entries(el.views).forEach(([key, node]) => {
     node.hidden = key !== name;
@@ -2229,6 +2235,37 @@ petRoom = createPetRoom({
   demo: params.get('pet') === 'demo',
 });
 
+// Note Sprint: pick notes, read them against the clock. Its own screen and its
+// own stats per name; it borrows the microphone through the same router.
+sprintView = createSprintView({
+  root: el.views.sprint,
+  profileId: () => petProfileId(),
+  openMic: async () => {
+    cancelListening();
+    closeMic();
+    micTicket += 1;
+    const mic = await openMic(routeFrame);
+    state.mic = mic;
+    state.micMode = 'sprint';
+    return mic;
+  },
+  closeMic: () => {
+    micTicket += 1;
+    closeMic();
+  },
+  getMic: () => state.mic,
+  micError: (err) => micErrorMessage(err),
+  onFinish: (result) => {
+    // A finished sprint is practice: it ticks the day and feeds the pet.
+    noteTake('sprint', null, 0, { heard: result.notes, expected: result.notes, seconds: result.totalMs / 1000, score: 100 });
+  },
+  onBack: () => goHome(),
+});
+el.openSprintBtn.addEventListener('click', () => {
+  sprintView.open();
+  showView('sprint');
+});
+
 // The pet, small, beside the music: it listens while you play. One on the
 // scale card, one by the sight-reading controls, one on the result page.
 listenBuddy = createBuddy($('listenBuddy'), { profileId: () => activeProfile.id });
@@ -2269,7 +2306,7 @@ function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null) {
         ? t('pet.toast.for', { name: esc(name) })
         : t('pet.toast.room');
   const extra = bonus
-    ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : 'pet.toast.newScale', { n: bonus })}</span>`
+    ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : kind === 'sprint' ? 'pet.toast.newSprint' : 'pet.toast.newScale', { n: bonus })}</span>`
     : '';
   el.petToast.innerHTML =
     `${petRoom.portrait()}<span class="pet-toast-text"><span class="pet-toast-top">` +
@@ -3128,9 +3165,10 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
 
   if (counted) Journal.logTake(journal, today, tag);
   // Real practice earns notes for the pet room; a false start earns nothing.
-  if (counted && (tag === 'scales' || tag === 'sight')) {
-    const earned = petRoom.earnTake({ kind: tag === 'sight' ? 'sight' : 'scale', id: cardId || '', dayKey: today });
-    petToast(earned.amount, earned.warmed, earned.bonus, tag === 'sight' ? 'sight' : 'scale', earned.grew);
+  if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint')) {
+    const kind = tag === 'scales' ? 'scale' : tag;
+    const earned = petRoom.earnTake({ kind, id: cardId || '', dayKey: today });
+    petToast(earned.amount, earned.warmed, earned.bonus, kind, earned.grew);
   }
   if (cardId && counted) Journal.noteScale(journal, cardId, today, score);
   // Sight reading is filed per level, not per passage: a level VI page is a
@@ -4059,6 +4097,7 @@ function micErrorMessage(err) {
  */
 function routeFrame(frame) {
   paintMicLevel(frame.rms);
+  if (sprintView?.listening) return sprintView.frame(frame);
   if (sight.phase !== 'idle' && sight.take) return ingestSightFrame(frame);
   if (state.take) return onFrame(frame);
   if (state.tune?.listening) return onTuneFrame(frame);

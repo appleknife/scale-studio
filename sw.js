@@ -21,7 +21,7 @@
 // — the publish routine does both from one number. Without that, a student keeps
 // whatever was cached the first time, which is the same stale-code trap the
 // stamps exist to avoid.
-const VERSION = '202611089600';
+const VERSION = '202611089700';
 const SHELL = 'scale-studio-shell-' + VERSION;
 const SAMPLES = 'scale-studio-samples-' + VERSION;
 
@@ -42,6 +42,8 @@ const BASE = [
   'src/buddy.js',
   'src/ink.js',
   'src/follow.js',
+  'src/sprint.js',
+  'src/sprintview.js',
   'src/intonation.js',
   'src/journal.js',
   'src/music.js',

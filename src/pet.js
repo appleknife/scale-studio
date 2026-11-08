@@ -111,7 +111,7 @@ export function emptyPet() {
     owned: [],
     placed: [],
     wall: null, // the wallpaper item in use, or null for the plain one
-    day: { key: '', earned: 0, keys: [], sight: false, any: false },
+    day: { key: '', earned: 0, keys: [], sight: false, sprint: false, any: false },
     lastSeen: 0,
     totalEarned: 0,
     friends: [], // grown (or set-aside) pets, waiting in the pet book
@@ -178,10 +178,13 @@ export function savePet(profileId, pet, storage = globalThis.localStorage) {
  */
 export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
   if (pet.day.key !== dayKey) {
-    pet.day = { key: dayKey, earned: 0, keys: [], sight: false, any: false };
+    pet.day = { key: dayKey, earned: 0, keys: [], sight: false, sprint: false, any: false };
   }
   const day = pet.day;
-  const fresh = (kind === 'scale' && id && !day.keys.includes(id)) || (kind === 'sight' && !day.sight);
+  const fresh =
+    (kind === 'scale' && id && !day.keys.includes(id)) ||
+    (kind === 'sight' && !day.sight) ||
+    (kind === 'sprint' && !day.sprint);
   // The new-key bonus stands apart from the cap, so it can be shown on its own.
   const bonus = fresh ? EARN.newKey : 0;
   let base;
@@ -196,6 +199,7 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
   day.any = true;
   if (kind === 'scale' && id && !day.keys.includes(id)) day.keys.push(id);
   if (kind === 'sight') day.sight = true;
+  if (kind === 'sprint') day.sprint = true;
   day.earned += amount;
   pet.notes += amount;
   pet.totalEarned = (pet.totalEarned || 0) + amount;

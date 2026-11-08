@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611089600" />
+    <link rel="stylesheet" href="app.css?v=202611089700" />
   </head>
   <body>
     <div class="shell">
@@ -114,6 +114,12 @@
                 Eight bars you have never seen, written to your level.
               </span>
             </button>
+            <button class="menu-tile" id="openSprintBtn" type="button">
+              <span class="menu-title">Note Sprint <span class="menu-new">New</span></span>
+              <span class="menu-sub">
+                Pick the notes you know, then read them as fast as you can. The app listens.
+              </span>
+            </button>
             <button class="menu-tile" id="openLogBtn" type="button">
               <span class="menu-title">Practice log</span>
               <span class="menu-sub" id="logBannerText">
@@ -135,6 +141,9 @@
             </button>
           </div>
         </section>
+
+        <!-- ── Note Sprint (drawn by src/sprintview.js) ──────────────────── -->
+        <section class="view" id="view-sprint" hidden></section>
 
         <!-- ── Pet room ────────────────────────────────────────────────── -->
         <section class="view" id="view-pet" hidden>
@@ -1154,13 +1163,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611089600"></script>
+    <script type="module" src="src/app.js?v=202611089700"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611089600';
+        var V = '202611089700';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;

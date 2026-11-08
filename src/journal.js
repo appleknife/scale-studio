@@ -13,7 +13,7 @@
 //   * "what was hard" is one tap, because reflection is the step that turns
 //     playing into practicing, and it is what the teacher can use next lesson.
 
-export const TAGS = ['scales', 'sight', 'tuner', 'piece', 'recording', 'other'];
+export const TAGS = ['scales', 'sight', 'sprint', 'tuner', 'piece', 'recording', 'other'];
 export const HARD = ['intonation', 'rhythm', 'shifts', 'reading', 'tone'];
 
 /** A scale is "ready" after it has been played cleanly on this many days. */
