@@ -475,7 +475,9 @@
       for (const level of SIGHT_LEVELS) {
         const counts = { 1: 0, 2: 0, 4: 0, 8: 0 };
         let resting = 0;
-        for (let seed = 0; seed < 120; seed++) {
+        // 400 passages: at 120 the count of quarter rests swung by a dozen with
+        // the seeds alone, which is a test of the seeds, not of the chooser.
+        for (let seed = 0; seed < 400; seed++) {
           const evs = flatten(generatePassage({ level, seed }));
           let any = false;
           for (const e of evs) {
@@ -487,14 +489,14 @@
           if (any) resting++;
         }
         log.push(
-          `L${level} rests: ${resting}/120 passages — ` +
+          `L${level} rests: ${resting}/400 passages — ` +
             `${counts[4]} quarter, ${counts[8]} half, ${counts[2]} eighth, ${counts[1]} sixteenth`,
         );
         if (level === 1 || level === 2) {
           if (resting) problems.push(`L${level}: ${resting} passages with a rest, and rests start at III`);
         } else {
-          if (counts[4] < 40) problems.push(`L${level}: only ${counts[4]} quarter rests in 120 passages`);
-          if (counts[8] < 6) problems.push(`L${level}: only ${counts[8]} half rests in 120 passages`);
+          if (counts[4] < 133) problems.push(`L${level}: only ${counts[4]} quarter rests in 400 passages`);
+          if (counts[8] < 20) problems.push(`L${level}: only ${counts[8]} half rests in 400 passages`);
           if (counts[8] >= counts[4]) problems.push(`L${level}: as many half rests (${counts[8]}) as quarter rests (${counts[4]})`);
         }
       }
