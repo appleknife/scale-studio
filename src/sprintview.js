@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611091645';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091645';
-import { CLEF_PATH } from './clef.js?v=202611091645';
-import { hearLevel } from './pitch.js?v=202611091645';
-import { t } from './i18n.js?v=202611091645';
+import * as Sprint from './sprint.js?v=202611091700';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091700';
+import { CLEF_PATH } from './clef.js?v=202611091700';
+import { hearLevel } from './pitch.js?v=202611091700';
+import { t } from './i18n.js?v=202611091700';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -369,7 +369,7 @@ export function createSprintView(deps) {
     run = null;
     panel = 'done';
     paint();
-    if (result.notes >= 5) deps.onFinish(result);
+    deps.onFinish(result);
   }
 
   /* ── The run, on screen ─────────────────────────────────────────────── */

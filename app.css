@@ -5945,3 +5945,47 @@ select,
   fill: #3f8a68;
   filter: drop-shadow(0 0 6px rgba(63, 138, 104, 0.85));
 }
+
+/* A picked purchase, waiting for its Buy. */
+.tray-item.is-picked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash, #e6eee8);
+}
+
+.pet-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 14px;
+  margin: 12px auto 4px;
+  max-width: 480px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  font-weight: 600;
+  text-align: center;
+  animation: confirm-in 0.18s ease-out;
+}
+
+.pet-confirm-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.pet-confirm .small {
+  padding: 8px 16px;
+  font-size: 15px;
+}
+
+@keyframes confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+:root[data-theme='dark'] .tray-item.is-picked {
+  box-shadow: 0 0 0 3px #2c4a3e;
+}

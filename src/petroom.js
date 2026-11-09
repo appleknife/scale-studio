@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611091645';
+import * as Pet from './pet.js?v=202611091700';
 import {
   petMarkup,
   eggMarkup,
@@ -29,8 +29,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611091645';
-import { t } from './i18n.js?v=202611091645';
+} from './petart.js?v=202611091700';
+import { t } from './i18n.js?v=202611091700';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -86,6 +86,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   let lastTouch = Date.now();
   let tray = null; // 'feed' | 'decorate' | 'pets' | null
   let choosing = false; // picking the next egg, with a grown pet in the room
+  // A purchase waiting for its "Buy" — one tap picks, a second button pays, so a
+  // stray tap never spends a week's notes. { kind: 'snack' | 'item', id }
+  let pending = null;
   let renaming = false;
   let picked = null; // the egg being considered
   let ball = null; // { x, y } while a ball is out
@@ -745,10 +748,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   function feedTray() {
     const species = pet.pet.species;
-    return `<div class="pet-tray">${Pet.SNACKS.map((s) => {
+    return `${confirmRow('snack')}<div class="pet-tray">${Pet.SNACKS.map((s) => {
       const snack = Pet.snackFor(species, s.id);
       const can = pet.notes >= s.cost;
-      return `<button class="tray-item${snack.favourite ? ' is-fav' : ''}" type="button" data-snack="${s.id}" ${can ? '' : 'disabled'}>
+      const picked = pending?.kind === 'snack' && pending.id === s.id;
+      return `<button class="tray-item${snack.favourite ? ' is-fav' : ''}${picked ? ' is-picked' : ''}" type="button" data-snack="${s.id}" ${can ? '' : 'disabled'} aria-pressed="${picked}">
         ${foodIcon(snack.look)}
         <span class="tray-name">${t(`pet.food.${snack.look}`)}${snack.favourite ? ` <span class="fav-star" aria-label="${t('pet.fav')}">★</span>` : ''}</span>
         <span class="tray-cost">♪ ${s.cost}${can ? '' : `<span class="tray-need">${t('pet.need', { n: s.cost - pet.notes })}</span>`}</span></button>`;
@@ -777,7 +781,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   }
 
   function decorTray() {
-    return `<div class="pet-tray is-decor">${Pet.ITEMS.filter((i) => !(isFish() && i.id === 'bed') && !(isFish() && i.id === 'ball')).map((item) => {
+    return `${confirmRow('item')}<div class="pet-tray is-decor">${Pet.ITEMS.filter((i) => !(isFish() && i.id === 'bed') && !(isFish() && i.id === 'ball')).map((item) => {
       const owned = pet.owned.includes(item.id);
       const out = Pet.isPlaced(pet, item.id);
       const can = owned || pet.notes >= item.cost;
@@ -786,11 +790,36 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
           ? t('pet.item.out')
           : t('pet.item.away')
         : `♪ ${item.cost}${can ? '' : `<span class="tray-need">${t('pet.need', { n: item.cost - pet.notes })}</span>`}`;
-      return `<button class="tray-item${out ? ' is-out' : ''}" type="button" data-item="${item.id}" ${can ? '' : 'disabled'} aria-pressed="${out}">
+      const picked = pending?.kind === 'item' && pending.id === item.id;
+      return `<button class="tray-item${out ? ' is-out' : ''}${picked ? ' is-picked' : ''}" type="button" data-item="${item.id}" ${can ? '' : 'disabled'} aria-pressed="${out || picked}">
         ${itemIcon(item.id)}
         <span class="tray-name">${t(`pet.item.${item.id}`)}</span>
         <span class="tray-cost">${label}</span></button>`;
     }).join('')}</div>`;
+  }
+
+  /** The question sits above the tray; on a short screen, bring it into view. */
+  function showConfirm() {
+    const row = els.panel.querySelector('.pet-confirm');
+    if (!row) return;
+    const box = row.getBoundingClientRect();
+    if (box.top < 60 || box.bottom > window.innerHeight - 10) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  /** "Rug for ♪ 10?" — above the tray, once something is picked. */
+  function confirmRow(kind) {
+    if (!pending || pending.kind !== kind) return '';
+    const name =
+      kind === 'snack'
+        ? t(`pet.food.${Pet.snackFor(pet.pet.species, pending.id).look}`)
+        : t(`pet.item.${pending.id}`);
+    const cost = kind === 'snack' ? Pet.SNACKS.find((x) => x.id === pending.id).cost : Pet.ITEMS.find((x) => x.id === pending.id).cost;
+    return `<div class="pet-confirm" role="group">
+      <span>${t(kind === 'snack' ? 'pet.confirm.snack' : 'pet.confirm.item', { name: esc(name), cost, left: pet.notes - cost })}</span>
+      <span class="pet-confirm-btns">
+        <button class="primary-btn small" type="button" data-act="confirm-buy">${t(kind === 'snack' ? 'pet.confirm.feed' : 'pet.confirm.buy')}</button>
+        <button class="quiet-btn small" type="button" data-act="cancel-buy">${t('pet.confirm.cancel')}</button>
+      </span></div>`;
   }
 
   els.panel.addEventListener('click', (event) => {
@@ -821,9 +850,33 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       if (input) input.value = b.dataset.name;
     } else if (b.dataset.tray) {
       tray = tray === b.dataset.tray ? null : b.dataset.tray;
+      pending = null;
       paintPanel();
-    } else if (b.dataset.snack) feed(b.dataset.snack);
-    else if (b.dataset.item) buyOrToggle(b.dataset.item);
+    } else if (b.dataset.act === 'confirm-buy' && pending) {
+      const { kind, id } = pending;
+      pending = null;
+      if (kind === 'snack') feed(id);
+      else buyOrToggle(id);
+      paintPanel();
+    } else if (b.dataset.act === 'cancel-buy') {
+      pending = null;
+      paintPanel();
+    } else if (b.dataset.snack) {
+      // tapping the picked one again lets it go
+      pending = pending?.kind === 'snack' && pending.id === b.dataset.snack ? null : { kind: 'snack', id: b.dataset.snack };
+      paintPanel();
+      showConfirm();
+    } else if (b.dataset.item) {
+      // an item already bought is just put out or away — no money moves
+      if (pet.owned.includes(b.dataset.item)) {
+        pending = null;
+        buyOrToggle(b.dataset.item);
+      } else {
+        pending = pending?.kind === 'item' && pending.id === b.dataset.item ? null : { kind: 'item', id: b.dataset.item };
+        paintPanel();
+        showConfirm();
+      }
+    }
   });
 
   els.panel.addEventListener('submit', (event) => {
@@ -930,6 +983,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     // The day's wish is there before the first take, so the room can name it.
     if (Pet.ensureWish(pet, localDayKey())) save();
     running = true;
+    pending = null;
     picked = null;
     choosing = false;
     renaming = false;
