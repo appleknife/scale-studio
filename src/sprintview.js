@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611091700';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091700';
-import { CLEF_PATH } from './clef.js?v=202611091700';
-import { hearLevel } from './pitch.js?v=202611091700';
-import { t } from './i18n.js?v=202611091700';
+import * as Sprint from './sprint.js?v=202611091715';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091715';
+import { CLEF_PATH } from './clef.js?v=202611091715';
+import { hearLevel } from './pitch.js?v=202611091715';
+import { t } from './i18n.js?v=202611091715';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -43,6 +43,7 @@ export function createSprintView(deps) {
   let ticket = 0;
   let tick = 0;
   let lastResult = null;
+  let clearArmed = false; // "clear my sprint history" waits for a second tap
 
   root.innerHTML = `
     <button class="back-btn" type="button" data-act="back"><span aria-hidden="true">←</span> ${t('sprint.back')}</button>
@@ -731,7 +732,15 @@ export function createSprintView(deps) {
       <section class="sprint-card"><h4>${t('sprint.stats.strings')}</h4>${strings}</section>
       <section class="sprint-card"><h4>${t('sprint.stats.mixups')}</h4>${mixups}</section>
       ${s.helperRuns ? `<p class="sprint-muted">${t('sprint.stats.helper', { n: s.helperRuns })}</p>` : ''}
-      <p class="sprint-muted">${t('sprint.stats.note')}</p>`;
+      <p class="sprint-muted">${t('sprint.stats.note')}</p>
+      <div class="sprint-clear">
+        <button class="quiet-btn small${clearArmed ? ' is-armed' : ''}" type="button" data-act="clear-history">${t(clearArmed ? 'sprint.clear.confirm' : 'sprint.clear.btn')}</button>
+        ${
+          clearArmed
+            ? `<p class="sprint-clear-warn">${t('sprint.clear.warn')} <button class="link-btn" type="button" data-act="keep-history">${t('sprint.clear.keep')}</button></p>`
+            : ''
+        }
+      </div>`;
   }
 
   /** Average seconds a note, one point per sprint. Lower is faster, and the line says so. */
@@ -763,6 +772,7 @@ export function createSprintView(deps) {
       deps.onBack();
     } else if (b.dataset.tab) {
       stopRun();
+      clearArmed = false;
       panel = b.dataset.tab === 'stats' ? 'stats' : 'pick';
       paint();
     } else if (b.dataset.preset) {
@@ -791,6 +801,29 @@ export function createSprintView(deps) {
       paint();
     } else if (b.dataset.act === 'see-stats') {
       panel = 'stats';
+      paint();
+    } else if (b.dataset.act === 'clear-history') {
+      if (!clearArmed) {
+        clearArmed = true;
+        paint();
+        setTimeout(() => {
+          if (clearArmed) {
+            clearArmed = false;
+            if (panel === 'stats') paint();
+          }
+        }, 8000);
+        return;
+      }
+      // Everything this name has done in Note Sprint goes; the notes they picked
+      // and their switches stay, so the next sprint is one tap away.
+      clearArmed = false;
+      const fresh = Sprint.emptyStats();
+      stats = { ...fresh, picked: stats.picked, opts: stats.opts };
+      Sprint.saveStats(deps.profileId(), stats);
+      lastResult = null;
+      paint();
+    } else if (b.dataset.act === 'keep-history') {
+      clearArmed = false;
       paint();
     } else if (b.dataset.act === 'drill-weak') {
       // the slowest few, with a neighbour or two so it is not a two-note guessing game

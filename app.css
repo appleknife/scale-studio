@@ -5989,3 +5989,33 @@ select,
 :root[data-theme='dark'] .tray-item.is-picked {
   box-shadow: 0 0 0 3px #2c4a3e;
 }
+
+/* The ×, armed: it says what the next tap does. */
+.take-del.is-armed {
+  width: auto;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #a4534a;
+  color: #fff;
+  font: 700 13px var(--sans);
+  opacity: 1;
+}
+
+.sprint-clear {
+  margin: 22px 0 6px;
+  text-align: center;
+}
+
+.sprint-clear .is-armed {
+  background: #a4534a;
+  border-color: #a4534a;
+  color: #fff;
+}
+
+.sprint-clear-warn {
+  max-width: 440px;
+  margin: 10px auto 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}

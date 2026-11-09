@@ -64,6 +64,24 @@ function hall(ac) {
   return convolverCache;
 }
 
+/**
+ * How much to turn a recording up: enough to bring its loud moments near full
+ * scale (about −2 dB), measured on the 99.5th-percentile sample so a single
+ * click cannot hold the whole take down, and never more than ×16. Exported so
+ * it can be checked offline.
+ */
+export function loudnessGain(buffer, target = 0.8) {
+  const data = buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(data.length / 200000));
+  const mags = [];
+  for (let i = 0; i < data.length; i += step) mags.push(Math.abs(data[i]));
+  if (!mags.length) return 1;
+  mags.sort((a, b) => a - b);
+  const peak = mags[Math.floor(mags.length * 0.995)] || mags[mags.length - 1];
+  if (peak < 1e-4) return 1;
+  return Math.max(1, Math.min(16, target / peak));
+}
+
 /** True when this browser can record at all — Safari before 14.1 cannot. */
 export function canRecord() {
   return Boolean(window.MediaRecorder) && Boolean(navigator.mediaDevices?.getUserMedia);
@@ -159,6 +177,23 @@ export async function play(blob, { wet = 0.34, offset = 0 } = {}) {
   const source = ac.createBufferSource();
   source.buffer = buffer;
 
+  // A violin a few feet from a phone, recorded raw (no automatic gain — that
+  // would fight the pitch detector), plays back far too quietly. So the take is
+  // brought up to a healthy level first: a gain from its own loudest moments
+  // (the 99.5th-percentile peak, so one bow knock does not set it), then a gentle
+  // compressor that lifts the soft passages and catches anything the gain
+  // pushed too far. Only the playback is touched; the analysis never hears it.
+  const makeup = ac.createGain();
+  makeup.gain.value = loudnessGain(buffer);
+  const comp = ac.createDynamicsCompressor();
+  comp.threshold.value = -20;
+  comp.knee.value = 12;
+  comp.ratio.value = 3;
+  comp.attack.value = 0.01;
+  comp.release.value = 0.2;
+  source.connect(makeup);
+  makeup.connect(comp);
+
   // The dry path is trimmed a little so the mix does not clip once the tail is
   // added on top of it.
   const dry = ac.createGain();
@@ -167,9 +202,9 @@ export async function play(blob, { wet = 0.34, offset = 0 } = {}) {
   send.gain.value = wet;
   const room = hall(ac);
 
-  source.connect(dry);
+  comp.connect(dry);
   dry.connect(ac.destination);
-  source.connect(room);
+  comp.connect(room);
   room.connect(send);
   send.connect(ac.destination);
 

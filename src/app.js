@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091700';
-import { renderStaff } from './staff.js?v=202611091700';
-import { createInk } from './ink.js?v=202611091700';
-import { createFollower } from './follow.js?v=202611091700';
-import { createPetRoom } from './petroom.js?v=202611091700';
-import { createBuddy } from './buddy.js?v=202611091700';
-import { createSprintView } from './sprintview.js?v=202611091700';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091715';
+import { renderStaff } from './staff.js?v=202611091715';
+import { createInk } from './ink.js?v=202611091715';
+import { createFollower } from './follow.js?v=202611091715';
+import { createPetRoom } from './petroom.js?v=202611091715';
+import { createBuddy } from './buddy.js?v=202611091715';
+import { createSprintView } from './sprintview.js?v=202611091715';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611091700';
+window.__scaleStudioVersion = '202611091715';
 import {
   PitchDetector,
   midiToFreq,
@@ -18,16 +18,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611091700';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091700';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091700';
-import { generatePassage } from './sightreading.js?v=202611091700';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091700';
-import { renderScore } from './score.js?v=202611091700';
-import { summariseIntonation } from './intonation.js?v=202611091700';
-import * as Journal from './journal.js?v=202611091700';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091700';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091700';
+} from './pitch.js?v=202611091715';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091715';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091715';
+import { generatePassage } from './sightreading.js?v=202611091715';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091715';
+import { renderScore } from './score.js?v=202611091715';
+import { summariseIntonation } from './intonation.js?v=202611091715';
+import * as Journal from './journal.js?v=202611091715';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091715';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091715';
 import {
   STRINGS,
   FIFTHS,
@@ -36,7 +36,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611091700';
+} from './tuner.js?v=202611091715';
 
 const LANG = initLang();
 
@@ -3234,12 +3234,39 @@ function takeRow(take) {
 
 /* ── Erasing ─────────────────────────────────────────────────────────── */
 
+// Deleting a take is two taps: the × turns into "Delete?" and only a second
+// tap on it erases. Anything else — another row, a few seconds — lets it go.
+let delArmed = null;
+let delTimer = 0;
+function disarmDelete() {
+  clearTimeout(delTimer);
+  if (!delArmed) return;
+  const b = el.statPanel.querySelector(`button[data-del="${CSS.escape(delArmed)}"]`);
+  if (b) {
+    b.classList.remove('is-armed');
+    b.textContent = '×';
+    b.setAttribute('aria-label', t('stats.delete'));
+  }
+  delArmed = null;
+}
+
 el.statPanel.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-del]');
-  if (!btn) return;
-  // No confirmation: the row is one tap to delete and one to win back by
-  // playing, and a dialog on every accidental take would be worse than the
-  // mistake. The records derived from takes are rebuilt inside the journal.
+  if (!btn) {
+    disarmDelete();
+    return;
+  }
+  if (delArmed !== btn.dataset.del) {
+    disarmDelete();
+    delArmed = btn.dataset.del;
+    btn.classList.add('is-armed');
+    btn.textContent = t('stats.deleteConfirm');
+    btn.setAttribute('aria-label', t('stats.deleteConfirmAria'));
+    delTimer = setTimeout(disarmDelete, 4000);
+    return;
+  }
+  disarmDelete();
+  // The records derived from takes are rebuilt inside the journal.
   if (!Journal.removeTake(journal, btn.dataset.del)) return;
   saveJournal();
   renderStats();
@@ -3255,14 +3282,17 @@ function disarmClear() {
   el.statClearWarn.hidden = true;
 }
 
-el.statClear.addEventListener('click', () => {
+el.statClear.addEventListener('click', (event) => {
+  if (event.target.closest('[data-act="keep-stats"]')) return;
   if (!clearArmed) {
-    // First tap arms it and says exactly what will go. The second one erases.
+    // First tap arms it and says exactly what will go. The second one erases;
+    // "Keep them" (in the warning) or a few seconds put it back.
     clearArmed = true;
     el.statClear.textContent = t('stats.clearConfirm');
     el.statClear.classList.add('is-armed');
     el.statClearWarn.hidden = false;
-    el.statClearWarn.textContent = t('stats.clearWarn');
+    el.statClearWarn.innerHTML = `${t('stats.clearWarn')} <button class="link-btn" type="button" data-act="keep-stats">${t('stats.keep')}</button>`;
+    setTimeout(() => clearArmed && disarmClear(), 8000);
     return;
   }
   disarmClear();
@@ -3271,6 +3301,9 @@ el.statClear.addEventListener('click', () => {
   renderStats();
   renderLogBanner();
   if (!el.views.track.hidden) renderLog();
+});
+el.statClearWarn.addEventListener('click', (event) => {
+  if (event.target.closest('[data-act="keep-stats"]')) disarmClear();
 });
 el.openStatsBtn.addEventListener('click', () => {
   cancelListening();
