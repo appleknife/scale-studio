@@ -5678,9 +5678,55 @@ select,
   color: #e5ddd1;
 }
 
+.sprint-star {
+  position: relative;
+  display: inline-block;
+}
+
+/* A won star glows: warm gold with a soft halo, popping in, then breathing. */
 .sprint-star.is-on {
-  color: #e8a33d;
-  animation: star-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  color: #f4b43c;
+  text-shadow:
+    0 0 6px rgba(255, 196, 80, 0.9),
+    0 0 18px rgba(255, 170, 40, 0.55),
+    0 0 34px rgba(255, 150, 30, 0.3);
+  animation:
+    star-pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both,
+    star-glow 2.4s ease-in-out 1s infinite;
+}
+
+@keyframes star-glow {
+  50% {
+    text-shadow:
+      0 0 9px rgba(255, 210, 110, 1),
+      0 0 26px rgba(255, 180, 50, 0.75),
+      0 0 46px rgba(255, 150, 30, 0.4);
+  }
+}
+
+/* Little four-point sparkles that fly off a star as it lands. */
+.star-spark {
+  position: fixed;
+  z-index: 51;
+  pointer-events: none;
+  color: #ffd36b;
+  text-shadow: 0 0 6px rgba(255, 200, 80, 0.9);
+  transform: translate(-50%, -50%);
+  animation: star-spark 0.8s ease-out both;
+}
+
+@keyframes star-spark {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--spin));
+  }
 }
 
 @keyframes star-pop {
@@ -5832,6 +5878,10 @@ select,
   .sprint-star.is-on {
     animation: none;
   }
+
+  .star-spark {
+    display: none;
+  }
 }
 
 :root[data-theme='dark'] .sprint-progress,
@@ -5839,6 +5889,6 @@ select,
   background: #3a342d;
 }
 
-:root[data-theme='dark'] .sprint-star {
-  color: #4a433b;
+:root[data-theme='dark'] .sprint-star:not(.is-on) {
+  color: #5a5248;
 }

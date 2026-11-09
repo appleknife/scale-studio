@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611091600';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091600';
-import { CLEF_PATH } from './clef.js?v=202611091600';
-import { hearLevel } from './pitch.js?v=202611091600';
-import { t } from './i18n.js?v=202611091600';
+import * as Sprint from './sprint.js?v=202611091555';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091555';
+import { CLEF_PATH } from './clef.js?v=202611091555';
+import { hearLevel } from './pitch.js?v=202611091555';
+import { t } from './i18n.js?v=202611091555';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -440,6 +440,7 @@ export function createSprintView(deps) {
     if (!stage) return;
     const id = run.deck[run.index];
     stage.innerHTML = noteSvg(id, run.miss ? 'wrong' : null);
+    stage.dataset.note = id; // which note is up, for tests and assistive tech
     const svg = stage.querySelector('svg');
     svg.classList.remove('is-in');
     void svg.getBoundingClientRect();
@@ -590,6 +591,34 @@ export function createSprintView(deps) {
         </div>
       </div>`;
     if (r.best && !r.firstOfSet) burst(body.querySelector('h3'));
+    sparkleStars();
+  }
+
+  /** Each won star throws a few sparkles as it lands (timed to its pop). */
+  function sparkleStars() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    body.querySelectorAll('.sprint-star.is-on').forEach((star) => {
+      const delay = parseFloat(star.style.animationDelay) * 1000 + 220;
+      setTimeout(() => {
+        if (!star.isConnected) return;
+        const box = star.getBoundingClientRect();
+        for (let i = 0; i < 7; i++) {
+          const n = document.createElement('span');
+          n.className = 'star-spark';
+          n.textContent = i % 2 ? '✦' : '✧';
+          const angle = (i / 7) * Math.PI * 2 + Math.random() * 0.5;
+          const dist = 26 + Math.random() * 22;
+          n.style.left = `${box.left + box.width / 2}px`;
+          n.style.top = `${box.top + box.height / 2}px`;
+          n.style.fontSize = `${10 + Math.random() * 8}px`;
+          n.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+          n.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+          n.style.setProperty('--spin', `${(Math.random() - 0.5) * 120}deg`);
+          document.body.appendChild(n);
+          n.addEventListener('animationend', () => n.remove());
+        }
+      }, delay);
+    });
   }
 
   function burst(anchor) {
