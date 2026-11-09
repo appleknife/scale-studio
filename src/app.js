@@ -1,16 +1,17 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091750';
-import { renderStaff } from './staff.js?v=202611091750';
-import { createInk } from './ink.js?v=202611091750';
-import { createFollower } from './follow.js?v=202611091750';
-import { createPetRoom } from './petroom.js?v=202611091750';
-import { createBuddy } from './buddy.js?v=202611091750';
-import { createSprintView } from './sprintview.js?v=202611091750';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091930';
+import { renderStaff } from './staff.js?v=202611091930';
+import { createInk } from './ink.js?v=202611091930';
+import { createFollower } from './follow.js?v=202611091930';
+import { createPetRoom } from './petroom.js?v=202611091930';
+import { createBuddy } from './buddy.js?v=202611091930';
+import { createSprintView } from './sprintview.js?v=202611091930';
+import { createListenView } from './listenview.js?v=202611091930';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611091750';
+window.__scaleStudioVersion = '202611091930';
 import {
   PitchDetector,
   midiToFreq,
@@ -18,16 +19,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611091750';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091750';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091750';
-import { generatePassage } from './sightreading.js?v=202611091750';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091750';
-import { renderScore } from './score.js?v=202611091750';
-import { summariseIntonation } from './intonation.js?v=202611091750';
-import * as Journal from './journal.js?v=202611091750';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091750';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091750';
+} from './pitch.js?v=202611091930';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091930';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091930';
+import { generatePassage } from './sightreading.js?v=202611091930';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091930';
+import { renderScore } from './score.js?v=202611091930';
+import { summariseIntonation } from './intonation.js?v=202611091930';
+import * as Journal from './journal.js?v=202611091930';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091930';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091930';
 import {
   STRINGS,
   FIFTHS,
@@ -36,7 +37,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611091750';
+} from './tuner.js?v=202611091930';
 
 const LANG = initLang();
 
@@ -57,8 +58,10 @@ const el = {
     'test-result': $('view-test-result'),
     pet: $('view-pet'),
     sprint: $('view-sprint'),
+    listen: $('view-listen'),
   },
   openSprintBtn: $('openSprintBtn'),
+  openListenBtn: $('openListenBtn'),
   openPetBtn: $('openPetBtn'),
   petBack: $('petBack'),
   menuPetArt: $('menuPetArt'),
@@ -287,6 +290,7 @@ let micTicket = 0;
 /** The pet room's controller, made once the logs are loaded (see below). */
 let petRoom = null;
 let sprintView = null;
+let listenView = null;
 /** The small pets that listen beside the music (see createBuddy, below). */
 let listenBuddy = null;
 let sightBuddy = null;
@@ -400,6 +404,7 @@ function showView(name) {
   if (name !== 'pet' && petRoom) petRoom.stop();
   // Note Sprint lets go of the microphone the moment its screen goes.
   if (name !== 'sprint' && sprintView) sprintView.stop();
+  if (name !== 'listen' && listenView) listenView.stop();
   if (name !== 'sight') stopSightReplay();
   if (name === 'choose') paintMenuPet();
   Object.entries(el.views).forEach(([key, node]) => {
@@ -2403,6 +2408,35 @@ el.openSprintBtn.addEventListener('click', () => {
   showView('sprint');
 });
 
+// Listen (beta): free playing, or a piece against its MusicXML score. Same
+// microphone router; a real take (twenty seconds or more of notes) is logged as
+// practice on a piece.
+listenView = createListenView({
+  root: el.views.listen,
+  openMic: async () => {
+    cancelListening();
+    closeMic();
+    micTicket += 1;
+    const mic = await openMic(routeFrame);
+    state.mic = mic;
+    state.micMode = 'listen';
+    return mic;
+  },
+  closeMic: () => {
+    micTicket += 1;
+    closeMic();
+  },
+  getMic: () => state.mic,
+  micError: (err) => micErrorMessage(err),
+  onFinish: () => noteTake('piece'),
+  onBack: () => goHome(),
+});
+el.openListenBtn.addEventListener('click', () => {
+  listenView.open();
+  showView('listen');
+});
+window.__listenView = listenView;
+
 // The pet, small, beside the music: it listens while you play. One on the
 // scale card, one by the sight-reading controls, one on the result page.
 listenBuddy = createBuddy($('listenBuddy'), { profileId: () => activeProfile.id });
@@ -4311,6 +4345,7 @@ function micErrorMessage(err) {
 function routeFrame(frame) {
   paintMicLevel(frame.rms);
   if (sprintView?.listening) return sprintView.frame(frame);
+  if (listenView?.listening) return listenView.frame(frame);
   if (sight.phase !== 'idle' && sight.take) return ingestSightFrame(frame);
   if (state.take) return onFrame(frame);
   if (state.tune?.listening) return onTuneFrame(frame);

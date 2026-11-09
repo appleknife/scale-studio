@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Listen (beta)</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      pre {
+        background: #fffdfa;
+        border: 1px solid #e8dfd1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // Listen (beta): reading a score the student brings, and what a take of it
+      // says. The test score (scores/test-piece.musicxml) has a piano part first,
+      // a forward repeat, a tie across a barline, a grace note, a double stop, a
+      // rest, a second voice, 1st and 2nd endings — the things MusicXML readers
+      // get wrong — and the same score zipped as .mxl.
+      import { readScore, readMxl } from '../src/musicxml.js';
+      import { analyzeScore, analyzeFree, vibratoOf, accompanimentOf } from '../src/listen.js';
+      import { PitchDetector } from '../src/pitch.js';
+
+      const problems = [];
+      const log = [];
+      const eq = (label, got, want) => {
+        const ok = JSON.stringify(got) === JSON.stringify(want);
+        log.push(`${ok ? '✓' : '✗'} ${label}${ok ? '' : ` — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`);
+        if (!ok) problems.push(label);
+      };
+      const near = (label, got, want, tol) => {
+        const ok = got != null && Math.abs(got - want) <= tol;
+        log.push(`${ok ? '✓' : '✗'} ${label}: ${got == null ? 'null' : got.toFixed(2)} (want ${want} ± ${tol})`);
+        if (!ok) problems.push(label);
+      };
+
+      try {
+        const xml = await (await fetch('scores/test-piece.musicxml')).text();
+        const score = readScore(xml);
+        eq('the violin part is found by name, not taken as the first', score.partId, 'P2');
+        eq('title', score.title, 'Test Minuet');
+        eq('repeats and endings unrolled into playing order', score.order, [0, 1, 2, 3, 0, 1, 4, 5, 6]);
+        eq(
+          'notes in playing order: tie joined, grace skipped, double stop as its top note, rest and voice 2 left out',
+          score.notes.map((n) => n.midi),
+          [62, 66, 69, 71, 76, 73, 62, 66, 69, 71, 74, 67, 66, 64, 62],
+        );
+        eq('the tied A lasts two beats', score.notes[2].quarters, 2);
+        eq('tempo from the metronome mark', score.tempo, 90);
+        eq('key', score.keyFifths, 2);
+        eq('total length in quarters (9 bars of 3/4)', score.totalQuarters, 27);
+
+        const mxl = await (await fetch('scores/test-piece.mxl')).arrayBuffer();
+        const fromZip = readScore(await readMxl(mxl));
+        eq('.mxl reads to the same notes', fromZip.notes.map((n) => n.midi), score.notes.map((n) => n.midi));
+
+        // A synthetic take at 100 bpm: every note played, with a 6 Hz, ±15 cent
+        // vibrato on held notes, every F♯ 25 cents sharp, and note 5 (the C♯) a
+        // semitone low.
+        const FR = 0.03;
+        const spq = 0.6; // 100 bpm
+        const frames = [];
+        let t = 0;
+        const push = (midi, secs, vib = 0, offset = 0) => {
+          const n = Math.round(secs / FR);
+          for (let i = 0; i < n; i++) {
+            const cents = offset + vib * Math.sin(2 * Math.PI * 6 * (i * FR));
+            frames.push({ t, freq: 440 * 2 ** ((midi - 69 + cents / 100) / 12), clarity: 0.95, rms: 0.05 });
+            t += FR;
+          }
+        };
+        const silence = (secs) => {
+          for (let i = 0; i < Math.round(secs / FR); i++) {
+            frames.push({ t, freq: 0, clarity: 0, rms: 0.0003 });
+            t += FR;
+          }
+        };
+        silence(0.5);
+        score.notes.forEach((n, i) => {
+          // a written rest is a silence in the take as well
+          const due = 0.5 + n.abs * spq;
+          if (due - t > FR) silence(due - t);
+          const secs = n.quarters * spq;
+          const midi = i === 5 ? n.midi - 1 : n.midi;
+          const sharp = n.midi % 12 === 6 ? 25 : 0;
+          push(midi, secs - 0.06, secs >= 1 ? 15 : 0, sharp);
+          silence(0.06);
+        });
+        // the rest in bar 2 is in the score but not in the note list: leave its gap
+        silence(1);
+
+        const a = analyzeScore(frames, score);
+        eq('every written note heard', a.results.filter((r) => r.status !== 'missed').length, 15);
+        eq('the low C♯ is the one wrong note', a.results.filter((r) => r.status === 'wrong').map((r) => r.index), [5]);
+        near('tempo found from the playing (bpm)', a.tempo.bpm, 100, 4);
+        near('steady playing reads as steady', a.tempo.steadiness, 1, 0.12);
+        const fs = a.intonation.tendencies.find((x) => x.name === 'F♯');
+        near('F♯s found running sharp (cents)', fs && fs.mean, 25, 6);
+        eq('bars as played', a.bars.length, 9);
+        eq('the wrong note is in played bar 4 (written bar 4)', a.worst.map((b) => b.number), ['4']);
+        near('bar 7 (2nd ending) starts where it was played (s)', a.bars[6].start, 0.5 + 18 * spq, 0.15);
+        near('vibrato rate (Hz)', a.vibrato.rate, 6, 0.8);
+        near('vibrato width (cents, peak to peak)', a.vibrato.width, 30, 8);
+
+        // Free playing on the same take: no score, so only tendencies.
+        const f = analyzeFree(frames);
+        const fs2 = f.intonation.tendencies.find((x) => x.name === 'F♯');
+        near('without a score, F♯ still runs sharp', fs2 && fs2.mean, 25, 6);
+        eq('no long stops in a straight-through take', f.stops.length, 0);
+
+        // No vibrato on a still note.
+        const still = [];
+        for (let i = 0; i < 40; i++) still.push({ t: i * FR, freq: 440, clarity: 0.95, rms: 0.05 });
+        eq('a still note has no vibrato', vibratoOf(still, { t0: 0, t1: 39 * FR, pitch: 69 }), null);
+
+        // Accompaniment: a violin-like tone alone, and over a piano chord.
+        const SR = 44100;
+        async function render(withPiano) {
+          const ctx = new OfflineAudioContext(1, SR * 4, SR);
+          const osc = ctx.createOscillator();
+          osc.type = 'sawtooth';
+          osc.frequency.value = 659.3;
+          const lp = ctx.createBiquadFilter();
+          lp.frequency.value = 4000;
+          const g = ctx.createGain();
+          g.gain.value = 0.25;
+          osc.connect(lp).connect(g).connect(ctx.destination);
+          osc.start();
+          if (withPiano) {
+            for (const f0 of [146.8, 220, 293.7, 370]) {
+              const p = ctx.createOscillator();
+              p.type = 'triangle';
+              p.frequency.value = f0;
+              const pg = ctx.createGain();
+              pg.gain.value = 0.22;
+              p.connect(pg).connect(ctx.destination);
+              p.start();
+            }
+          }
+          const sig = (await ctx.startRendering()).getChannelData(0);
+          const det = new PitchDetector({ sampleRate: SR, bufferSize: 2048 });
+          const out = [];
+          for (let at = 0; at + 2048 <= sig.length; at += 1323) {
+            const r = det.detect(sig.subarray(at, at + 2048));
+            out.push({ t: at / SR, ...r });
+          }
+          return out;
+        }
+        const solo = accompanimentOf(await render(false), 0.002);
+        const along = accompanimentOf(await render(true), 0.002);
+        log.push(`unclear share: solo ${solo.share.toFixed(2)}, with chord ${along.share.toFixed(2)}`);
+        eq('a violin alone is not taken for accompaniment', solo.likely, false);
+        eq('a violin over a piano chord is noticed', along.likely, true);
+      } catch (err) {
+        problems.push('exception: ' + err.message + ' ' + (err.stack || '').split('\n')[1]);
+      }
+
+      const ok = !problems.length;
+      document.getElementById('report').textContent = `${ok ? 'LISTEN OK' : 'LISTEN FAILED\n' + problems.join('\n')}\n\n${log.join('\n')}`;
+      document.title = ok ? 'LISTEN OK' : 'LISTEN FAILED';
+    </script>
+  </body>
+</html>

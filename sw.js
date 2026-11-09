@@ -16,12 +16,14 @@
 //            fetched the first time somebody asks to hear a passage, or when a
 //            teacher presses "make this available offline" for a classroom of
 //            devices. A student who never uses sight reading never carries it.
+//            The score renderer (vendor/, 1.4 MB) is kept the same way: fetched
+//            the first time a score is opened in Listen, then there offline.
 //
 // VERSION must be bumped on every publish, alongside the ?v= stamps in the HTML
 // — the publish routine does both from one number. Without that, a student keeps
 // whatever was cached the first time, which is the same stale-code trap the
 // stamps exist to avoid.
-const VERSION = '202611091750';
+const VERSION = '202611091930';
 const SHELL = 'scale-studio-shell-' + VERSION;
 const SAMPLES = 'scale-studio-samples-' + VERSION;
 
@@ -44,6 +46,9 @@ const BASE = [
   'src/follow.js',
   'src/sprint.js',
   'src/sprintview.js',
+  'src/listen.js',
+  'src/listenview.js',
+  'src/musicxml.js',
   'src/intonation.js',
   'src/journal.js',
   'src/music.js',
@@ -105,7 +110,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname.includes('/samples/')) {
+  if (url.pathname.includes('/samples/') || url.pathname.includes('/vendor/')) {
     // Recorded takes never change name within a version, and they are the bulk
     // of the download: cache first, and only fetched when something needs them.
     event.respondWith(
