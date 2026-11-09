@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611091400';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091400';
-import { CLEF_PATH } from './clef.js?v=202611091400';
-import { hearLevel } from './pitch.js?v=202611091400';
-import { t } from './i18n.js?v=202611091400';
+import * as Sprint from './sprint.js?v=202611091538';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091538';
+import { CLEF_PATH } from './clef.js?v=202611091538';
+import { hearLevel } from './pitch.js?v=202611091538';
+import { t } from './i18n.js?v=202611091538';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -352,10 +352,12 @@ export function createSprintView(deps) {
       parts.push(`<line x1="8" x2="${NOTE_W - 8}" y1="${ly}" y2="${ly}" stroke="#9c9083" stroke-width="1.4"/>`);
     }
     // ledger lines
-    for (let p = -2; p >= pos - (pos % 2 === 0 ? 0 : 1) && pos < 0; p -= 2) {
+    // only the lines between the staff and the note: B3 hangs from C4's line, it
+    // does not sit on A3's
+    for (let p = -2; p >= pos; p -= 2) {
       parts.push(`<line x1="${x - 19}" x2="${x + 19}" y1="${NOTE_BOTTOM - p * NOTE_STEP}" y2="${NOTE_BOTTOM - p * NOTE_STEP}" stroke="${INK}" stroke-width="1.6"/>`);
     }
-    for (let p = 10; p <= pos && pos > 9; p += 2) {
+    for (let p = 10; p <= pos; p += 2) {
       parts.push(`<line x1="${x - 19}" x2="${x + 19}" y1="${NOTE_BOTTOM - p * NOTE_STEP}" y2="${NOTE_BOTTOM - p * NOTE_STEP}" stroke="${INK}" stroke-width="1.6"/>`);
     }
     const h = gap * 7.1;
