@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611091538';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091538';
-import { CLEF_PATH } from './clef.js?v=202611091538';
-import { hearLevel } from './pitch.js?v=202611091538';
-import { t } from './i18n.js?v=202611091538';
+import * as Sprint from './sprint.js?v=202611091600';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091600';
+import { CLEF_PATH } from './clef.js?v=202611091600';
+import { hearLevel } from './pitch.js?v=202611091600';
+import { t } from './i18n.js?v=202611091600';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -159,6 +159,8 @@ export function createSprintView(deps) {
                 <span><b>${t('sprint.opt.weak')}</b><span class="switch-sub">${t('sprint.opt.weak.sub')}</span></span></label>`
             : ''
         }
+        <label class="switch-row"><input type="checkbox" data-opt="helper" ${o.helper ? 'checked' : ''}/>
+          <span><b>${t('sprint.opt.helper')}</b><span class="switch-sub">${t('sprint.opt.helper.sub')}</span></span></label>
       </div>
       <div class="sprint-actions">
         <button class="primary-btn" type="button" data-act="start" ${enough ? '' : 'disabled'}>${t('sprint.start')}</button>
@@ -239,6 +241,10 @@ export function createSprintView(deps) {
       clockStart: null,
       flash: null,
       miss: null,
+      helper: Boolean(opts.helper),
+      ghost: null, // the note being played, drawn grey beside the written one
+      ghostCand: null,
+      ghostSince: 0,
     };
     panel = 'play';
     paint();
@@ -282,6 +288,7 @@ export function createSprintView(deps) {
     // Outside the violin's reading range is not a note to judge — the chime that
     // says "right" sits above it on purpose.
     if (midi != null && (midi < 53.5 || midi > 90.5)) midi = null;
+    if (run.helper) followGhost(time, midi);
     const ev = run.ear.frame(time, midi);
     if (!ev) return;
     if (run.clockStart == null && (ev.type === 'start' || ev.type === 'right' || ev.type === 'wrong')) {
@@ -304,6 +311,7 @@ export function createSprintView(deps) {
     }
     run.flash = id;
     run.miss = null;
+    run.ghost = null;
     run.ear.show(Sprint.parseId(run.deck[run.index]).midi, time);
     run.ear.settle(time);
     paintNote();
@@ -314,7 +322,28 @@ export function createSprintView(deps) {
     run.wrong.push(played);
     const want = Sprint.parseId(run.deck[run.index]).midi;
     run.miss = { dir: want > played ? 'up' : 'down', played };
+    // Without the helper, this is the one moment the played note is shown: just
+    // after the slip, where it landed beside where it should be.
+    if (!run.helper) run.ghost = played;
     paintNote();
+  }
+
+  /**
+   * The helper: the note being played, live. A pitch has to hold for a few
+   * frames before the grey note moves, so a slide or a bow change does not make
+   * it flicker; a short silence takes it away.
+   */
+  function followGhost(time, midi) {
+    const m = midi == null ? null : Math.round(midi);
+    if (m !== run.ghostCand) {
+      run.ghostCand = m;
+      run.ghostSince = time;
+      return;
+    }
+    const wait = m == null ? 0.2 : 0.06;
+    if (time - run.ghostSince < wait || run.ghost === m) return;
+    run.ghost = m;
+    paintGhost();
   }
 
   function finish() {
@@ -322,9 +351,9 @@ export function createSprintView(deps) {
     clearInterval(tick);
     tick = 0;
     deps.closeMic();
-    const result = Sprint.recordRun(stats, run.chosen, run.steps);
+    const result = Sprint.recordRun(stats, run.chosen, run.steps, Date.now(), { helper: run.helper });
     Sprint.saveStats(deps.profileId(), stats);
-    lastResult = { ...result, chosen: run.chosen, opts: { ...stats.opts } };
+    lastResult = { ...result, helper: run.helper, chosen: run.chosen, opts: { ...stats.opts, helper: run.helper } };
     run = null;
     panel = 'done';
     paint();
@@ -335,7 +364,8 @@ export function createSprintView(deps) {
 
   // One note on a zoomed staff.
   const NOTE_STEP = 9;
-  const NOTE_W = 240;
+  const NOTE_W = 272;
+  const GHOST_X = 228; // the played note, to the right of the written one (x 150)
   const NOTE_H = 230;
   const NOTE_BOTTOM = 150; // the E4 line
 
@@ -376,9 +406,10 @@ export function createSprintView(deps) {
         ? `<line x1="${x + 9.6}" x2="${x + 9.6}" y1="${y - 2}" y2="${y - 63}" stroke="${colour}" stroke-width="1.8"/>`
         : `<line x1="${x - 9.6}" x2="${x - 9.6}" y1="${y + 2}" y2="${y + 63}" stroke="${colour}" stroke-width="1.8"/>`,
     );
+    parts.push('<g class="sprint-ghost"></g>');
     if (state === 'wrong' && run?.miss) {
       // the same arrow the scale screen uses: which way the written note lies
-      const ax = x + 34;
+      const ax = x + 30;
       const dirUp = run.miss.dir === 'up';
       const tip = dirUp ? y - 18 : y + 18;
       const tail = dirUp ? y + 12 : y - 12;
@@ -414,7 +445,60 @@ export function createSprintView(deps) {
     void svg.getBoundingClientRect();
     if (!run.miss) svg.classList.add('is-in');
     else svg.classList.add('is-shake');
+    paintGhost();
     paintStatus();
+  }
+
+  /**
+   * The played note in grey, beside the written one. Spelled to read against
+   * it: on the written note's own letter when it can be (B♮ beside B♭, with
+   * its natural sign), otherwise in sharps going up and flats coming down.
+   * Hidden when it is the written note — there is nothing to compare.
+   */
+  function paintGhost() {
+    const layer = body.querySelector('.sprint-ghost');
+    if (!layer || !run) return;
+    const target = Sprint.parseId(run.deck[run.index]);
+    const m = run.ghost;
+    if (m == null || m === target.midi) {
+      layer.innerHTML = '';
+      return;
+    }
+    const letters = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    const pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+    let letter;
+    let alter;
+    let octave;
+    // the written note's own letter, if the played note is that letter ± a semitone
+    for (const o of [target.octave - 1, target.octave, target.octave + 1]) {
+      const d = m - (12 * (o + 1) + pc[target.letter]);
+      // …but never as E♯, B♯, F♭ or C♭: E beside F reads as E, not F♭
+      const odd = (d === 1 && 'EB'.includes(target.letter)) || (d === -1 && 'FC'.includes(target.letter));
+      if (Math.abs(d) <= 1 && !odd) {
+        letter = target.letter;
+        alter = d;
+        octave = o;
+      }
+    }
+    if (letter == null) {
+      const sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      const flats = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+      const name = (m > target.midi ? sharps : flats)[m % 12];
+      letter = name[0];
+      alter = name[1] === '#' ? 1 : name[1] === 'b' ? -1 : 0;
+      octave = Math.floor(m / 12) - 1;
+    }
+    const pos = (octave - 4) * 7 + letters.indexOf(letter) - 2;
+    const y = NOTE_BOTTOM - pos * NOTE_STEP;
+    const x = GHOST_X;
+    const ink = '#a89c8e';
+    const parts = [];
+    for (let p = -2; p >= pos; p -= 2) parts.push(`<line x1="${x - 17}" x2="${x + 17}" y1="${NOTE_BOTTOM - p * NOTE_STEP}" y2="${NOTE_BOTTOM - p * NOTE_STEP}" stroke="${ink}" stroke-width="1.5"/>`);
+    for (let p = 10; p <= pos; p += 2) parts.push(`<line x1="${x - 17}" x2="${x + 17}" y1="${NOTE_BOTTOM - p * NOTE_STEP}" y2="${NOTE_BOTTOM - p * NOTE_STEP}" stroke="${ink}" stroke-width="1.5"/>`);
+    // a sign when it has one, and a natural when it shares an altered note's letter
+    if (alter !== 0 || (letter === target.letter && target.alter !== 0)) parts.push(accidentalAt(alter, x - 22, y, ink, 1.3));
+    parts.push(`<ellipse cx="${x}" cy="${y}" rx="10" ry="7.4" transform="rotate(-18 ${x} ${y})" fill="none" stroke="${ink}" stroke-width="2.4"/>`);
+    layer.innerHTML = parts.join('');
   }
 
   function paintProgress() {
@@ -489,6 +573,7 @@ export function createSprintView(deps) {
       <div class="sprint-done${r.best && !r.firstOfSet ? ' is-best' : ''}">
         <div class="sprint-stars" aria-label="${esc(t('sprint.stars', { n: r.stars }))}">${stars}</div>
         <h3>${headline}</h3>
+        ${r.helper ? `<p class="sprint-helper-tag">${t('sprint.done.helper')}</p>` : ''}
         ${compare ? `<p class="sprint-compare">${compare}</p>` : ''}
         <div class="stat-grid sprint-tiles">
           <div class="stat-tile"><span class="stat-value">${secs(r.totalMs)} s</span><span class="stat-label">${t('sprint.tile.time')}</span></div>
@@ -567,7 +652,7 @@ export function createSprintView(deps) {
       <div class="stat-grid">
         ${tile(s.runs, 'sprint.stats.runs')}
         ${tile(s.notesRead, 'sprint.stats.notes')}
-        ${tile(`${secs(s.avgMs)} s`, 'sprint.stats.avg')}
+        ${tile(s.avgMs == null ? '—' : `${secs(s.avgMs)} s`, 'sprint.stats.avg')}
         ${tile(s.streak, 'sprint.stats.streak')}
       </div>
       ${week ? `<p class="sprint-compare">${week}</p>` : ''}
@@ -579,6 +664,7 @@ export function createSprintView(deps) {
       </div>
       <section class="sprint-card"><h4>${t('sprint.stats.strings')}</h4>${strings}</section>
       <section class="sprint-card"><h4>${t('sprint.stats.mixups')}</h4>${mixups}</section>
+      ${s.helperRuns ? `<p class="sprint-muted">${t('sprint.stats.helper', { n: s.helperRuns })}</p>` : ''}
       <p class="sprint-muted">${t('sprint.stats.note')}</p>`;
   }
 
@@ -644,7 +730,7 @@ export function createSprintView(deps) {
       // the slowest few, with a neighbour or two so it is not a two-note guessing game
       const s = Sprint.summary(stats);
       const ids = s.perNote.slice(-6).map((n) => n.id);
-      start(ids, { repeats: true, weak: true, length: 20 });
+      start(ids, { repeats: true, weak: true, length: 20, helper: stats.opts.helper });
     }
   });
 

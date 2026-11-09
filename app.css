@@ -5694,6 +5694,21 @@ select,
   color: #c47f17;
 }
 
+.sprint-helper-tag {
+  display: inline-block;
+  margin: 4px 0 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #eef0f6;
+  color: #55607e;
+  font: 600 13px var(--sans);
+}
+
+:root[data-theme='dark'] .sprint-helper-tag {
+  background: #2c3040;
+  color: #b7c0dc;
+}
+
 .sprint-compare {
   color: var(--ink-soft);
   font-weight: 600;

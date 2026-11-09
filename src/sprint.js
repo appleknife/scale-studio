@@ -277,7 +277,7 @@ export function emptyStats() {
   return {
     v: 1,
     picked: PRESETS[1].notes.slice(),
-    opts: { repeats: true, weak: false, length: 20 },
+    opts: { repeats: true, weak: false, length: 20, helper: false },
     runs: [], // { at, set, notes, totalMs, avgMs, perMinute, firstTry, stars, misses }
     notes: {}, // { [id]: { seen, totalMs, bestMs, misses } }
     mixups: {}, // { 'B4>C5': n } — wanted B4, played C5
@@ -319,11 +319,19 @@ export function saveStats(profileId, stats, store = localStorage) {
  * Files a finished run. `steps` is one entry per note on screen:
  * { id, ms, wrong: [midi…] }. Returns the score and what was new about it.
  */
-export function recordRun(stats, chosen, steps, at = Date.now()) {
+/**
+ * `helper`: the run showed the played note live. Seeing where you are while you
+ * play makes a sprint easier without teaching the reading as well — feedback
+ * *during* a movement helps on the day and less afterwards (the guidance
+ * effect). So a helper run keeps its own personal bests, and its times stay out
+ * of the per-note speeds and the trend: those measure reading on its own.
+ * Mix-ups still count — a wrong note is worth knowing about either way.
+ */
+export function recordRun(stats, chosen, steps, at = Date.now(), { helper = false } = {}) {
   const times = steps.map((s) => s.ms);
   const misses = steps.flatMap((s) => s.wrong.map((w) => ({ id: s.id, played: w })));
   const score = scoreRun(times, steps.filter((s) => s.wrong.length));
-  const key = setKey(chosen);
+  const key = (helper ? 'helper:' : '') + setKey(chosen);
   const previous = stats.bests[key];
   const best = previous == null || score.avgMs < previous;
   if (best) stats.bests[key] = score.avgMs;
@@ -331,20 +339,21 @@ export function recordRun(stats, chosen, steps, at = Date.now()) {
   let run = 0;
   let longest = 0;
   for (const s of steps) {
+    run = s.wrong.length ? 0 : run + 1;
+    longest = Math.max(longest, run);
+    if (helper) continue;
     const n = (stats.notes[s.id] = stats.notes[s.id] || { seen: 0, totalMs: 0, bestMs: null, misses: 0 });
     n.seen += 1;
     n.totalMs += s.ms;
     if (n.bestMs == null || s.ms < n.bestMs) n.bestMs = s.ms;
     n.misses += s.wrong.length;
-    run = s.wrong.length ? 0 : run + 1;
-    longest = Math.max(longest, run);
   }
   for (const m of misses) {
     const k = `${m.id}>${m.played}`;
     stats.mixups[k] = (stats.mixups[k] || 0) + 1;
   }
-  const streakBest = longest > (stats.streak || 0);
-  stats.streak = Math.max(stats.streak || 0, longest);
+  const streakBest = !helper && longest > (stats.streak || 0);
+  if (!helper) stats.streak = Math.max(stats.streak || 0, longest);
   stats.runs.push({
     at,
     set: key,
@@ -355,6 +364,7 @@ export function recordRun(stats, chosen, steps, at = Date.now()) {
     firstTry: Math.round(score.firstTry * 100) / 100,
     stars: score.stars,
     misses: misses.length,
+    ...(helper ? { helper: true } : {}),
   });
   if (stats.runs.length > 300) stats.runs = stats.runs.slice(-300);
   return { ...score, best, firstOfSet: previous == null, previousBest: previous ?? null, longest, streakBest };
@@ -369,8 +379,10 @@ export function playedName(midi) {
 }
 
 export function summary(stats) {
-  const runs = stats.runs || [];
-  const notesRead = runs.reduce((a, r) => a + r.notes, 0);
+  const all = stats.runs || [];
+  const notesRead = all.reduce((a, r) => a + r.notes, 0);
+  // Speeds are reading speeds: runs with the helper on are counted, not timed.
+  const runs = all.filter((r) => !r.helper);
   const avg = (list) => {
     const n = list.reduce((a, r) => a + r.notes, 0);
     return n ? list.reduce((a, r) => a + r.avgMs * r.notes, 0) / n : null;
@@ -407,7 +419,8 @@ export function summary(stats) {
   const fastest = runs.length ? runs.reduce((a, r) => (r.avgMs < a.avgMs && r.notes >= 5 ? r : a), runs[0]) : null;
 
   return {
-    runs: runs.length,
+    runs: all.length,
+    helperRuns: all.length - runs.length,
     notesRead,
     avgMs: avg(runs),
     weekAvgMs: avg(thisWeek),
