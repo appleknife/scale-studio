@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611091555" />
+    <link rel="stylesheet" href="app.css?v=202611091620" />
   </head>
   <body>
     <div class="shell">
@@ -600,6 +600,10 @@
               </div>
             </div>
             <ul class="sight-parts" id="sightParts"></ul>
+            <div class="sight-replay">
+              <button class="ghost-btn" id="sightReplayBtn" type="button" hidden>Hear yourself</button>
+              <span class="sight-replay-hint">Tap a bar on the page to start from there.</span>
+            </div>
             <!-- The lane is drawn under the page itself, above this card, one
                  stem per note; this is the count that goes with it. -->
             <p class="intonation-sum" id="sightIntonationSum"></p>
@@ -1165,13 +1169,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611091555"></script>
+    <script type="module" src="src/app.js?v=202611091620"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611091555';
+        var V = '202611091620';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;

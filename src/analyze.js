@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611091555';
-import { getLang, t } from './i18n.js?v=202611091555';
+import { median } from './pitch.js?v=202611091620';
+import { getLang, t } from './i18n.js?v=202611091620';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -677,6 +677,7 @@ export function analyzeSightTake(frames, passage, options = {}) {
     const diff = det.midi - expectedMidi[e];
     const r = results[e];
     r.detected = det.midi;
+    r.at = det.t0; // when it was played, seconds into the take
     if (diff === 0) {
       r.status = 'exact';
       r.cents = det.cents;

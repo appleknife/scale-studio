@@ -5892,3 +5892,23 @@ select,
 :root[data-theme='dark'] .sprint-star:not(.is-on) {
   color: #5a5248;
 }
+
+/* Hearing yourself back, under the sight-reading result. */
+.sight-replay {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 12px 0 4px;
+}
+
+.sight-replay .ghost-btn.is-on {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.sight-replay-hint {
+  font-size: 13px;
+  color: var(--muted);
+}

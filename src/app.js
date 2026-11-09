@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091555';
-import { renderStaff } from './staff.js?v=202611091555';
-import { createInk } from './ink.js?v=202611091555';
-import { createFollower } from './follow.js?v=202611091555';
-import { createPetRoom } from './petroom.js?v=202611091555';
-import { createBuddy } from './buddy.js?v=202611091555';
-import { createSprintView } from './sprintview.js?v=202611091555';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091620';
+import { renderStaff } from './staff.js?v=202611091620';
+import { createInk } from './ink.js?v=202611091620';
+import { createFollower } from './follow.js?v=202611091620';
+import { createPetRoom } from './petroom.js?v=202611091620';
+import { createBuddy } from './buddy.js?v=202611091620';
+import { createSprintView } from './sprintview.js?v=202611091620';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611091555';
+window.__scaleStudioVersion = '202611091620';
 import {
   PitchDetector,
   midiToFreq,
@@ -18,16 +18,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611091555';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091555';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091555';
-import { generatePassage } from './sightreading.js?v=202611091555';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091555';
-import { renderScore } from './score.js?v=202611091555';
-import { summariseIntonation } from './intonation.js?v=202611091555';
-import * as Journal from './journal.js?v=202611091555';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611091555';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091555';
+} from './pitch.js?v=202611091620';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091620';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091620';
+import { generatePassage } from './sightreading.js?v=202611091620';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091620';
+import { renderScore } from './score.js?v=202611091620';
+import { summariseIntonation } from './intonation.js?v=202611091620';
+import * as Journal from './journal.js?v=202611091620';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091620';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091620';
 import {
   STRINGS,
   FIFTHS,
@@ -36,7 +36,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611091555';
+} from './tuner.js?v=202611091620';
 
 const LANG = initLang();
 
@@ -68,6 +68,7 @@ const el = {
   sightBack: $('sightBack'),
   sightNewBtn: $('sightNewBtn'),
   sightHearBtn: $('sightHearBtn'),
+  sightReplayBtn: $('sightReplayBtn'),
   sightTempoBtn: $('sightTempoBtn'),
   sightLevels: $('sightLevels'),
   sightSpeeds: $('sightSpeeds'),
@@ -399,6 +400,7 @@ function showView(name) {
   if (name !== 'pet' && petRoom) petRoom.stop();
   // Note Sprint lets go of the microphone the moment its screen goes.
   if (name !== 'sprint' && sprintView) sprintView.stop();
+  if (name !== 'sight') stopSightReplay();
   if (name === 'choose') paintMenuPet();
   Object.entries(el.views).forEach(([key, node]) => {
     node.hidden = key !== name;
@@ -1154,6 +1156,8 @@ const sight = {
   // marks it and turns the example into "start here", which is what a student
   // who has lost their place actually needs.
   pickedBar: null,
+  replay: null, // the last take, recorded: { blob, lead, result, passage }
+  replaying: null,
   // The speed the example and the assisted clicks run at. The printed marking is
   // the default — a student should hear what the page says the first time, and
   // drop to ½ or ¾ themselves if a level VI excerpt is a stretch. (Only VI is
@@ -1302,9 +1306,112 @@ function stopHearing() {
 
 /** The hear button's words follow the selection: whole passage, or from a bar. */
 function paintHearLabel() {
+  paintReplayButton();
   if (player.playing) return;
   el.sightHearBtn.textContent =
     sight.pickedBar == null ? t('sight.hear') : t('sight.hearFrom', { bar: sight.pickedBar + 1 });
+}
+
+/* ── Hearing yourself back ─────────────────────────────────────────────
+   The take is recorded alongside the listening and kept in memory only, until
+   the next take or the next page. It plays through the same synthetic hall as
+   the practice log's recordings — a little of it: a home sounds dry — and from
+   the picked bar when there is one. The bar is found in the audio from the
+   notes the analysis matched: the first matched note at or after the bar, less
+   however much of the bar came before it at the student's own pace. */
+
+function clearSightReplay() {
+  stopSightReplay();
+  sight.replay = null;
+  paintReplayButton();
+}
+
+function stopSightReplay() {
+  if (sight.replaying) {
+    sight.replaying.stop();
+    sight.replaying = null;
+    hidePlayhead();
+  }
+  paintReplayButton();
+}
+
+function paintReplayButton() {
+  if (!el.sightReplayBtn) return;
+  el.sightReplayBtn.hidden = !sight.replay;
+  const hint = el.sightReplayBtn.nextElementSibling;
+  if (hint) hint.hidden = !sight.replay;
+  el.sightReplayBtn.classList.toggle('is-on', Boolean(sight.replaying));
+  el.sightReplayBtn.textContent = sight.replaying
+    ? t('sight.replayStop')
+    : sight.pickedBar == null
+      ? t('sight.replay')
+      : t('sight.replayFrom', { bar: sight.pickedBar + 1 });
+}
+
+/** Seconds into the take where a bar was begun, from the matched notes. */
+function sightBarTime(replay, bar) {
+  const { result, passage } = replay;
+  if (!result?.results || !passage) return bar ? null : 0;
+  const from = bar * passage.perBar;
+  const unit = result.unit || 0.15;
+  const hit = result.results.find((r) => r.at != null && r.event.abs >= from);
+  if (!hit) return bar ? null : 0;
+  return Math.max(0, hit.at - (hit.event.abs - from) * unit);
+}
+
+/** Where the line belongs while the recording plays: between matched notes. */
+function sightAbsAt(replay, takeTime) {
+  const pts = (replay.result?.results || []).filter((r) => r.at != null).map((r) => [r.at, r.event.abs]);
+  if (!pts.length) return null;
+  if (takeTime <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) {
+    if (takeTime < pts[i][0]) {
+      const [t0, a0] = pts[i - 1];
+      const [t1, a1] = pts[i];
+      return a0 + ((takeTime - t0) / Math.max(0.001, t1 - t0)) * (a1 - a0);
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+
+async function playSightReplay() {
+  if (sight.replaying) {
+    stopSightReplay();
+    return;
+  }
+  const replay = sight.replay;
+  if (!replay) return;
+  if (player.playing) stopHearing();
+  const barTime = sightBarTime(replay, sight.pickedBar || 0);
+  if (barTime == null) {
+    el.sightStatus.textContent = t('sight.replayNoBar');
+    return;
+  }
+  // a breath before the bar, so its first note is not clipped
+  const offset = Math.max(0, replay.lead + barTime - 0.4);
+  try {
+    const handle = await playRecording(replay.blob, { wet: 0.22, offset });
+    sight.replaying = handle;
+    paintReplayButton();
+    ensurePlayhead();
+    sight.anchors = sightAnchors(replay.passage, el.sightStaff.querySelector('svg'));
+    const step = () => {
+      if (sight.replaying !== handle) return;
+      const at = sightAbsAt(replay, handle.position() - replay.lead);
+      if (at != null) movePlayhead(sight, at);
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    handle.ended.then(() => {
+      if (sight.replaying === handle) {
+        sight.replaying = null;
+        hidePlayhead();
+        paintReplayButton();
+      }
+    });
+  } catch {
+    el.sightStatus.textContent = t('sight.replayFail');
+  }
 }
 
 /** Marks the picked bar in the drawing, and nothing else. */
@@ -1320,6 +1427,7 @@ function hearPassage() {
     stopHearing();
     return;
   }
+  stopSightReplay();
   const passage = sight.passage;
   if (!passage) return;
   const fromBar = sight.pickedBar || 0;
@@ -1447,6 +1555,7 @@ function newPassage(level = sight.level, seed = null) {
   sight.anchors = null;    // the drawing is about to be replaced
   sight.pickedBar = null;  // and a bar number means nothing on the next page
   sight.result = null;     // nor does the last take's intonation lane
+  clearSightReplay();      // nor a recording of a different page
   playhead = null;
   stopSightTake(false);
   el.sightResult.hidden = true;
@@ -1724,6 +1833,12 @@ function armSightTake(options = {}) {
   el.sightLive.hidden = true;
   if (el.sightLevel) el.sightLevel.hidden = false;
   resetSightLive();
+  // Recorded from the moment the take is armed, so the first note's attack is
+  // in it — hearing yourself back is the point (see the replay button).
+  clearSightReplay();
+  if (canRecord() && state.mic?.stream) {
+    sight.take.rec = recordStream(state.mic.stream);
+  }
   el.sightStart.disabled = false;
   el.sightStart.hidden = true;
   el.sightStop.hidden = false;
@@ -1781,6 +1896,7 @@ function ingestSightFrame(frame) {
     take.started = true;
     sight.phase = 'taking';
     take.t0 = frame.t;
+    take.perfT0 = performance.now();
     if (take.live) {
       el.sightLive.hidden = false;
       resetSightLive();
@@ -1805,6 +1921,7 @@ function ingestSightFrame(frame) {
       take.started = true;
       sight.phase = 'taking';
       take.t0 = Math.max(0, frame.t - 0.1);
+      take.perfT0 = performance.now() - (frame.t - take.t0) * 1000;
       el.sightStatus.textContent = t('sight.playing');
       if (take.live) {
         el.sightLive.hidden = false;
@@ -1870,6 +1987,18 @@ function stopSightTake(analyse = true) {
   hidePlayhead();
   // Nothing stale left behind: a reading only exists while a take is running.
   resetSightLive();
+  const keep = Boolean(analyse && take && take.started);
+  if (take?.rec) {
+    const rec = take.rec;
+    take.rec = null;
+    rec.stop().then((blob) => {
+      if (!keep || !blob || sight.take) return;
+      // Where the take began in the recording, in seconds — the bars are found
+      // from there (see sightReplayOffset).
+      sight.replay = { blob, lead: Math.max(0, ((take.perfT0 || rec.startedAt) - rec.startedAt) / 1000), result: sight.result, passage: sight.passage };
+      paintReplayButton();
+    });
+  }
   if (analyse && take && take.started) {
     const result = analyzeSightTake(take.frames, sight.passage);
     // Compared against earlier readings at this level, before this one is filed.
@@ -2113,7 +2242,11 @@ function playTempo(passage) {
 el.openSightBtn.addEventListener('click', () => openSight());
 el.sightBack.addEventListener('click', goHome);
 el.sightNewBtn.addEventListener('click', () => newPassage(sight.level));
-el.sightStart.addEventListener('click', startSightTake);
+el.sightStart.addEventListener('click', () => {
+  stopSightReplay();
+  startSightTake();
+});
+el.sightReplayBtn?.addEventListener('click', playSightReplay);
 el.sightStop.addEventListener('click', () => stopSightTake(true));
 el.sightAgain.addEventListener('click', () => {
   el.sightResult.hidden = true;
@@ -4999,6 +5132,9 @@ if (params.has('autostart')) {
   startListening();
 }
 window.__scaleStudioReady = true;
+// Read-only views for the browser suites: the page on screen and the replay.
+window.__sightPassage = () => sight.passage;
+window.__sightReplay = () => (sight.replay ? { blob: sight.replay.blob, lead: sight.replay.lead, playing: Boolean(sight.replaying), at: sight.replaying?.position() ?? null, barTime: (b) => sightBarTime(sight.replay, b) } : null);
 
 renderLogBanner();
 // The names row has to be right on the first screen, not after a visit to the

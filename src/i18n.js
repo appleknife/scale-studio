@@ -467,6 +467,11 @@ export const S = {
   'sight.hear': ['Hear the passage', '听一遍谱子'],
   'sight.stopHearing': ['Stop the example', '停止试听'],
   'sight.hearFrom': ['Start at bar {bar}', '从第 {bar} 小节开始'],
+  'sight.replay': ['▶ Hear yourself', '▶ 听听自己'],
+  'sight.replayFrom': ['▶ Hear yourself from bar {bar}', '▶ 从第 {bar} 小节听自己'],
+  'sight.replayStop': ['■ Stop', '■ 停止'],
+  'sight.replayNoBar': ['That bar wasn’t heard in the take, so there’s nowhere to start it from.', '这次录音里没听到那一小节，所以没法从那里开始。'],
+  'sight.replayFail': ['This browser couldn’t play the recording back.', '这个浏览器无法播放这段录音。'],
 
   // ── Offline ──
   'offline.status': [
@@ -1085,6 +1090,7 @@ export const STATIC = {
   /* chrome */
   'Dark': '深色',
   'Pet room': '宠物小屋',
+  'Tap a bar on the page to start from there.': '点谱子上的一个小节，就从那里开始。',
   'Note Sprint': '音符冲刺',
   'Pick the notes you know, then read them as fast as you can. The app listens.': '选出你认识的音，然后尽快读出来、拉出来。应用会听。',
   'New': '新',

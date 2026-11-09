@@ -111,10 +111,47 @@ export async function startRecording() {
 }
 
 /**
+ * Records a stream that is already open — the microphone the detector is
+ * listening to — without opening a second one and without closing it after:
+ * the take's own listening goes on untouched. `startedAt` is performance.now()
+ * at the moment recording began, so a moment in the take can be found in the
+ * audio later.
+ */
+export function recordStream(stream) {
+  if (!window.MediaRecorder || !stream) return null;
+  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+  const mimeType = candidates.find(
+    (type) => !window.MediaRecorder.isTypeSupported || window.MediaRecorder.isTypeSupported(type),
+  );
+  let recorder;
+  try {
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  } catch {
+    return null;
+  }
+  const chunks = [];
+  recorder.ondataavailable = (event) => {
+    if (event.data && event.data.size) chunks.push(event.data);
+  };
+  const done = new Promise((resolve) => {
+    recorder.onstop = () => resolve(chunks.length ? new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }) : null);
+  });
+  const startedAt = performance.now();
+  recorder.start();
+  return {
+    startedAt,
+    stop() {
+      if (recorder.state !== 'inactive') recorder.stop();
+      return done;
+    },
+  };
+}
+
+/**
  * Plays a recorded take back through the hall. `wet` is how much of the hall is
  * mixed in — 0.34 is a recital room, 0 is the microphone's own sound.
  */
-export async function play(blob, { wet = 0.34 } = {}) {
+export async function play(blob, { wet = 0.34, offset = 0 } = {}) {
   const ac = audio();
   if (!ac) throw new Error('no-audio');
   const buffer = await ac.decodeAudioData(await blob.arrayBuffer());
@@ -136,11 +173,15 @@ export async function play(blob, { wet = 0.34 } = {}) {
   room.connect(send);
   send.connect(ac.destination);
 
-  source.start();
+  const from = Math.max(0, Math.min(offset, buffer.duration - 0.05));
+  const began = ac.currentTime;
+  source.start(0, from);
   const ended = new Promise((resolve) => {
     source.onended = () => resolve();
   });
   return {
+    /** Seconds into the recording that are sounding now. */
+    position: () => from + (ac.currentTime - began),
     stop() {
       try {
         source.stop();
