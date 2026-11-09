@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611091630';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091630';
-import { CLEF_PATH } from './clef.js?v=202611091630';
-import { hearLevel } from './pitch.js?v=202611091630';
-import { t } from './i18n.js?v=202611091630';
+import * as Sprint from './sprint.js?v=202611091645';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091645';
+import { CLEF_PATH } from './clef.js?v=202611091645';
+import { hearLevel } from './pitch.js?v=202611091645';
+import { t } from './i18n.js?v=202611091645';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -580,6 +580,7 @@ export function createSprintView(deps) {
         <h3>${headline}</h3>
         ${r.helper ? `<p class="sprint-helper-tag">${t('sprint.done.helper')}</p>` : ''}
         ${compare ? `<p class="sprint-compare">${compare}</p>` : ''}
+        ${whyLine(r)}
         <div class="stat-grid sprint-tiles">
           <div class="stat-tile"><span class="stat-value">${secs(r.totalMs)} s</span><span class="stat-label">${t('sprint.tile.time')}</span></div>
           <div class="stat-tile"><span class="stat-value">${secs(r.avgMs)} s</span><span class="stat-label">${t('sprint.tile.avg')}</span></div>
@@ -587,7 +588,12 @@ export function createSprintView(deps) {
           <div class="stat-tile"><span class="stat-value">${Math.round(r.firstTry * 100)}%</span><span class="stat-label">${t('sprint.tile.firstTry')}</span></div>
         </div>
         ${r.streakBest && r.longest >= 5 ? `<p class="sprint-compare">${t('sprint.done.streak', { n: r.longest })}</p>` : ''}
-        <p class="sprint-starkey">${t('sprint.starkey', { two: secs(Sprint.STAR_MS.two), three: secs(Sprint.STAR_MS.three) })}</p>
+        <p class="sprint-starkey">${t('sprint.starkey', {
+          two: secs(Sprint.STAR_MS.two),
+          three: secs(Sprint.STAR_MS.three),
+          p2: Math.round(Sprint.STAR_FIRST.two * 100),
+          p3: Math.round(Sprint.STAR_FIRST.three * 100),
+        })}</p>
         <div class="sprint-actions">
           <button class="primary-btn" type="button" data-act="again">${t('sprint.again')}</button>
           <button class="quiet-btn" type="button" data-act="change">${t('sprint.change')}</button>
@@ -623,6 +629,33 @@ export function createSprintView(deps) {
         }
       }, delay);
     });
+  }
+
+  /**
+   * Stars are the lower of speed and right-first-time. When the two differ, say
+   * which one held the run back and what the next star needs — a fast run with
+   * one star otherwise looks like a mistake in the counting.
+   */
+  function whyLine(r) {
+    if (r.speedStars == null || r.speedStars === r.firstTryStars) return '';
+    const stars = (n) => '★'.repeat(n);
+    const next = r.stars + 1;
+    if (r.firstTryStars < r.speedStars) {
+      return `<p class="sprint-why">${t('sprint.why.firstTry', {
+        speed: stars(r.speedStars),
+        pct: Math.round(r.firstTry * 100),
+        stars: stars(r.stars),
+        need: Math.round(Sprint.STAR_FIRST[next === 3 ? 'three' : 'two'] * 100),
+        next: stars(next),
+      })}</p>`;
+    }
+    return `<p class="sprint-why">${t('sprint.why.speed', {
+      acc: stars(r.firstTryStars),
+      avg: secs(r.avgMs),
+      stars: stars(r.stars),
+      need: secs(Sprint.STAR_MS[next === 3 ? 'three' : 'two']),
+      next: stars(next),
+    })}</p>`;
   }
 
   function burst(anchor) {

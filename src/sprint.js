@@ -249,6 +249,8 @@ export function createEar() {
  * the thresholds sit where a teacher would say "that is getting fluent".
  */
 export const STAR_MS = { two: 2200, three: 1300 };
+/** …and how many of the notes have to be right first time for each. */
+export const STAR_FIRST = { two: 0.7, three: 0.9 };
 
 export function scoreRun(times, misses) {
   const n = times.length;
@@ -256,10 +258,13 @@ export function scoreRun(times, misses) {
   const avgMs = n ? total / n : 0;
   const firstTry = n ? (n - Math.min(n, misses.length)) / n : 0;
   const perMinute = total ? (n / total) * 60000 : 0;
-  let stars = n ? 1 : 0;
-  if (n && avgMs <= STAR_MS.two && firstTry >= 0.7) stars = 2;
-  if (n && avgMs <= STAR_MS.three && firstTry >= 0.9) stars = 3;
-  return { notes: n, totalMs: total, avgMs, perMinute, firstTry, stars };
+  // Two halves, and the run gets the lower: speed alone is not reading if half
+  // the notes needed a second go. Each half is reported, so the finish can say
+  // which one held the stars back.
+  const speedStars = avgMs <= STAR_MS.three ? 3 : avgMs <= STAR_MS.two ? 2 : 1;
+  const firstTryStars = firstTry >= STAR_FIRST.three ? 3 : firstTry >= STAR_FIRST.two ? 2 : 1;
+  const stars = n ? Math.min(speedStars, firstTryStars) : 0;
+  return { notes: n, totalMs: total, avgMs, perMinute, firstTry, stars, speedStars, firstTryStars };
 }
 
 /** Which set of notes a run was: the same set, in any order, is the same race. */

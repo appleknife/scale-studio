@@ -2753,7 +2753,7 @@ dialog .primary-btn {
 .sight-tips li {
   font-size: 14px;
   line-height: 1.5;
-  color: #3a342d;
+  color: var(--ink-soft);
   padding-left: 16px;
   position: relative;
 }
@@ -3811,8 +3811,8 @@ select,
   padding: 1px 8px;
   border-radius: 999px;
   background: #f6a4b4;
-  color: #fff;
-  font: 600 11px/1.6 var(--sans);
+  color: #5c1f2c;
+  font: 700 11px/1.6 var(--sans);
   letter-spacing: 0.04em;
   vertical-align: 3px;
 }
@@ -5759,6 +5759,21 @@ select,
   color: var(--ink-soft);
   font-weight: 600;
   margin: 6px 0;
+}
+
+.sprint-why {
+  max-width: 440px;
+  margin: 12px auto 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--gold-wash, #f6eedc);
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+:root[data-theme='dark'] .sprint-why {
+  background: #352c1c;
 }
 
 .sprint-tiles {
