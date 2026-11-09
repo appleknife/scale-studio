@@ -219,7 +219,7 @@ export const S = {
   'sprint.opt.length': ['How many', '数量'],
   'sprint.opt.weak': ['Weaker notes more often', '弱的音多练几次'],
   'sprint.opt.helper': ['Show what I’m playing', '显示我正在拉的音'],
-  'sprint.opt.helper.sub': ['A grey note follows your playing, so you can see where you are. Great for getting started; these sprints keep their own bests.', '一个灰色的音会跟着你拉的音移动，让你看到自己在哪里。适合刚开始练；这些冲刺有自己的最佳纪录。'],
+  'sprint.opt.helper.sub': ['A dot beside the note follows your playing, like a tuner — it turns green when you line up. Great for getting started; these sprints keep their own bests.', '音符旁边有一个小圆点跟着你拉的音移动，像调音器一样——对上了就变绿。适合刚开始练；这些冲刺有自己的最佳纪录。'],
   'sprint.done.helper': ['With “Show what I’m playing” on — compared only with your other helper sprints.', '开着“显示我正在拉的音”——只和你其他开着提示的冲刺比较。'],
   'sprint.stats.helper': ['{n} sprints with “Show what I’m playing” on are counted but not timed here.', '有 {n} 次开着“显示我正在拉的音”的冲刺：计入次数，但不计入这里的速度。'],
   'sprint.opt.weak.sub': ['Notes you read slowly or miss come up more.', '读得慢或常出错的音会出现得更多。'],

@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611091620';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091620';
-import { CLEF_PATH } from './clef.js?v=202611091620';
-import { hearLevel } from './pitch.js?v=202611091620';
-import { t } from './i18n.js?v=202611091620';
+import * as Sprint from './sprint.js?v=202611091630';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611091630';
+import { CLEF_PATH } from './clef.js?v=202611091630';
+import { hearLevel } from './pitch.js?v=202611091630';
+import { t } from './i18n.js?v=202611091630';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -242,9 +242,8 @@ export function createSprintView(deps) {
       flash: null,
       miss: null,
       helper: Boolean(opts.helper),
-      ghost: null, // the note being played, drawn grey beside the written one
-      ghostCand: null,
-      ghostSince: 0,
+      ghost: null, // the pitch being played (fractional midi), shown as a dot
+      quietSince: null,
     };
     panel = 'play';
     paint();
@@ -324,25 +323,38 @@ export function createSprintView(deps) {
     run.miss = { dir: want > played ? 'up' : 'down', played };
     // Without the helper, this is the one moment the played note is shown: just
     // after the slip, where it landed beside where it should be.
-    if (!run.helper) run.ghost = played;
+    if (!run.helper) {
+      run.ghost = played;
+      clearTimeout(run.dotTimer);
+      // a moment, then it goes: it shows where the slip landed, not a target to chase
+      run.dotTimer = setTimeout(() => {
+        if (run && !run.helper) {
+          run.ghost = null;
+          paintGhost();
+        }
+      }, 1600);
+    }
     paintNote();
   }
 
   /**
-   * The helper: the note being played, live. A pitch has to hold for a few
-   * frames before the grey note moves, so a slide or a bow change does not make
-   * it flicker; a short silence takes it away.
+   * The helper: a dot that follows the playing, every frame, like the tuner's
+   * needle. It is smoothed — a little within a note, hardly at all across a
+   * jump to a new one — so it glides rather than twitches; a short silence takes
+   * it away.
    */
   function followGhost(time, midi) {
-    const m = midi == null ? null : Math.round(midi);
-    if (m !== run.ghostCand) {
-      run.ghostCand = m;
-      run.ghostSince = time;
+    if (midi == null) {
+      if (run.quietSince == null) run.quietSince = time;
+      if (run.ghost != null && time - run.quietSince > 0.2) {
+        run.ghost = null;
+        paintGhost();
+      }
       return;
     }
-    const wait = m == null ? 0.2 : 0.06;
-    if (time - run.ghostSince < wait || run.ghost === m) return;
-    run.ghost = m;
+    run.quietSince = null;
+    const prev = run.ghost;
+    run.ghost = prev == null || Math.abs(midi - prev) > 0.7 ? midi : prev * 0.55 + midi * 0.45;
     paintGhost();
   }
 
@@ -365,7 +377,7 @@ export function createSprintView(deps) {
   // One note on a zoomed staff.
   const NOTE_STEP = 9;
   const NOTE_W = 272;
-  const GHOST_X = 228; // the played note, to the right of the written one (x 150)
+  const DOT_X = 212; // the lane the dot moves in, right of the written note (x 150)
   const NOTE_H = 230;
   const NOTE_BOTTOM = 150; // the E4 line
 
@@ -406,7 +418,11 @@ export function createSprintView(deps) {
         ? `<line x1="${x + 9.6}" x2="${x + 9.6}" y1="${y - 2}" y2="${y - 63}" stroke="${colour}" stroke-width="1.8"/>`
         : `<line x1="${x - 9.6}" x2="${x - 9.6}" y1="${y + 2}" y2="${y + 63}" stroke="${colour}" stroke-width="1.8"/>`,
     );
-    parts.push('<g class="sprint-ghost"></g>');
+    // The lane and the dot: drawn once, moved by paintGhost.
+    parts.push(
+      `<g class="sprint-ghost" style="display:none"><line class="sprint-lane" x1="${DOT_X}" x2="${DOT_X}" y1="6" y2="${NOTE_H - 8}"/>` +
+        `<circle class="sprint-dot" cx="${DOT_X}" cy="0" r="7.5"/></g>`,
+    );
     if (state === 'wrong' && run?.miss) {
       // the same arrow the scale screen uses: which way the written note lies
       const ax = x + 30;
@@ -451,55 +467,43 @@ export function createSprintView(deps) {
   }
 
   /**
-   * The played note in grey, beside the written one. Spelled to read against
-   * it: on the written note's own letter when it can be (B♮ beside B♭, with
-   * its natural sign), otherwise in sharps going up and flats coming down.
-   * Hidden when it is the written note — there is nothing to compare.
+   * Where a pitch sits on the staff, in steps above E4 — continuously. Between
+   * two plain notes it sits partway (F♯ halfway from F to G). On the written
+   * note's own pitch, though, it sits exactly on the written note — F♯ on the F
+   * line, B♭ on the B line — and a little above or below it when sharp or flat.
+   * So lined up always means right.
    */
+  function staffPos(m, target) {
+    const tPos = (target.octave - 4) * 7 + ['C', 'D', 'E', 'F', 'G', 'A', 'B'].indexOf(target.letter) - 2;
+    const off = m - target.midi;
+    if (Math.abs(off) < 0.5) return { pos: tPos + off * 0.9, on: Math.abs(off) < 0.3 };
+    const naturals = [];
+    for (let o = 3; o <= 7; o++) {
+      [0, 2, 4, 5, 7, 9, 11].forEach((pc, k) => naturals.push({ midi: 12 * (o + 1) + pc, pos: (o - 4) * 7 + k - 2 }));
+    }
+    let i = naturals.findIndex((n) => n.midi > m);
+    if (i <= 0) i = 1;
+    const a = naturals[i - 1];
+    const b = naturals[i];
+    return { pos: a.pos + ((m - a.midi) / (b.midi - a.midi)) * (b.pos - a.pos), on: false };
+  }
+
+  /** Moves the dot to the pitch being played, or hides it. */
   function paintGhost() {
     const layer = body.querySelector('.sprint-ghost');
     if (!layer || !run) return;
-    const target = Sprint.parseId(run.deck[run.index]);
     const m = run.ghost;
-    if (m == null || m === target.midi) {
-      layer.innerHTML = '';
+    if (m == null) {
+      layer.style.display = 'none';
       return;
     }
-    const letters = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
-    const pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-    let letter;
-    let alter;
-    let octave;
-    // the written note's own letter, if the played note is that letter ± a semitone
-    for (const o of [target.octave - 1, target.octave, target.octave + 1]) {
-      const d = m - (12 * (o + 1) + pc[target.letter]);
-      // …but never as E♯, B♯, F♭ or C♭: E beside F reads as E, not F♭
-      const odd = (d === 1 && 'EB'.includes(target.letter)) || (d === -1 && 'FC'.includes(target.letter));
-      if (Math.abs(d) <= 1 && !odd) {
-        letter = target.letter;
-        alter = d;
-        octave = o;
-      }
-    }
-    if (letter == null) {
-      const sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-      const flats = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-      const name = (m > target.midi ? sharps : flats)[m % 12];
-      letter = name[0];
-      alter = name[1] === '#' ? 1 : name[1] === 'b' ? -1 : 0;
-      octave = Math.floor(m / 12) - 1;
-    }
-    const pos = (octave - 4) * 7 + letters.indexOf(letter) - 2;
-    const y = NOTE_BOTTOM - pos * NOTE_STEP;
-    const x = GHOST_X;
-    const ink = '#a89c8e';
-    const parts = [];
-    for (let p = -2; p >= pos; p -= 2) parts.push(`<line x1="${x - 17}" x2="${x + 17}" y1="${NOTE_BOTTOM - p * NOTE_STEP}" y2="${NOTE_BOTTOM - p * NOTE_STEP}" stroke="${ink}" stroke-width="1.5"/>`);
-    for (let p = 10; p <= pos; p += 2) parts.push(`<line x1="${x - 17}" x2="${x + 17}" y1="${NOTE_BOTTOM - p * NOTE_STEP}" y2="${NOTE_BOTTOM - p * NOTE_STEP}" stroke="${ink}" stroke-width="1.5"/>`);
-    // a sign when it has one, and a natural when it shares an altered note's letter
-    if (alter !== 0 || (letter === target.letter && target.alter !== 0)) parts.push(accidentalAt(alter, x - 22, y, ink, 1.3));
-    parts.push(`<ellipse cx="${x}" cy="${y}" rx="10" ry="7.4" transform="rotate(-18 ${x} ${y})" fill="none" stroke="${ink}" stroke-width="2.4"/>`);
-    layer.innerHTML = parts.join('');
+    const target = Sprint.parseId(run.deck[run.index]);
+    const { pos, on } = staffPos(m, target);
+    const y = Math.max(10, Math.min(NOTE_H - 12, NOTE_BOTTOM - pos * NOTE_STEP));
+    layer.style.display = '';
+    const dot = layer.querySelector('.sprint-dot');
+    dot.setAttribute('cy', y.toFixed(1));
+    dot.classList.toggle('is-on', on);
   }
 
   function paintProgress() {

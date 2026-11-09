@@ -5912,3 +5912,21 @@ select,
   font-size: 13px;
   color: var(--muted);
 }
+
+/* Note Sprint: the dot that shows where you are playing, like the tuner's needle. */
+.sprint-lane {
+  stroke: #ece4d8;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.sprint-dot {
+  fill: #6a7fd0;
+  filter: drop-shadow(0 0 4px rgba(106, 127, 208, 0.7));
+  transition: cy 0.07s linear, fill 0.15s;
+}
+
+.sprint-dot.is-on {
+  fill: #3f8a68;
+  filter: drop-shadow(0 0 6px rgba(63, 138, 104, 0.85));
+}
