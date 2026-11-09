@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091740';
-import { renderStaff } from './staff.js?v=202611091740';
-import { createInk } from './ink.js?v=202611091740';
-import { createFollower } from './follow.js?v=202611091740';
-import { createPetRoom } from './petroom.js?v=202611091740';
-import { createBuddy } from './buddy.js?v=202611091740';
-import { createSprintView } from './sprintview.js?v=202611091740';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091750';
+import { renderStaff } from './staff.js?v=202611091750';
+import { createInk } from './ink.js?v=202611091750';
+import { createFollower } from './follow.js?v=202611091750';
+import { createPetRoom } from './petroom.js?v=202611091750';
+import { createBuddy } from './buddy.js?v=202611091750';
+import { createSprintView } from './sprintview.js?v=202611091750';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611091740';
+window.__scaleStudioVersion = '202611091750';
 import {
   PitchDetector,
   midiToFreq,
@@ -18,16 +18,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611091740';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091740';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091740';
-import { generatePassage } from './sightreading.js?v=202611091740';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091740';
-import { renderScore } from './score.js?v=202611091740';
-import { summariseIntonation } from './intonation.js?v=202611091740';
-import * as Journal from './journal.js?v=202611091740';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091740';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091740';
+} from './pitch.js?v=202611091750';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091750';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091750';
+import { generatePassage } from './sightreading.js?v=202611091750';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091750';
+import { renderScore } from './score.js?v=202611091750';
+import { summariseIntonation } from './intonation.js?v=202611091750';
+import * as Journal from './journal.js?v=202611091750';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091750';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091750';
 import {
   STRINGS,
   FIFTHS,
@@ -36,7 +36,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611091740';
+} from './tuner.js?v=202611091750';
 
 const LANG = initLang();
 
@@ -2066,8 +2066,12 @@ function renderSightResult(result) {
           : t('test.stops', { n: result.stops }),
     ],
   ];
+  const keys = ['sightNotes', 'sightTuned', 'sightPulse', 'sightStops'];
   el.sightParts.innerHTML = rows
-    .map(([label, value]) => `<li><span>${label}</span><span>${value}</span></li>`)
+    .map(
+      ([label, value], i) =>
+        `<li data-explain="${keys[i]}"><button class="part-btn" type="button" aria-expanded="false"><span>${label} <span class="explain-i" aria-hidden="true">ⓘ</span></span><span>${value}</span></button><p class="explain-text" hidden>${t(`explain.${keys[i]}`)}</p></li>`,
+    )
     .join('');
   // The picture is drawn with the notes; this is the count under it.
   paintIntonationLine(el.sightIntonationSum, result.results);
@@ -3249,6 +3253,26 @@ function disarmDelete() {
   }
   delArmed = null;
 }
+
+/**
+ * Tapping a part of a result (Notes, Intonation, Steadiness, Flow; or the sight-
+ * reading rows) opens a sentence on what it measures. One open at a time.
+ */
+function explainPart(event) {
+  const btn = event.target.closest('[data-explain] > button');
+  if (!btn) return;
+  const holder = btn.parentElement;
+  const text = holder.querySelector('.explain-text');
+  const open = text.hidden;
+  holder.parentElement.querySelectorAll('.explain-text').forEach((p) => (p.hidden = true));
+  holder.parentElement.querySelectorAll('[data-explain] > button').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  holder.parentElement.querySelectorAll('[data-explain]').forEach((h) => h.classList.remove('is-open'));
+  text.hidden = !open;
+  holder.classList.toggle('is-open', open);
+  btn.setAttribute('aria-expanded', String(open));
+}
+el.breakdown.addEventListener('click', explainPart);
+el.sightParts.addEventListener('click', explainPart);
 
 el.statPanel.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-del]');
@@ -4726,17 +4750,20 @@ function renderResult(result) {
   });
 
   const metrics = [
-    [t('component.notes'), result.components.accuracy],
-    [t('component.intonation'), result.components.intonation],
-    [t('component.steadiness'), result.components.steadiness],
-    [t('component.flow'), result.components.continuity],
+    [t('component.notes'), result.components.accuracy, 'notes'],
+    [t('component.intonation'), result.components.intonation, 'intonation'],
+    [t('component.steadiness'), result.components.steadiness, 'steadiness'],
+    [t('component.flow'), result.components.continuity, 'flow'],
   ];
+  // Each part is a button: tapping it says what it measures and how much of the
+  // score it is (see explainPart).
   el.breakdown.innerHTML = metrics
     .map(
-      ([label, value]) => `
-        <div class="metric">
-          <div class="metric-label"><span>${label}</span><span class="metric-value">${Math.round(value * 100)}%</span></div>
+      ([label, value, key]) => `
+        <div class="metric" data-explain="${key}">
+          <button class="metric-label" type="button" aria-expanded="false"><span>${label} <span class="explain-i" aria-hidden="true">ⓘ</span></span><span class="metric-value">${Math.round(value * 100)}%</span></button>
           <div class="metric-bar"><span style="width:0%"></span></div>
+          <p class="explain-text" hidden>${t(`explain.${key}`)}</p>
         </div>`,
     )
     .join('');

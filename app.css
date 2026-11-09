@@ -6019,3 +6019,68 @@ select,
   line-height: 1.45;
   color: var(--ink-soft);
 }
+
+/* The parts of a result explain themselves when tapped. */
+.metric .metric-label,
+.sight-parts .part-btn {
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.metric .metric-label {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sight-parts .part-btn {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sight-parts .part-btn span:last-child {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sight-parts .part-btn span:first-child {
+  color: var(--muted);
+}
+
+.explain-i {
+  font-size: 11px;
+  opacity: 0.7;
+  letter-spacing: 0;
+}
+
+.explain-text {
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: 0;
+  animation: confirm-in 0.18s ease-out;
+}
+
+.sight-parts .explain-text {
+  margin: 6px 0 2px;
+}
+
+.sight-parts li[data-explain] {
+  display: block;
+}
+
+/* An opened part takes the whole row, so its explanation reads as a line of
+   text rather than a tall narrow column beside an empty tile. */
+.breakdown .metric.is-open {
+  grid-column: 1 / -1;
+}
