@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091715';
-import { renderStaff } from './staff.js?v=202611091715';
-import { createInk } from './ink.js?v=202611091715';
-import { createFollower } from './follow.js?v=202611091715';
-import { createPetRoom } from './petroom.js?v=202611091715';
-import { createBuddy } from './buddy.js?v=202611091715';
-import { createSprintView } from './sprintview.js?v=202611091715';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091740';
+import { renderStaff } from './staff.js?v=202611091740';
+import { createInk } from './ink.js?v=202611091740';
+import { createFollower } from './follow.js?v=202611091740';
+import { createPetRoom } from './petroom.js?v=202611091740';
+import { createBuddy } from './buddy.js?v=202611091740';
+import { createSprintView } from './sprintview.js?v=202611091740';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611091715';
+window.__scaleStudioVersion = '202611091740';
 import {
   PitchDetector,
   midiToFreq,
@@ -18,16 +18,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611091715';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091715';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091715';
-import { generatePassage } from './sightreading.js?v=202611091715';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091715';
-import { renderScore } from './score.js?v=202611091715';
-import { summariseIntonation } from './intonation.js?v=202611091715';
-import * as Journal from './journal.js?v=202611091715';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091715';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091715';
+} from './pitch.js?v=202611091740';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091740';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091740';
+import { generatePassage } from './sightreading.js?v=202611091740';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091740';
+import { renderScore } from './score.js?v=202611091740';
+import { summariseIntonation } from './intonation.js?v=202611091740';
+import * as Journal from './journal.js?v=202611091740';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611091740';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091740';
 import {
   STRINGS,
   FIFTHS,
@@ -36,7 +36,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611091715';
+} from './tuner.js?v=202611091740';
 
 const LANG = initLang();
 
@@ -3345,7 +3345,7 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
   // Real practice earns notes for the pet room; a false start earns nothing.
   if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint')) {
     const kind = tag === 'scales' ? 'scale' : tag;
-    const earned = petRoom.earnTake({ kind, id: cardId || '', dayKey: today });
+    const earned = petRoom.earnTake({ kind, id: cardId || '', dayKey: today, octaves: details?.octaves || 1 });
     petToast(earned.amount, earned.warmed, earned.bonus, kind, earned.grew, earned.wished, cardId || '');
   }
   if (cardId && counted) Journal.noteScale(journal, cardId, today, score);
@@ -4575,6 +4575,7 @@ function finishTake() {
     heard: result.stats.heard,
     expected: result.stats.expected,
     seconds: result.stats.duration,
+    octaves: state.scale.octaves || 1,
   });
 
   // In a mock audition the microphone stays open, the score stays hidden, and

@@ -143,6 +143,19 @@
         eq('ordinary snacks teach no tricks', P.tricksOf(plainSnacks.pet), []);
       }
 
+      // Two octaves pay more than one
+      {
+        const p = P.emptyPet();
+        const one = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-12-10', octaves: 1 }).amount;
+        const two = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-12-10', octaves: 2 }).amount;
+        const twoAgain = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-12-10', octaves: 2 }).amount;
+        const oneAgain = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-12-10', octaves: 1 }).amount;
+        eq('a repeat two-octave take pays extraOctave more than a one-octave one', twoAgain - oneAgain, P.EARN.extraOctave);
+        eq('a two-octave take is the take amount plus extraOctave', twoAgain, P.EARN.take + P.EARN.extraOctave);
+        eq('sight reading is not paid by octave', P.earn(P.emptyPet(), { kind: 'sight', dayKey: 'x', octaves: 2 }).amount, P.EARN.take + P.EARN.newKey + P.EARN.firstOfDay);
+        if (one <= 0 || two <= 0) problems.push('scale takes stopped paying');
+      }
+
       // Eggs and hatching
       {
         const p = P.emptyPet();

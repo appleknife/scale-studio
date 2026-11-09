@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611091715';
+import * as Pet from './pet.js?v=202611091740';
 import {
   petMarkup,
   eggMarkup,
@@ -29,8 +29,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611091715';
-import { t } from './i18n.js?v=202611091715';
+} from './petart.js?v=202611091740';
+import { t } from './i18n.js?v=202611091740';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -956,10 +956,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  function earnTake({ kind = 'scale', id = '', dayKey = '' } = {}) {
+  function earnTake({ kind = 'scale', id = '', dayKey = '', octaves = 1 } = {}) {
     pet = Pet.loadPet(profileId());
     const key = dayKey || localDayKey();
-    const result = Pet.earn(pet, { kind, id, dayKey: key });
+    const result = Pet.earn(pet, { kind, id, dayKey: key, octaves });
     save();
     if (running) paintNotes();
     return result;

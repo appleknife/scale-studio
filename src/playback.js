@@ -16,8 +16,8 @@
 // anything else changing: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611091715';
-import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611091715';
+import { makeHallIR } from './recorder.js?v=202611091740';
+import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611091740';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };

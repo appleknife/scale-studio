@@ -346,7 +346,7 @@ export const S = {
   'pet.notes.aria': ['{n} notes to spend', '可用音符 {n} 个'],
   'pet.aria.pat': ['Pat {name}', '摸摸{name}'],
   'pet.aria.egg': ['Your egg', '你的蛋'],
-  'pet.foot': ['Notes ♪ come from real practice: every scale or sight-reading take earns some, a scale you haven’t played yet today earns a bonus, and so does the first take of the day. Every take also helps your pet grow up.', '音符 ♪ 来自真正的练习：每拉完一条音阶或一段视奏都能得到一些，今天还没拉过的音阶有额外奖励，每天第一次练习也有奖励。每次练习也会让你的宠物长大一点。'],
+  'pet.foot': ['Notes ♪ come from real practice: every scale or sight-reading take earns some, a two-octave scale earns more than a one-octave one, a scale you haven’t played yet today earns a bonus, and so does the first take of the day. Every take also helps your pet grow up.', '音符 ♪ 来自真正的练习：每拉完一条音阶或一段视奏都能得到一些，两个八度的音阶比一个八度的多，今天还没拉过的音阶有额外奖励，每天第一次练习也有奖励。每次练习也会让你的宠物长大一点。'],
   'pet.demo': ['Pretend I practised', '假装我练过了'],
   'pet.toast.for': ['for {name}', '送给{name}'],
   'pet.toast.warm': ['The egg got warmer', '蛋更暖和了'],

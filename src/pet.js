@@ -60,6 +60,7 @@ export const DAILY_CAP = 60;
 
 export const EARN = {
   take: 3, // every counted take
+  extraOctave: 2, // and for a scale, this much more for each octave past the first
   newKey: 4, // a scale not yet played today, or the first sight reading of the day
   firstOfDay: 5, // the first counted take of the day
   // Practice that is not a take counts too: a day logged by hand, and a take kept
@@ -192,7 +193,7 @@ export function savePet(profileId, pet, storage = globalThis.localStorage) {
  * Returns what was earned in all, the part of it that was the new-key bonus, the
  * part that was the day's wish, whether the egg warmed, and whether the pet grew.
  */
-export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
+export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } = {}) {
   if (pet.day.key !== dayKey) pet.day = freshDay(dayKey);
   const day = pet.day;
   ensureWish(pet, dayKey);
@@ -227,7 +228,9 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
   if (day.earned >= DAILY_CAP) {
     base = EARN.afterCap;
   } else {
-    base = EARN.take;
+    // A two-octave scale is twice the playing of a one-octave one, and pays more.
+    const extra = kind === 'scale' ? Math.max(0, Math.min(2, (Number(octaves) || 1) - 1)) * EARN.extraOctave : 0;
+    base = EARN.take + extra;
     if (!day.any) base += EARN.firstOfDay;
     base = Math.min(base, DAILY_CAP - day.earned + EARN.afterCap);
   }
