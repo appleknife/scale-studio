@@ -85,6 +85,17 @@
         await wait(40);
         check(d.getElementById('inkPen').getAttribute('aria-pressed') === 'true', 'the pen did not light up');
         check(svg().classList.contains('is-inking'), 'the staff was not handed to the pen');
+        // The scroller the staff sits in has to stop panning too, not just the
+        // drawing: a scroller that starts panning cancels the pointer under it,
+        // and the stroke comes out in pieces.
+        const host = svg().parentElement;
+        check(host.classList.contains('is-inking'), 'the staff scroller was not told the pen is on');
+        check(
+          w.getComputedStyle(host).touchAction === 'none',
+          `the scroller still pans: touch-action is ${w.getComputedStyle(host).touchAction}`,
+        );
+        const touch = new w.Event('touchstart', { bubbles: true, cancelable: true });
+        check(host.dispatchEvent(touch) === false, 'a touch on the scroller was not taken from the browser');
         check(!hint().includes('Swipe'), `the hint still says to swipe while the pen is on: "${hint()}"`);
         await stroke();
         const drawn = paths();
@@ -216,6 +227,20 @@
         await wait(60);
         check(paths().length === 0, `Ctrl+Z left ${paths().length} strokes`);
         log.push('leaving: tool cleared, hint restored · Ctrl+Z undid the last mark');
+        // And with the tool down, the staff scrolls again and a double tap is a
+        // double tap rather than a zoom on every screen: `manipulation` everywhere,
+        // `none` only where the finger is drawing.
+        const host2 = svg().parentElement;
+        check(!host2.classList.contains('is-inking'), 'the scroller still thinks the pen is on');
+        check(
+          w.getComputedStyle(host2).touchAction === 'manipulation',
+          `the scroller did not go back to scrolling: ${w.getComputedStyle(host2).touchAction}`,
+        );
+        const plain = d.querySelector('.menu-tile') || d.querySelector('.key-card');
+        check(
+          !plain || w.getComputedStyle(plain).touchAction === 'manipulation',
+          `a tile would still zoom on a double tap: ${plain && w.getComputedStyle(plain).touchAction}`,
+        );
       }
 
       document.getElementById('out').textContent = problems.length

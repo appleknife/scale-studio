@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611090100';
-import { renderStaff } from './staff.js?v=202611090100';
-import { createInk } from './ink.js?v=202611090100';
-import { createFollower } from './follow.js?v=202611090100';
-import { createPetRoom } from './petroom.js?v=202611090100';
-import { createBuddy } from './buddy.js?v=202611090100';
-import { createSprintView } from './sprintview.js?v=202611090100';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611090200';
+import { renderStaff } from './staff.js?v=202611090200';
+import { createInk } from './ink.js?v=202611090200';
+import { createFollower } from './follow.js?v=202611090200';
+import { createPetRoom } from './petroom.js?v=202611090200';
+import { createBuddy } from './buddy.js?v=202611090200';
+import { createSprintView } from './sprintview.js?v=202611090200';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611090100';
+window.__scaleStudioVersion = '202611090200';
 import {
   PitchDetector,
   midiToFreq,
@@ -18,16 +18,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611090100';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611090100';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611090100';
-import { generatePassage } from './sightreading.js?v=202611090100';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611090100';
-import { renderScore } from './score.js?v=202611090100';
-import { summariseIntonation } from './intonation.js?v=202611090100';
-import * as Journal from './journal.js?v=202611090100';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611090100';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611090100';
+} from './pitch.js?v=202611090200';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611090200';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611090200';
+import { generatePassage } from './sightreading.js?v=202611090200';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611090200';
+import { renderScore } from './score.js?v=202611090200';
+import { summariseIntonation } from './intonation.js?v=202611090200';
+import * as Journal from './journal.js?v=202611090200';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611090200';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611090200';
 import {
   STRINGS,
   FIFTHS,
@@ -36,7 +36,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611090100';
+} from './tuner.js?v=202611090200';
 
 const LANG = initLang();
 
@@ -4774,6 +4774,40 @@ el.stopBtn.addEventListener('click', finishTake);
 el.inkPen.addEventListener('click', () => ink.toggle('pen'));
 el.inkErase.addEventListener('click', () => ink.toggle('erase'));
 el.inkUndo.addEventListener('click', () => ink.undo());
+// A double tap is two taps, never a zoom.
+//
+// `touch-action: manipulation` is the proper fix and every element now states it,
+// but iPad Safari still zooms on some screens: it answers per element, and a
+// heading or a card inside a scrolling body does not always get the page's
+// policy. So a second tap landing within a third of a second and a finger's width
+// of the first is cancelled outright. Only on things that are *not* controls —
+// tapping the same button twice in a row is a real thing to do (a level, a chip, a
+// snack), and its own tap handling must not be swallowed.
+const CONTROL_SELECTOR =
+  'button, a, label, input, select, textarea, summary, [role="button"], [role="tab"], [role="slider"]';
+let tapAt = 0;
+let tapX = 0;
+let tapY = 0;
+document.addEventListener(
+  'touchend',
+  (event) => {
+    if (event.touches.length || event.changedTouches.length !== 1) return;
+    const touch = event.changedTouches[0];
+    const now = performance.now();
+    const twice =
+      now - tapAt < 330 && Math.hypot(touch.clientX - tapX, touch.clientY - tapY) < 45;
+    if (twice && !(event.target.closest && event.target.closest(CONTROL_SELECTOR))) {
+      if (event.cancelable) event.preventDefault();
+      tapAt = 0;
+      return;
+    }
+    tapAt = now;
+    tapX = touch.clientX;
+    tapY = touch.clientY;
+  },
+  { passive: false },
+);
+
 // Ctrl+Z / ⌘Z undoes a mark while the practice screen is showing — unless the
 // keyboard is busy in a text field, which has its own undo.
 document.addEventListener('keydown', (event) => {

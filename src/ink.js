@@ -80,6 +80,7 @@ function touches(stroke, box) {
  */
 export function createInk({ onChange = () => {} } = {}) {
   let svg = null;
+  let host = null; // the scroller the staff sits in, which must stop panning too
   let layer = null;
   let current = null; // the page being written on
   let tool = null; // null | 'pen' | 'erase'
@@ -129,7 +130,10 @@ export function createInk({ onChange = () => {} } = {}) {
   // iPad Safari does not always honour `touch-action: none` on an SVG, and with
   // the Pencil it can start scrolling the page under a stroke. Cancelling the
   // touch itself is the one thing it always obeys — but only while a tool is on,
-  // so with the pen down the staff swipes as before.
+  // so with the pen down the staff swipes as before. The guard goes on the
+  // scroller as well as on the drawing, in the capture phase: a scroller that
+  // starts panning *cancels* the pointer under it, and that is what a line broken
+  // into pieces is.
   function holdStill(event) {
     if (tool && event.cancelable) event.preventDefault();
   }
@@ -257,8 +261,14 @@ export function createInk({ onChange = () => {} } = {}) {
         svg.removeEventListener('touchstart', holdStill);
         svg.removeEventListener('touchmove', holdStill);
       }
+      if (host) {
+        host.removeEventListener('touchstart', holdStill, true);
+        host.removeEventListener('touchmove', holdStill, true);
+        host.classList.remove('is-inking');
+      }
       gesture = null;
       svg = staffSvg || null;
+      host = svg ? svg.parentElement : null;
       current = page(key);
       if (!svg) {
         notify();
@@ -274,6 +284,11 @@ export function createInk({ onChange = () => {} } = {}) {
       svg.addEventListener('pointercancel', cancel);
       svg.addEventListener('touchstart', holdStill, { passive: false });
       svg.addEventListener('touchmove', holdStill, { passive: false });
+      if (host) {
+        host.addEventListener('touchstart', holdStill, { passive: false, capture: true });
+        host.addEventListener('touchmove', holdStill, { passive: false, capture: true });
+        host.classList.toggle('is-inking', Boolean(tool));
+      }
       svg.classList.toggle('is-inking', Boolean(tool));
       svg.dataset.tool = tool || '';
       redraw();
@@ -286,6 +301,7 @@ export function createInk({ onChange = () => {} } = {}) {
       if (svg) {
         svg.classList.toggle('is-inking', Boolean(tool));
         svg.dataset.tool = tool || '';
+        if (host) host.classList.toggle('is-inking', Boolean(tool));
       }
       notify();
     },
@@ -298,6 +314,7 @@ export function createInk({ onChange = () => {} } = {}) {
         svg.classList.remove('is-inking');
         svg.dataset.tool = '';
       }
+      if (host) host.classList.remove('is-inking');
       notify();
     },
 
