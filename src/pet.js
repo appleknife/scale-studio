@@ -62,8 +62,19 @@ export const EARN = {
   take: 3, // every counted take
   newKey: 4, // a scale not yet played today, or the first sight reading of the day
   firstOfDay: 5, // the first counted take of the day
+  // Practice that is not a take counts too: a day logged by hand, and a take kept
+  // to listen back to. Each pays once a day — the pet is company for the whole
+  // practice, not only for the parts the app can hear.
+  practice: 4,
+  recording: 2,
+  // And the key it asked for: paid once, and paid even past the daily cap. A wish
+  // is an invitation, not a wage.
+  wish: 6,
   afterCap: 1, // what a take still earns once the day's cap is reached
 };
+
+/** The twelve majors a wish can name, in the order the grid shows them. */
+export const WISH_KEYS = ['G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'C'];
 
 /** Snacks: eaten once, bought each time. `fav` is the species that loves it most. */
 export const SNACKS = [
@@ -111,7 +122,9 @@ export function emptyPet() {
     owned: [],
     placed: [],
     wall: null, // the wallpaper item in use, or null for the plain one
-    day: { key: '', earned: 0, keys: [], sight: false, sprint: false, any: false },
+    day: freshDay(''),
+    // The key it would like to hear today, or null — see ensureWish().
+    wish: null,
     lastSeen: 0,
     totalEarned: 0,
     friends: [], // grown (or set-aside) pets, waiting in the pet book
@@ -172,21 +185,44 @@ export function savePet(profileId, pet, storage = globalThis.localStorage) {
 }
 
 /**
- * A counted take earns notes. `kind` is 'scale' or 'sight'; `id` is the scale's
- * key for a scale. Returns what was earned in all, the part of it that was the
- * new-key bonus, and whether the egg warmed.
+ * Notes are earned by practice. `kind` is 'scale', 'sight' or 'sprint' for a
+ * counted take, 'practice' for a day of practice logged by hand, and 'recording'
+ * for a take kept to listen back to; `id` is the scale's key for a scale.
+ *
+ * Returns what was earned in all, the part of it that was the new-key bonus, the
+ * part that was the day's wish, whether the egg warmed, and whether the pet grew.
  */
 export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
-  if (pet.day.key !== dayKey) {
-    pet.day = { key: dayKey, earned: 0, keys: [], sight: false, sprint: false, any: false };
-  }
+  if (pet.day.key !== dayKey) pet.day = freshDay(dayKey);
   const day = pet.day;
+  ensureWish(pet, dayKey);
+
+  // Practice that is not a take: a day logged by hand, and a take kept to listen
+  // back to. Each pays once a day, counts towards the same cap, and does not warm
+  // the egg or grow the pet — those follow the takes the app itself hears.
+  if (kind === 'practice' || kind === 'recording') {
+    const flag = kind === 'practice' ? 'practice' : 'recording';
+    const nothing = { amount: 0, warmed: false, bonus: 0, grew: null, boosted: false, wished: 0 };
+    if (day[flag]) return nothing;
+    day[flag] = true;
+    const amount = kind === 'practice' ? EARN.practice : EARN.recording;
+    credit(pet, day, amount);
+    return { ...nothing, amount };
+  }
+
   const fresh =
     (kind === 'scale' && id && !day.keys.includes(id)) ||
     (kind === 'sight' && !day.sight) ||
     (kind === 'sprint' && !day.sprint);
   // The new-key bonus stands apart from the cap, so it can be shown on its own.
   const bonus = fresh ? EARN.newKey : 0;
+  // The wish: the key it asked for today, paid once — and paid even past the cap,
+  // because it is an invitation rather than a wage.
+  let wished = 0;
+  if (kind === 'scale' && id && pet.wish && pet.wish.key === dayKey && pet.wish.id === id && !pet.wish.done) {
+    pet.wish.done = true;
+    wished = EARN.wish;
+  }
   let base;
   if (day.earned >= DAILY_CAP) {
     base = EARN.afterCap;
@@ -195,14 +231,12 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
     if (!day.any) base += EARN.firstOfDay;
     base = Math.min(base, DAILY_CAP - day.earned + EARN.afterCap);
   }
-  const amount = base + bonus;
+  const amount = base + bonus + wished;
   day.any = true;
   if (kind === 'scale' && id && !day.keys.includes(id)) day.keys.push(id);
   if (kind === 'sight') day.sight = true;
   if (kind === 'sprint') day.sprint = true;
-  day.earned += amount;
-  pet.notes += amount;
-  pet.totalEarned = (pet.totalEarned || 0) + amount;
+  credit(pet, day, amount);
 
   let warmed = false;
   if (pet.egg && pet.egg.warmth < HATCH_TAKES) {
@@ -221,7 +255,48 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '' } = {}) {
     const after = stageOf(pet.pet);
     if (after !== before) grew = after;
   }
-  return { amount, warmed, bonus, grew, boosted };
+  return { amount, warmed, bonus, grew, boosted, wished };
+}
+
+/** A day's tally, empty. */
+function freshDay(dayKey) {
+  return {
+    key: dayKey,
+    earned: 0,
+    keys: [],
+    sight: false,
+    sprint: false,
+    any: false,
+    practice: false,
+    recording: false,
+  };
+}
+
+/** Notes into the purse and into the day's tally, against the same cap. */
+function credit(pet, day, amount) {
+  day.earned += amount;
+  pet.notes += amount;
+  pet.totalEarned = (pet.totalEarned || 0) + amount;
+}
+
+/**
+ * The key the pet would like to hear today.
+ *
+ * One a day, chosen at random from the twelve majors and held for the whole day
+ * so the room can name it. Granting it pays a bonus; not granting it costs
+ * nothing at all, and tomorrow's is a different one — an invitation, never a
+ * chore, and never something to lose.
+ */
+export function ensureWish(pet, dayKey, roll = Math.random) {
+  if (pet.wish && pet.wish.key === dayKey) return pet.wish;
+  // An egg has no opinions, and a pet with no name has not been introduced yet.
+  if (!pet.pet || !pet.pet.name) {
+    pet.wish = null;
+    return null;
+  }
+  const id = WISH_KEYS[Math.min(WISH_KEYS.length - 1, Math.floor(roll() * WISH_KEYS.length))];
+  pet.wish = { key: dayKey, id, done: false };
+  return pet.wish;
 }
 
 /** The local calendar day, as the journal writes it. */
@@ -350,11 +425,26 @@ export function hatch(pet, now = Date.now(), roll = Math.random()) {
   return true;
 }
 
+/**
+ * The takes a named pet has already been given, as a head start.
+ *
+ * The endowed-progress effect: people finish a card that arrives with two stamps
+ * on it far more often than one that starts empty (Nunes & Drèze). The first
+ * stage of the very first pet therefore begins a little way in — once, at the
+ * moment the student names it, never on a rename and never for a later pet, whose
+ * egg already arrives warm instead.
+ */
+export const HEADSTART = 3;
+
 export function name(pet, value) {
   if (!pet.pet) return false;
   const clean = String(value || '').trim().slice(0, 18);
   if (!clean) return false;
+  const first = !pet.pet.name;
   pet.pet.name = clean;
+  // Only the first animal a student ever names: a later pet already arrives warm
+  // as an egg, and a second head start would make the first one mean nothing.
+  if (first && !pet.pet.growth && !(pet.friends || []).length) pet.pet.growth = HEADSTART;
   return true;
 }
 

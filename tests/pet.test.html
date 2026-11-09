@@ -63,12 +63,19 @@
         eq('no growing before it has a name', P.earn(p, { kind: 'scale', id: 'D', dayKey: '2026-11-06' }).grew, null);
         eq('…and its growth did not move', p.pet.growth, 0);
         P.name(p, 'Mochi');
+        eq('the very first pet starts a little way in', p.pet.growth, P.HEADSTART);
+        P.name(p, 'Mochi again');
+        eq('a rename hands out no second head start', p.pet.growth, P.HEADSTART);
+        P.name(p, 'Mochi');
         const stages = [];
         for (let i = 0; i < 2 * P.GROW_TAKES; i += 1) {
           const r = P.earn(p, { kind: 'scale', id: 'G', dayKey: `2026-11-${10 + (i % 9)}` });
           if (r.grew) stages.push(`${i + 1}:${r.grew}`);
         }
-        eq('kid, then grown, a stage every GROW_TAKES takes', stages, [`${P.GROW_TAKES}:kid`, `${2 * P.GROW_TAKES}:grown`]);
+        eq('kid, then grown, a stage every GROW_TAKES takes less the head start', stages, [
+          `${P.GROW_TAKES - P.HEADSTART}:kid`,
+          `${2 * P.GROW_TAKES - P.HEADSTART}:grown`,
+        ]);
         eq('the room celebrates a stage once', [P.unseenGrowth(p), P.unseenGrowth(p)], ['grown', null]);
         eq('a grown pet may have a new egg', P.canChooseNextEgg(p), true);
         eq('not a made-up animal', P.chooseNextEgg(p, 'dragon'), false);
@@ -190,6 +197,71 @@
         eq('one wallpaper at a time', [P.isPlaced(p, 'wall-mint'), P.isPlaced(p, 'wall-dots')], [false, true]);
         p.notes = 3;
         eq('too few notes, no lamp', P.buy(p, 'lamp'), false);
+      }
+
+      // Practice that is not a take: a day logged by hand, and a take kept to listen
+      // back to. Both pay, once a day, and neither warms the egg or grows the pet.
+      {
+        const p = P.emptyPet();
+        P.chooseEgg(p, 'cat');
+        for (let i = 0; i < P.HATCH_TAKES; i += 1) P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-12-10' });
+        P.hatch(p, 0, 0.9);
+        P.name(p, 'Mochi');
+        const growth = p.pet.growth;
+        const day = '2026-12-11';
+        const logged = P.earn(p, { kind: 'practice', dayKey: day });
+        eq('a day logged by hand pays the pet', logged.amount, P.EARN.practice);
+        eq('…and is only notes', [logged.warmed, logged.bonus, logged.grew, logged.wished], [false, 0, null, 0]);
+        eq('…once a day', P.earn(p, { kind: 'practice', dayKey: day }).amount, 0);
+        eq('a recording pays a little', P.earn(p, { kind: 'recording', dayKey: day }).amount, P.EARN.recording);
+        eq('…once a day too', P.earn(p, { kind: 'recording', dayKey: day }).amount, 0);
+        eq('neither of them grows the pet', p.pet.growth, growth);
+        eq('the day they were paid on is ticked', [p.day.practice, p.day.recording], [true, true]);
+        eq('both are new the next day', [
+          P.earn(p, { kind: 'practice', dayKey: '2026-12-12' }).amount,
+          P.earn(p, { kind: 'recording', dayKey: '2026-12-12' }).amount,
+        ], [P.EARN.practice, P.EARN.recording]);
+        // They are tallied into the same day as the takes, so they sit under the
+        // same daily cap rather than beside it.
+        eq('the two are tallied together, in the same day as the takes', p.day.earned, P.EARN.practice + P.EARN.recording);
+      }
+
+      // The wish: one key a day, paid once, held for the whole day, and never a
+      // debt if the student spends the day on something else.
+      {
+        const p = P.emptyPet();
+        P.chooseEgg(p, 'cat');
+        for (let i = 0; i < P.HATCH_TAKES; i += 1) P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-12-15' });
+        P.hatch(p, 0, 0.9);
+        eq('an animal with no name yet wishes for nothing', P.ensureWish(p, '2026-12-15'), null);
+        P.name(p, 'Mochi');
+        const d1 = '2026-12-16';
+        const wish = P.ensureWish(p, d1, () => 0);
+        eq('the wish is one of the twelve majors', wish && wish.id, P.WISH_KEYS[0]);
+        eq('…and it is held for the whole day', P.ensureWish(p, d1, () => 0.9).id, P.WISH_KEYS[0]);
+        eq('another key is welcome, but pays no wish', P.earn(p, { kind: 'scale', id: 'D', dayKey: d1 }).wished, 0);
+        eq('the wished key pays', P.earn(p, { kind: 'scale', id: P.WISH_KEYS[0], dayKey: d1 }).wished, P.EARN.wish);
+        eq('…once only', P.earn(p, { kind: 'scale', id: P.WISH_KEYS[0], dayKey: d1 }).wished, 0);
+        eq('the room can say it was granted', p.wish.done, true);
+        // The next day asks again — and the day after expires quietly.
+        P.ensureWish(p, '2026-12-17', () => 0);
+        eq('a new day asks again', P.earn(p, { kind: 'scale', id: P.WISH_KEYS[0], dayKey: '2026-12-17' }).wished, P.EARN.wish);
+        P.ensureWish(p, '2026-12-18', () => 3 / 12);
+        const other = P.earn(p, { kind: 'scale', id: 'A', dayKey: '2026-12-18' });
+        eq('ignoring the wish takes nothing away', [other.amount > 0, other.wished, p.wish.done], [true, 0, false]);
+        // Paid past the daily cap: there are only twelve keys, and the wish is an
+        // invitation rather than a wage.
+        const rich = P.emptyPet();
+        P.chooseEgg(rich, 'cat');
+        for (let i = 0; i < P.HATCH_TAKES; i += 1) P.earn(rich, { kind: 'scale', id: 'G', dayKey: '2026-12-20' });
+        P.hatch(rich, 0, 0.9);
+        P.name(rich, 'Pip');
+        const d2 = '2026-12-21';
+        const asked = P.ensureWish(rich, d2, () => 1.5 / 12).id;
+        for (let i = 0; i < 45; i += 1) P.earn(rich, { kind: 'scale', id: 'G', dayKey: d2 });
+        if (rich.day.earned < P.DAILY_CAP) problems.push('the cap was never reached in the wish test');
+        const late = P.earn(rich, { kind: 'scale', id: asked, dayKey: d2 });
+        eq('past the cap the wish is still paid in full', late.wished, P.EARN.wish);
       }
 
       // Each name has its own room, and a broken store is a fresh room

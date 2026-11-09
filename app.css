@@ -3787,6 +3787,19 @@ select,
   display: none;
 }
 
+/* The finish line, stated on the tile itself: "6 of 15 to growing up". */
+.menu-pet-grow {
+  display: block;
+  margin-top: 7px;
+  font: 600 12.5px var(--sans);
+  color: #a97f45;
+  font-variant-numeric: tabular-nums;
+}
+
+.menu-pet-grow:empty {
+  display: none;
+}
+
 .menu-pet-art .pet-icon {
   width: 100%;
   height: 100%;
@@ -4082,6 +4095,36 @@ select,
   color: var(--ink);
 }
 
+/*
+ * What the pet would like to hear today. It is set apart from the buttons and
+ * never looks like a box to tick: an invitation reads as one, and a chore reads
+ * as one too — the same wording on a different shape feels quite different.
+ */
+.pet-keywish {
+  margin: 12px 0 4px;
+  padding: 9px 15px;
+  border: 1px solid #f2dfc2;
+  border-radius: 14px;
+  background: #fff7ea;
+  font: 500 14px/1.4 var(--sans);
+  color: #8b6422;
+  text-align: center;
+}
+
+.pet-keywish.is-done {
+  border-color: #cfe7d8;
+  background: #eff8f2;
+  color: #3f7a5f;
+}
+
+/* How far short a snack or a decoration is, so the next step is visible. */
+.tray-need {
+  display: block;
+  margin-top: 2px;
+  font: 600 11.5px var(--sans);
+  color: #b08a4a;
+}
+
 .pet-sub {
   margin: 14px 0 8px;
   font: 700 13px var(--sans);
@@ -4351,6 +4394,12 @@ select,
   color: #c47f17;
   letter-spacing: 0.01em;
   animation: bonus-in 0.5s 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+/* The key it asked for: a warmer colour than the ordinary bonus. */
+.pet-toast-wish {
+  color: #d0668a;
+  animation-delay: 0.55s;
 }
 
 @keyframes bonus-in {
@@ -5223,6 +5272,26 @@ select,
 :root[data-theme='dark'] .grow-stage.is-grown {
   background: #3a3020;
   color: #f2c766;
+}
+
+:root[data-theme='dark'] .pet-keywish {
+  border-color: #4a3c28;
+  background: #2d2620;
+  color: #e0c58c;
+}
+
+:root[data-theme='dark'] .pet-keywish.is-done {
+  border-color: #35503f;
+  background: #24322b;
+  color: #96d3af;
+}
+
+:root[data-theme='dark'] .menu-pet-grow {
+  color: #c9a877;
+}
+
+:root[data-theme='dark'] .tray-need {
+  color: #b99a68;
 }
 
 :root[data-theme='dark'] .pet-card.is-rare {

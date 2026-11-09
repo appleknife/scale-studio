@@ -1,16 +1,16 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611090200';
-import { renderStaff } from './staff.js?v=202611090200';
-import { createInk } from './ink.js?v=202611090200';
-import { createFollower } from './follow.js?v=202611090200';
-import { createPetRoom } from './petroom.js?v=202611090200';
-import { createBuddy } from './buddy.js?v=202611090200';
-import { createSprintView } from './sprintview.js?v=202611090200';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611091400';
+import { renderStaff } from './staff.js?v=202611091400';
+import { createInk } from './ink.js?v=202611091400';
+import { createFollower } from './follow.js?v=202611091400';
+import { createPetRoom } from './petroom.js?v=202611091400';
+import { createBuddy } from './buddy.js?v=202611091400';
+import { createSprintView } from './sprintview.js?v=202611091400';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611090200';
+window.__scaleStudioVersion = '202611091400';
 import {
   PitchDetector,
   midiToFreq,
@@ -18,16 +18,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611090200';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611090200';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611090200';
-import { generatePassage } from './sightreading.js?v=202611090200';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611090200';
-import { renderScore } from './score.js?v=202611090200';
-import { summariseIntonation } from './intonation.js?v=202611090200';
-import * as Journal from './journal.js?v=202611090200';
-import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611090200';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611090200';
+} from './pitch.js?v=202611091400';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611091400';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611091400';
+import { generatePassage } from './sightreading.js?v=202611091400';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611091400';
+import { renderScore } from './score.js?v=202611091400';
+import { summariseIntonation } from './intonation.js?v=202611091400';
+import * as Journal from './journal.js?v=202611091400';
+import { canRecord, startRecording, play as playRecording } from './recorder.js?v=202611091400';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611091400';
 import {
   STRINGS,
   FIFTHS,
@@ -36,7 +36,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611090200';
+} from './tuner.js?v=202611091400';
 
 const LANG = initLang();
 
@@ -62,6 +62,7 @@ const el = {
   openPetBtn: $('openPetBtn'),
   petBack: $('petBack'),
   menuPetArt: $('menuPetArt'),
+  menuPetGrow: $('menuPetGrow'),
   petToast: $('petToast'),
   openSightBtn: $('openSightBtn'),
   sightBack: $('sightBack'),
@@ -2281,9 +2282,13 @@ function openPet() {
   petRoom.open();
 }
 
-/** The menu tile wears the pet's own face once there is one. */
+/**
+ * The menu tile wears the pet's own face once there is one, and says how close
+ * the next stage is: a goal you can see the end of is the one people finish.
+ */
 function paintMenuPet() {
   if (el.menuPetArt) el.menuPetArt.innerHTML = petRoom ? petRoom.portrait() : '';
+  if (el.menuPetGrow) el.menuPetGrow.textContent = petRoom ? petRoom.progressLine() : '';
 }
 
 let toastTimer = 0;
@@ -2291,7 +2296,7 @@ let toastTimer = 0;
  * "+5 ♪" after a counted take: the pet noticed. A scale not yet played today
  * gets more: a bonus line, the total counting up, and a burst of notes.
  */
-function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null) {
+function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null, wished = 0, wishId = '') {
   if (!amount || !el.petToast) return;
   const name = petRoom.name();
   const line = grew
@@ -2301,14 +2306,22 @@ function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null) {
       : name
         ? t('pet.toast.for', { name: esc(name) })
         : t('pet.toast.room');
-  const extra = bonus
-    ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : kind === 'sprint' ? 'pet.toast.newSprint' : 'pet.toast.newScale', { n: bonus })}</span>`
-    : '';
+  // Everything paid on top of the take itself: today's new key, and the key the
+  // pet asked for. The take's own notes show at once and the rest counts up.
+  const topped = bonus + wished;
+  const extra = [
+    bonus
+      ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : kind === 'sprint' ? 'pet.toast.newSprint' : 'pet.toast.newScale', { n: bonus })}</span>`
+      : '',
+    wished
+      ? `<span class="pet-toast-bonus pet-toast-wish">${t('pet.toast.keywish', { key: esc(keyName(wishId)) })}</span>`
+      : '',
+  ].join('');
   el.petToast.innerHTML =
     `${petRoom.portrait()}<span class="pet-toast-text"><span class="pet-toast-top">` +
-    `<span class="pet-toast-n">+${bonus ? amount - bonus : amount} ♪</span>` +
+    `<span class="pet-toast-n">+${topped ? amount - topped : amount} ♪</span>` +
     `<span class="pet-toast-line">${line}</span></span>${extra}</span>`;
-  el.petToast.classList.toggle('has-bonus', Boolean(bonus));
+  el.petToast.classList.toggle('has-bonus', Boolean(topped));
   el.petToast.hidden = false;
   el.petToast.classList.remove('is-in');
   void el.petToast.offsetWidth;
@@ -2317,13 +2330,13 @@ function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null) {
   toastTimer = setTimeout(() => {
     el.petToast.hidden = true;
     document.querySelectorAll('.note-burst').forEach((n) => n.remove());
-  }, bonus ? 4200 : 3200);
+  }, topped ? 4200 + (wished ? 600 : 0) : 3200);
 
-  if (!bonus) return;
+  if (!topped) return;
   // Once the toast has landed, the total counts up by the bonus and notes burst
   // out of it. Reduced motion keeps the count and the line, without the burst.
   const counter = el.petToast.querySelector('.pet-toast-n');
-  const from = amount - bonus;
+  const from = amount - topped;
   setTimeout(() => {
     let shown = from;
     const step = setInterval(() => {
@@ -3164,7 +3177,7 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
   if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint')) {
     const kind = tag === 'scales' ? 'scale' : tag;
     const earned = petRoom.earnTake({ kind, id: cardId || '', dayKey: today });
-    petToast(earned.amount, earned.warmed, earned.bonus, kind, earned.grew);
+    petToast(earned.amount, earned.warmed, earned.bonus, kind, earned.grew, earned.wished, cardId || '');
   }
   if (cardId && counted) Journal.noteScale(journal, cardId, today, score);
   // Sight reading is filed per level, not per passage: a level VI page is a
@@ -3314,10 +3327,17 @@ el.todayChips.addEventListener('click', (event) => {
   const today = todayKey();
   const day = journal.days[today];
   const tag = chip.dataset.tag;
-  if (day && day.tags.includes(tag)) day.tags = day.tags.filter((k) => k !== tag);
-  else Journal.log(journal, today, tag);
+  const adding = !(day && day.tags.includes(tag));
+  if (adding) Journal.log(journal, today, tag);
+  else day.tags = day.tags.filter((k) => k !== tag);
   saveJournal();
   renderLog();
+  // Logging a practice day by hand counts for the pet too, once a day: some of a
+  // student's practice happens where the microphone cannot follow it.
+  if (adding) {
+    const earned = petRoom.earnPractice(today);
+    if (earned && earned.amount) petToast(earned.amount, false, 0, 'practice');
+  }
 });
 
 el.hardChips.addEventListener('click', (event) => {
@@ -3461,6 +3481,10 @@ async function toggleRecording() {
           URL.revokeObjectURL(recorder.takes.pop().url);
         }
         noteTake('recording');
+        // A take kept to listen back to is practice too, so the pet notices —
+        // once a day, and never at the cost of a take the app counted itself.
+        const earned = petRoom.earnRecording();
+        if (earned && earned.amount) petToast(earned.amount, false, 0, 'recording');
       }
       el.recStatus.textContent = '';
     } catch {

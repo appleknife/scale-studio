@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611090200';
+import * as Pet from './pet.js?v=202611091400';
 import {
   petMarkup,
   eggMarkup,
@@ -29,8 +29,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611090200';
-import { t } from './i18n.js?v=202611090200';
+} from './petart.js?v=202611091400';
+import { t } from './i18n.js?v=202611091400';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -646,6 +646,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     } else {
       p.innerHTML = `
         ${growthRow()}
+        ${wishRow()}
         <div class="pet-tabs" role="tablist">
           <button class="pet-tab" type="button" role="tab" data-tray="feed" aria-selected="${tray === 'feed'}">${t('pet.feed')}</button>
           <button class="pet-tab" type="button" role="tab" data-tray="decorate" aria-selected="${tray === 'decorate'}">${t('pet.decorate')}</button>
@@ -658,6 +659,22 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     els.foot.innerHTML = `${t('pet.foot')}${
       demo ? ` <button class="link-btn" type="button" data-act="demo">${t('pet.demo')}</button>` : ''
     }`;
+  }
+
+  /** The key the pet would like to hear today, in the room's own words. */
+  function wishRow() {
+    const w = pet.wish;
+    if (!w || !pet.pet || !pet.pet.name) return '';
+    const key = keyName(w.id);
+    const name = esc(pet.pet.name);
+    return `<p class="pet-keywish${w.done ? ' is-done' : ''}">${
+      w.done ? t('pet.keywish.done', { key, name }) : t('pet.keywish.ask', { key, name })
+    }</p>`;
+  }
+
+  /** 'F#' as a musician writes it. */
+  function keyName(id) {
+    return String(id || '').replace('#', '♯').replace(/b$/, '♭');
   }
 
   /** Where the pet is in growing up, its name to change, and — once grown — the next egg. */
@@ -734,7 +751,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       return `<button class="tray-item${snack.favourite ? ' is-fav' : ''}" type="button" data-snack="${s.id}" ${can ? '' : 'disabled'}>
         ${foodIcon(snack.look)}
         <span class="tray-name">${t(`pet.food.${snack.look}`)}${snack.favourite ? ` <span class="fav-star" aria-label="${t('pet.fav')}">★</span>` : ''}</span>
-        <span class="tray-cost">♪ ${s.cost}</span></button>`;
+        <span class="tray-cost">♪ ${s.cost}${can ? '' : `<span class="tray-need">${t('pet.need', { n: s.cost - pet.notes })}</span>`}</span></button>`;
     }).join('')}</div>
     ${feedInfo()}
     <p class="pet-note">${t('pet.feed.note', { name: esc(pet.pet.name) })}</p>`;
@@ -764,7 +781,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       const owned = pet.owned.includes(item.id);
       const out = Pet.isPlaced(pet, item.id);
       const can = owned || pet.notes >= item.cost;
-      const label = owned ? (out ? t('pet.item.out') : t('pet.item.away')) : `♪ ${item.cost}`;
+      const label = owned
+        ? out
+          ? t('pet.item.out')
+          : t('pet.item.away')
+        : `♪ ${item.cost}${can ? '' : `<span class="tray-need">${t('pet.need', { n: item.cost - pet.notes })}</span>`}`;
       return `<button class="tray-item${out ? ' is-out' : ''}" type="button" data-item="${item.id}" ${can ? '' : 'disabled'} aria-pressed="${out}">
         ${itemIcon(item.id)}
         <span class="tray-name">${t(`pet.item.${item.id}`)}</span>
@@ -877,15 +898,28 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   // ── Earning ────────────────────────────────────────────────────────────
 
+  const localDayKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+
   function earnTake({ kind = 'scale', id = '', dayKey = '' } = {}) {
     pet = Pet.loadPet(profileId());
-    const d = new Date();
-    const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const key = dayKey || local;
+    const key = dayKey || localDayKey();
     const result = Pet.earn(pet, { kind, id, dayKey: key });
     save();
     if (running) paintNotes();
     return result;
+  }
+
+  /** A day of practice logged by hand — it counts for the pet too, once a day. */
+  function earnPractice(dayKey = localDayKey()) {
+    return earnTake({ kind: 'practice', dayKey });
+  }
+
+  /** A take kept to listen back to — a little, once a day. */
+  function earnRecording(dayKey = localDayKey()) {
+    return earnTake({ kind: 'recording', dayKey });
   }
 
   // ── Coming and going ───────────────────────────────────────────────────
@@ -893,6 +927,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   function open() {
     stop();
     pet = Pet.loadPet(profileId());
+    // The day's wish is there before the first take, so the room can name it.
+    if (Pet.ensureWish(pet, localDayKey())) save();
     running = true;
     picked = null;
     choosing = false;
@@ -938,10 +974,28 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     if (els.bubble) els.bubble.hidden = true;
   }
 
+  /**
+   * One short line for the menu tile: how far the pet is from its next stage.
+   * The finish line is visible before the room is opened, which is what makes the
+   * next step feel close (and what a goal without a visible finish line lacks).
+   */
+  function progressLine() {
+    const me = Pet.loadPet(profileId());
+    if (me.egg) return t('pet.menu.egg', { n: Math.max(0, Pet.HATCH_TAKES - me.egg.warmth) });
+    if (!me.pet) return '';
+    if (!me.pet.name) return t('pet.menu.hatch');
+    const left = Pet.growthToNext(me.pet);
+    if (!left) return t('pet.menu.grown');
+    return t('pet.menu.grow', { done: left.done, need: left.need });
+  }
+
   return {
     open,
     stop,
     earnTake,
+    earnPractice,
+    earnRecording,
+    progressLine,
     /** The pet's portrait (or its egg), for the toast. */
     portrait() {
       const p = Pet.loadPet(profileId());

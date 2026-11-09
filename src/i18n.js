@@ -338,6 +338,17 @@ export const S = {
   'pet.toast.room': ['for the pet room', '存进宠物小屋'],
   'pet.toast.newScale': ['New scale today! +{n} bonus', '今天的新音阶！额外 +{n}'],
   'pet.toast.newSight': ['First sight reading today! +{n} bonus', '今天第一次视奏！额外 +{n}'],
+  'pet.toast.keywish': ['{key} major — how did you know?', '{key} 大调——你怎么知道的？'],
+  // The wish is an invitation: the pet names one key a day and says nothing
+  // reproachful if the day goes another way.
+  // No indefinite article: "a A major scale" and "a E major scale" are both wrong.
+  'pet.keywish.ask': ['{name} would love to hear {key} major today.', '{name} 今天很想听 {key} 大调。'],
+  'pet.keywish.done': ['{name} loved that {key} major scale!', '{name} 好喜欢那条 {key} 大调音阶！'],
+  'pet.need': ['{n} more ♪ to go', '还差 {n} 个 ♪'],
+  'pet.menu.egg': ['{n} more ♪ to hatch', '再 {n} 个 ♪ 就孵出来了'],
+  'pet.menu.hatch': ['Say hello to it!', '给它起个名字吧！'],
+  'pet.menu.grow': ['{done} of {need} to growing up', '再 {done}/{need} 就长大一点'],
+  'pet.menu.grown': ['All grown up ★', '已经长大啦 ★'],
   'who.title': ['Who’s practicing?', '谁在练习？'],
   'who.all': ['Everyone ({n})', '全部（{n}）'],
   'who.search': ['Find a name', '找名字'],
@@ -1073,7 +1084,8 @@ export const STATIC = {
   'Note Sprint': '音符冲刺',
   'Pick the notes you know, then read them as fast as you can. The app listens.': '选出你认识的音，然后尽快读出来、拉出来。应用会听。',
   'New': '新',
-  'Hatch a pet and look after it. Every scale you play earns notes for snacks and toys.': '孵一只小宠物，好好照顾它。每拉一条音阶都能赚音符，换点心和玩具。',
+  'Hatch a pet and look after it. Every scale you play — and every practice day you log — earns notes for snacks and toys.':
+    '孵一只小宠物，好好照顾它。每拉一条音阶、每记一次练习，都能赚音符换点心和玩具。',
   'Tuner': '调音',
   'How it works': '评分说明',
   'English': 'English',
