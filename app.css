@@ -452,11 +452,17 @@ h3 {
 }
 
 .sig-glyphs {
-  height: 15px;
-  font-size: 13px;
-  letter-spacing: 1.5px;
+  height: 19px;
+  font-size: 19px;
+  margin: 1px 0;
   color: var(--gold);
   line-height: 1;
+}
+
+/* The signs themselves: one em tall, as wide as the key needs. */
+.sig-svg {
+  display: block;
+  height: 1em;
 }
 
 .key-sub {

@@ -1,7 +1,7 @@
 // app.js — screen flow, microphone capture and rendering.
 
 import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611102301';
-import { renderStaff } from './staff.js?v=202611102301';
+import { renderStaff, keySignatureGlyphs } from './staff.js?v=202611102301';
 import { createInk } from './ink.js?v=202611102301';
 import { createFollower } from './follow.js?v=202611102301';
 import { createPetRoom } from './petroom.js?v=202611102301';
@@ -432,10 +432,7 @@ function renderGrid() {
       const scale = buildScale(card, 0, state.mode, state.form);
       const names = card.variants.map((v) => v.name).join(' / ');
       const suffix = state.mode === 'minor' ? '<span class="minor-suffix"> minor</span>' : '';
-      const glyphs =
-        scale.fifths === 0
-          ? ''
-          : (scale.fifths > 0 ? '\u266F' : '\u266D').repeat(Math.abs(scale.fifths));
+      const glyphs = keySignatureGlyphs(scale.fifths);
       const times = today.get(card.id) || 0;
       const badge = times
         ? `<span class="key-today" aria-hidden="true">×${times}</span>

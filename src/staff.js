@@ -115,6 +115,49 @@ export function accidentalAt(alter, x, y, colour = INK, size = 1) {
   return naturalAt(x);
 }
 
+/**
+ * A key signature as a small row of engraved signs, for the scale cards: the
+ * same sharp and flat the staff draws, not the font's. As text they came from
+ * whichever symbol font the device happened to have, so the flats arrived thin,
+ * pale and a different shape on every machine. Drawn in currentColor, one em
+ * tall by way of the CSS, so the card decides the colour and size.
+ */
+export function keySignatureGlyphs(fifths) {
+  const count = Math.abs(fifths);
+  if (!count) return '';
+  const sharp = fifths > 0;
+  const s = LINE_GAP;
+  const step = (sharp ? 1.42 : 1.3) * s;
+  // A flat's stem is its left edge and the bowl hangs to the right of it; a
+  // sharp is centred. The box is the same height for both so rows line up.
+  const first = (sharp ? 0.52 : 0.14) * s;
+  const top = (sharp ? -1.62 : -2.1) * s;
+  const height = 3.24 * s;
+  const width = first + (count - 1) * step + (sharp ? 0.52 : 0.95) * s;
+  // The flat here is its own outline rather than the staff's: on a staff the
+  // bowl is a heavy stroke sized to fill a space, which at card size closes up
+  // into a blob. This one is the printed shape — a thin stem, a bowl that
+  // swells on the right and comes back to a point — with the counter left open
+  // (even-odd). Coordinates are staff spaces, the stem on x = 0.
+  const FLAT_PATH =
+    'M-0.085 -1.95 H0.085 V-0.42 C0.28 -0.76 0.80 -0.70 0.78 -0.26 ' +
+    'C0.76 0.12 0.36 0.38 0.085 0.65 H-0.085 Z ' +
+    'M0.085 -0.16 C0.21 -0.45 0.47 -0.45 0.47 -0.22 C0.47 0.00 0.27 0.16 0.085 0.34 Z';
+  let marks = '';
+  for (let i = 0; i < count; i += 1) {
+    const x = first + i * step;
+    marks += sharp
+      ? accidentalAt(1, x, 0, 'currentColor')
+      : `<path d="${FLAT_PATH}" transform="translate(${x} 0) scale(${s})" ` +
+        `fill="currentColor" fill-rule="evenodd"/>`;
+  }
+  const r = (n) => Math.round(n * 100) / 100;
+  return (
+    `<svg class="sig-svg" viewBox="0 ${r(top)} ${r(width)} ${r(height)}" ` +
+    `style="width:${r(width / height)}em" focusable="false">${marks}</svg>`
+  );
+}
+
 export function renderStaff(
   notes,
   {
