@@ -1416,6 +1416,7 @@ export const STATIC = {
   'Choose a space. Scales is where most days start — pick a key, press start, and the app listens to the whole scale.':
     '选一个空间。大多数时候都是先练音阶——挑一个调，点开始，应用会听完整条音阶。',
   'Menu': '菜单',
+  'Home': '主页',
   'Test — no clicks, no line, just the page': '考试模式——没有节拍、没有指示线，只有谱子',
   'NYSSMA tempo': 'NYSSMA 原速',
   'The clicks come out of the speaker and the microphone is open — headphones keep one out of the other. Test runs are kept in your stats under their own heading.':

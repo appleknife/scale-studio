@@ -265,6 +265,8 @@ h3 {
 .subtle {
   margin: 6px 0 0;
   font-size: 13.5px;
+  /* The lead under a title often runs to three lines on a phone. */
+  line-height: 1.45;
   color: var(--muted);
 }
 
@@ -2267,6 +2269,19 @@ h3 {
 
 .dot-sep {
   opacity: 0.5;
+}
+
+/* On a phone the footer wraps, and a separator that ends one line or starts the
+   next is just a stray dot. Stacked, the three lines need none. */
+@media (max-width: 720px) {
+  .footer {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .dot-sep {
+    display: none;
+  }
 }
 
 dialog {
@@ -4296,7 +4311,7 @@ select,
 
 .pet-note,
 .pet-foot {
-  margin: 14px auto 0;
+  margin: 14px auto 20px;
   max-width: 620px;
   font-size: 13.5px;
   line-height: 1.5;
