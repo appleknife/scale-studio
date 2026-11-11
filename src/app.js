@@ -1,17 +1,17 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611111026';
-import { renderStaff, keySignatureGlyphs } from './staff.js?v=202611111026';
-import { createInk } from './ink.js?v=202611111026';
-import { createFollower } from './follow.js?v=202611111026';
-import { createPetRoom } from './petroom.js?v=202611111026';
-import { createBuddy } from './buddy.js?v=202611111026';
-import { createSprintView } from './sprintview.js?v=202611111026';
-import { createListenView } from './listenview.js?v=202611111026';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611111105';
+import { renderStaff, keySignatureGlyphs } from './staff.js?v=202611111105';
+import { createInk } from './ink.js?v=202611111105';
+import { createFollower } from './follow.js?v=202611111105';
+import { createPetRoom } from './petroom.js?v=202611111105';
+import { createBuddy } from './buddy.js?v=202611111105';
+import { createSprintView } from './sprintview.js?v=202611111105';
+import { createListenView } from './listenview.js?v=202611111105';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611111026';
+window.__scaleStudioVersion = '202611111105';
 import {
   PitchDetector,
   midiToFreq,
@@ -19,16 +19,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611111026';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611111026';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611111026';
-import { generatePassage } from './sightreading.js?v=202611111026';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611111026';
-import { renderScore } from './score.js?v=202611111026';
-import { summariseIntonation } from './intonation.js?v=202611111026';
-import * as Journal from './journal.js?v=202611111026';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611111026';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611111026';
+} from './pitch.js?v=202611111105';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611111105';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611111105';
+import { generatePassage } from './sightreading.js?v=202611111105';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611111105';
+import { renderScore } from './score.js?v=202611111105';
+import { summariseIntonation } from './intonation.js?v=202611111105';
+import * as Journal from './journal.js?v=202611111105';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611111105';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611111105';
 import {
   STRINGS,
   FIFTHS,
@@ -37,7 +37,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611111026';
+} from './tuner.js?v=202611111105';
 
 const LANG = initLang();
 
@@ -4038,7 +4038,14 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
 
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
-  analyser.fftSize = windowSize;
+  // The window is a length of *time* — 43 ms — and 2048 samples is only that at
+  // 44.1 or 48 kHz. An audio interface (or a PC whose sound settings say "studio
+  // quality") runs at 96 or 192 kHz, where the same 2048 samples are 21 or 11
+  // ms: two periods of the open G, which is not enough to agree on a pitch. So
+  // read two or four times as many samples there and average them back down,
+  // which leaves the detector with the window, and the work, it was built for.
+  const thin = ctx.sampleRate > 128000 ? 4 : ctx.sampleRate > 64000 ? 2 : 1;
+  analyser.fftSize = windowSize * thin;
   analyser.smoothingTimeConstant = 0;
   source.connect(analyser);
 
@@ -4062,11 +4069,17 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
   };
 
   const buf = new Float32Array(analyser.fftSize);
+  // What the detector is given: `buf` itself, or `buf` averaged down by `thin`.
+  const frame = thin === 1 ? buf : new Float32Array(windowSize);
   const detector = new PitchDetector({
-    sampleRate: ctx.sampleRate,
-    bufferSize: analyser.fftSize,
+    sampleRate: ctx.sampleRate / thin,
+    bufferSize: windowSize,
     minFreq: 150,
-    maxFreq: 1800,
+    // Up to the E three octaves above the open E string (2637 Hz). The ceiling
+    // was 1800, and a ceiling does not make a higher note go unheard — it makes
+    // it heard an octave low: the B flat above the staff's second ledger octave
+    // and everything over it came back as the note below, confidently.
+    maxFreq: 2800,
   });
 
   // What the browser actually gave us, not what we asked for: on iOS the three
@@ -4082,6 +4095,8 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     settings = {};
   }
 
+  let closed = false;
+  let screenLock = null;
   const mic = {
     stream,
     ctx,
@@ -4093,7 +4108,36 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     // Room noise, learned as the page runs — see nextFloor() in pitch.js.
     floor: 0.0012,
     stalled: false,
+    /**
+     * Keep the screen on while the microphone is. A tablet on a music stand is
+     * not being touched, so it dims and locks on its usual timer — and locking
+     * suspends the audio, which ends the take with nothing scored. The lock is
+     * the browser's to give (and it takes it back whenever the page is hidden,
+     * so this is called again when the page returns); where there is no such
+     * thing the screen simply behaves as it always did.
+     */
+    async holdScreen() {
+      if (closed || screenLock || !navigator.wakeLock?.request) return;
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        if (closed) {
+          lock.release().catch(() => {});
+          return;
+        }
+        screenLock = lock;
+        lock.addEventListener('release', () => {
+          if (screenLock === lock) screenLock = null;
+        });
+      } catch {
+        /* low battery, or not allowed here — the screen keeps its own timer */
+      }
+    },
     close() {
+      closed = true;
+      if (screenLock) {
+        screenLock.release().catch(() => {});
+        screenLock = null;
+      }
       clearInterval(timer);
       stream.getTracks().forEach((t) => t.stop());
       ctx.close().catch(() => {});
@@ -4195,7 +4239,14 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     }
     staleTicks = 0;
     last.set(buf);
-    const { freq, clarity, rms } = detector.detect(buf);
+    if (thin > 1) {
+      for (let i = 0, j = 0; i < frame.length; i += 1, j += thin) {
+        let sum = 0;
+        for (let k = 0; k < thin; k += 1) sum += buf[j + k];
+        frame[i] = sum / thin;
+      }
+    }
+    const { freq, clarity, rms } = detector.detect(frame);
     // Pitched frames are the violin, and must never teach the room's level.
     mic.floor = nextFloor(mic.floor, rms, freq > 0 && clarity >= 0.5);
     if (rms === 0) {
@@ -4206,6 +4257,8 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     }
     emit({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms });
   }, 30);
+
+  mic.holdScreen();
 
   ctx.addEventListener?.('statechange', () => {
     // Clearing a stall is always safe. Declaring one is left to the interval,
@@ -4312,6 +4365,8 @@ function paintMicDiagnostics() {
  */
 document.addEventListener('visibilitychange', () => {
   if (document.hidden || !state.mic) return;
+  // the browser let go of the screen lock when the page was hidden
+  state.mic.holdScreen?.();
   state.mic.wake().then((awake) => {
     if (!awake) onMicStalled();
   });

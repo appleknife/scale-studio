@@ -5,11 +5,11 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611111026';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611111026';
-import { CLEF_PATH } from './clef.js?v=202611111026';
-import { hearLevel } from './pitch.js?v=202611111026';
-import { t } from './i18n.js?v=202611111026';
+import * as Sprint from './sprint.js?v=202611111105';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611111105';
+import { CLEF_PATH } from './clef.js?v=202611111105';
+import { hearLevel } from './pitch.js?v=202611111105';
+import { t } from './i18n.js?v=202611111105';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
