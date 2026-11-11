@@ -1,17 +1,17 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611102301';
-import { renderStaff } from './staff.js?v=202611102301';
-import { createInk } from './ink.js?v=202611102301';
-import { createFollower } from './follow.js?v=202611102301';
-import { createPetRoom } from './petroom.js?v=202611102301';
-import { createBuddy } from './buddy.js?v=202611102301';
-import { createSprintView } from './sprintview.js?v=202611102301';
-import { createListenView } from './listenview.js?v=202611102301';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611111026';
+import { renderStaff, keySignatureGlyphs } from './staff.js?v=202611111026';
+import { createInk } from './ink.js?v=202611111026';
+import { createFollower } from './follow.js?v=202611111026';
+import { createPetRoom } from './petroom.js?v=202611111026';
+import { createBuddy } from './buddy.js?v=202611111026';
+import { createSprintView } from './sprintview.js?v=202611111026';
+import { createListenView } from './listenview.js?v=202611111026';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611102301';
+window.__scaleStudioVersion = '202611111026';
 import {
   PitchDetector,
   midiToFreq,
@@ -19,16 +19,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611102301';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611102301';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611102301';
-import { generatePassage } from './sightreading.js?v=202611102301';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611102301';
-import { renderScore } from './score.js?v=202611102301';
-import { summariseIntonation } from './intonation.js?v=202611102301';
-import * as Journal from './journal.js?v=202611102301';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611102301';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611102301';
+} from './pitch.js?v=202611111026';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611111026';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611111026';
+import { generatePassage } from './sightreading.js?v=202611111026';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611111026';
+import { renderScore } from './score.js?v=202611111026';
+import { summariseIntonation } from './intonation.js?v=202611111026';
+import * as Journal from './journal.js?v=202611111026';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611111026';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611111026';
 import {
   STRINGS,
   FIFTHS,
@@ -37,7 +37,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611102301';
+} from './tuner.js?v=202611111026';
 
 const LANG = initLang();
 
@@ -432,10 +432,7 @@ function renderGrid() {
       const scale = buildScale(card, 0, state.mode, state.form);
       const names = card.variants.map((v) => v.name).join(' / ');
       const suffix = state.mode === 'minor' ? '<span class="minor-suffix"> minor</span>' : '';
-      const glyphs =
-        scale.fifths === 0
-          ? ''
-          : (scale.fifths > 0 ? '\u266F' : '\u266D').repeat(Math.abs(scale.fifths));
+      const glyphs = keySignatureGlyphs(scale.fifths);
       const times = today.get(card.id) || 0;
       const badge = times
         ? `<span class="key-today" aria-hidden="true">×${times}</span>

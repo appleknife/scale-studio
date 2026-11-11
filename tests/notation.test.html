@@ -120,6 +120,26 @@
       /** A point has no extent, so it needs its own test, not `overlap`. */
       const inside = (pt, b) => pt.x > b.x0 && pt.x < b.x1 && pt.y > b.y0 && pt.y < b.y1;
 
+      /** Is a point inside a convex outline, or within `air` of its edge? */
+      const nearPoly = (pt, poly, air) => {
+        let insideIt = true;
+        let sign = 0;
+        let closest = Infinity;
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i];
+          const b = poly[(i + 1) % poly.length];
+          const cross = (b.x - a.x) * (pt.y - a.y) - (b.y - a.y) * (pt.x - a.x);
+          if (cross !== 0) {
+            if (sign === 0) sign = Math.sign(cross);
+            else if (Math.sign(cross) !== sign) insideIt = false;
+          }
+          const len2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2 || 1;
+          const t = Math.max(0, Math.min(1, ((pt.x - a.x) * (b.x - a.x) + (pt.y - a.y) * (b.y - a.y)) / len2));
+          closest = Math.min(closest, Math.hypot(pt.x - (a.x + t * (b.x - a.x)), pt.y - (a.y + t * (b.y - a.y))));
+        }
+        return insideIt || closest < air;
+      };
+
       /**
        * The `M … C …` a slur is drawn with, sampled into points — half a unit
        * apart, because a stem is only about two units wide and a coarser walk
@@ -214,7 +234,18 @@
             ),
             ...[...svg.querySelectorAll('circle')].filter((n) => !n.closest('g.score-rest')),
           ];
-          const ink = inkNodes.map((n) => box(n));
+          // A beam keeps its outline as well as its box. It slants, so its box is
+          // half empty: a slur that runs under a rising beam passes through the
+          // box's bare corner without coming near the beam, and has to be judged
+          // against the beam itself.
+          const ink = inkNodes.map((n) => {
+            const b = box(n);
+            if (n.classList.contains('score-beam')) {
+              const v = (n.getAttribute('d').match(/-?\d+(\.\d+)?/g) || []).map(Number);
+              b.poly = [0, 2, 4, 6].map((i) => ({ x: v[i], y: v[i + 1] }));
+            }
+            return b;
+          });
 
           for (const r of restBoxes) {
             const bad = ink.find((b) => overlap(r, b));
@@ -476,7 +507,7 @@
             const near = solids.filter((b) => overlap(box(slur), b, 30));
             const bad = slurPoints(slur)
               .filter((pt) => pt.t > 0.06 && pt.t < 0.94)
-              .find((pt) => near.find((b) => inside(pt, b)));
+              .find((pt) => near.find((b) => inside(pt, b) && (!b.poly || nearPoly(pt, b.poly, 1))));
             if (bad) {
               slurHits.push(`L${level} seed ${seed}: slur passes through ink at ${bad.x.toFixed(0)},${bad.y.toFixed(0)}`);
               break;

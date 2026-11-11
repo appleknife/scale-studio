@@ -21,7 +21,7 @@
 //     single-pitch detector frames with no clear period, so a take that is loud
 //     but mostly unclear is most likely playing along with something.
 
-import { segmentNotes, align } from './analyze.js?v=202611102301';
+import { segmentNotes, align } from './analyze.js?v=202611111026';
 
 const median = (xs) => {
   if (!xs.length) return null;

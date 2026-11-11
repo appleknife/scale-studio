@@ -76,8 +76,8 @@
           if (!/major/.test(d.getElementById('scaleTitle').textContent))
             problems.push('title broken after spelling switch');
           // accidentals are drawn as paths now (text glyphs sat on a baseline
-          // nobody controls), so the six flats of G-flat are twelve path pieces
-          if (d.querySelectorAll('#staffHost .staff-key-sig path').length !== 12)
+          // nobody controls), one outline each, so G-flat's six flats are six paths
+          if (d.querySelectorAll('#staffHost .staff-key-sig path').length !== 6)
             problems.push('key signature missing after switch');
 
           /* ── octave toggle ───────────────────────────────────────── */

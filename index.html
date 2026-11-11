@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611102301" />
+    <link rel="stylesheet" href="app.css?v=202611111026" />
   </head>
   <body>
     <div class="shell">
@@ -159,7 +159,7 @@
         <!-- ── Pet room ────────────────────────────────────────────────── -->
         <section class="view" id="view-pet" hidden>
           <button class="back-btn" id="petBack" type="button">
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true">←</span> Home
           </button>
           <div class="pet-top">
             <div class="intro">
@@ -179,7 +179,7 @@
         <!-- ── Scales ──────────────────────────────────────────────────── -->
         <section class="view" id="view-scales" hidden>
           <button class="back-btn" id="scalesBack" type="button">
-            <span aria-hidden="true">←</span> Menu
+            <span aria-hidden="true">←</span> Home
           </button>
 
           <div class="intro">
@@ -230,7 +230,7 @@
         <!-- ── Tuner ────────────────────────────────────────────────── -->
         <section class="view" id="view-tune" hidden>
           <button class="back-btn" id="tuneBack" type="button">
-            <span aria-hidden="true">←</span> All scales
+            <span aria-hidden="true">←</span> Home
           </button>
 
           <div class="head-row">
@@ -355,7 +355,7 @@
         <!-- ── Mock audition: choosing what you prepared (I–IV) ──────── -->
         <section class="view" id="view-test-pick" hidden>
           <button class="back-btn" id="pickBack" type="button">
-            <span aria-hidden="true">←</span> All scales
+            <span aria-hidden="true">←</span> Home
           </button>
 
           <h2 class="draw-title" id="pickTitle">Choose three scales</h2>
@@ -397,7 +397,7 @@
         <!-- ── Mock audition: the draw ────────────────────────────────── -->
         <section class="view" id="view-test-draw" hidden>
           <button class="back-btn" id="drawBack" type="button">
-            <span aria-hidden="true">←</span> All scales
+            <span aria-hidden="true">←</span> Home
           </button>
 
           <h2 class="draw-title">Your three scales</h2>
@@ -442,7 +442,7 @@
         <!-- ── Sight reading ───────────────────────────────────────────── -->
         <section class="view" id="view-sight" hidden>
           <button class="back-btn" id="sightBack" type="button">
-            <span aria-hidden="true">←</span> All scales
+            <span aria-hidden="true">←</span> Home
           </button>
 
           <div class="head-row">
@@ -630,7 +630,7 @@
              actually measures. -->
         <section class="view" id="view-stats" hidden>
           <button class="back-btn" id="statsBack" type="button">
-            <span aria-hidden="true">←</span> All scales
+            <span aria-hidden="true">←</span> Home
           </button>
 
           <div class="head-row">
@@ -681,7 +681,7 @@
         <!-- ── Practice log ────────────────────────────────────────────── -->
         <section class="view" id="view-track" hidden>
           <button class="back-btn" id="trackBack" type="button">
-            <span aria-hidden="true">←</span> All scales
+            <span aria-hidden="true">←</span> Home
           </button>
 
           <div class="head-row">
@@ -1046,7 +1046,7 @@
         <!-- ── Mock audition: the report ──────────────────────────────── -->
         <section class="view" id="view-test-result" hidden>
           <button class="back-btn" id="testResultBack" type="button">
-            <span aria-hidden="true">←</span> All scales
+            <span aria-hidden="true">←</span> Home
           </button>
 
           <div class="result-head">
@@ -1076,7 +1076,7 @@
           <div class="actions">
             <button class="primary-btn" id="againBtn" type="button">Play these three again</button>
             <button class="quiet-btn" id="newDrawBtn" type="button">Draw three new</button>
-            <button class="quiet-btn" id="testHomeBtn" type="button">All scales</button>
+            <button class="quiet-btn" id="testHomeBtn" type="button">Home</button>
           </div>
         </section>
       </main>
@@ -1178,13 +1178,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611102301"></script>
+    <script type="module" src="src/app.js?v=202611111026"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611102301';
+        var V = '202611111026';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;

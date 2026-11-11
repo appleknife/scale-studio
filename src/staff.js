@@ -3,8 +3,8 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202611102301';
-import { intonationLane } from './intonation.js?v=202611102301';
+import { CLEF_PATH } from './clef.js?v=202611111026';
+import { intonationLane } from './intonation.js?v=202611111026';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -55,6 +55,11 @@ export const STAFF_GEOM = {
   FLAT_POSITIONS,
 };
 
+const FLAT_PATH =
+  'M-0.085 -1.95 H0.085 V-0.42 C0.28 -0.76 0.80 -0.70 0.78 -0.26 ' +
+  'C0.76 0.12 0.36 0.38 0.085 0.65 H-0.085 Z ' +
+  'M0.085 -0.16 C0.21 -0.45 0.47 -0.45 0.47 -0.22 C0.47 0.00 0.27 0.16 0.085 0.34 Z';
+
 /**
  * Sharps, flats and naturals drawn as paths, sized in staff spaces: a flat's
  * bowl is exactly one space and the glyph stands about three. Text glyphs sit on
@@ -66,10 +71,15 @@ export function accidentalAt(alter, x, y, colour = INK, size = 1) {
   const s = LINE_GAP * size;
   const stem = 0.17 * s;
 
+  // A flat: the printed outline, as one filled path — a thin stem, a bowl that
+  // swells on the right and comes back down to a point on the stem, the counter
+  // left open (even-odd). It used to be a stem and a heavy half-ellipse stroke,
+  // which read as a "D" on a stick: round at the bottom where a flat is pointed,
+  // and closed up into a blob at small sizes. Coordinates are in staff spaces
+  // with the stem on x = 0; the bowl sits on the note's line or space.
   const flatAt = (cx) =>
-    `<path d="M${cx} ${y - 1.95 * s} L${cx} ${y + 0.5 * s}" stroke="${colour}" stroke-width="${0.2 * s}"/>` +
-    `<path d="M${cx} ${y - 0.5 * s} A ${0.66 * s} ${0.5 * s} 0 0 1 ${cx} ${y + 0.5 * s}" ` +
-    `fill="none" stroke="${colour}" stroke-width="${0.44 * s}" stroke-linecap="round"/>`;
+    `<path d="${FLAT_PATH}" transform="translate(${cx} ${y}) scale(${s})" ` +
+    `fill="${colour}" fill-rule="evenodd"/>`;
 
   // A sharp: the engraved sample the app was matched against, traced once from a
   // high-resolution bitmap of it and kept as a path. The outline is the printed
@@ -113,6 +123,36 @@ export function accidentalAt(alter, x, y, colour = INK, size = 1) {
   if (alter === -2) return flatAt(x - 0.75 * s) + flatAt(x + 0.75 * s);
   if (alter === 2) return sharpAt(x - 0.75 * s) + sharpAt(x + 0.75 * s);
   return naturalAt(x);
+}
+
+/**
+ * A key signature as a small row of engraved signs, for the scale cards: the
+ * same sharp and flat the staff draws, not the font's. As text they came from
+ * whichever symbol font the device happened to have, so the flats arrived thin,
+ * pale and a different shape on every machine. Drawn in currentColor, one em
+ * tall by way of the CSS, so the card decides the colour and size.
+ */
+export function keySignatureGlyphs(fifths) {
+  const count = Math.abs(fifths);
+  if (!count) return '';
+  const sharp = fifths > 0;
+  const s = LINE_GAP;
+  const step = (sharp ? 1.42 : 1.3) * s;
+  // A flat's stem is its left edge and the bowl hangs to the right of it; a
+  // sharp is centred. The box is the same height for both so rows line up.
+  const first = (sharp ? 0.52 : 0.14) * s;
+  const top = (sharp ? -1.62 : -2.1) * s;
+  const height = 3.24 * s;
+  const width = first + (count - 1) * step + (sharp ? 0.52 : 0.95) * s;
+  let marks = '';
+  for (let i = 0; i < count; i += 1) {
+    marks += accidentalAt(sharp ? 1 : -1, first + i * step, 0, 'currentColor');
+  }
+  const r = (n) => Math.round(n * 100) / 100;
+  return (
+    `<svg class="sig-svg" viewBox="0 ${r(top)} ${r(width)} ${r(height)}" ` +
+    `style="width:${r(width / height)}em" focusable="false">${marks}</svg>`
+  );
 }
 
 export function renderStaff(
@@ -214,7 +254,7 @@ export function renderStaff(
     for (const l of ledgers) {
       const ly = STAFF_BOTTOM - (l - E4) * STEPS;
       part.push(
-        `<line x1="${x - 9}" y1="${ly}" x2="${x + 9}" y2="${ly}" stroke="#c3b49d" stroke-width="1.15"/>`,
+        `<line x1="${x - 10.5}" y1="${ly}" x2="${x + 10.5}" y2="${ly}" stroke="#c3b49d" stroke-width="1.15"/>`,
       );
     }
 
@@ -228,16 +268,26 @@ export function renderStaff(
     }
 
     // Stem
+    // The printed proportions, the same as the sight-reading page: a stem is an
+    // octave long (3.5 spaces) and stands at the edge of its head, starting where
+    // the leaning oval is widest. A note out on ledger lines has its stem carried
+    // back to the middle line, so the low G and the high notes stay tied to the
+    // staff instead of floating beside it. (It was 2.7 spaces for every note,
+    // set inside a head that did not fill its space.)
     const stemUp = idx < 34;
-    const stemX = stemUp ? x + 5.4 : x - 5.4;
-    const stemY2 = stemUp ? y - 30 : y + 30;
+    const stemX = stemUp ? x + 6 : x - 6;
+    const stemY1 = stemUp ? y - 1 : y + 1;
+    const middle = STAFF_TOP + 2 * LINE_GAP;
+    const stemY2 = stemUp
+      ? Math.min(y - 3.5 * LINE_GAP, middle)
+      : Math.max(y + 3.5 * LINE_GAP, middle);
     part.push(
-      `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemY2}" stroke="${color}" stroke-width="1.4" stroke-linecap="round"/>`,
+      `<line x1="${stemX}" y1="${stemY1}" x2="${stemX}" y2="${stemY2}" stroke="${color}" stroke-width="1.42" stroke-linecap="round"/>`,
     );
 
     // Note head
     part.push(
-      `<ellipse class="staff-head" data-i="${i}" data-stem="${stemUp ? 'up' : 'down'}" cx="${x}" cy="${y}" rx="5.7" ry="4.2" fill="${color}" transform="rotate(-18 ${x} ${y})"/>`,
+      `<ellipse class="staff-head" data-i="${i}" data-stem="${stemUp ? 'up' : 'down'}" cx="${x}" cy="${y}" rx="6.9" ry="5.1" fill="${color}" transform="rotate(-20 ${x} ${y})"/>`,
     );
 
     if (labels) {
