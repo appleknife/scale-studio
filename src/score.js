@@ -35,12 +35,26 @@ const BARS_PER_SYSTEM = 4;
 // Proportions follow engraving convention in staff spaces (one space = LINE_GAP):
 // a stem is 3.5 spaces, a beam half a space thick, a note head a little over a
 // space wide. Anything smaller reads as a sketch rather than a score.
-// Head proportions from a display-weight eighth note the app was matched
-// against: 1.56 wide to tall, leaning 24°. The engraved default is nearer 1.33
-// at 18°, which reads thinner at phone size than the rest of this design.
-const HEAD_RX = 7.1;
-const HEAD_RY = 4.55;
-const HEAD_ANGLE = -24;
+// Head proportions as they are printed: a full oval that fills its space —
+// 1.22 spaces wide, 0.97 tall, leaning 20°. They used to be matched to the
+// app's logo note (1.56 wide to tall, leaning 24°), which on a staff reads as a
+// thin, sharply tilted bean with white showing above and below it in the space.
+// The logo keeps its own drawing in noteMarkSvg.
+const HEAD_RX = 6.9;
+const HEAD_RY = 5.1;
+const HEAD_ANGLE = -20;
+// A stem stands at the edge of its head, not inside it: its outer side is flush
+// with the widest point of the oval. That point is not level with the centre on
+// a leaning oval — it is a little above on the right, a little below on the
+// left — and the stem starts there, so no corner of it shows past the head.
+// Half the height the leaning oval actually takes up on the page — a little
+// more than HEAD_RY — for anything that has to stay clear of a head.
+const HEAD_HALF_H = Math.hypot(
+  HEAD_RX * Math.sin((HEAD_ANGLE * Math.PI) / 180),
+  HEAD_RY * Math.cos((HEAD_ANGLE * Math.PI) / 180),
+);
+const STEM_DX = 6.0;
+const STEM_LIFT = 1.0;
 const STEM = 3.5 * LINE_GAP;
 const BEAM = 0.48 * LINE_GAP;
 
@@ -154,7 +168,7 @@ function ledgerLines(letter, octave, x, bottom) {
   const out = [];
   const line = (l) => {
     const y = bottom - (l - E4) * STEPS;
-    out.push(`<line x1="${x - 9.5}" y1="${y}" x2="${x + 9.5}" y2="${y}" stroke="#c3b49d" stroke-width="1.15"/>`);
+    out.push(`<line x1="${x - 10.5}" y1="${y}" x2="${x + 10.5}" y2="${y}" stroke="#c3b49d" stroke-width="1.15"/>`);
   };
   if (idx < E4) for (let l = E4 - 2; l >= idx; l -= 2) line(l);
   else if (idx > E4 + 8) for (let l = E4 + 10; l <= idx; l += 2) line(l);
@@ -169,7 +183,26 @@ function ledgerLines(letter, octave, x, bottom) {
  */
 function head(x, y, { hollow = false, colour = INK } = {}) {
   if (hollow) {
-    return `<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="none" stroke="${colour}" stroke-width="1.7" transform="rotate(${HEAD_ANGLE} ${x} ${y})"/>`;
+    // A half note is not an outline of even weight: the white inside is a
+    // narrower oval that leans further than the head, which leaves the wall
+    // heavy on the upper left and lower right and fine at the two ends. Drawn as
+    // one even-odd path; the ellipse stays, unpainted, because the head is what
+    // the page (and the tests) find a note by.
+    const oval = (rx, ry, deg) => {
+      const a = (deg * Math.PI) / 180;
+      const dx = rx * Math.cos(a);
+      const dy = rx * Math.sin(a);
+      const f = (n) => n.toFixed(2);
+      return (
+        `M${f(x + dx)} ${f(y + dy)} A${rx} ${ry} ${deg} 1 0 ${f(x - dx)} ${f(y - dy)} ` +
+        `A${rx} ${ry} ${deg} 1 0 ${f(x + dx)} ${f(y + dy)} Z`
+      );
+    };
+    return (
+      `<path class="score-open-head" d="${oval(HEAD_RX, HEAD_RY, HEAD_ANGLE)} ${oval(5.5, 2.75, HEAD_ANGLE - 14)}" ` +
+      `fill="${colour}" fill-rule="evenodd"/>` +
+      `<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="none" transform="rotate(${HEAD_ANGLE} ${x} ${y})"/>`
+    );
   }
   return `<ellipse cx="${x}" cy="${y}" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="${colour}" transform="rotate(${HEAD_ANGLE} ${x} ${y})"/>`;
 }
@@ -604,7 +637,7 @@ function drawSystem(
       if (e.dur <= 2) {
         if (beamed.has(e)) return HEAD_RX;
         const up = STAFF_GEOM.stemUp(e.note.letter, e.note.octave);
-        return up ? 5.2 + 11.7 : HEAD_RX;
+        return up ? STEM_DX + 11.7 : HEAD_RX;
       }
       return HEAD_RX;
     });
@@ -878,7 +911,7 @@ function drawSystem(
 
     groups.forEach((group) => {
       const beam = beamOf.get(group[0]);
-      const stemX = (e) => xOf(e) + (beam.up ? 5.2 : -5.2);
+      const stemX = (e) => xOf(e) + (beam.up ? STEM_DX : -STEM_DX);
       const first = group[0];
       const last = group[group.length - 1];
 
@@ -1007,13 +1040,14 @@ function drawSystem(
         );
       }
 
-      const stemX = up ? x + 5.2 : x - 5.2;
+      const stemX = up ? x + STEM_DX : x - STEM_DX;
+      const stemStart = up ? y - STEM_LIFT : y + STEM_LIFT;
       const stemEnd = beam ? beam.at(event) : up ? y - STEM : y + STEM;
       musicTop = Math.min(musicTop, stemEnd);
       // a stem is drawn for everything but a whole note and a beamed eighth
       if (!(event.dur >= 16)) {
         part.push(
-          `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemEnd}" stroke="${INK}" stroke-width="1.42" stroke-linecap="round"/>`,
+          `<line x1="${stemX}" y1="${stemStart}" x2="${stemX}" y2="${stemEnd}" stroke="${INK}" stroke-width="1.42" stroke-linecap="round"/>`,
         );
       }
       if (event.dur <= 2 && !beam) {
@@ -1094,7 +1128,12 @@ function drawSystem(
       const stemInfo = (ev) => {
         const beam = beamOf.get(ev);
         const up = beam ? beam.up : stemUp(ev.note.letter, ev.note.octave);
-        return { up, reach: beam ? STEM + BEAM : STEM };
+        // A beamed stem is as long as its beam makes it, which on a slanting
+        // beam is often longer than the plain 3.5 spaces: measure the one that
+        // was drawn. Assuming the plain length let a slur on the beam side end
+        // level with the beam and hook up beside its tip.
+        const ym = yForNote(ev.note.letter, ev.note.octave, bottom);
+        return { up, reach: beam ? Math.max(STEM, Math.abs(beam.at(ev) - ym)) + BEAM + 0.8 : STEM };
       };
       // An articulation mark sits opposite the stem — the same side the slur
       // takes — so it has to be cleared too, or the slur runs through the dot.
@@ -1158,8 +1197,8 @@ function drawSystem(
         obstacles.push({
           x0: ex - HEAD_RX - 1,
           x1: ex + HEAD_RX + 1,
-          y0: Math.min(up ? ey - reach : ey - HEAD_RY, !up && mark ? ey - mark : ey - HEAD_RY),
-          y1: Math.max(up ? ey + HEAD_RY : ey + reach, up && mark ? ey + mark : ey + HEAD_RY),
+          y0: Math.min(up ? ey - reach : ey - HEAD_HALF_H, !up && mark ? ey - mark : ey - HEAD_HALF_H),
+          y1: Math.max(up ? ey + HEAD_HALF_H : ey + reach, up && mark ? ey + mark : ey + HEAD_HALF_H),
         });
       }
       const curveX = (t) => {
@@ -1241,8 +1280,14 @@ function drawSystem(
         `<path class="score-slur" d="M${f(x1)} ${f(startY)} ` +
           `C${f(x1 + (x2 - x1) * grip)} ${f(bulge)} ` +
           `${f(x2 - (x2 - x1) * grip)} ${f(bulge)} ` +
-          `${f(x2)} ${f(stopY)}" ` +
-          `fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>`,
+          `${f(x2)} ${f(stopY)} ` +
+          // …and back along a flatter curve, so the slur is a sliver: fine at the
+          // tips and full in the middle, the way a printed one is, where a single
+          // stroke of even weight looked like a bent wire.
+          `C${f(x2 - (x2 - x1) * grip)} ${f(bulge - dir * 2.5)} ` +
+          `${f(x1 + (x2 - x1) * grip)} ${f(bulge - dir * 2.5)} ` +
+          `${f(x1)} ${f(startY)} Z" ` +
+          `fill="${INK}" stroke="${INK}" stroke-width="0.6" stroke-linejoin="round"/>`,
       );
     }
   }
@@ -1370,8 +1415,10 @@ export function noteMarkSvg({ height = 100, colour = INK } = {}) {
     `<path d="${hook}" fill="${colour}"/>` +
     `<line x1="${stemX}" y1="0" x2="${stemX}" y2="${stemEnd}" stroke="${colour}" ` +
     `stroke-width="1.42" stroke-linecap="round"/>` +
-    `<ellipse cx="0" cy="0" rx="${HEAD_RX}" ry="${HEAD_RY}" fill="${colour}" ` +
-    `transform="rotate(${HEAD_ANGLE} 0 0)"/>` +
+    // The logo's own head: the display-weight oval the icons were drawn from,
+    // deliberately not the staff's fuller one.
+    `<ellipse cx="0" cy="0" rx="7.1" ry="4.55" fill="${colour}" ` +
+    `transform="rotate(-24 0 0)"/>` +
     `</svg>`
   );
 }

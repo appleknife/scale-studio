@@ -254,7 +254,7 @@ export function renderStaff(
     for (const l of ledgers) {
       const ly = STAFF_BOTTOM - (l - E4) * STEPS;
       part.push(
-        `<line x1="${x - 9}" y1="${ly}" x2="${x + 9}" y2="${ly}" stroke="#c3b49d" stroke-width="1.15"/>`,
+        `<line x1="${x - 10.5}" y1="${ly}" x2="${x + 10.5}" y2="${ly}" stroke="#c3b49d" stroke-width="1.15"/>`,
       );
     }
 
@@ -268,16 +268,26 @@ export function renderStaff(
     }
 
     // Stem
+    // The printed proportions, the same as the sight-reading page: a stem is an
+    // octave long (3.5 spaces) and stands at the edge of its head, starting where
+    // the leaning oval is widest. A note out on ledger lines has its stem carried
+    // back to the middle line, so the low G and the high notes stay tied to the
+    // staff instead of floating beside it. (It was 2.7 spaces for every note,
+    // set inside a head that did not fill its space.)
     const stemUp = idx < 34;
-    const stemX = stemUp ? x + 5.4 : x - 5.4;
-    const stemY2 = stemUp ? y - 30 : y + 30;
+    const stemX = stemUp ? x + 6 : x - 6;
+    const stemY1 = stemUp ? y - 1 : y + 1;
+    const middle = STAFF_TOP + 2 * LINE_GAP;
+    const stemY2 = stemUp
+      ? Math.min(y - 3.5 * LINE_GAP, middle)
+      : Math.max(y + 3.5 * LINE_GAP, middle);
     part.push(
-      `<line x1="${stemX}" y1="${y}" x2="${stemX}" y2="${stemY2}" stroke="${color}" stroke-width="1.4" stroke-linecap="round"/>`,
+      `<line x1="${stemX}" y1="${stemY1}" x2="${stemX}" y2="${stemY2}" stroke="${color}" stroke-width="1.42" stroke-linecap="round"/>`,
     );
 
     // Note head
     part.push(
-      `<ellipse class="staff-head" data-i="${i}" data-stem="${stemUp ? 'up' : 'down'}" cx="${x}" cy="${y}" rx="5.7" ry="4.2" fill="${color}" transform="rotate(-18 ${x} ${y})"/>`,
+      `<ellipse class="staff-head" data-i="${i}" data-stem="${stemUp ? 'up' : 'down'}" cx="${x}" cy="${y}" rx="6.9" ry="5.1" fill="${color}" transform="rotate(-20 ${x} ${y})"/>`,
     );
 
     if (labels) {
