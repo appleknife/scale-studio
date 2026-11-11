@@ -410,6 +410,71 @@
         if (Math.abs(foldOctave(196) - 196) > 0.5) problems.push('a correct G was folded when it should not be');
         if (Math.abs(foldOctave(440) - 440) > 0.5) problems.push('the A string was folded when it should not be');
       }
+      {
+        // ---- The detector in a noisy room, and at the top of the fingerboard ----
+        //
+        // Two ways it used to hand back the wrong octave with full confidence.
+        // With noise in the room the dip at the true period sits just over the
+        // threshold while the one at twice the period slips under it, so the note
+        // came back an octave (or a twelfth) low — a quarter of all frames at a
+        // signal-to-noise of 12 dB, two thirds at 9. And above its 1800 Hz ceiling
+        // it did not go quiet: it reported the octave below.
+        const rate = 48000;
+        const size = 2048;
+        const detector = new PitchDetector({ sampleRate: rate, bufferSize: size, minFreq: 150, maxFreq: 2800 });
+        const partials = [1, 0.6, 0.45, 0.3, 0.2, 0.12, 0.08, 0.05];
+        // a small repeatable generator, so a failure can be run again
+        let seed = 12345;
+        const rand = () => {
+          seed = (seed * 1664525 + 1013904223) >>> 0;
+          return seed / 4294967296;
+        };
+        const bowed = (hz, noise) => {
+          const x = new Float32Array(size);
+          const phase = rand() * 6.28;
+          for (let i = 0; i < size; i++) {
+            let v = 0;
+            for (let k = 0; k < partials.length; k++) {
+              if (hz * (k + 1) < rate / 2) v += partials[k] * Math.sin((k + 1) * (phase + (2 * Math.PI * hz * i) / rate) + k * 1.3);
+            }
+            x[i] = 0.05 * v + noise * (rand() * 2 - 1) * 1.7;
+          }
+          return x;
+        };
+        for (const [noise, label, allowed] of [
+          [0.02, 'a noisy room', 0.04],
+          [0.03, 'a very noisy room', 0.04],
+        ]) {
+          let wrongOctave = 0;
+          let total = 0;
+          for (let midi = 55; midi <= 93; midi++) {
+            const hz = 440 * 2 ** ((midi - 69) / 12);
+            for (let r = 0; r < 20; r++) {
+              const got = detector.detect(bowed(hz, noise));
+              total += 1;
+              if (got.freq && Math.abs(1200 * Math.log2(got.freq / hz)) > 300) wrongOctave += 1;
+            }
+          }
+          log.push(`${label}: ${wrongOctave} of ${total} frames read in the wrong octave`);
+          if (wrongOctave / total > allowed) problems.push(`${label}: ${wrongOctave} of ${total} frames read in the wrong octave`);
+        }
+        for (const midi of [94, 96, 98, 100]) {
+          const hz = 440 * 2 ** ((midi - 69) / 12);
+          const got = detector.detect(bowed(hz, 0.002));
+          const off = got.freq ? 1200 * Math.log2(got.freq / hz) : NaN;
+          log.push(`${hz.toFixed(0)} Hz reads ${got.freq.toFixed(0)} Hz (${Number.isFinite(off) ? off.toFixed(1) : '—'} cents)`);
+          if (!(Math.abs(off) < 10)) problems.push(`${hz.toFixed(0)} Hz was read as ${got.freq.toFixed(0)} Hz`);
+        }
+        // and noise alone must still be nothing
+        let phantom = 0;
+        for (let r = 0; r < 300; r++) {
+          const x = new Float32Array(size);
+          for (let i = 0; i < size; i++) x[i] = 0.05 * (rand() * 2 - 1);
+          const got = detector.detect(x);
+          if (got.freq && got.clarity >= 0.5) phantom += 1;
+        }
+        if (phantom) problems.push(`${phantom} of 300 frames of plain noise were read as a note`);
+      }
       const payload = {
         problems,
         log: log.join('\n'),

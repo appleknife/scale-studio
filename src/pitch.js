@@ -105,7 +105,43 @@ export class PitchDetector {
         }
       }
       if (bestTau < 0 || best > 0.45) return { freq: 0, clarity: 0, rms };
+      // A periodic signal dips at its period and again at every multiple of it,
+      // and in a noisy room — the only time this fallback runs — those dips are
+      // all about as deep as each other. Taking the single deepest one picked a
+      // multiple as often as not, which is the note reported an octave (or a
+      // twelfth) too low. The period is the *first* of them: the earliest dip
+      // that is nearly as deep as the deepest.
+      const nearlyAsDeep = best + 0.1 * (1 - best) + 0.02;
+      for (let tau = minLag + 1; tau < bestTau; tau++) {
+        if (cmnd[tau] <= nearlyAsDeep && cmnd[tau] <= cmnd[tau - 1] && cmnd[tau] <= cmnd[tau + 1]) {
+          bestTau = tau;
+          break;
+        }
+      }
       tauEst = bestTau;
+    }
+
+    // Whichever way the dip was found, it may be a multiple of the period rather
+    // than the period. With some noise in the room the dip at the true period
+    // can sit a hair above the threshold while the one at twice or three times
+    // it slips under — and the scan above then reports the note an octave or a
+    // twelfth low, with full confidence. So look back at a half, a third, a
+    // quarter and a fifth of the lag (shortest first): a dip there that is all
+    // but as deep is the real period. On a clean note this never fires, because
+    // a dip that deep would already have been the first one under the threshold.
+    {
+      const chosen = cmnd[tauEst];
+      const allow = chosen + 0.1 * (1 - chosen) + 0.02;
+      for (let k = 5; k >= 2; k--) {
+        const centre = Math.round(tauEst / k);
+        if (centre - 2 < minLag) continue;
+        let at = centre - 2;
+        for (let tau = centre - 1; tau <= centre + 2; tau++) if (cmnd[tau] < cmnd[at]) at = tau;
+        if (cmnd[at] <= allow && cmnd[at] <= cmnd[at - 1] && cmnd[at] <= cmnd[at + 1]) {
+          tauEst = at;
+          break;
+        }
+      }
     }
 
     // Parabolic interpolation around the dip for sub-sample accuracy.
@@ -121,9 +157,6 @@ export class PitchDetector {
       return { freq: 0, clarity: 0, rms };
     }
 
-    // Guard against the most common failure: reporting the octave above.
-    // If half the period correlates almost as well and the second harmonic is
-    // weak, prefer the lower octave.
     const clarity = Math.max(0, Math.min(1, 1 - y1));
     return { freq, clarity, rms };
   }
