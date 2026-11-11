@@ -6,6 +6,11 @@
 
 const SAMPLES_KEY = 'scaleStudio.samplesOffline';
 const SAMPLE_BASE = 'samples/';
+// What the flag holds once a download has finished. It was 'yes' while the
+// service worker fetched the takes without keeping them, so a 'yes' from then
+// describes a cache that is empty: it no longer counts, and those devices are
+// offered the download again.
+const STORED = 'kept-1';
 
 let registration = null;
 let onUpdate = null;
@@ -55,7 +60,7 @@ export function applyUpdate() {
  */
 export function samplesStored() {
   try {
-    return localStorage.getItem(SAMPLES_KEY) === 'yes';
+    return localStorage.getItem(SAMPLES_KEY) === STORED;
   } catch {
     return false;
   }
@@ -89,7 +94,7 @@ export async function downloadSamples(onProgress) {
 
   const complete = missing === 0;
   try {
-    if (complete) localStorage.setItem(SAMPLES_KEY, 'yes');
+    if (complete) localStorage.setItem(SAMPLES_KEY, STORED);
     else localStorage.removeItem(SAMPLES_KEY);
   } catch {
     /* private mode — the download still worked for this visit */

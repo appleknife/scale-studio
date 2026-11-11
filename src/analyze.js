@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611091930';
-import { getLang, t } from './i18n.js?v=202611091930';
+import { median } from './pitch.js?v=202611102301';
+import { getLang, t } from './i18n.js?v=202611102301';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -47,7 +47,10 @@ const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
 export function listenNotes(results = [], ratios = []) {
   const tuned = results.filter((r) => r.status === 'exact' && Number.isFinite(r.cents));
 
-  // A systematic error by pitch class: the same finger, the same habit.
+  // A systematic error on one written note: the same finger, the same habit.
+  // Grouped by the note itself, not its pitch class — D4 and D5 are different
+  // fingers on different strings, and averaging them blamed "the D4" for a D5
+  // that was sharp, and counted every D on the page as one of "them".
   const byClass = new Map();
   for (const r of tuned) {
     // Two analysers, two shapes: a scale take carries the written note on the
@@ -56,7 +59,7 @@ export function listenNotes(results = [], ratios = []) {
     const midi = note && note.midi != null ? note.midi : r.event && r.event.midi;
     if (midi == null) continue;
     const pc = ((midi % 12) + 12) % 12;
-    const cell = byClass.get(pc) || {
+    const cell = byClass.get(midi) || {
       pc,
       midi,
       sum: 0,
@@ -67,7 +70,7 @@ export function listenNotes(results = [], ratios = []) {
     };
     cell.sum += r.cents;
     cell.n += 1;
-    byClass.set(pc, cell);
+    byClass.set(midi, cell);
   }
   const bias = [...byClass.values()]
     .filter((c) => c.n >= 2)
@@ -91,7 +94,7 @@ export function listenNotes(results = [], ratios = []) {
 
   return {
     mean,
-    // Only one pitch class is ever named: a list of five would be a diagnosis,
+    // Only one note is ever named: a list of five would be a diagnosis,
     // and this is a suggestion.
     bias: bias.length && Math.abs(bias[0].cents) >= 15 ? bias[0] : null,
     drift,
@@ -611,6 +614,34 @@ export function buildTips(result) {
         text: t('tip.notes.text'),
       },
       (1 - components.accuracy) * 0.5,
+    );
+  }
+
+  // A different note where the page asks for another — nearly always the key
+  // signature (F natural in G major) or a finger a half step out. It used to earn
+  // no tip at all, so a scale with four wrong notes and nothing else amiss was
+  // told there was "nothing to fix". Not said when the whole take is in the wrong
+  // octave: that has its own tip, and these would be the same news twice.
+  const wrongNotes = notes.filter((n) => n.status === 'wrong');
+  if (wrongNotes.length && !stats.octaveShift) {
+    const names = [...new Set(wrongNotes.map((n) => n.note.name))];
+    push(
+      {
+        kind: 'notes',
+        title:
+          wrongNotes.length === 1
+            ? t('tip.wrong.titleOne')
+            : t('tip.wrong.title', { n: wrongNotes.length }),
+        text: t('tip.wrong.text', {
+          list:
+            names.length > 4
+              ? names.slice(0, 4).join(getLang() === 'zh' ? '、' : ', ')
+              : noteList(names),
+          more: names.length > 4 ? t('tip.wrong.more') : '',
+        }),
+      },
+      // Ahead of intonation and rhythm: the right pitch comes before a centred one.
+      0.3 + Math.min(0.2, wrongNotes.length * 0.02),
     );
   }
 

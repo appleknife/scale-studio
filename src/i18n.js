@@ -902,6 +902,13 @@ export const S = {
     'Either a note was skipped, or it was too quiet for the microphone. Play the scale again at a confident dynamic — a clear, even bow helps the app hear every note.',
     '可能是漏了一个音，也可能是太轻了麦克风没收到。用更有把握的音量再拉一遍——清楚、均匀的弓能帮它听到每个音。',
   ],
+  'tip.wrong.titleOne': ['1 note was a different note', '有 1 个音拉成了别的音'],
+  'tip.wrong.title': ['{n} notes were different notes', '有 {n} 个音拉成了别的音'],
+  'tip.wrong.text': [
+    'Look at {list}{more} — a different pitch came out there. Check the key signature first: a sharp or flat left out is the usual reason. Then play just those notes slowly, with the note before each one.',
+    '看看 {list}{more}——这里拉出来的是另一个音高。先对一下调号：最常见的原因是漏了升号或降号。然后把这几个音连同它前面的一个音，慢慢单独练。',
+  ],
+  'tip.wrong.more': [' and others', ' 等'],
   'tip.range.titleHigh': ['You started an octave above the written range', '起音比谱面高了一个八度'],
   'tip.range.titleLow': ['You started an octave below the written range', '起音比谱面低了一个八度'],
   'tip.range.text': [
