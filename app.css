@@ -45,7 +45,7 @@
   --shadow-lg: 0 30px 70px -40px rgba(0, 0, 0, 0.8);
 }
 
-:root[data-theme='dark'] /* The same policy, stated by every element. Safari on iPad does not reliably
+/* The same policy, stated by every element. Safari on iPad does not reliably
    carry the root's `touch-action` down to the element it is asked about, which is
    why some screens still zoomed on a double tap while others did not.
    `manipulation` leaves scrolling and pinching alone and takes only the double-tap
@@ -55,7 +55,7 @@
   touch-action: manipulation;
 }
 
-body {
+:root[data-theme='dark'] body {
   background-image:
     radial-gradient(1100px 520px at 12% -12%, #26221d 0%, rgba(38, 34, 29, 0) 62%),
     radial-gradient(900px 480px at 92% 4%, #201d19 0%, rgba(32, 29, 25, 0) 60%);

@@ -25,7 +25,13 @@
 // stamps exist to avoid.
 const VERSION = '202611091930';
 const SHELL = 'scale-studio-shell-' + VERSION;
-const SAMPLES = 'scale-studio-samples-' + VERSION;
+// The recordings and the score renderer do not change from one publish to the
+// next, so their cache is not named after VERSION: a new version used to throw
+// away 2 MB the device had been asked to keep, while the page went on saying it
+// was stored. Bump SAMPLES_REV by hand when a take is re-recorded or the file in
+// vendor/ is replaced.
+const SAMPLES_REV = '1';
+const SAMPLES = 'scale-studio-samples-r' + SAMPLES_REV;
 
 const BASE = [
   'index.html',
@@ -63,9 +69,26 @@ const BASE = [
   'src/tuner.js',
 ];
 
-/** The modules are requested with a ?v= stamp; the cache holds them by name. */
-const fresh = (cache, request) =>
-  cache.match(request, { ignoreSearch: true }).then((hit) => hit || fetch(request));
+/**
+ * Cache first, and what had to be fetched is kept. The keeping is the point:
+ * without it "make this available offline" downloaded every take and stored
+ * none of them.
+ */
+const fresh = async (cache, request) => {
+  const hit = await cache.match(request, { ignoreSearch: true });
+  if (hit) return hit;
+  const response = await fetch(request);
+  // Only whole, good answers: a 206 (a media element asking for a byte range)
+  // cannot be stored, and a 404 should not be.
+  if (response && response.status === 200) {
+    try {
+      await cache.put(request, response.clone());
+    } catch {
+      /* storage full or refused — the answer is still good for this visit */
+    }
+  }
+  return response;
+};
 
 self.addEventListener('install', (event) => {
   // No skipWaiting: a new version waits, and the page offers a reload. Taking
@@ -78,10 +101,12 @@ self.addEventListener('install', (event) => {
       // last one used to be installed with the *previous* version's code inside
       // it — a new page with nothing behind its new buttons, until the next
       // update came along.
-      .then((cache) => cache.addAll(BASE.map((path) => new Request(path, { cache: 'reload' }))))
-      .catch(() => {
-        /* a shell file failed to fetch — leave the old cache alone */
-      }),
+      // No catch: if a shell file fails to fetch, the install must fail. A
+      // swallowed error let this worker install with an empty cache and then,
+      // on activation, delete the previous version's — the device lost its
+      // offline copy because of one dropped request. A failed install leaves the
+      // old worker and its cache in charge, and the browser tries again later.
+      .then((cache) => cache.addAll(BASE.map((path) => new Request(path, { cache: 'reload' })))),
   );
 });
 
