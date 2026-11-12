@@ -4138,6 +4138,128 @@ select,
   color: #3f7a5f;
 }
 
+/*
+ * "When will I hear you next?" — a question with four answers, in the same quiet
+ * voice as the wish above it. Once answered it folds down to one line.
+ */
+.pet-plan {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 14px;
+  font: 500 14px/1.4 var(--sans);
+  color: var(--muted);
+  text-align: center;
+}
+
+.pet-plan .chip-row {
+  justify-content: center;
+  margin: 0;
+}
+
+.pet-plan.is-set {
+  display: block;
+  color: var(--ink-soft);
+}
+
+.pet-plan.is-set .link-btn {
+  margin-left: 6px;
+}
+
+/* Something new in the book: a dot on its tab until the book is opened. */
+.pet-tab {
+  position: relative;
+}
+
+.pet-tab-dot {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* The memory book: the twelve keys as places to fill, then the firsts by date. */
+.mem-keys-head {
+  margin-top: 4px;
+}
+
+.mem-keys {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px 0 14px;
+}
+
+.mem-key {
+  min-width: 38px;
+  padding: 6px 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  font: 600 14px var(--serif);
+  color: var(--muted);
+  opacity: 0.75;
+  text-align: center;
+}
+
+.mem-key.is-heard {
+  border: 1px solid #f2dfc2;
+  background: #fff7ea;
+  color: #8b6422;
+}
+
+.mem-list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 460px;
+  text-align: left;
+}
+
+.mem-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 4px;
+  border-top: 1px solid var(--line);
+  font: 500 14.5px/1.35 var(--sans);
+  color: var(--ink);
+}
+
+.mem-row:first-child {
+  border-top: 0;
+}
+
+.mem-day {
+  flex: 0 0 58px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.mem-text {
+  flex: 1;
+}
+
+.mem-new {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+:root[data-theme='dark'] .mem-key.is-heard {
+  border-color: #6b5a3a;
+  background: #3a3226;
+  color: #f0d9a8;
+}
+
 /* How far short a snack or a decoration is, so the next step is visible. */
 .tray-need {
   display: block;
@@ -5016,9 +5138,11 @@ select,
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  /* Four tabs now: two rows of two on a phone, each with room for its word. */
   .pet-tab {
     min-width: 0;
-    flex: 1;
+    flex: 1 1 40%;
+    padding: 11px 12px;
   }
 
   .pet-bubble {

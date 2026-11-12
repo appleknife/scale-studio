@@ -290,6 +290,85 @@
         eq('a broken store is a fresh room', P.loadPet('carol', storage).notes, 0);
       }
 
+      // The memory book and the plan (v3)
+      {
+        const p = P.emptyPet();
+        P.chooseEgg(p, 'cat');
+        const first = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-10', octaves: 2 });
+        eq('the first take writes three memories: the take, the key, two octaves', first.memories, ['take', 'key:G', 'twoOctaves']);
+        const again = P.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-10', octaves: 2 });
+        eq('the same thing again is not a first', again.memories, []);
+        P.earn(p, { kind: 'scale', id: 'demo123', dayKey: '2026-11-10' });
+        eq('a pretend take is not a key', P.bookSummary(p).keys, ['G']);
+        P.hatch(p, new Date(2026, 10, 10, 18).getTime(), 0.9);
+        P.name(p, 'Mochi');
+        if (!p.book.entries.some((e) => e.kind === 'hatched' && e.species === 'cat')) problems.push('hatching was not written in the book');
+        eq('three takes on one day are one day', [P.bookSummary(p).days, P.bookSummary(p).takes], [1, 3]);
+
+        // days are counted, never chained: a gap changes nothing
+        P.earn(p, { kind: 'scale', id: 'Em', dayKey: '2026-11-11' });
+        const afterGap = P.earn(p, { kind: 'sight', dayKey: '2026-11-20' });
+        eq('the third day of practice is marked, however far apart the days were', afterGap.memories.includes('days:3'), true);
+        eq('…and a first sight reading with it', afterGap.memories.includes('sight'), true);
+        eq('a minor key is counted as a minor', [P.bookSummary(p).majors, P.bookSummary(p).minors], [1, 1]);
+        const byHand = P.earn(p, { kind: 'practice', dayKey: '2026-11-21' });
+        eq('a day logged by hand is a day of practice', P.bookSummary(p).days, 4);
+        eq('…but not a take', P.bookSummary(p).takes, 5);
+        eq('…and earns what it always did', byHand.amount, P.EARN.practice);
+
+        // every major, once: the twelve keys
+        for (const k of P.WISH_KEYS) P.earn(p, { kind: 'scale', id: k, dayKey: '2026-11-22' });
+        if (!p.book.firsts.allMajors) problems.push('twelve majors were played and the book did not say so');
+        if (!p.book.firsts['takes:10']) problems.push('ten takes went unmarked');
+
+        // nothing in the book changes what is earned
+        const a = P.emptyPet();
+        eq('the book pays nothing', P.earn(a, { kind: 'scale', id: 'D', dayKey: '2026-11-10' }).amount, 12);
+
+        // reading the book
+        if (!P.bookSummary(p).unseen) problems.push('new memories were not marked as new');
+        P.bookSeen(p);
+        eq('opening the book reads it', P.bookSummary(p).unseen, 0);
+
+        // the plan
+        const q = P.emptyPet();
+        P.chooseEgg(q, 'dog');
+        for (let i = 0; i < 3; i++) P.earn(q, { kind: 'scale', id: 'G', dayKey: '2026-11-10' });
+        P.hatch(q, Date.now(), 0.9);
+        P.name(q, 'Rex');
+        eq('a plan has to name one of the moments', P.makePlan(q, 'whenever', '2026-11-10'), false);
+        eq('a plan is made', P.makePlan(q, 'afterDinner', '2026-11-10'), true);
+        const sameDay = P.earn(q, { kind: 'scale', id: 'D', dayKey: '2026-11-10' });
+        eq('more practice the same day does not use the plan up', [sameDay.kept, q.plan && q.plan.cue], [null, 'afterDinner']);
+        const before = q.notes;
+        const later = P.earn(q, { kind: 'scale', id: 'D', dayKey: '2026-11-13' });
+        eq('practice on a later day keeps it — three days on is as good as one', later.kept, 'afterDinner');
+        eq('keeping a plan pays nothing extra', q.notes - before, later.amount);
+        eq('…and what it would have earned anyway is unchanged', later.amount, 3 + 4 + 5);
+        eq('the kept plan is handed to the room once', [P.takeKept(q) && 'afterDinner', P.takeKept(q)], ['afterDinner', null]);
+        eq('and then there is no plan, so it can be asked again', q.plan, null);
+
+        // a save from before the book
+        const store = { m: {}, getItem(k) { return this.m[k] || null; }, setItem(k, v) { this.m[k] = v; } };
+        const old = P.emptyPet();
+        delete old.book;
+        delete old.plan;
+        delete old.kept;
+        old.v = 2;
+        old.totalEarned = 80;
+        old.pet = { species: 'dog', name: 'Rex', born: new Date(2026, 9, 20, 10).getTime(), fullness: 50, fedAt: 0, snacks: 0, growth: 20, seen: 'kid', variant: 'plain' };
+        store.setItem(P.storageKey('old'), JSON.stringify(old));
+        const up = P.loadPet('old', store);
+        eq('an older save gets a book, with its pet\u2019s hatching in it', up.book.entries.map((e) => e.kind), ['hatched']);
+        eq('…and nothing in it is announced as new', up.book.unseen, 0);
+        const next = P.earn(up, { kind: 'scale', id: 'A', dayKey: '2026-11-12' });
+        eq('a student who was already practising is not told this is their first take', next.memories, ['key:A']);
+        P.savePet('old', up, store);
+        eq('the book survives a save and a load', P.loadPet('old', store).book.keys, ['A']);
+        log.push(`memory book: ${p.book.entries.length} memories after ${P.bookSummary(p).takes} takes on ${P.bookSummary(p).days} days`);
+      }
+
+
       document.getElementById('report').textContent = problems.length
         ? `PET FAILED\n${problems.join('\n')}\n\n${log.join('\n')}`
         : `PET OK\n${log.join('\n')}`;

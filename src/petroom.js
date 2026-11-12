@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611111105';
+import * as Pet from './pet.js?v=202611120215';
 import {
   petMarkup,
   eggMarkup,
@@ -29,8 +29,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611111105';
-import { t } from './i18n.js?v=202611111105';
+} from './petart.js?v=202611120215';
+import { t, getLang } from './i18n.js?v=202611120215';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -650,14 +650,24 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       p.innerHTML = `
         ${growthRow()}
         ${wishRow()}
+        ${planRow()}
         <div class="pet-tabs" role="tablist">
           <button class="pet-tab" type="button" role="tab" data-tray="feed" aria-selected="${tray === 'feed'}">${t('pet.feed')}</button>
           <button class="pet-tab" type="button" role="tab" data-tray="decorate" aria-selected="${tray === 'decorate'}">${t('pet.decorate')}</button>
           <button class="pet-tab" type="button" role="tab" data-tray="pets" aria-selected="${tray === 'pets'}">${t('pet.tab.pets')}</button>
+          <button class="pet-tab" type="button" role="tab" data-tray="book" aria-selected="${tray === 'book'}">${t('pet.tab.book')}${
+            Pet.bookSummary(pet).unseen && tray !== 'book' ? `<span class="pet-tab-dot" aria-label="${t('pet.book.new')}"></span>` : ''
+          }</button>
         </div>
         ${tray === 'feed' ? feedTray() : ''}
         ${tray === 'decorate' ? decorTray() : ''}
-        ${tray === 'pets' ? petsTray() : ''}`;
+        ${tray === 'pets' ? petsTray() : ''}
+        ${tray === 'book' ? bookTray() : ''}`;
+      // Opening the book is reading it: what was new is marked this once.
+      if (tray === 'book' && Pet.bookSummary(pet).unseen) {
+        Pet.bookSeen(pet);
+        save();
+      }
     }
     els.foot.innerHTML = `${t('pet.foot')}${
       demo ? ` <button class="link-btn" type="button" data-act="demo">${t('pet.demo')}</button>` : ''
@@ -673,6 +683,109 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     return `<p class="pet-keywish${w.done ? ' is-done' : ''}">${
       w.done ? t('pet.keywish.done', { key, name }) : t('pet.keywish.ask', { key, name })
     }</p>`;
+  }
+
+  /**
+   * "When will I hear you next?" — asked, answered by the student, and then
+   * simply remembered. Four moments that come round every day, because a plan
+   * hung on something that already happens ("after dinner") is the kind that
+   * gets kept; a time on a clock is the kind that gets missed.
+   */
+  function planRow() {
+    if (!pet.pet || !pet.pet.name) return '';
+    const name = esc(pet.pet.name);
+    if (pet.plan) {
+      return `<p class="pet-plan is-set">${t('pet.plan.set', { when: t(`pet.plan.when.${pet.plan.cue}`), name })}
+        <button class="link-btn" type="button" data-act="replan">${t('pet.plan.change')}</button></p>`;
+    }
+    return `<div class="pet-plan">
+        <span class="pet-plan-ask">${t('pet.plan.ask', { name })}</span>
+        <span class="chip-row">${Pet.PLAN_CUES.map(
+          (cue) => `<button class="chip" type="button" data-plan="${cue}">${t(`pet.plan.cue.${cue}`)}</button>`,
+        ).join('')}</span>
+      </div>`;
+  }
+
+  /** A key id as the book writes it: 'E♭ major', 'F♯ minor'. */
+  function keyTitle(id) {
+    const minor = /m$/.test(id);
+    return t(minor ? 'pet.mem.minor' : 'pet.mem.major', { key: keyName(minor ? id.slice(0, -1) : id) });
+  }
+
+  /** One memory, in words. */
+  function memoryText(entry) {
+    switch (entry.kind) {
+      case 'take':
+        return t('pet.mem.take');
+      case 'hatched':
+        return t('pet.mem.hatched', { kind: t(`pet.kind.${entry.species}`) });
+      case 'key':
+        return t('pet.mem.key', { key: keyTitle(entry.key) });
+      case 'allMajors':
+        return t('pet.mem.allMajors');
+      case 'twoOctaves':
+        return t('pet.mem.twoOctaves');
+      case 'sight':
+        return t('pet.mem.sight');
+      case 'sprint':
+        return t('pet.mem.sprint');
+      case 'takes':
+        return t('pet.mem.takes', { n: entry.n });
+      case 'days':
+        return t('pet.mem.days', { n: entry.n });
+      case 'grew':
+        return t(entry.stage === 'grown' ? 'pet.mem.grew.grown' : 'pet.mem.grew.kid', {
+          name: esc(entry.name || pet.pet?.name || ''),
+        });
+      default:
+        return '';
+    }
+  }
+
+  /** '2026-11-12' as a short date in the page's language. */
+  function dayLabel(day) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day || '');
+    if (!m) return '';
+    const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    try {
+      return date.toLocaleDateString(getLang() === 'zh' ? 'zh-CN' : 'en-US', { month: 'short', day: 'numeric' });
+    } catch {
+      return day;
+    }
+  }
+
+  /**
+   * The memory book: how much practice there has been, which keys the pet has
+   * heard, and every first, newest at the top. Nothing in it is a score, and the
+   * keys not yet heard are drawn as empty places rather than as anything missed.
+   */
+  function bookTray() {
+    const sum = Pet.bookSummary(pet);
+    const name = esc(pet.pet.name);
+    const entries = (pet.book?.entries || []).slice();
+    const fresh = sum.unseen;
+    const keys = Pet.WISH_KEYS.map(
+      (id) => `<span class="mem-key${sum.keys.includes(id) ? ' is-heard' : ''}">${keyName(id)}</span>`,
+    ).join('');
+    const minors = sum.minors ? ` ${t(sum.minors === 1 ? 'pet.book.minor1' : 'pet.book.minors', { n: sum.minors })}` : '';
+    const list = entries
+      .map((entry, i) => ({ entry, isNew: i >= entries.length - fresh }))
+      .reverse()
+      .slice(0, 40)
+      .map(({ entry, isNew }) => {
+        const text = memoryText(entry);
+        if (!text) return '';
+        return `<li class="mem-row${isNew ? ' is-new' : ''}"><span class="mem-day">${esc(dayLabel(entry.day))}</span>
+          <span class="mem-text">${text}</span>${isNew ? `<span class="mem-new">${t('pet.book.new')}</span>` : ''}</li>`;
+      })
+      .join('');
+    return `<p class="pet-sub">${t(sum.days === 1 ? 'pet.book.day1' : 'pet.book.days', { n: sum.days })} · ${t(
+      sum.takes === 1 ? 'pet.book.take1' : 'pet.book.takes',
+      { n: sum.takes },
+    )}</p>
+      <p class="pet-sub mem-keys-head">${t('pet.book.keys', { name, n: sum.majors })}${minors}</p>
+      <div class="mem-keys" aria-hidden="true">${keys}</div>
+      ${list ? `<ul class="mem-list">${list}</ul>` : `<p class="pet-note">${t('pet.book.empty')}</p>`}`;
   }
 
   /** 'F#' as a musician writes it. */
@@ -844,6 +957,17 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     } else if (b.dataset.act === 'unrename') {
       renaming = false;
       paintPanel();
+    } else if (b.dataset.plan) {
+      if (Pet.makePlan(pet, b.dataset.plan, localDayKey())) {
+        save();
+        paintPanel();
+        hearts(3);
+        say(t('pet.plan.thanks'), 2200);
+      }
+    } else if (b.dataset.act === 'replan') {
+      Pet.clearPlan(pet);
+      save();
+      paintPanel();
     } else if (b.dataset.friend != null) switchPet(Number(b.dataset.friend));
     else if (b.dataset.name) {
       const input = els.panel.querySelector('#petNameInput');
@@ -1002,9 +1126,22 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       blinkLoop();
       later(wander, 1800);
       const grew = Pet.unseenGrowth(pet);
+      // A plan that was kept is said once, and it outranks an ordinary welcome.
+      const kept = pet.pet.name ? Pet.takeKept(pet) : null;
+      if (kept) save();
       if (grew) {
         save();
         celebrateGrowth(grew);
+      } else if (kept) {
+        later(() => {
+          walkTo(isFish() ? 200 : 210, pos.y, () => {
+            setMode('happy');
+            hop();
+            hearts(5);
+            say(t('pet.plan.kept'), 3200);
+            later(() => setMode('idle'), 1800);
+          }, 110);
+        }, 500);
       } else if (longAway && pet.pet.name) {
         later(() => {
           walkTo(isFish() ? 200 : 210, pos.y, () => {
