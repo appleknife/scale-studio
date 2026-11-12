@@ -6601,3 +6601,336 @@ select,
 :root[data-theme='dark'] .listen-score-wrap {
   border-color: #3d3730;
 }
+
+/* ── Trill Trainer ─────────────────────────────────────────────────────── */
+
+.trill-howto,
+.trill-ask,
+.trill-best,
+.trill-doing {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+  margin: 6px 0;
+}
+
+.trill-group {
+  margin: 14px 0 0;
+}
+
+.trill-group .chip-row {
+  margin: 6px 0 0;
+}
+
+.trill-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trill-group .segmented {
+  margin-top: 6px;
+}
+
+/* The two notes, said plainly: which stays, which taps. */
+.trill-notes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin: 16px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.trill-note b {
+  font: 600 20px var(--serif);
+  color: var(--ink);
+  margin-right: 4px;
+}
+
+.trill-note.is-high b {
+  color: var(--gold);
+}
+
+.trill-arrow {
+  color: var(--muted);
+}
+
+/* The ladder: six rungs, the one being climbed lit, the ones done ticked. */
+.trill-ladder {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.trill-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.trill-step-n {
+  font: 600 22px var(--serif);
+  color: var(--ink);
+}
+
+.trill-step-label {
+  font-size: 11.5px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.trill-step-tick {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.trill-step.is-done {
+  border-color: #bcd3c6;
+}
+
+.trill-step.is-on {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.trill-opts {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.trill-tempo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.trill-tempo[hidden],
+.trill-opts .switch-row[hidden] {
+  display: none;
+}
+
+.trill-bpm {
+  min-width: 74px;
+  text-align: center;
+  font: 600 17px var(--serif);
+  color: var(--ink);
+}
+
+.trill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+
+.trill-tips {
+  margin: 18px 0 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.trill-tips summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.trill-tips ul {
+  margin: 10px 0 2px;
+  padding-left: 18px;
+}
+
+.trill-tips li + li {
+  margin-top: 6px;
+}
+
+.trill-error {
+  color: #a4412f;
+  font-size: 14px;
+}
+
+/* Playing: the picture, with the count-in's number over it. */
+.trill-stage {
+  position: relative;
+  margin: 10px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.trill-canvas {
+  display: block;
+  width: 100%;
+  height: min(46vh, 300px);
+}
+
+.trill-count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 600 92px var(--serif);
+  color: var(--accent);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.trill-count[hidden] {
+  display: none;
+}
+
+.trill-count.is-pop {
+  animation: trill-pop 0.35s ease-out;
+}
+
+@keyframes trill-pop {
+  from {
+    transform: scale(1.35);
+    opacity: 0.3;
+  }
+}
+
+.trill-status {
+  min-height: 1.5em;
+  margin: 8px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+}
+
+/* What was heard. */
+.trill-done {
+  margin: 8px 0 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.trill-done.is-pass {
+  border-color: #bcd3c6;
+  background: var(--accent-wash);
+}
+
+.trill-verdict {
+  margin: 0 0 6px;
+  font: 600 22px var(--serif);
+  color: var(--ink);
+}
+
+.trill-advice {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.trill-badge {
+  display: inline-block;
+  margin: 10px 8px 0 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.trill-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.trill-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.trill-tile-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.trill-tile b {
+  font: 600 24px var(--serif);
+  color: var(--ink);
+}
+
+.trill-tile.is-good b {
+  color: var(--accent);
+}
+
+.trill-tile.is-off b {
+  color: #b0562f;
+}
+
+.trill-tile-sub {
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .trill-ladder {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .trill-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trill-canvas {
+    height: min(40vh, 250px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trill-count.is-pop {
+    animation: none;
+  }
+}
