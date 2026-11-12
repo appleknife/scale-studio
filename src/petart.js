@@ -384,34 +384,104 @@ const WALLS = {
   },
 };
 
-function sky(hour) {
-  if (hour >= 7 && hour < 17) return { sky: '#bfe4f7', night: false, tint: '#e9f6fd' };
-  if (hour >= 17 && hour < 20) return { sky: '#f9c39a', night: false, tint: '#fde0c8' };
-  if (hour >= 5 && hour < 7) return { sky: '#f7d3c4', night: false, tint: '#fbe8de' };
-  return { sky: '#34407a', night: true, tint: '#4b5899' };
+/**
+ * The sky outside, by the clock on the wall of the student's own room.
+ *
+ * It used to have four settings and jump between them on the hour. This one
+ * moves: a handful of moments through the day, blended, so six in the evening
+ * is not the same sky as half past seven. `dark` runs from 0 (day) to 1 (night)
+ * and is what the stars, the hills and the room's own dimness follow.
+ */
+const SKY_KEYS = [
+  [0, '#1b2452', '#34407a', 1],
+  [4.75, '#1b2452', '#34407a', 1],
+  [6, '#8f9fd6', '#f7c9b0', 0.45],
+  [7.5, '#a9d8f5', '#e6f4fc', 0],
+  [12, '#8fd0f5', '#d6eefb', 0],
+  [16.5, '#a9d8f5', '#e9f5fb', 0],
+  [18.5, '#f2a36e', '#fbd3a6', 0.2],
+  [19.75, '#6f6aa8', '#f0a988', 0.6],
+  [21, '#1b2452', '#34407a', 1],
+  [24, '#1b2452', '#34407a', 1],
+];
+
+function mix(a, b, f) {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `#${pa.map((v, i) => Math.round(v + (pb[i] - v) * f).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** The sky at `time` (hours, fractions welcome): top and bottom colour, and how dark it is. */
+export function skyAt(time) {
+  // anything that is not a time is treated as the middle of the day
+  const h = Number.isFinite(Number(time)) ? ((Number(time) % 24) + 24) % 24 : 12;
+  let i = 0;
+  while (i < SKY_KEYS.length - 2 && h >= SKY_KEYS[i + 1][0]) i += 1;
+  const [h0, t0, b0, d0] = SKY_KEYS[i];
+  const [h1, t1, b1, d1] = SKY_KEYS[i + 1];
+  const f = h1 === h0 ? 0 : Math.min(1, Math.max(0, (h - h0) / (h1 - h0)));
+  return { top: mix(t0, t1, f), bottom: mix(b0, b1, f), dark: d0 + (d1 - d0) * f };
+}
+
+/** The time of day, as hours with a fraction. */
+export function clockNow(date = new Date()) {
+  return date.getHours() + date.getMinutes() / 60;
 }
 
 const ITEM_ART = {
-  window(hour) {
-    const s = sky(hour);
-    const extras = s.night
-      ? `<circle cx="116" cy="62" r="9" fill="#fff4c2"/><circle cx="120" cy="59" r="8" fill="${s.sky}"/>
-         <g fill="#fff">${[
-           [66, 58],
-           [88, 76],
-           [104, 92],
-           [74, 96],
-         ]
-           .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.4"/>`)
-           .join('')}</g>`
-      : `<g class="cloud" fill="#fff" opacity=".95"><ellipse cx="80" cy="70" rx="14" ry="7"/><ellipse cx="90" cy="65" rx="10" ry="7"/><ellipse cx="72" cy="66" rx="8" ry="6"/></g>
-         <g class="cloud cloud-2" fill="#fff" opacity=".8"><ellipse cx="112" cy="94" rx="10" ry="5"/><ellipse cx="118" cy="90" rx="7" ry="5"/></g>`;
+  window(time) {
+    const h = Number.isFinite(Number(time)) ? ((Number(time) % 24) + 24) % 24 : 12;
+    const s = skyAt(h);
+    const r = (n) => Math.round(n * 10) / 10;
+    // The sun crosses from the left of the pane at six to the right by half past
+    // seven in the evening; the moon takes the night shift along the same arc.
+    const arc = (f) => ({ x: 54 + 84 * (0.08 + 0.84 * f), y: 116 - Math.sin(Math.PI * f) * 58 });
+    const sunF = (h - 6) / 13.5;
+    const moonF = (((h - 19.5) % 24) + 24) % 24 / 10.5;
+    let lights = '';
+    if (sunF >= 0 && sunF <= 1) {
+      const at = arc(sunF);
+      // low in the sky it reddens
+      const low = 1 - Math.sin(Math.PI * sunF);
+      const core = mix('#ffe27a', '#ffa35c', Math.min(1, low * 1.2));
+      lights += `<circle cx="${r(at.x)}" cy="${r(at.y)}" r="15" fill="${core}" opacity=".28"/>
+        <circle cx="${r(at.x)}" cy="${r(at.y)}" r="9" fill="${core}"/>`;
+    }
+    if (moonF >= 0 && moonF <= 1) {
+      const at = arc(moonF);
+      lights += `<g transform="translate(${r(at.x)} ${r(at.y)})" opacity="${r(Math.min(1, s.dark * 1.6))}">
+          <circle r="13" fill="#fff4c2" opacity=".14"/>
+          <path d="M2 -8 A8 8 0 1 0 2 8 A6 8 0 1 1 2 -8 Z" fill="#fff4c2"/></g>`;
+    }
+    const stars =
+      s.dark > 0.25
+        ? `<g fill="#fff" opacity="${r(Math.min(1, (s.dark - 0.25) * 1.6))}">${[
+            [64, 56, 1.4],
+            [79, 70, 1],
+            [90, 52, 1.2],
+            [104, 88, 1.3],
+            [72, 94, 1],
+            [124, 60, 1.1],
+            [130, 84, 1.4],
+            [112, 72, 0.9],
+          ]
+            .map(([x, y, rad], i) => `<circle class="star" style="animation-delay:${(i * 0.7) % 3}s" cx="${x}" cy="${y}" r="${rad}"/>`)
+            .join('')}</g>`
+        : '';
+    const cloudy = 1 - s.dark * 0.85;
+    const cloudTint = mix('#ffffff', s.bottom, s.dark > 0.1 ? 0.35 : 0);
+    const clouds =
+      cloudy > 0.2
+        ? `<g class="cloud" fill="${cloudTint}" opacity="${r(0.95 * cloudy)}"><ellipse cx="80" cy="70" rx="14" ry="7"/><ellipse cx="90" cy="65" rx="10" ry="7"/><ellipse cx="72" cy="66" rx="8" ry="6"/></g>
+         <g class="cloud cloud-2" fill="${cloudTint}" opacity="${r(0.8 * cloudy)}"><ellipse cx="112" cy="94" rx="10" ry="5"/><ellipse cx="118" cy="90" rx="7" ry="5"/></g>`
+        : '';
     return `
       <g class="room-window">
-        <rect x="54" y="44" width="84" height="74" rx="8" fill="${s.sky}"/>
+        <linearGradient id="win-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.top}"/><stop offset="1" stop-color="${s.bottom}"/></linearGradient>
+        <rect x="54" y="44" width="84" height="74" rx="8" fill="url(#win-sky)"/>
         <clipPath id="win-clip"><rect x="54" y="44" width="84" height="74" rx="8"/></clipPath>
-        <g clip-path="url(#win-clip)">${extras}
-          <path d="M54 118 q20 -16 42 -6 q22 -14 42 0 v10 h-84 z" fill="${s.night ? '#2d5a4a' : '#9fd39a'}"/></g>
+        <g clip-path="url(#win-clip)">${stars}${lights}${clouds}
+          <path d="M54 118 q20 -16 42 -6 q22 -14 42 0 v10 h-84 z" fill="${mix('#9fd39a', '#2d5a4a', s.dark)}"/></g>
         <rect x="54" y="44" width="84" height="74" rx="8" fill="none" stroke="#fff" stroke-width="7"/>
         <path d="M96 44 v74 M54 81 h84" stroke="#fff" stroke-width="4"/>
         <rect x="48" y="117" width="96" height="7" rx="3.5" fill="#f0e2cc"/>
@@ -523,10 +593,17 @@ function fishbowl() {
  * The room, without the pet (the pet is added by the room controller so it can
  * move). `placed` is the list of decorations put out; `wall` the wallpaper.
  */
-export function roomMarkup({ placed = [], wall = null, fish = false, hour = new Date().getHours() } = {}) {
+export function roomMarkup({ placed = [], wall = null, fish = false, hour = clockNow(), where = {} } = {}) {
   const w = WALLS[wall] || WALLS.plain;
   const has = (id) => placed.includes(id);
-  const night = sky(hour).night;
+  const dark = skyAt(hour).dark;
+  // Each thing in the room sits in its own group, moved by however far the
+  // student has dragged it from where it was first put down.
+  const off = (id) => {
+    const at = where && where[id];
+    return `${Math.round((at && at.x) || 0)} ${Math.round((at && at.y) || 0)}`;
+  };
+  const item = (id, art) => `<g class="room-item" data-item="${id}" transform="translate(${off(id)})">${art}</g>`;
   return `
     <defs>
       ${w.pattern}
@@ -537,9 +614,9 @@ export function roomMarkup({ placed = [], wall = null, fish = false, hour = new 
     <rect class="room-wall" x="0" y="0" width="400" height="206" fill="${w.fill}"/>
     <radialGradient id="wall-light" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
     <rect x="0" y="0" width="400" height="206" fill="url(#wall-light)" pointer-events="none"/>
-    ${has('window') ? ITEM_ART.window(hour) : ''}
-    ${has('picture') ? ITEM_ART.picture() : ''}
     ${has('bunting') ? ITEM_ART.bunting() : ''}
+    ${has('window') ? item('window', ITEM_ART.window(hour)) : ''}
+    ${has('picture') ? item('picture', ITEM_ART.picture()) : ''}
     <rect x="0" y="200" width="400" height="100" fill="url(#floor-grad)"/>
     <g stroke="#d4a874" stroke-width="1.4" opacity=".7">
       <path d="M0 226 H400 M0 254 H400 M0 284 H400"/>
@@ -547,14 +624,21 @@ export function roomMarkup({ placed = [], wall = null, fish = false, hour = new 
     </g>
     <rect x="0" y="196" width="400" height="9" fill="#f6e7d2"/>
     <rect x="0" y="204" width="400" height="2" fill="#d9bc93"/>
-    ${has('rug') ? ITEM_ART.rug() : ''}
-    ${has('lamp') ? ITEM_ART.lamp() : ''}
-    ${has('plant') ? ITEM_ART.plant() : ''}
-    ${has('stand') ? ITEM_ART.stand() : ''}
-    ${has('bed') && !fish ? ITEM_ART.bed() : ''}
-    ${fish ? fishbowl() : ITEM_ART.bowl()}
-    ${night && has('lamp') ? '' : ''}
-    ${night ? '<rect class="room-night" x="0" y="0" width="400" height="300" fill="#1d2550" opacity=".12" pointer-events="none"/>' : ''}`;
+    ${has('rug') ? item('rug', ITEM_ART.rug()) : ''}
+    ${has('bed') && !fish ? item('bed', ITEM_ART.bed()) : ''}
+    ${has('stand') ? item('stand', ITEM_ART.stand()) : ''}
+    ${has('plant') ? item('plant', ITEM_ART.plant()) : ''}
+    ${has('lamp') ? item('lamp', ITEM_ART.lamp()) : ''}
+    ${fish ? fishbowl() : item('bowl', ITEM_ART.bowl())}
+    ${dark > 0.02 ? `<rect class="room-night" x="0" y="0" width="400" height="300" fill="#1d2550" opacity="${(dark * 0.2).toFixed(3)}" pointer-events="none"/>` : ''}
+    ${
+      // After dark the lamp is what lights the room: its pool of light is drawn
+      // over the dusk, so the corner it stands in stays warm.
+      dark > 0.3 && has('lamp')
+        ? `<g transform="translate(${off('lamp')})" pointer-events="none"><path class="lamp-glow is-lit" d="M344 156 L384 156 L414 268 L314 268 Z" fill="#ffe9a8" opacity="${(0.16 + dark * 0.2).toFixed(3)}"/>
+           <ellipse cx="364" cy="268" rx="52" ry="9" fill="#ffe9a8" opacity="${(dark * 0.22).toFixed(3)}"/></g>`
+        : ''
+    }`;
 }
 
 export function ballMarkup() {

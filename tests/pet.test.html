@@ -290,6 +290,28 @@
         eq('a broken store is a fresh room', P.loadPet('carol', storage).notes, 0);
       }
 
+      // Moving the furniture
+      {
+        const p = P.emptyPet();
+        eq('nothing has been moved to begin with', P.itemAt(p, 'lamp'), { x: 0, y: 0 });
+        eq('a lamp slides along the floor, and only along it', P.moveItem(p, 'lamp', -120.4, 55), { x: -120, y: 0 });
+        eq('…and stops at the wall', P.moveItem(p, 'lamp', -9999, 0).x, P.ITEM_RANGE.lamp.x[0]);
+        eq('the window goes up and down the wall as well', P.moveItem(p, 'window', 100, 40), { x: 100, y: 40 });
+        eq('…but not off it', P.moveItem(p, 'window', 100, 999).y, P.ITEM_RANGE.window.y[1]);
+        eq('something that is not furniture cannot be moved', P.moveItem(p, 'ceiling', 5, 5), null);
+        eq('where it was put is where it is', P.itemAt(p, 'window'), { x: 100, y: 64 });
+        const store = { m: {}, getItem(k) { return this.m[k] || null; }, setItem(k, v) { this.m[k] = v; } };
+        p.where.picture = { x: 5000, y: 'up' };
+        p.where.nonsense = { x: 1, y: 1 };
+        P.savePet('mover', p, store);
+        const back = P.loadPet('mover', store);
+        eq('a save is tidied on the way in: held to the room, and nothing unknown', back.where, {
+          lamp: { x: P.ITEM_RANGE.lamp.x[0], y: 0 },
+          window: { x: 100, y: 64 },
+          picture: { x: P.ITEM_RANGE.picture.x[1], y: 0 },
+        });
+      }
+
       // The memory book and the plan (v3)
       {
         const p = P.emptyPet();

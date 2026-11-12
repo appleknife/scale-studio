@@ -3891,6 +3891,75 @@ select,
   outline: none;
 }
 
+/*
+ * Things that can be moved: the furniture, and the pet. They take the drag for
+ * themselves (a finger on the lamp moves the lamp, not the page); the bare wall
+ * and floor between them still scroll.
+ */
+.room-item,
+.pet-hit {
+  touch-action: none;
+  cursor: grab;
+}
+
+/* The rug is most of the floor: a finger going up or down it is scrolling the
+   page, and only a sideways one is moving the rug. */
+.room-item[data-item='rug'] {
+  touch-action: pan-y;
+}
+
+.room-item.is-dragging,
+.pet-hit.is-held {
+  cursor: grabbing;
+}
+
+.room-item.is-dragging {
+  filter: drop-shadow(0 5px 5px rgba(60, 40, 20, 0.28));
+}
+
+/* In the hand it dangles: a slow swing from where it is held. */
+.pet-hit.is-held {
+  transform-box: fill-box;
+  transform-origin: 50% 20%;
+  animation: pet-dangle 0.9s ease-in-out infinite;
+}
+
+@keyframes pet-dangle {
+  0%,
+  100% {
+    transform: rotate(-7deg);
+  }
+  50% {
+    transform: rotate(7deg);
+  }
+}
+
+/* Stars come and go a little. */
+.room-window .star {
+  animation: star-twinkle 3s ease-in-out infinite;
+}
+
+@keyframes star-twinkle {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* The hint under the room, until it has been tried once. */
+.pet-tip {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-hit.is-held,
+  .room-window .star {
+    animation: none;
+  }
+}
+
 .pet-bubble {
   position: absolute;
   transform: translate(-50%, -100%);
