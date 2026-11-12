@@ -279,6 +279,7 @@ function recordTake(p, { kind, id, dayKey, octaves, grew }) {
   }
   if (kind === 'sight') add('sight', { kind: 'sight' });
   if (kind === 'sprint') add('sprint', { kind: 'sprint' });
+  if (kind === 'trill') add('trill', { kind: 'trill' });
   for (const mark of TAKE_MARKS) {
     if (book.takes === mark) add(`takes:${mark}`, { kind: 'takes', n: mark });
   }
@@ -395,7 +396,8 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } 
   const fresh =
     (kind === 'scale' && id && !day.keys.includes(id)) ||
     (kind === 'sight' && !day.sight) ||
-    (kind === 'sprint' && !day.sprint);
+    (kind === 'sprint' && !day.sprint) ||
+    (kind === 'trill' && !day.trill);
   // The new-key bonus stands apart from the cap, so it can be shown on its own.
   const bonus = fresh ? EARN.newKey : 0;
   // The wish: the key it asked for today, paid once — and paid even past the cap,
@@ -420,6 +422,7 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } 
   if (kind === 'scale' && id && !day.keys.includes(id)) day.keys.push(id);
   if (kind === 'sight') day.sight = true;
   if (kind === 'sprint') day.sprint = true;
+  if (kind === 'trill') day.trill = true;
   credit(pet, day, amount);
 
   let warmed = false;

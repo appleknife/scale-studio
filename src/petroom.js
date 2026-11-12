@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611120915';
+import * as Pet from './pet.js?v=202611121640';
 import {
   petMarkup,
   eggMarkup,
@@ -30,8 +30,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611120915';
-import { t, getLang } from './i18n.js?v=202611120915';
+} from './petart.js?v=202611121640';
+import { t, getLang } from './i18n.js?v=202611121640';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -926,6 +926,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         return t('pet.mem.sight');
       case 'sprint':
         return t('pet.mem.sprint');
+      case 'trill':
+        return t('pet.mem.trill');
       case 'takes':
         return t('pet.mem.takes', { n: entry.n });
       case 'days':

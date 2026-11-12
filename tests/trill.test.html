@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Trill trainer rules</title>
+    <style>
+      body {
+        font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif;
+        margin: 20px;
+        background: #faf7f1;
+        color: #221e19;
+      }
+      pre {
+        background: #fffdfa;
+        border: 1px solid #e8dfd1;
+        padding: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // The trill trainer's rules, against trills that are known in advance: a
+      // tone is synthesised going between two notes at a set pace, with a set
+      // share of the time on the upper one, and run through the same pitch
+      // detector and the same 30 ms frames the microphone gives the page.
+      import * as T from '../src/trill.js';
+      import { PitchDetector } from '../src/pitch.js';
+
+      const problems = [];
+      const log = [];
+      const eq = (what, got, want) => {
+        if (JSON.stringify(got) !== JSON.stringify(want)) problems.push(`${what}: got ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`);
+      };
+      const near = (what, got, want, slack) => {
+        if (!(Math.abs(got - want) <= slack)) problems.push(`${what}: got ${got}, wanted ${want} ± ${slack}`);
+      };
+
+      // a small repeatable generator, so a failure can be run again
+      let seed = 2026;
+      const rand = () => {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        return seed / 4294967296;
+      };
+
+      const RATE = 48000;
+      const SIZE = 2048;
+      const detector = new PitchDetector({ sampleRate: RATE, bufferSize: SIZE, minFreq: 150, maxFreq: 2800 });
+
+      /** Frames of a trill: `pace` cycles a second, `upper` the share of each cycle on the top note. */
+      function trill(notes, { pace = 2, secs = 5, upper = 0.5, jitter = 0, flat = 0, noise = 0.002, still = false } = {}) {
+        const lead = 0.5;
+        const n = Math.floor(RATE * (secs + lead + 0.4));
+        const x = new Float32Array(n);
+        const fl = T.hz(notes.low);
+        const fu = T.hz(notes.high) * 2 ** (-flat / 1200);
+        const edges = [];
+        let at = lead;
+        while (!still && at < lead + secs) {
+          const period = (1 / pace) * (1 + (rand() - 0.5) * 2 * jitter);
+          edges.push([at, fl], [at + period * (1 - upper), fu]);
+          at += period;
+        }
+        let ei = 0;
+        let target = fl;
+        let f = fl;
+        let phase = 0;
+        const glide = 1 - Math.exp(-1 / (0.008 * RATE));
+        const partials = [1, 0.6, 0.45, 0.3, 0.2, 0.12];
+        for (let i = 0; i < n; i++) {
+          const time = i / RATE;
+          while (ei < edges.length && time >= edges[ei][0]) target = edges[ei++][1];
+          if (time > lead + secs) target = fl;
+          f += (target - f) * glide;
+          phase += (2 * Math.PI * f) / RATE;
+          let v = 0;
+          for (let h = 0; h < partials.length; h++) v += partials[h] * Math.sin((h + 1) * phase + h * 1.3);
+          x[i] = 0.05 * v + noise * (rand() * 2 - 1);
+        }
+        const frames = [];
+        for (let time = SIZE / RATE; time < n / RATE; time += 0.03) {
+          const end = Math.floor(time * RATE);
+          const r = detector.detect(x.subarray(end - SIZE, end));
+          frames.push({ t: time, freq: r.freq, clarity: r.clarity });
+        }
+        return frames;
+      }
+
+      // ── which notes ──
+      {
+        const a12 = T.notesFor('A', '12', '');
+        eq('1–2 on the A string is B and C sharp', [a12.lowName, a12.highName, a12.spacing], ['B4', 'C♯5', 'whole']);
+        const a12h = T.notesFor('A', '12', 'half');
+        eq('…and with a low second finger, B and C', [a12h.lowName, a12h.highName], ['B4', 'C5']);
+        const g01h = T.notesFor('G', '01', 'half');
+        eq('a low first finger on the G string is written as a flat', [g01h.lowName, g01h.highName], ['G3', 'A♭3']);
+        const d23 = T.notesFor('D', '23', '');
+        eq('2–3 comes as a half step first: F sharp and G', [d23.lowName, d23.highName, d23.spacing], ['F♯4', 'G4', 'half']);
+        const d23w = T.notesFor('D', '23', 'whole');
+        eq('…and a whole step lowers the second finger: F and G', [d23w.lowName, d23w.highName], ['F4', 'G4']);
+        const e34 = T.notesFor('E', '34', '');
+        eq('3–4 on the E string is A and B', [e34.lowName, e34.highName], ['A5', 'B5']);
+        eq('open to first finger holds nothing down', T.notesFor('E', '01', '').lowFinger, 0);
+        eq('eight notes a beat at 60 is eight a second', T.targetRate(T.stepById('eight'), 60), 8);
+        eq('the free step has no pace to keep', T.targetRate(T.stepById('free'), 60), 0);
+      }
+
+      // ── an even trill is measured as what it is, on every string and at every pace ──
+      for (const [string, pair] of [['G', '01'], ['D', '12'], ['A', '23'], ['E', '34']]) {
+        const notes = T.notesFor(string, pair, '');
+        for (const pace of [1.5, 2, 3, 4, 6]) {
+          const r = T.analyse(trill(notes, { pace }), notes, { step: T.stepById('free') });
+          near(`${string} ${pair} at ${pace * 2} notes a second: pace`, r.rate, pace * 2, 0.25);
+          if (r.even < 90) problems.push(`${string} ${pair} at ${pace * 2} notes a second: a perfectly even trill read ${r.even}% even`);
+          near(`${string} ${pair} at ${pace * 2}: balance`, r.balance, 0.5, 0.05);
+          near(`${string} ${pair} at ${pace * 2}: reach`, r.reach, 0, 8);
+          eq(`${string} ${pair} at ${pace * 2}: verdict`, r.verdict.id, 'good');
+        }
+      }
+      log.push('even trills on four strings, 3 to 12 notes a second: pace, evenness, balance and reach all read true');
+
+      // ── each fault is called by its name ──
+      {
+        const notes = T.notesFor('A', '12', '');
+        const free = { step: T.stepById('free') };
+        const stuck = T.analyse(trill(notes, { pace: 3, upper: 0.72 }), notes, free);
+        near('a finger left down: balance', stuck.balance, 0.72, 0.05);
+        eq('a finger left down is called stuck', stuck.verdict.id, 'stuck');
+        const dab = T.analyse(trill(notes, { pace: 3, upper: 0.28 }), notes, free);
+        eq('a finger that only brushes is called a dab', dab.verdict.id, 'dab');
+        const flat = T.analyse(trill(notes, { pace: 3, flat: 45 }), notes, free);
+        near('an upper note 45 cents low: reach', flat.reach, -45, 8);
+        eq('…is called short of its pitch', flat.verdict.id, 'reach');
+        const nearly = T.analyse(trill(notes, { pace: 3, flat: 15 }), notes, free);
+        eq('15 cents low is close enough to pass', nearly.verdict.id, 'good');
+        let uneven = 0;
+        for (let i = 0; i < 6; i++) {
+          const r = T.analyse(trill(notes, { pace: 3, jitter: 0.6 }), notes, free);
+          if (r.verdict.id === 'uneven') uneven += 1;
+        }
+        if (uneven < 5) problems.push(`a very uneven trill was called uneven only ${uneven} times in 6`);
+        const held = T.analyse(trill(notes, { still: true, secs: 3 }), notes, free);
+        eq('a held note is not a trill', [held.cycles, held.verdict.id], [0, 'none']);
+        const silence = T.analyse([], notes, free);
+        eq('silence is not a trill either', silence.verdict.id, 'none');
+        const noisy = T.analyse(trill(notes, { pace: 4, noise: 0.02 }), notes, free);
+        eq('a noisy room does not spoil an even trill', noisy.verdict.id, 'good');
+      }
+
+      // ── with the click ──
+      {
+        const notes = T.notesFor('A', '12', '');
+        const four = trill(notes, { pace: 2, secs: 8 }); // four notes a second
+        eq('four to a beat at 60, asked for four', T.analyse(four, notes, { bpm: 60, step: T.stepById('four') }).verdict.id, 'good');
+        eq('…asked for six: behind the click', T.analyse(four, notes, { bpm: 60, step: T.stepById('six') }).verdict.id, 'slow');
+        eq('…asked for two: ahead of it', T.analyse(four, notes, { bpm: 60, step: T.stepById('two') }).verdict.id, 'fast');
+        eq('the same playing is three to a beat at 80', T.analyse(four, notes, { bpm: 80, step: T.stepById('three') }).verdict.id, 'good');
+        const two = trill(notes, { pace: 1, secs: 8 });
+        eq('the slowest step, two to a beat, has enough to judge in eight beats', T.analyse(two, notes, { bpm: 60, step: T.stepById('two') }).verdict.id, 'good');
+      }
+
+      // ── what is remembered ──
+      {
+        const store = { m: {}, getItem(k) { return this.m[k] || null; }, setItem(k, v) { this.m[k] = v; } };
+        const stats = T.loadStats('x', store);
+        const notes = T.notesFor('A', '12', '');
+        eq('a new student starts on the first step', T.nextStep(stats, notes).id, 'two');
+        const pass = { rate: 4, verdict: { id: 'good', pass: true } };
+        const miss = { rate: 4, verdict: { id: 'uneven', pass: false } };
+        eq('a step that was not even is not ticked', T.recordRun(stats, notes, T.stepById('two'), miss).newStep, false);
+        eq('one that was, is', T.recordRun(stats, notes, T.stepById('two'), pass).newStep, true);
+        eq('…once', T.recordRun(stats, notes, T.stepById('two'), pass).newStep, false);
+        eq('and the next step is offered', T.nextStep(stats, notes).id, 'three');
+        eq('another pair of fingers starts from the beginning', T.nextStep(stats, T.notesFor('A', '34', '')).id, 'two');
+        const free = T.stepById('free');
+        eq('the first free trill sets a pace without calling it a record', T.recordRun(stats, notes, free, { rate: 8.04, verdict: { id: 'good', pass: true } }), { newStep: true, newBest: false, best: 8 });
+        eq('a faster even one is a best', T.recordRun(stats, notes, free, { rate: 9.2, verdict: { id: 'good', pass: true } }).newBest, true);
+        eq('a faster uneven one is not', T.recordRun(stats, notes, free, { rate: 12, verdict: { id: 'uneven', pass: false } }).best, 9.2);
+        T.saveStats('x', stats, store);
+        const back = T.loadStats('x', store);
+        eq('it survives a save and a load', [back.sets['A:12:whole'].done, back.sets['A:12:whole'].best, back.runs], [['two', 'free'], 9.2, 6]);
+        store.setItem(T.storageKey('y'), '{"opts":{"string":"Z","pair":"99","bpm":900},"sets":{"A:12:whole":{"done":["two","nonsense"],"best":"fast"}}}');
+        const odd = T.loadStats('y', store);
+        eq('a damaged save is tidied, not trusted', [odd.opts.string, odd.opts.pair, odd.opts.bpm, odd.sets['A:12:whole']], ['A', '12', T.TEMPO.max, { done: ['two'], best: 0, runs: 0, last: '' }]);
+      }
+
+      document.getElementById('report').textContent = problems.length ? `TRILL FAILED\n${problems.join('\n')}` : `TRILL OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'TRILL FAILED' : 'TRILL OK';
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'trill', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

@@ -23,7 +23,7 @@
 // — the publish routine does both from one number. Without that, a student keeps
 // whatever was cached the first time, which is the same stale-code trap the
 // stamps exist to avoid.
-const VERSION = '202611120915';
+const VERSION = '202611121640';
 const SHELL = 'scale-studio-shell-' + VERSION;
 // The recordings and the score renderer do not change from one publish to the
 // next, so their cache is not named after VERSION: a new version used to throw
@@ -52,6 +52,8 @@ const BASE = [
   'src/follow.js',
   'src/sprint.js',
   'src/sprintview.js',
+  'src/trill.js',
+  'src/trillview.js',
   'src/listen.js',
   'src/listenview.js',
   'src/musicxml.js',
