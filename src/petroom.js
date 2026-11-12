@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611120215';
+import * as Pet from './pet.js?v=202611120330';
 import {
   petMarkup,
   eggMarkup,
@@ -23,14 +23,15 @@ import {
   foodMarkup,
   foodIcon,
   roomMarkup,
+  clockNow,
   ballMarkup,
   itemIcon,
   petIcon,
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611120215';
-import { t, getLang } from './i18n.js?v=202611120215';
+} from './petart.js?v=202611120330';
+import { t, getLang } from './i18n.js?v=202611120330';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -75,7 +76,7 @@ function node(tag, attrs = {}, html = '') {
  * `profileId()` names whose pet is on screen; `onPractise()` sends the student
  * to the scales; `demo` turns on the "pretend I practised" button.
  */
-export function createPetRoom({ els, profileId, onPractise = () => {}, demo = false }) {
+export function createPetRoom({ els, profileId, onPractise = () => {}, demo = false, hour = null }) {
   let pet = Pet.loadPet(profileId());
   let running = false;
   let timers = [];
@@ -93,6 +94,16 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   let picked = null; // the egg being considered
   let ball = null; // { x, y } while a ball is out
   let busy = false; // a scripted moment (eating, hatching) is playing
+  let held = false; // the pet is in the student's hand
+  let drag = null; // a press that may become a drag: { kind, id, el, start, from, moved }
+  let skyStep = -1; // which five minutes the window was last painted for
+
+  // The time the room goes by: the clock, or `?hour=21` to see the evening at noon.
+  const timeNow = () => (Number.isFinite(hour) ? hour : clockNow());
+  // The bowl and the bed are wherever they have been dragged to.
+  const bowlAt = () => ({ x: BOWL.x + Pet.itemAt(pet, 'bowl').x, y: BOWL.y });
+  const bedAt = () => ({ x: BED.x + Pet.itemAt(pet, 'bed').x, y: BED.y });
+  const roomArt = () => roomMarkup({ placed: pet.placed, wall: pet.wall, fish: isFish(), hour: timeNow(), where: pet.where });
 
   const layers = {};
 
@@ -112,7 +123,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   function drawRoom() {
     const svg = els.svg;
     svg.innerHTML = '';
-    layers.room = node('g', { class: 'room-base' }, roomMarkup({ placed: pet.placed, wall: pet.wall, fish: isFish() }));
+    layers.room = node('g', { class: 'room-base' }, roomArt());
+    skyStep = Math.floor(timeNow() * 12);
     layers.stage = node('g', { class: 'room-stage' });
     layers.fx = node('g', { class: 'room-fx', 'pointer-events': 'none' });
     svg.append(layers.room, layers.stage, layers.fx);
@@ -132,7 +144,15 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       layers.petFlip.append(layers.pet);
       layers.petPos.append(layers.petFlip);
       layers.stage.append(layers.petPos);
-      layers.pet.addEventListener('pointerdown', patPet);
+      // A press on the pet is a pat if it is let go, and a lift if it is carried.
+      layers.pet.addEventListener('pointerdown', (event) => {
+        if (busy) return;
+        if (isFish()) {
+          patPet();
+          return;
+        }
+        beginDrag(event, { kind: 'pet', from: { ...pos } });
+      });
       layers.pet.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -277,9 +297,173 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     }, ms);
   }
 
+  // ── Dragging: the furniture, and the pet ───────────────────────────────
+
+  /** A pointer event, in the room's own 400 × 300 units. */
+  function roomPoint(event) {
+    const m = els.svg.getScreenCTM();
+    if (!m) return { x: 0, y: 0 };
+    const p = new DOMPoint(event.clientX, event.clientY).matrixTransform(m.inverse());
+    return { x: p.x, y: p.y };
+  }
+
+  function beginDrag(event, what) {
+    if (!running || busy || choosing || !pet.pet) return;
+    drag = { ...what, start: roomPoint(event), moved: false, pointer: event.pointerId };
+    try {
+      els.svg.setPointerCapture(event.pointerId);
+    } catch {
+      /* an old browser: the drag still works while the pointer stays over the room */
+    }
+  }
+
+  // Furniture is found by where the press landed; the pet has its own listener.
+  els.svg.addEventListener('pointerdown', (event) => {
+    if (drag) return;
+    const el = event.target.closest ? event.target.closest('.room-item') : null;
+    if (!el || !Pet.ITEM_RANGE[el.dataset.item]) return;
+    beginDrag(event, { kind: 'item', id: el.dataset.item, el, from: Pet.itemAt(pet, el.dataset.item) });
+  });
+
+  els.svg.addEventListener('pointermove', (event) => {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    const at = roomPoint(event);
+    const dx = at.x - drag.start.x;
+    const dy = at.y - drag.start.y;
+    // A press that wanders a little is still a press.
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      lastTouch = Date.now();
+      if (els.bubble) els.bubble.hidden = true;
+      if (drag.kind === 'pet') liftPet();
+      else drag.el.classList.add('is-dragging');
+    }
+    event.preventDefault();
+    if (drag.kind === 'item') {
+      const to = Pet.moveItem(pet, drag.id, drag.from.x + dx, drag.from.y + dy);
+      drag.el.setAttribute('transform', `translate(${to.x} ${to.y})`);
+      // its light goes with the lamp
+      if (drag.id === 'lamp') layers.room.querySelector('.lamp-glow.is-lit')?.parentNode.setAttribute('transform', `translate(${to.x} ${to.y})`);
+    } else {
+      // held by its middle, kept inside the room, never below the floor
+      pos = {
+        x: Math.min(372, Math.max(28, drag.from.x + dx)),
+        y: Math.min(FLOOR_Y, Math.max(72, drag.from.y + dy)),
+      };
+      placePet();
+    }
+  });
+
+  const endDrag = (event) => {
+    if (!drag || (event && event.pointerId !== drag.pointer)) return;
+    const done = drag;
+    drag = null;
+    try {
+      els.svg.releasePointerCapture(done.pointer);
+    } catch {
+      /* nothing was captured */
+    }
+    if (done.kind === 'item') {
+      done.el.classList.remove('is-dragging');
+      if (done.moved) {
+        pet.tips = { ...(pet.tips || {}), drag: true };
+        save();
+        paintFoot();
+        admire(done.id);
+      }
+      return;
+    }
+    if (!done.moved) patPet();
+    else dropPet();
+  };
+  els.svg.addEventListener('pointerup', endDrag);
+  els.svg.addEventListener('pointercancel', endDrag);
+
+  // Where each thing stands before it is dragged anywhere, for the pet to walk to.
+  const ITEM_X = { lamp: 364, plant: 34, stand: 96, bed: 296, rug: 200, bowl: 126, window: 96, picture: 309 };
+
+  /** Something has been moved: now and then the pet trots over to see, and approves. */
+  function admire(id) {
+    if (busy || held || mode === 'sleep' || isFish() || Math.random() < 0.4) return;
+    const x = (ITEM_X[id] || 200) + Pet.itemAt(pet, id).x;
+    const beside = Math.min(360, Math.max(40, x + (x > pos.x ? -36 : 36)));
+    walkTo(beside, FLOOR_Y, () => {
+      facing = x > pos.x ? 1 : -1;
+      placePet();
+      setMode('happy');
+      hop();
+      say(t('pet.say.nice'), 1900);
+      later(() => mode === 'happy' && !held && setMode('idle'), 1400);
+    }, 110);
+  }
+
+  /** Picked up: whatever it was doing stops, and it dangles, delighted. */
+  function liftPet() {
+    held = true;
+    cancelAnimationFrame(raf);
+    setMode('happy');
+    layers.pet?.classList.add('is-held');
+  }
+
+  /** Let go: it drops to the floor, lands with a bounce — and if it lands in bed, stays there. */
+  function dropPet() {
+    held = false;
+    layers.pet?.classList.remove('is-held');
+    pet.tips = { ...(pet.tips || {}), drag: true };
+    save();
+    paintFoot();
+    const from = pos.y;
+    const fall = FLOOR_Y - from;
+    const ms = 110 + 24 * Math.sqrt(Math.max(0, fall));
+    const start = performance.now();
+    const land = () => {
+      if (!running) return;
+      hop();
+      const bed = bedAt();
+      if (pet.placed.includes('bed') && Math.abs(pos.x - bed.x) < 34) {
+        say(t('pet.say.cosy'), 1800);
+        later(() => {
+          if (held || busy) return;
+          pos = { x: bed.x, y: bed.y };
+          placePet();
+          setMode('sleep');
+        }, 1300);
+        return;
+      }
+      hearts(2);
+      say(t(pick(['pet.say.whee', 'pet.say.again', ...SOUNDS[pet.pet.species]])), 1800);
+      later(() => mode === 'happy' && !held && setMode('idle'), 1400);
+    };
+    if (fall < 2) {
+      land();
+      return;
+    }
+    const step = (now) => {
+      if (!running || held) return;
+      const f = Math.min(1, (now - start) / ms);
+      pos = { x: pos.x, y: from + fall * f * f }; // it falls faster as it goes
+      placePet();
+      if (f < 1) raf = requestAnimationFrame(step);
+      else land();
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  /** The window follows the clock while the room is open — every five minutes is plenty. */
+  function watchSky() {
+    const step = Math.floor(timeNow() * 12);
+    if (step !== skyStep && layers.room && !busy && !drag && !choosing && pet.pet) {
+      skyStep = step;
+      layers.room.innerHTML = roomArt();
+    }
+    later(watchSky, 30000);
+  }
+
   // ── Behaviour ──────────────────────────────────────────────────────────
 
   function walkTo(x, y = pos.y, then = null, speed = 70) {
+    if (held) return;
     cancelAnimationFrame(raf);
     const from = { ...pos };
     const dist = Math.hypot(x - from.x, y - from.y);
@@ -310,12 +494,12 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   function wander() {
     if (!pet.pet || choosing) return;
-    if (busy) {
+    if (busy || held) {
       later(wander, 2000);
       return;
     }
     const quiet = Date.now() - lastTouch;
-    const hour = new Date().getHours();
+    const hour = timeNow();
     if (mode !== 'sleep' && (quiet > SLEEP_AFTER || ((hour >= 21 || hour < 6) && quiet > 15000))) {
       goToSleep();
     } else if (mode === 'idle') {
@@ -346,7 +530,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   function goToSleep() {
     if (!isFish() && pet.placed.includes('bed')) {
-      walkTo(BED.x, BED.y, () => setMode('sleep'), 50);
+      const bed = bedAt();
+      walkTo(bed.x, bed.y, () => setMode('sleep'), 50);
     } else {
       setMode('sleep');
     }
@@ -533,8 +718,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const bowl = layers.room.querySelector('.bowl-food');
     // Sat on the bowl: the snack's box centres on (50, 56), drawn at half size.
     bowl.innerHTML = `<g class="food-in-bowl" transform="translate(101 226) scale(.5)">${foodMarkup(snack.look)}</g>`;
-    walkTo(BOWL.x + 38, FLOOR_Y, () => {
-      facing = -1;
+    // It eats from whichever side of the bowl there is room on.
+    const at = bowlAt();
+    const fromRight = at.x + 38 <= 372;
+    walkTo(at.x + (fromRight ? 38 : -38), FLOOR_Y, () => {
+      facing = fromRight ? -1 : 1;
       placePet();
       eat(snack, bowl);
     }, 90);
@@ -669,7 +857,16 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         save();
       }
     }
-    els.foot.innerHTML = `${t('pet.foot')}${
+    paintFoot();
+  }
+
+  /** The line under the room: how notes are earned, and — until it has been tried — that things can be moved. */
+  function paintFoot() {
+    const tip =
+      pet.pet && pet.pet.name && !(pet.tips && pet.tips.drag) && !choosing
+        ? `<span class="pet-tip">${t(isFish() ? 'pet.tip.dragFish' : 'pet.tip.drag', { name: esc(pet.pet.name) })}</span>`
+        : '';
+    els.foot.innerHTML = `${tip}${t('pet.foot')}${
       demo ? ` <button class="link-btn" type="button" data-act="demo">${t('pet.demo')}</button>` : ''
     }`;
   }
@@ -1121,10 +1318,13 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       later(runHatch, 700);
       return;
     }
+    held = false;
+    drag = null;
     if (pet.pet) {
       lastTouch = Date.now();
       blinkLoop();
       later(wander, 1800);
+      later(watchSky, 30000);
       const grew = Pet.unseenGrowth(pet);
       // A plan that was kept is said once, and it outranks an ordinary welcome.
       const kept = pet.pet.name ? Pet.takeKept(pet) : null;

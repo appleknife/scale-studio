@@ -140,6 +140,23 @@ export const ITEMS = [
   { id: 'wall-stars', cost: 18, slot: 'wall' },
 ];
 
+/**
+ * How far each thing in the room may be dragged from where it is first put down,
+ * in room units (the room is 400 wide). Things on the floor slide along it; the
+ * window and the picture go anywhere on the wall; the rug has a little depth.
+ * The bowl counts as furniture here, though it is never bought.
+ */
+export const ITEM_RANGE = {
+  window: { x: [-44, 250], y: [-32, 64] },
+  picture: { x: [-272, 54], y: [-42, 64] },
+  lamp: { x: [-336, 14], y: [0, 0] },
+  plant: { x: [-12, 342], y: [0, 0] },
+  stand: { x: [-66, 272], y: [0, 0] },
+  bed: { x: [-246, 54], y: [0, 0] },
+  rug: { x: [-76, 76], y: [-4, 10] },
+  bowl: { x: [-98, 246], y: [0, 0] },
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Fullness lost per day — a gentle drift, about one snack a day keeps it content. */
 const HUNGER_PER_DAY = 35;
@@ -162,6 +179,8 @@ export function emptyPet() {
     dex: {}, // { [species]: { plain: n, rare: n } } — every hatch, ever
     // The memory book — see remember() — and the plan for next time.
     book: freshBook(),
+    where: {}, // { [item]: { x, y } } — how far each thing has been dragged
+    tips: {}, // hints already taken up, so they stop being offered
     plan: null, // { cue, day } — when the student said they would practise next
     kept: null, // { cue, day } — a plan that was kept, until the room has said so
   };
@@ -204,6 +223,12 @@ function upgrade(p) {
     if (!p.book.firsts || typeof p.book.firsts !== 'object') p.book.firsts = {};
   }
   if (p.plan && !PLAN_CUES.includes(p.plan.cue)) p.plan = null;
+  if (!p.where || typeof p.where !== 'object' || Array.isArray(p.where)) p.where = {};
+  for (const id of Object.keys(p.where)) {
+    if (ITEM_RANGE[id]) moveItem(p, id, p.where[id] && p.where[id].x, p.where[id] && p.where[id].y);
+    else delete p.where[id];
+  }
+  if (!p.tips || typeof p.tips !== 'object') p.tips = {};
   p.v = 3;
   return p;
 }
@@ -688,6 +713,22 @@ export function isPlaced(pet, itemId) {
   const item = ITEMS.find((i) => i.id === itemId);
   if (!item) return false;
   return item.slot === 'wall' ? pet.wall === itemId : pet.placed.includes(itemId);
+}
+
+/** Where a thing in the room has been dragged to, as an offset from its first place. */
+export function itemAt(pet, id) {
+  const at = pet.where && pet.where[id];
+  return { x: (at && at.x) || 0, y: (at && at.y) || 0 };
+}
+
+/** Put a thing somewhere else. It stays in the room: the offset is held to its range. */
+export function moveItem(pet, id, x, y) {
+  const range = ITEM_RANGE[id];
+  if (!range) return null;
+  const hold = (v, [lo, hi]) => Math.round(Math.min(hi, Math.max(lo, Number(v) || 0)));
+  if (!pet.where || typeof pet.where !== 'object') pet.where = {};
+  pet.where[id] = { x: hold(x, range.x), y: hold(y, range.y) };
+  return pet.where[id];
 }
 
 /** Back after a while? The room greets you — gladly, never reproachfully. */
