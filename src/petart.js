@@ -489,16 +489,46 @@ const ITEM_ART = {
         <path d="M142 40 q-22 30 -10 82 l10 0 z" fill="#f7b9b0" opacity=".9"/>
       </g>`;
   },
+  // A framed violin, with its bow. Drawn as the instrument is built — two bouts
+  // with a waist cut in between, f-holes either side of the bridge, a dark
+  // fingerboard running up to the pegbox and scroll — because the children
+  // looking at it hold one every day and know what it should look like.
   picture: () => `
     <g class="room-picture">
-      <rect x="282" y="54" width="54" height="66" rx="5" fill="#fff8ee" stroke="#c49a6c" stroke-width="5"/>
-      <g transform="translate(309 87) rotate(-18)">
-        <path d="M0 -24 c7 0 9 6 6 10 c-2 3 -2 5 1 8 c4 5 2 15 -7 15 c-9 0 -11 -10 -7 -15 c3 -3 3 -5 1 -8 c-3 -4 -1 -10 6 -10 z" fill="#c9773b" stroke="#8a4b20" stroke-width="1.6"/>
-        <path d="M0 -36 v44" stroke="#3b2c22" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M-2.4 -6 h4.8 M-2.4 -2 h4.8" stroke="#3b2c22" stroke-width="1"/>
+      <rect x="280" y="52" width="58" height="70" rx="5" fill="#b98a58"/>
+      <rect x="280" y="52" width="58" height="70" rx="5" fill="none" stroke="#8f6238" stroke-width="1.6"/>
+      <rect x="285.5" y="57.5" width="47" height="59" rx="2.5" fill="#fff8ee" stroke="#e4d3b6" stroke-width="1.2"/>
+      <g transform="translate(305.5 88.5) rotate(-16) scale(.88)">
+        <!-- the bow, behind, leaning the other way -->
+        <g transform="rotate(34 4 0)">
+          <path d="M9 -27 L9 25" stroke="#8a5a2c" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M11.2 -25 L11.2 21" stroke="#f3ead8" stroke-width=".8"/>
+          <path d="M8.4 -28.4 q2.6 -.4 3.2 2.6 l-2.4 1 z" fill="#8a5a2c"/>
+          <rect x="8.2" y="19.5" width="3.6" height="5" rx=".8" fill="#3b2c22"/>
+        </g>
+        <!-- neck, pegbox and scroll -->
+        <path d="M-1.9 -22 L1.9 -22 L1.6 -3 L-1.6 -3 Z" fill="#a85f2a"/>
+        <path d="M-1.9 -28.5 L1.9 -28.5 L1.9 -21.5 L-1.9 -21.5 Z" fill="#a85f2a" stroke="#7d431a" stroke-width=".7"/>
+        <circle cx="0" cy="-30.6" r="2.7" fill="#b96a30" stroke="#7d431a" stroke-width=".8"/>
+        <circle cx="0" cy="-30.6" r=".9" fill="#7d431a"/>
+        <path d="M-1.9 -27 h-3 M-1.9 -23.6 h-3 M1.9 -25.4 h3 M1.9 -22 h3" stroke="#3b2c22" stroke-width="1.5" stroke-linecap="round"/>
+        <!-- the body -->
+        <path d="M0 -4.5 C4.6 -4.5 8.6 -3 8.6 2.4 C8.6 5.6 7.3 6.6 6.3 7.3 L7.4 8.2 C5.2 9.8 5.2 12.6 7.6 14 L6.6 15 C8.4 15.8 10.6 17.2 10.6 21.4 C10.6 26.6 5.6 28.4 0 28.4 C-5.6 28.4 -10.6 26.6 -10.6 21.4 C-10.6 17.2 -8.4 15.8 -6.6 15 L-7.6 14 C-5.2 12.6 -5.2 9.8 -7.4 8.2 L-6.3 7.3 C-7.3 6.6 -8.6 5.6 -8.6 2.4 C-8.6 -3 -4.6 -4.5 0 -4.5 Z"
+          fill="#cf7d3c" stroke="#7d431a" stroke-width="1.3" stroke-linejoin="round"/>
+        <path d="M-5.4 -1.4 C-6.6 0 -6.8 2.4 -6.2 4 M-7.4 19 C-8 21 -7.6 23.2 -6.2 24.6" fill="none" stroke="#e9a468" stroke-width="1.3" stroke-linecap="round"/>
+        <!-- f-holes -->
+        <g fill="none" stroke="#3b2c22" stroke-width=".9" stroke-linecap="round">
+          <path d="M-4.9 9.4 c1.2 1.2 -1.6 5.8 -.2 7.4"/>
+          <path d="M4.9 9.4 c-1.2 1.2 1.6 5.8 .2 7.4"/>
+        </g>
+        <g fill="#3b2c22"><circle cx="-4.6" cy="9.2" r=".75"/><circle cx="-5.4" cy="17" r=".75"/><circle cx="4.6" cy="9.2" r=".75"/><circle cx="5.4" cy="17" r=".75"/></g>
+        <!-- fingerboard, strings, bridge, tailpiece, chinrest -->
+        <path d="M-1.7 -22 L1.7 -22 L2.3 9.6 L-2.3 9.6 Z" fill="#3b2c22"/>
+        <path d="M-.9 -21 L-1.2 21 M.9 -21 L1.2 21" stroke="#e9dcc2" stroke-width=".45"/>
+        <rect x="-3.3" y="13.2" width="6.6" height="1.5" rx=".6" fill="#f1dfbd" stroke="#b3905c" stroke-width=".4"/>
+        <path d="M-2 19.4 L2 19.4 L2.9 26.4 Q0 27.6 -2.9 26.4 Z" fill="#3b2c22"/>
+        <path d="M-9 24.4 C-8.4 27.4 -5.4 28.2 -3.4 27.6 C-4.6 25.6 -6.4 24.2 -9 24.4 Z" fill="#4a3628"/>
       </g>
-      <path d="M318 66 q4 -4 8 0 v12" fill="none" stroke="#3b2c22" stroke-width="1.6"/>
-      <circle cx="316" cy="79" r="2.6" fill="#3b2c22"/>
     </g>`,
   bunting: () => {
     const colors = ['#f6a4a4', '#ffd97a', '#a6d8c1', '#a9c8f0', '#f3b7e1'];
@@ -649,7 +679,7 @@ export function ballMarkup() {
 export function itemIcon(id) {
   const views = {
     window: '46 38 104 90',
-    picture: '276 48 66 78',
+    picture: '274 46 70 82',
     bunting: '0 8 400 60',
     lamp: '320 122 90 150',
     plant: '8 170 56 104',
