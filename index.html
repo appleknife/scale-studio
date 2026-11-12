@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611111105" />
+    <link rel="stylesheet" href="app.css?v=202611120215" />
   </head>
   <body>
     <div class="shell">
@@ -1178,13 +1178,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611111105"></script>
+    <script type="module" src="src/app.js?v=202611120215"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611111105';
+        var V = '202611120215';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;

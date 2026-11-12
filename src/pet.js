@@ -30,7 +30,37 @@
 //   - every pet is kept. Grown friends wait in the pet book and any of them
 //     can come back into the room.
 
+// A plan and a memory book (v3). Two more things the research points to, and
+// neither of them is a reward:
+//   - "when will I hear you next?" — the student picks the moment themselves
+//     (before school, after dinner…). Deciding in advance *when* is the single
+//     cheapest thing that makes an intention happen (Gollwitzer & Sheeran's
+//     if-then plans), and choosing it yourself is what keeps it yours. Nothing
+//     is paid for keeping a plan and nothing is said if it slips: the pet is
+//     simply glad, the next time there is practice, that you came back;
+//   - a memory book: firsts and milestones, dated, in the student's own terms —
+//     the first time each key was played, the first two-octave scale, ten takes,
+//     thirty days of practice. Days are *counted*, never chained: there is no
+//     streak to break, because a missed day does not undo a habit and a broken
+//     streak mostly teaches a child to stop. Every entry is for doing, none for
+//     scoring, so the book tells a student they are getting somewhere without
+//     ever grading them.
+
 export const SPECIES = ['dog', 'cat', 'hamster', 'chicken', 'fish'];
+
+/** The moments a plan can name: things that happen every day, to hang practice on. */
+export const PLAN_CUES = ['morning', 'afterSchool', 'afterDinner', 'beforeBed'];
+
+/** Counted takes, and days with any practice, that the memory book marks. */
+export const TAKE_MARKS = [10, 25, 50, 100, 200, 300, 500, 750, 1000];
+export const DAY_MARKS = [3, 7, 14, 30, 50, 75, 100, 150, 200, 365];
+
+/** The most entries the book keeps (far more than a year of firsts). */
+const BOOK_LIMIT = 240;
+
+function freshBook() {
+  return { takes: 0, days: 0, lastDay: '', keys: [], firsts: {}, entries: [], unseen: 0 };
+}
 
 /** Counted takes it takes to hatch an egg: the first session ends with a pet. */
 export const HATCH_TAKES = 3;
@@ -130,6 +160,10 @@ export function emptyPet() {
     totalEarned: 0,
     friends: [], // grown (or set-aside) pets, waiting in the pet book
     dex: {}, // { [species]: { plain: n, rare: n } } — every hatch, ever
+    // The memory book — see remember() — and the plan for next time.
+    book: freshBook(),
+    plan: null, // { cue, day } — when the student said they would practise next
+    kept: null, // { cue, day } — a plan that was kept, until the room has said so
   };
 }
 
@@ -146,8 +180,125 @@ function upgrade(p) {
     if (!p.pet.seen) p.pet.seen = stageOf(p.pet);
     if (!(p.dex[p.pet.species] && p.dex[p.pet.species][p.pet.variant])) note(p, p.pet);
   }
-  p.v = 2;
+  // A save from before the memory book. It cannot know what was played, so it
+  // starts counting now — but it does know who hatched and when, and a student
+  // who has been practising for weeks is not told that today's take is their
+  // first.
+  if (!p.book || typeof p.book !== 'object') {
+    p.book = freshBook();
+    const before = Boolean(p.pet || p.friends.length || p.totalEarned > 0);
+    if (before) p.book.firsts.take = 'before';
+    for (const animal of [...p.friends, p.pet].filter(Boolean)) {
+      if (!Number.isFinite(animal.born)) continue;
+      remember(p, `hatched:${animal.born}`, dayKeyOf(animal.born), { kind: 'hatched', species: animal.species });
+      const stage = stageOf(animal);
+      if (stage !== 'baby') p.book.firsts[`grew:kid:${animal.born}`] = 'before';
+      if (stage === 'grown') p.book.firsts[`grew:grown:${animal.born}`] = 'before';
+    }
+    p.book.entries.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+    p.book.unseen = 0; // old news is not announced
+  } else {
+    p.book = { ...freshBook(), ...p.book };
+    if (!Array.isArray(p.book.keys)) p.book.keys = [];
+    if (!Array.isArray(p.book.entries)) p.book.entries = [];
+    if (!p.book.firsts || typeof p.book.firsts !== 'object') p.book.firsts = {};
+  }
+  if (p.plan && !PLAN_CUES.includes(p.plan.cue)) p.plan = null;
+  p.v = 3;
   return p;
+}
+
+/**
+ * Write a memory down, once. `id` is what makes it a first — the same id is
+ * never written twice — and `data` is whatever the page needs to say it.
+ */
+function remember(p, id, day, data = {}) {
+  const book = p.book;
+  if (book.firsts[id]) return false;
+  book.firsts[id] = day || 'yes';
+  book.entries.push({ id, day, ...data });
+  if (book.entries.length > BOOK_LIMIT) book.entries.splice(0, book.entries.length - BOOK_LIMIT);
+  book.unseen = Math.min(book.entries.length, (book.unseen || 0) + 1);
+  return true;
+}
+
+/** Is this the id of a real key — 'G', 'Bb', 'F#m' — and not a demo's? */
+const isKeyId = (id) => /^[A-G](#|b)?m?$/.test(String(id || ''));
+
+/** A day with any practice in it: counted once, and never as a chain. */
+function countDay(p, dayKey, made) {
+  const book = p.book;
+  if (!dayKey || book.lastDay === dayKey) return;
+  book.lastDay = dayKey;
+  book.days += 1;
+  for (const mark of DAY_MARKS) {
+    if (book.days === mark && remember(p, `days:${mark}`, dayKey, { kind: 'days', n: mark })) made.push(`days:${mark}`);
+  }
+}
+
+/** What a counted take adds to the book. Returns the ids of any new memories. */
+function recordTake(p, { kind, id, dayKey, octaves, grew }) {
+  const book = p.book;
+  const made = [];
+  const add = (memId, data) => {
+    if (remember(p, memId, dayKey, data)) made.push(memId);
+  };
+  book.takes += 1;
+  countDay(p, dayKey, made);
+  add('take', { kind: 'take' });
+  if (kind === 'scale' && isKeyId(id)) {
+    if (!book.keys.includes(id)) book.keys.push(id);
+    add(`key:${id}`, { kind: 'key', key: id });
+    if (WISH_KEYS.every((k) => book.keys.includes(k))) add('allMajors', { kind: 'allMajors' });
+    if ((Number(octaves) || 1) >= 2) add('twoOctaves', { kind: 'twoOctaves' });
+  }
+  if (kind === 'sight') add('sight', { kind: 'sight' });
+  if (kind === 'sprint') add('sprint', { kind: 'sprint' });
+  for (const mark of TAKE_MARKS) {
+    if (book.takes === mark) add(`takes:${mark}`, { kind: 'takes', n: mark });
+  }
+  if (grew && p.pet) add(`grew:${grew}:${p.pet.born}`, { kind: 'grew', stage: grew, name: p.pet.name || '' });
+  return made;
+}
+
+/** The book at a glance: days and takes, and how many keys have been heard. */
+export function bookSummary(pet) {
+  const book = pet.book || freshBook();
+  const keys = book.keys || [];
+  return {
+    days: book.days || 0,
+    takes: book.takes || 0,
+    majors: WISH_KEYS.filter((k) => keys.includes(k)).length,
+    minors: keys.filter((k) => /m$/.test(k)).length,
+    keys,
+    unseen: book.unseen || 0,
+  };
+}
+
+/** The book has been read: nothing in it is new any more. */
+export function bookSeen(pet) {
+  if (pet.book) pet.book.unseen = 0;
+}
+
+/**
+ * "When will I hear you next?" The student's own answer, kept until practice on
+ * a later day — at which point it has been kept, whatever the clock said.
+ */
+export function makePlan(pet, cue, dayKey = dayKeyOf()) {
+  if (!PLAN_CUES.includes(cue)) return false;
+  pet.plan = { cue, day: dayKey };
+  return true;
+}
+
+export function clearPlan(pet) {
+  pet.plan = null;
+}
+
+/** A kept plan the room has not yet been glad about: handed over once. */
+export function takeKept(pet) {
+  const kept = pet.kept || null;
+  pet.kept = null;
+  return kept;
 }
 
 function note(p, animal) {
@@ -171,6 +322,8 @@ export function loadPet(profileId, storage = globalThis.localStorage) {
       day: { ...base.day, ...(parsed.day || {}) },
       owned: Array.isArray(parsed.owned) ? parsed.owned : [],
       placed: Array.isArray(parsed.placed) ? parsed.placed : [],
+      // not the empty book a new pet gets: upgrade() has to tell them apart
+      book: parsed.book && typeof parsed.book === 'object' ? parsed.book : null,
     });
   } catch {
     return emptyPet();
@@ -203,12 +356,15 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } 
   // the egg or grow the pet — those follow the takes the app itself hears.
   if (kind === 'practice' || kind === 'recording') {
     const flag = kind === 'practice' ? 'practice' : 'recording';
-    const nothing = { amount: 0, warmed: false, bonus: 0, grew: null, boosted: false, wished: 0 };
+    const nothing = { amount: 0, warmed: false, bonus: 0, grew: null, boosted: false, wished: 0, memories: [], kept: null };
     if (day[flag]) return nothing;
     day[flag] = true;
     const amount = kind === 'practice' ? EARN.practice : EARN.recording;
     credit(pet, day, amount);
-    return { ...nothing, amount };
+    // A day logged by hand is a day of practice in the book as well.
+    const memories = [];
+    if (kind === 'practice') countDay(pet, dayKey, memories);
+    return { ...nothing, amount, memories, kept: kind === 'practice' ? keepPlan(pet, dayKey) : null };
   }
 
   const fresh =
@@ -258,7 +414,20 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } 
     const after = stageOf(pet.pet);
     if (after !== before) grew = after;
   }
-  return { amount, warmed, bonus, grew, boosted, wished };
+  const memories = recordTake(pet, { kind, id, dayKey, octaves, grew });
+  return { amount, warmed, bonus, grew, boosted, wished, memories, kept: keepPlan(pet, dayKey) };
+}
+
+/**
+ * Practice on a later day than the plan was made: the plan was kept. Nothing is
+ * paid for it — a plan that earns is a wage, and stops working the day the wage
+ * stops — it is only set aside for the room to be glad about.
+ */
+function keepPlan(pet, dayKey) {
+  if (!pet.plan || !dayKey || pet.plan.day === dayKey) return null;
+  pet.kept = { cue: pet.plan.cue, day: dayKey };
+  pet.plan = null;
+  return pet.kept.cue;
 }
 
 /** A day's tally, empty. */
@@ -425,6 +594,8 @@ export function hatch(pet, now = Date.now(), roll = Math.random()) {
   pet.egg = null;
   if (!pet.dex) pet.dex = {};
   note(pet, pet.pet);
+  if (!pet.book) pet.book = freshBook();
+  remember(pet, `hatched:${now}`, dayKeyOf(now), { kind: 'hatched', species: pet.pet.species });
   return true;
 }
 
