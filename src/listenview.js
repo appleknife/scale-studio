@@ -11,12 +11,12 @@
 // score is drawn by OpenSheetMusicDisplay (BSD-3, vendor/), loaded only when a
 // score is opened, so the rest of the app never pays for it.
 
-import { readScore, readScoreFile, listParts, parseXml, sectionOf } from './musicxml.js?v=202611122010';
-import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611122010';
-import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611122010';
-import { t } from './i18n.js?v=202611122010';
+import { readScore, readScoreFile, listParts, parseXml, sectionOf } from './musicxml.js?v=202611131110';
+import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611131110';
+import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611131110';
+import { t } from './i18n.js?v=202611131110';
 
-const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611122010';
+const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611131110';
 const MAX_SECONDS = 600; // ten minutes: enough for any audition piece
 const MIN_SECONDS = 5;
 const MIN_SECTION_SECONDS = 1.5; // a single bar is a fair thing to practise
@@ -128,9 +128,10 @@ export function createListenView(deps) {
   function paintStart() {
     resultsEl.innerHTML = '';
     const scoreLine = source
-      ? `<p class="listen-file-line">${t('listen.scoreLoaded', { title: esc(source.score.title || source.fileName) })}
+      ? `<p class="listen-file-line">${t('listen.scoreLoaded', { title: esc(source.piece?.title || source.score.title || source.fileName) })}
            <button class="quiet-btn" type="button" data-act="pick">${t('listen.otherScore')}</button>
            <button class="quiet-btn" type="button" data-act="noscore">${t('listen.noScore')}</button></p>
+         ${scannedHtml()}
          ${sectionHtml()}
          <p class="listen-hint">${
            section
@@ -153,6 +154,7 @@ export function createListenView(deps) {
                 <p>${t('listen.scoreText')}</p>
                 <button class="ghost-btn" type="button" data-act="pick">${t('listen.pickScore')}</button>
               </div>
+              ${libraryHtml()}
             </div>`
       }
       <ul class="listen-tips">
@@ -165,6 +167,14 @@ export function createListenView(deps) {
       </div>
       <p class="listen-status" role="status"></p>`;
     paintHear();
+  }
+
+  /** Said plainly wherever a scanned score is used: a machine read it, and machines misread. */
+  function scannedHtml() {
+    if (!source?.piece?.scanned) return '';
+    return `<p class="listen-scanned">${t('listen.scannedNote')}${
+      source.piece.credit ? ` <span class="listen-credit">${esc(source.piece.credit)}</span>` : ''
+    }</p>`;
   }
 
   const barNo = (mi) => source.score.measures[mi]?.number ?? mi + 1;
@@ -238,6 +248,7 @@ export function createListenView(deps) {
         <button class="ghost-btn" type="button" data-act="playall">${t('listen.playAll')}</button>
       </div>
       ${hearHtml(false)}
+      ${scannedHtml()}
       <p class="listen-status" role="status"></p>`;
     paintPlayButtons();
     paintHear();
@@ -251,7 +262,55 @@ export function createListenView(deps) {
 
   /* ── The score ───────────────────────────────────────────────────────── */
 
-  async function openFile(file) {
+  /* ── The teacher's pieces ────────────────────────────────────────────── */
+
+  let pieces = []; // library/index.json: what the teacher has put in the app
+
+  async function loadLibrary() {
+    try {
+      const res = await fetch('library/index.json', { cache: 'no-cache' });
+      if (!res.ok) return;
+      const list = (await res.json()).pieces;
+      pieces = Array.isArray(list) ? list.filter((p) => p && p.file && p.title) : [];
+      if (pieces.length && panel === 'start' && !source) paint();
+    } catch {
+      /* no library, or offline before it was ever fetched: the file picker still works */
+    }
+  }
+
+  function libraryHtml() {
+    if (!pieces.length) return '';
+    return `
+      <div class="listen-choice listen-library">
+        <h4>${t('listen.libTitle')}</h4>
+        <p>${t('listen.libText')}</p>
+        <ul class="listen-pieces">${pieces
+          .map(
+            (p, i) =>
+              `<li><button class="listen-piece" type="button" data-act="piece" data-piece="${i}">
+                 <span class="listen-piece-title">${esc(p.title)}</span>
+                 ${p.composer ? `<span class="listen-piece-by">${esc(p.composer)}</span>` : ''}
+                 ${p.scanned ? `<span class="listen-piece-tag">${t('listen.scannedTag')}</span>` : ''}
+               </button></li>`,
+          )
+          .join('')}</ul>
+      </div>`;
+  }
+
+  async function openPiece(piece) {
+    if (!piece) return;
+    status(t('listen.reading'));
+    try {
+      const res = await fetch(`library/${piece.file}`);
+      if (!res.ok) throw new Error('missing');
+      const blob = await res.blob();
+      await openFile(new File([blob], piece.file, { type: 'application/xml' }), piece);
+    } catch {
+      status(t('listen.libFail'));
+    }
+  }
+
+  async function openFile(file, piece = null) {
     if (!file) return;
     status(t('listen.reading'));
     try {
@@ -261,7 +320,7 @@ export function createListenView(deps) {
       const score = readScore(xml);
       if (!score.notes.length) throw new Error('no-notes');
       stopHearing();
-      source = { xml, score, parts, fileName: file.name.replace(/\.(musicxml|xml|mxl)$/i, '') };
+      source = { xml, score, parts, piece, fileName: piece?.title || file.name.replace(/\.(musicxml|xml|mxl)$/i, '') };
       resetPractice();
       result = null;
       pickedBar = null;
@@ -336,6 +395,9 @@ export function createListenView(deps) {
         drawPartNames: false,
         drawCredits: false,
         coloringEnabled: true,
+        // A scanned score says nothing about beams; without this every eighth
+        // note would carry its own flag.
+        autoBeam: !/<beam[\s>]/.test(source.xml),
       });
       await osmd.load(source.xml);
       if (mine !== ticket) return;
@@ -888,6 +950,7 @@ export function createListenView(deps) {
     const act = btn.dataset.act;
     if (act === 'back') return deps.onBack();
     if (act === 'pick') return fileInput.click();
+    if (act === 'piece') return openPiece(pieces[Number(btn.dataset.piece)]);
     if (act === 'whole') return section ? setSection(null) : undefined;
     if (act === 'section') {
       if (section) return;
@@ -943,6 +1006,7 @@ export function createListenView(deps) {
     stopHearing();
   });
   fileInput.addEventListener('change', () => openFile(fileInput.files?.[0]));
+  loadLibrary();
   partSelect.addEventListener('change', () => choosePart(partSelect.value));
 
   let resizeTimer = 0;
