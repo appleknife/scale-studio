@@ -6442,6 +6442,19 @@ select,
   font-size: 13.5px;
 }
 
+.listen-paper p {
+  margin: 0 0 6px;
+}
+
+.listen-paper p:last-child {
+  margin-bottom: 0;
+}
+
+.listen-paper a {
+  color: inherit;
+  font-weight: 600;
+}
+
 .listen-credit {
   display: block;
   margin-top: 4px;

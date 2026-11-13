@@ -2,7 +2,16 @@
 
 Pieces listed in `index.json` appear in Listen under "Pieces from your teacher".
 
-## Adding a piece from photos or a scanned PDF
+## The easy way: the inbox
+
+Upload a scanned PDF (or a folder of photos) to `library/inbox/` on GitHub,
+named for the piece: `Gavotte - Gossec.pdf`. A few minutes later it is in the
+app. See `library/inbox/README.md`.
+
+Lines that the page labels as exercises ("Bonus exercise", "Warm-up", "Drill",
+…) are left out; the list of words is `SKIP_WORDS` in `tools/scan.py`.
+
+## By hand: from photos or a scanned PDF
 
 On a computer with Python:
 
