@@ -26,7 +26,7 @@
       // a forward repeat, a tie across a barline, a grace note, a double stop, a
       // rest, a second voice, 1st and 2nd endings — the things MusicXML readers
       // get wrong — and the same score zipped as .mxl.
-      import { readScore, readMxl } from '../src/musicxml.js';
+      import { readScore, readMxl, sectionOf } from '../src/musicxml.js';
       import { analyzeScore, analyzeFree, vibratoOf, accompanimentOf } from '../src/listen.js';
       import { PitchDetector } from '../src/pitch.js';
 
@@ -58,6 +58,15 @@
         eq('tempo from the metronome mark', score.tempo, 90);
         eq('key', score.keyFifths, 2);
         eq('total length in quarters (9 bars of 3/4)', score.totalQuarters, 27);
+
+        // A passage on its own: written bars 2–4 (indexes 1–3), once through.
+        const part = sectionOf(score, 3, 1);
+        eq('a section is its bars, in order, once', part.order, [1, 2, 3]);
+        eq('a section keeps only its own notes', part.notes.map((n) => n.midi), score.notes.filter((n) => n.pass === 0 && n.measure >= 1 && n.measure <= 3).map((n) => n.midi));
+        eq('a section counts its beats from its own first bar', part.notes[0].abs, part.notes[0].at);
+        eq('a section is as long as its bars', part.totalQuarters, 9);
+        eq('the 2nd ending alone is a section too', sectionOf(score, 4, 4).notes.length > 0, true);
+        eq('the whole score is left as it was', score.order.length, 9);
 
         const mxl = await (await fetch('scores/test-piece.mxl')).arrayBuffer();
         const fromZip = readScore(await readMxl(mxl));
