@@ -382,6 +382,31 @@ const WALLS = {
       <path d="M11 6 l1.8 3.8 l4.2 .5 l-3.1 2.9 l.8 4.1 l-3.7 -2 l-3.7 2 l.8 -4.1 l-3.1 -2.9 l4.2 -.5 z" fill="#fff6c9"/>
       <path d="M33 26 l1.3 2.7 l3 .4 l-2.2 2.1 l.6 2.9 l-2.7 -1.4 l-2.7 1.4 l.6 -2.9 l-2.2 -2.1 l3 -.4 z" fill="#fff6c9"/></pattern>`,
   },
+  'wall-notes': {
+    fill: 'url(#wall-notes)',
+    pattern: `<pattern id="wall-notes" width="48" height="48" patternUnits="userSpaceOnUse">
+      <rect width="48" height="48" fill="#fdf3dc"/>
+      <g fill="#edd3a0"><ellipse cx="11" cy="17" rx="3.4" ry="2.5" transform="rotate(-20 11 17)"/><rect x="13.4" y="5" width="1.3" height="12"/>
+      <ellipse cx="32" cy="40" rx="3.4" ry="2.5" transform="rotate(-20 32 40)"/><ellipse cx="41" cy="37" rx="3.4" ry="2.5" transform="rotate(-20 41 37)"/>
+      <rect x="34.4" y="27" width="1.3" height="13"/><rect x="43.4" y="24" width="1.3" height="13"/><path d="M34.4 27 L44.7 24 v3.2 L34.4 30.2 Z"/></g></pattern>`,
+  },
+  'wall-lilac': {
+    fill: 'url(#wall-lilac)',
+    pattern: `<pattern id="wall-lilac" width="30" height="30" patternUnits="userSpaceOnUse">
+      <rect width="30" height="30" fill="#ece6f8"/><path d="M15 3 L27 15 L15 27 L3 15 Z" fill="#e0d6f3"/><circle cx="15" cy="15" r="2" fill="#cfc1ec"/></pattern>`,
+  },
+};
+
+/** What is underfoot: the boards the room came with, or something laid over them. */
+const FLOORS = {
+  plain: { top: '#ecc99c', bottom: '#e0b886', line: '#d4a874', boards: true },
+  'floor-dark': { top: '#b98a5e', bottom: '#a47548', line: '#8d6038', boards: true },
+  'floor-tiles': {
+    boards: false,
+    fill: 'url(#floor-tiles)',
+    pattern: `<pattern id="floor-tiles" width="50" height="34" patternUnits="userSpaceOnUse" x="0" y="200">
+      <rect width="50" height="34" fill="#f4ede2"/><rect width="25" height="17" fill="#cfe3ea"/><rect x="25" y="17" width="25" height="17" fill="#cfe3ea"/></pattern>`,
+  },
 };
 
 /**
@@ -583,6 +608,125 @@ const ITEM_ART = {
       <g stroke="#8b8277" stroke-width=".9">${[172, 177, 182, 187].map((y) => `<path d="M80 ${y} h32"/>`).join('')}</g>
       <g fill="#3b2c22"><circle cx="86" cy="177" r="1.6"/><circle cx="94" cy="174.5" r="1.6"/><circle cx="103" cy="182" r="1.6"/></g>
     </g>`,
+  // The room's own clock: it tells the real time, like the window does.
+  clock: (time = 10.17) => {
+    const h = Number.isFinite(Number(time)) ? ((Number(time) % 24) + 24) % 24 : 10.17;
+    const hourAngle = (h % 12) * 30;
+    const minAngle = (h % 1) * 360;
+    const ticks = Array.from({ length: 12 }, (_, i) => `<path d="M0 -14.5 v${i % 3 === 0 ? 3 : 1.6}" transform="rotate(${i * 30})"/>`).join('');
+    return `
+    <g class="room-clock" transform="translate(200 52)">
+      <circle r="19" fill="#c9976a" stroke="#9a6b43" stroke-width="2"/>
+      <circle r="15.5" fill="#fffdf6"/>
+      <g stroke="#8b7d6b" stroke-width="1.2" stroke-linecap="round">${ticks}</g>
+      <path d="M0 1.5 V-8" stroke="#3b2c22" stroke-width="2.4" stroke-linecap="round" transform="rotate(${hourAngle.toFixed(1)})"/>
+      <path d="M0 2 V-12.5" stroke="#3b2c22" stroke-width="1.5" stroke-linecap="round" transform="rotate(${minAngle.toFixed(1)})"/>
+      <circle r="1.8" fill="#e0685c"/>
+    </g>`;
+  },
+  poster: () => `
+    <g class="room-poster">
+      <rect x="158" y="78" width="40" height="52" rx="2" fill="#fff8e6" stroke="#c9a77d" stroke-width="2"/>
+      <path d="M176 74 h4 v7 h-4 z" fill="#e0685c"/>
+      <g fill="#5b8fd0"><ellipse cx="170" cy="112" rx="5" ry="3.7" transform="rotate(-20 170 112)"/><ellipse cx="186" cy="107" rx="5" ry="3.7" transform="rotate(-20 186 107)"/>
+        <rect x="173.2" y="91" width="1.9" height="21"/><rect x="189.2" y="86" width="1.9" height="21"/><path d="M173.2 91 L191.1 86 v5 L173.2 96 Z"/></g>
+      <path d="M165 122 h26" stroke="#f1b85a" stroke-width="2.4" stroke-linecap="round"/>
+    </g>`,
+  shelf: () => `
+    <g class="room-shelf">
+      <path d="M12 150 v8 M50 150 v8" stroke="#9a6b43" stroke-width="3" stroke-linecap="round"/>
+      <rect x="4" y="145" width="54" height="6" rx="2" fill="#c9976a" stroke="#9a6b43" stroke-width="1.6"/>
+      <!-- a little cup, for all that practice -->
+      <path d="M15 124 h14 v6 c0 6 -3 9 -7 9 c-4 0 -7 -3 -7 -9 z" fill="#f6c84c" stroke="#c9952a" stroke-width="1.6" stroke-linejoin="round"/>
+      <path d="M15 126 c-5 0 -5 8 1 8 M29 126 c5 0 5 8 -1 8" fill="none" stroke="#c9952a" stroke-width="1.6"/>
+      <path d="M22 139 v3 M17 145 h10 l-1.5 -3 h-7 z" stroke="#c9952a" stroke-width="1.6" fill="#f6c84c" stroke-linejoin="round"/>
+      <path d="M22 128.5 l1.2 2.4 l2.6 .3 l-1.9 1.8 l.5 2.6 l-2.4 -1.3 l-2.4 1.3 l.5 -2.6 l-1.9 -1.8 l2.6 -.3 z" fill="#fff6c9"/>
+      <g stroke="#3b2c22" stroke-opacity=".25" stroke-width=".8"><rect x="37" y="129" width="5" height="16" fill="#7fb7e6"/><rect x="42" y="126" width="5" height="19" fill="#f2a0a0"/><rect x="47" y="131" width="5" height="14" fill="#a6d8a9"/></g>
+    </g>`,
+  // Fairy lights: `lit` draws only the glow, laid over the dusk so they shine after dark.
+  lights: (lit = false) => {
+    const colors = ['#ffd97a', '#f6a4a4', '#a9d8f0', '#b7e3b0', '#f3b7e1'];
+    const at = (i) => {
+      const x = 14 + i * 26.6;
+      const f = (x % 200) / 200;
+      return { x, y: 5 + Math.sin(f * Math.PI) * 13 };
+    };
+    const bulbs = Array.from({ length: 15 }, (_, i) => {
+      const { x, y } = at(i);
+      return lit
+        ? `<circle cx="${x.toFixed(1)}" cy="${(y + 5).toFixed(1)}" r="8" fill="${colors[i % 5]}" opacity=".4"/>`
+        : `<path d="M${x.toFixed(1)} ${y.toFixed(1)} v2.4" stroke="#7a6a58" stroke-width="1.6"/><ellipse class="fairy-bulb" style="animation-delay:${(i % 5) * 0.4}s" cx="${x.toFixed(1)}" cy="${(y + 5.6).toFixed(1)}" rx="3" ry="3.8" fill="${colors[i % 5]}"/>`;
+    }).join('');
+    return lit
+      ? `<g class="room-lights-glow" pointer-events="none">${bulbs}</g>`
+      : `<g class="room-lights"><path d="M0 4 Q100 32 200 5 Q300 32 400 4" fill="none" stroke="#7a6a58" stroke-width="1.4"/>${bulbs}</g>`;
+  },
+  flowers: () => `
+    <g class="room-flowers">
+      <ellipse cx="130" cy="216" rx="15" ry="3.5" fill="rgba(60,40,20,.12)"/>
+      <path d="M130 198 v16 M122 215 h16" stroke="#9a6b43" stroke-width="3" stroke-linecap="round"/>
+      <ellipse cx="130" cy="197" rx="16" ry="4" fill="#e7bd8f" stroke="#a9774c" stroke-width="1.8"/>
+      <g stroke="#4d9a52" stroke-width="1.6" fill="none" stroke-linecap="round"><path d="M130 184 C129 176 125 170 122 164"/><path d="M130 184 C130 174 131 168 131 159"/><path d="M130 184 C131 177 136 172 139 167"/></g>
+      <g><circle cx="122" cy="163" r="4.6" fill="#f6a4b8"/><circle cx="122" cy="163" r="1.8" fill="#ffe27a"/>
+        <circle cx="131" cy="157" r="5" fill="#ffd166"/><circle cx="131" cy="157" r="1.9" fill="#e98b4a"/>
+        <circle cx="139.5" cy="166" r="4.4" fill="#b9a4ee"/><circle cx="139.5" cy="166" r="1.7" fill="#ffe27a"/></g>
+      <path d="M124 182 h12 l-2 14 h-8 z" fill="#8fc7e8" stroke="#5f9ac0" stroke-width="1.8" stroke-linejoin="round"/>
+    </g>`,
+  metronome: () => `
+    <g class="room-metronome">
+      <ellipse cx="228" cy="286" rx="14" ry="3.5" fill="rgba(60,40,20,.12)"/>
+      <path d="M223 250 h10 l7 34 h-24 z" fill="#b5763f" stroke="#7d4d24" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M224.6 254 h6.8 l4.6 24 h-16 z" fill="#f6e3c4"/>
+      <g class="metro-arm"><path d="M228 279 V253" stroke="#4a4038" stroke-width="1.8" stroke-linecap="round"/><rect x="225" y="259" width="6" height="5" rx="1" fill="#c9cdd3" stroke="#6f757d" stroke-width="1"/></g>
+      <rect x="215" y="281" width="26" height="5" rx="1.5" fill="#8d5a2e" stroke="#7d4d24" stroke-width="1.4"/>
+    </g>`,
+  toybox: () => `
+    <g class="room-toybox">
+      <ellipse cx="350" cy="292" rx="28" ry="4.5" fill="rgba(60,40,20,.12)"/>
+      <circle cx="338" cy="262" r="8" fill="#7fb7e6" stroke="#4f8cc0" stroke-width="1.8"/>
+      <rect x="349" y="254" width="13" height="13" rx="2" fill="#f6a4a4" stroke="#d17070" stroke-width="1.8" transform="rotate(12 355 260)"/>
+      <path d="M364 266 l5 -12 l5 12 z" fill="#b7e3b0" stroke="#6fae69" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M326 266 h48 l-3 25 h-42 z" fill="#f6b36b" stroke="#c9843c" stroke-width="2.2" stroke-linejoin="round"/>
+      <rect x="323" y="262" width="54" height="7" rx="2.5" fill="#fbc98a" stroke="#c9843c" stroke-width="2"/>
+      <path d="M350 273 l2 4.2 l4.6 .5 l-3.4 3.2 l.9 4.6 l-4.1 -2.3 l-4.1 2.3 l.9 -4.6 l-3.4 -3.2 l4.6 -.5 z" fill="#fff6c9"/>
+    </g>`,
+  beanbag: () => `
+    <g class="room-beanbag">
+      <ellipse cx="60" cy="287" rx="32" ry="5" fill="rgba(60,40,20,.12)"/>
+      <path d="M30 276 C26 258 44 246 60 247 C78 246 94 258 90 276 C90 288 30 288 30 276 Z" fill="#b7a4e8" stroke="#8a74c4" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M44 262 C52 268 68 268 76 262" fill="none" stroke="#8a74c4" stroke-width="1.8" stroke-linecap="round"/>
+      <path d="M40 258 C44 252 52 250 58 250" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".55"/>
+    </g>`,
+  bookshelf: () => {
+    const books = [
+      [220, 148, '#f2a0a0', 5, 16], [225, 146, '#7fb7e6', 6, 18], [231, 150, '#ffd166', 4, 14], [235, 147, '#a6d8a9', 6, 17], [246, 152, '#b9a4ee', 12, 12],
+      [220, 174, '#a6d8a9', 6, 18], [226, 177, '#f6b36b', 5, 15], [231, 173, '#f2a0a0', 6, 19], [243, 176, '#7fb7e6', 5, 16], [248, 174, '#ffd166', 6, 18],
+      [221, 203, '#b9a4ee', 5, 15], [226, 200, '#ffd166', 6, 18], [237, 202, '#7fb7e6', 6, 16], [243, 199, '#f2a0a0', 5, 19], [248, 203, '#a6d8a9', 6, 15],
+    ]
+      .map(([x, top, c, w, h]) => `<rect x="${x}" y="${top}" width="${w}" height="${h}" rx=".8" fill="${c}"/>`)
+      .join('');
+    return `
+    <g class="room-bookshelf">
+      <ellipse cx="239" cy="222" rx="28" ry="4" fill="rgba(60,40,20,.12)"/>
+      <rect x="214" y="134" width="50" height="88" rx="3" fill="#c9976a" stroke="#9a6b43" stroke-width="2.2"/>
+      <rect x="218" y="138" width="42" height="80" fill="#8d6038"/>
+      <g stroke="#3b2c22" stroke-opacity=".22" stroke-width=".7">${books}</g>
+      <rect x="216" y="164" width="46" height="4" fill="#c9976a"/><rect x="216" y="192" width="46" height="4" fill="#c9976a"/>
+    </g>`;
+  },
+  piano: () => `
+    <g class="room-piano">
+      <ellipse cx="178" cy="222" rx="38" ry="4.5" fill="rgba(60,40,20,.14)"/>
+      <path d="M150 196 v24 M206 196 v24" stroke="#4a3226" stroke-width="5" stroke-linecap="round"/>
+      <rect x="146" y="152" width="64" height="62" rx="3" fill="#7a5340" stroke="#4a3226" stroke-width="2.2"/>
+      <rect x="143" y="148" width="70" height="7" rx="2.5" fill="#8d6350" stroke="#4a3226" stroke-width="2"/>
+      <rect x="162" y="160" width="32" height="16" rx="1.5" fill="#fffdf6" stroke="#4a3226" stroke-width="1.4"/>
+      <g stroke="#8b8277" stroke-width=".8"><path d="M165 165 h26 M165 168.5 h26 M165 172 h26"/></g>
+      <rect x="141" y="184" width="74" height="12" rx="2" fill="#8d6350" stroke="#4a3226" stroke-width="2"/>
+      <rect x="145" y="186" width="66" height="7" fill="#fffdf6"/>
+      <g stroke="#b9b0a3" stroke-width=".7">${Array.from({ length: 10 }, (_, i) => `<path d="M${151 + i * 6} 186 v7"/>`).join('')}</g>
+      <g fill="#2f241d">${[149, 155, 167, 173, 179, 191, 197].map((x) => `<rect x="${x}" y="186" width="3.4" height="4.4"/>`).join('')}</g>
+    </g>`,
   bowl: (fullness = 0) => `
     <g class="room-bowl">
       <ellipse cx="126" cy="274" rx="20" ry="4.5" fill="rgba(60,40,20,.12)"/>
@@ -623,8 +767,9 @@ function fishbowl() {
  * The room, without the pet (the pet is added by the room controller so it can
  * move). `placed` is the list of decorations put out; `wall` the wallpaper.
  */
-export function roomMarkup({ placed = [], wall = null, fish = false, hour = clockNow(), where = {} } = {}) {
+export function roomMarkup({ placed = [], wall = null, floor = null, fish = false, hour = clockNow(), where = {} } = {}) {
   const w = WALLS[wall] || WALLS.plain;
+  const f = FLOORS[floor] || FLOORS.plain;
   const has = (id) => placed.includes(id);
   const dark = skyAt(hour).dark;
   // Each thing in the room sits in its own group, moved by however far the
@@ -637,30 +782,46 @@ export function roomMarkup({ placed = [], wall = null, fish = false, hour = cloc
   return `
     <defs>
       ${w.pattern}
+      ${f.pattern || ''}
       <linearGradient id="floor-grad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#ecc99c"/><stop offset="1" stop-color="#e0b886"/>
+        <stop offset="0" stop-color="${f.top || '#ecc99c'}"/><stop offset="1" stop-color="${f.bottom || '#e0b886'}"/>
       </linearGradient>
     </defs>
     <rect class="room-wall" x="0" y="0" width="400" height="206" fill="${w.fill}"/>
     <radialGradient id="wall-light" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
     <rect x="0" y="0" width="400" height="206" fill="url(#wall-light)" pointer-events="none"/>
+    ${has('lights') ? ITEM_ART.lights() : ''}
     ${has('bunting') ? ITEM_ART.bunting() : ''}
     ${has('window') ? item('window', ITEM_ART.window(hour)) : ''}
     ${has('picture') ? item('picture', ITEM_ART.picture()) : ''}
-    <rect x="0" y="200" width="400" height="100" fill="url(#floor-grad)"/>
-    <g stroke="#d4a874" stroke-width="1.4" opacity=".7">
+    ${has('poster') ? item('poster', ITEM_ART.poster()) : ''}
+    ${has('clock') ? item('clock', ITEM_ART.clock(hour)) : ''}
+    ${has('shelf') ? item('shelf', ITEM_ART.shelf()) : ''}
+    <rect x="0" y="200" width="400" height="100" fill="${f.boards ? 'url(#floor-grad)' : f.fill}"/>
+    ${
+      f.boards
+        ? `<g stroke="${f.line}" stroke-width="1.4" opacity=".7">
       <path d="M0 226 H400 M0 254 H400 M0 284 H400"/>
       <path d="M70 200 v26 M190 200 v26 M310 200 v26 M30 226 v28 M150 226 v28 M270 226 v28 M370 226 v28 M100 254 v30 M230 254 v30 M340 254 v30"/>
-    </g>
+    </g>`
+        : ''
+    }
     <rect x="0" y="196" width="400" height="9" fill="#f6e7d2"/>
     <rect x="0" y="204" width="400" height="2" fill="#d9bc93"/>
     ${has('rug') ? item('rug', ITEM_ART.rug()) : ''}
+    ${has('piano') ? item('piano', ITEM_ART.piano()) : ''}
+    ${has('bookshelf') ? item('bookshelf', ITEM_ART.bookshelf()) : ''}
+    ${has('flowers') ? item('flowers', ITEM_ART.flowers()) : ''}
     ${has('bed') && !fish ? item('bed', ITEM_ART.bed()) : ''}
     ${has('stand') ? item('stand', ITEM_ART.stand()) : ''}
     ${has('plant') ? item('plant', ITEM_ART.plant()) : ''}
     ${has('lamp') ? item('lamp', ITEM_ART.lamp()) : ''}
     ${fish ? fishbowl() : item('bowl', ITEM_ART.bowl())}
+    ${has('beanbag') ? item('beanbag', ITEM_ART.beanbag()) : ''}
+    ${has('toybox') ? item('toybox', ITEM_ART.toybox()) : ''}
+    ${has('metronome') ? item('metronome', ITEM_ART.metronome()) : ''}
     ${dark > 0.02 ? `<rect class="room-night" x="0" y="0" width="400" height="300" fill="#1d2550" opacity="${(dark * 0.2).toFixed(3)}" pointer-events="none"/>` : ''}
+    ${dark > 0.3 && has('lights') ? ITEM_ART.lights(true) : ''}
     ${
       // After dark the lamp is what lights the room: its pool of light is drawn
       // over the dusk, so the corner it stands in stays warm.
@@ -687,7 +848,25 @@ export function itemIcon(id) {
     bed: '248 232 96 48',
     ball: '-12 -12 24 24',
     stand: '68 160 56 112',
+    clock: '176 28 48 48',
+    poster: '150 70 56 64',
+    shelf: '0 116 62 46',
+    lights: '0 -4 200 44',
+    flowers: '106 148 48 74',
+    metronome: '206 242 44 50',
+    toybox: '318 248 64 50',
+    beanbag: '22 240 76 54',
+    bookshelf: '206 128 66 100',
+    piano: '134 142 88 86',
   };
+  if (id.startsWith('floor-')) {
+    const f = FLOORS[id];
+    const fill = f.boards ? f.top : f.fill;
+    return `<svg class="item-icon" viewBox="0 200 60 44" aria-hidden="true"><defs>${f.pattern || ''}</defs>
+      <rect y="200" width="60" height="44" rx="6" fill="${fill}"/>${
+        f.boards ? `<path d="M0 214 H60 M0 230 H60 M22 200 v14 M44 214 v16 M14 230 v14" stroke="${f.line}" stroke-width="1.4"/>` : ''
+      }</svg>`;
+  }
   if (id.startsWith('wall-')) {
     const w = WALLS[id];
     return `<svg class="item-icon" viewBox="0 0 60 44" aria-hidden="true"><defs>${w.pattern}</defs>

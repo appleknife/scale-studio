@@ -138,6 +138,20 @@ export const ITEMS = [
   { id: 'wall-mint', cost: 15, slot: 'wall' },
   { id: 'wall-dots', cost: 15, slot: 'wall' },
   { id: 'wall-stars', cost: 18, slot: 'wall' },
+  { id: 'clock', cost: 12, slot: 'clock' },
+  { id: 'poster', cost: 8, slot: 'poster' },
+  { id: 'shelf', cost: 14, slot: 'shelf' },
+  { id: 'lights', cost: 14, slot: 'lights' },
+  { id: 'flowers', cost: 8, slot: 'flowers' },
+  { id: 'metronome', cost: 10, slot: 'metronome' },
+  { id: 'toybox', cost: 12, slot: 'toybox' },
+  { id: 'beanbag', cost: 14, slot: 'beanbag' },
+  { id: 'bookshelf', cost: 18, slot: 'bookshelf' },
+  { id: 'piano', cost: 30, slot: 'piano' },
+  { id: 'wall-notes', cost: 18, slot: 'wall' },
+  { id: 'wall-lilac', cost: 15, slot: 'wall' },
+  { id: 'floor-tiles', cost: 16, slot: 'floor' },
+  { id: 'floor-dark', cost: 16, slot: 'floor' },
 ];
 
 /**
@@ -155,6 +169,22 @@ export const ITEM_RANGE = {
   bed: { x: [-246, 54], y: [0, 0] },
   rug: { x: [-76, 76], y: [-4, 10] },
   bowl: { x: [-98, 246], y: [0, 0] },
+  clock: { x: [-176, 176], y: [-26, 108] },
+  poster: { x: [-154, 196], y: [-70, 58] },
+  shelf: { x: [-2, 340], y: [-104, 36] },
+  flowers: { x: [-110, 250], y: [0, 0] },
+  metronome: { x: [-210, 156], y: [-10, 6] },
+  toybox: { x: [-320, 22], y: [-12, 4] },
+  beanbag: { x: [-26, 300], y: [-14, 6] },
+  bookshelf: { x: [-212, 134], y: [0, 0] },
+  piano: { x: [-138, 182], y: [0, 0] },
+};
+
+const FISH_SPOTS = {
+  piano: { x: -138, y: 0 },
+  bookshelf: { x: 134, y: 0 },
+  poster: { x: -26, y: -58 },
+  metronome: { x: 64, y: 0 },
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -170,6 +200,7 @@ export function emptyPet() {
     owned: [],
     placed: [],
     wall: null, // the wallpaper item in use, or null for the plain one
+    floor: null, // the floor laid, or null for the boards the room came with
     day: freshDay(''),
     // The key it would like to hear today, or null — see ensureWish().
     wish: null,
@@ -229,6 +260,7 @@ function upgrade(p) {
     else delete p.where[id];
   }
   if (!p.tips || typeof p.tips !== 'object') p.tips = {};
+  if (!ITEMS.some((i) => i.slot === 'floor' && i.id === p.floor)) p.floor = null;
   p.v = 3;
   return p;
 }
@@ -696,15 +728,20 @@ export function buy(pet, itemId) {
   pet.notes -= item.cost;
   pet.owned.push(itemId);
   place(pet, itemId, true);
+  // A fish's bowl stands on a table in the middle of the room; what would be
+  // put down behind it goes beside it instead.
+  if (pet.pet && pet.pet.species === 'fish' && FISH_SPOTS[itemId] && !(pet.where && pet.where[itemId])) {
+    moveItem(pet, itemId, FISH_SPOTS[itemId].x, FISH_SPOTS[itemId].y);
+  }
   return true;
 }
 
-/** Put a bought decoration out, or away. A wallpaper replaces the one up. */
+/** Put a bought decoration out, or away. A wallpaper or a floor replaces the one in use. */
 export function place(pet, itemId, on = !isPlaced(pet, itemId)) {
   const item = ITEMS.find((i) => i.id === itemId);
   if (!item || !pet.owned.includes(itemId)) return false;
-  if (item.slot === 'wall') {
-    pet.wall = on ? itemId : null;
+  if (item.slot === 'wall' || item.slot === 'floor') {
+    pet[item.slot] = on ? itemId : null;
     return true;
   }
   pet.placed = pet.placed.filter((id) => id !== itemId);
@@ -715,7 +752,8 @@ export function place(pet, itemId, on = !isPlaced(pet, itemId)) {
 export function isPlaced(pet, itemId) {
   const item = ITEMS.find((i) => i.id === itemId);
   if (!item) return false;
-  return item.slot === 'wall' ? pet.wall === itemId : pet.placed.includes(itemId);
+  if (item.slot === 'wall' || item.slot === 'floor') return pet[item.slot] === itemId;
+  return pet.placed.includes(itemId);
 }
 
 /** Where a thing in the room has been dragged to, as an offset from its first place. */

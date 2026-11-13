@@ -3896,6 +3896,42 @@ select,
  * themselves (a finger on the lamp moves the lamp, not the page); the bare wall
  * and floor between them still scroll.
  */
+/* The metronome ticks, the fairy lights twinkle. */
+.metro-arm {
+  transform-box: view-box;
+  transform-origin: 228px 279px;
+  animation: metro-tick 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes metro-tick {
+  from {
+    transform: rotate(-16deg);
+  }
+  to {
+    transform: rotate(16deg);
+  }
+}
+
+.fairy-bulb {
+  animation: fairy-twinkle 2s ease-in-out infinite alternate;
+}
+
+@keyframes fairy-twinkle {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.62;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metro-arm,
+  .fairy-bulb {
+    animation: none;
+  }
+}
+
 .room-item,
 .pet-hit {
   touch-action: none;

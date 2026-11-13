@@ -13,9 +13,9 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611131110';
-import { t } from './i18n.js?v=202611131110';
-import { hearLevel } from './pitch.js?v=202611131110';
+import * as Trill from './trill.js?v=202611131615';
+import { t } from './i18n.js?v=202611131615';
+import { hearLevel } from './pitch.js?v=202611131615';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
