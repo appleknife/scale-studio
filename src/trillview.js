@@ -13,9 +13,9 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611121640';
-import { t } from './i18n.js?v=202611121640';
-import { hearLevel } from './pitch.js?v=202611121640';
+import * as Trill from './trill.js?v=202611121925';
+import { t } from './i18n.js?v=202611121925';
+import { hearLevel } from './pitch.js?v=202611121925';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -130,10 +130,11 @@ export function createTrillView(deps) {
       <details class="trill-tips">
         <summary>${t('trill.tips.title')}</summary>
         <ul>
+          <li>${t('trill.tips.contact')}</li>
+          <li>${t('trill.tips.clear')}</li>
+          <li>${t('trill.tips.travel')}</li>
           <li>${t('trill.tips.lift')}</li>
-          <li>${t('trill.tips.light')}</li>
           <li>${t('trill.tips.down')}</li>
-          <li>${t('trill.tips.even')}</li>
           <li>${t('trill.tips.pairs')}</li>
         </ul>
       </details>`;

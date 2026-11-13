@@ -11,12 +11,12 @@
 // score is drawn by OpenSheetMusicDisplay (BSD-3, vendor/), loaded only when a
 // score is opened, so the rest of the app never pays for it.
 
-import { readScore, readScoreFile, listParts, parseXml } from './musicxml.js?v=202611121640';
-import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611121640';
-import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611121640';
-import { t } from './i18n.js?v=202611121640';
+import { readScore, readScoreFile, listParts, parseXml } from './musicxml.js?v=202611121925';
+import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611121925';
+import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611121925';
+import { t } from './i18n.js?v=202611121925';
 
-const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611121640';
+const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611121925';
 const MAX_SECONDS = 600; // ten minutes: enough for any audition piece
 const MIN_SECONDS = 5;
 
