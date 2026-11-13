@@ -25,6 +25,10 @@ const PALETTE = {
   hamster: { body: '#f3b76a', dark: '#9a6226', belly: '#fff3df', inner: '#f6a7a0' },
   chicken: { body: '#ffe27c', dark: '#b8891c', wing: '#ffd14a', comb: '#f2665c', beak: '#f7a234' },
   fish: { body: '#ff9e69', dark: '#b9542a', fin: '#ffc79d', scale: '#ffbe93' },
+  rabbit: { body: '#f6ede2', dark: '#9c8672', belly: '#ffffff', inner: '#f8b5b5' },
+  koala: { body: '#c5c9d1', dark: '#6f7682', belly: '#eef0f3', inner: '#f3b9c0', nose: '#4a4550' },
+  penguin: { body: '#5b6f95', dark: '#33415f', belly: '#ffffff', beak: '#f7a234', wing: '#4b5d82' },
+  fox: { body: '#f39a52', dark: '#a3541f', belly: '#fff6ea', tip: '#5a3a28' },
 };
 
 // The rare colours: a hatchling now and then comes out in one of these. Same
@@ -35,6 +39,10 @@ const RARE = {
   hamster: { body: '#f6f1ea', dark: '#8b7d6b', belly: '#ffffff', inner: '#f6a7a0' },
   chicken: { body: '#d3ecff', dark: '#4a78a8', wing: '#acd2fa', comb: '#f2665c', beak: '#f7a234' },
   fish: { body: '#8fd3ff', dark: '#2e7bb0', fin: '#c8ebff', scale: '#b8e3ff' },
+  rabbit: { body: '#f9d5e0', dark: '#b06a85', belly: '#fff3f7', inner: '#f48fb1' },
+  koala: { body: '#f3e2c0', dark: '#a5844a', belly: '#fff8e8', inner: '#f3b9c0', nose: '#6b4a2a' },
+  penguin: { body: '#b79be0', dark: '#6d4fa3', belly: '#ffffff', beak: '#f7a234', wing: '#a488d2' },
+  fox: { body: '#e6eef7', dark: '#6f87a3', belly: '#ffffff', tip: '#9fb4cc' },
 };
 
 const eyes = (lx, rx, y, r = 4.3) => `
@@ -192,6 +200,101 @@ const SHAPES = {
         </g>
       </g>`;
   },
+
+  rabbit(c) {
+    return `
+      <circle cx="73" cy="83" r="6.5" fill="${c.belly}" stroke="${c.dark}" stroke-width="2"/>
+      <g class="pet-bob">
+        <ellipse cx="50" cy="78" rx="23.5" ry="18" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+        <ellipse cx="50" cy="82" rx="13" ry="10.5" fill="${c.belly}"/>
+        <ellipse cx="40" cy="93" rx="8" ry="4.6" fill="${c.belly}" stroke="${c.dark}" stroke-width="2"/>
+        <ellipse cx="60" cy="93" rx="8" ry="4.6" fill="${c.belly}" stroke="${c.dark}" stroke-width="2"/>
+        <g class="pet-head">
+          <g class="pet-ears">
+            <path d="M33 34 C25 12 31 -1 38 2 C45 5 46 20 44 31 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M67 34 C75 12 69 -1 62 2 C55 5 54 20 56 31 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M36 28 C32 16 34 8 37.5 8 C41 9 41.5 19 40.5 28 Z" fill="${c.inner}"/>
+            <path d="M64 28 C68 16 66 8 62.5 8 C59 9 58.5 19 59.5 28 Z" fill="${c.inner}"/>
+          </g>
+          <ellipse cx="50" cy="47" rx="24.5" ry="20.5" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+          ${eyes(41, 59, 46)}
+          ${blush(33, 67, 53.5)}
+          <path d="M48.2 50.8 h3.6 l-1.8 2.1 z" fill="${c.inner}" stroke="${c.inner}" stroke-width="1" stroke-linejoin="round"/>
+          <path d="M46 54 q2 2.4 4 0 q2 2.4 4 0" fill="none" stroke="${INK}" stroke-width="1.7" stroke-linecap="round"/>
+          <path d="M48.4 55.2 h3.2 v3 q-1.6 1 -3.2 0 z" fill="#fff" stroke="${c.dark}" stroke-width=".9" stroke-linejoin="round"/>
+        </g>
+      </g>`;
+  },
+
+  koala(c) {
+    return `
+      <g class="pet-bob">
+        <ellipse cx="50" cy="79" rx="23" ry="17.5" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+        <ellipse cx="50" cy="83" rx="13" ry="10" fill="${c.belly}"/>
+        <ellipse cx="40" cy="93" rx="7.5" ry="4.6" fill="${c.body}" stroke="${c.dark}" stroke-width="2"/>
+        <ellipse cx="60" cy="93" rx="7.5" ry="4.6" fill="${c.body}" stroke="${c.dark}" stroke-width="2"/>
+        <g class="pet-head">
+          <g class="pet-ears">
+            <circle cx="26" cy="33" r="12" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+            <circle cx="74" cy="33" r="12" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+            <circle cx="26.5" cy="34" r="6.5" fill="${c.inner}"/>
+            <circle cx="73.5" cy="34" r="6.5" fill="${c.inner}"/>
+          </g>
+          <ellipse cx="50" cy="46" rx="25.5" ry="21" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+          ${eyes(39, 61, 45)}
+          ${blush(31.5, 68.5, 53)}
+          <ellipse cx="50" cy="50" rx="5.2" ry="6.6" fill="${c.nose}"/>
+          <ellipse cx="48.4" cy="47" rx="1.5" ry="2" fill="#fff" opacity=".55"/>
+          <path d="M46.6 58.4 q3.4 2.6 6.8 0" fill="none" stroke="${INK}" stroke-width="1.7" stroke-linecap="round"/>
+        </g>
+      </g>`;
+  },
+
+  penguin(c) {
+    return `
+      <g fill="${c.beak}" stroke="#d27a1d" stroke-width="1.8" stroke-linejoin="round">
+        <ellipse cx="40" cy="94" rx="8" ry="3.6"/><ellipse cx="60" cy="94" rx="8" ry="3.6"/>
+      </g>
+      <g class="pet-bob">
+        <g class="pet-wings">
+          <path class="wing-l" d="M27 52 C15 60 14 76 21 82 C27 78 30 66 31 56 Z" fill="${c.wing}" stroke="${c.dark}" stroke-width="2" stroke-linejoin="round"/>
+          <path class="wing-r" d="M73 52 C85 60 86 76 79 82 C73 78 70 66 69 56 Z" fill="${c.wing}" stroke="${c.dark}" stroke-width="2" stroke-linejoin="round"/>
+        </g>
+        <path d="M50 20 C70 20 77 42 77 62 C77 82 66 93 50 93 C34 93 23 82 23 62 C23 42 30 20 50 20 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+        <path d="M50 37 C41 30 31 37 32.5 49 C29 62 33 89 50 89 C67 89 71 62 67.5 49 C69 37 59 30 50 37 Z" fill="${c.belly}"/>
+        <g class="pet-head">
+          ${eyes(41, 59, 46)}
+          ${blush(34, 66, 54)}
+          <path d="M45 50.6 L55 50.6 L50 57 Z" fill="${c.beak}" stroke="#d27a1d" stroke-width="1.6" stroke-linejoin="round"/>
+        </g>
+      </g>`;
+  },
+
+  fox(c) {
+    return `
+      <g class="pet-tail">
+        <path d="M70 86 C96 88 99 62 86 50 C83 62 78 72 68 76 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M86 50 C92 56 94 63 92 70 C88 66 85 60 83.5 57 Z" fill="${c.belly}"/>
+      </g>
+      <g class="pet-bob">
+        <ellipse cx="50" cy="78" rx="23.5" ry="18" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+        <ellipse cx="50" cy="82" rx="12.5" ry="10.5" fill="${c.belly}"/>
+        <ellipse cx="40" cy="93" rx="7.5" ry="4.6" fill="${c.tip}" stroke="${c.dark}" stroke-width="2"/>
+        <ellipse cx="60" cy="93" rx="7.5" ry="4.6" fill="${c.tip}" stroke="${c.dark}" stroke-width="2"/>
+        <g class="pet-head">
+          <path d="M26 40 L27 10 L48 28 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M74 40 L73 10 L52 28 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M30.5 30 L31 18 L41 27 Z" fill="${c.tip}"/>
+          <path d="M69.5 30 L69 18 L59 27 Z" fill="${c.tip}"/>
+          <path d="M50 25 C66 25 78 36 77 47 C76 57 62 66 50 67 C38 66 24 57 23 47 C22 36 34 25 50 25 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="M25 49 C32 49 40 53 50 53 C60 53 68 49 75 49 C73 58 61 65.2 50 66 C39 65.2 27 58 25 49 Z" fill="${c.belly}"/>
+          ${eyes(40, 60, 44)}
+          ${blush(32, 68, 55)}
+          <ellipse cx="50" cy="54.4" rx="3.4" ry="2.5" fill="${INK}"/>
+          <path d="M46 58.6 q2 2.4 4 0 q2 2.4 4 0" fill="none" stroke="${INK}" stroke-width="1.7" stroke-linecap="round"/>
+        </g>
+      </g>`;
+  },
 };
 
 /** One pet, in its own 100 × 100 box. `variant` is 'plain' or 'rare'. */
@@ -223,6 +326,10 @@ const EGGS = {
   hamster: { shell: '#fbe6b9', mark: '#c99a4f', pattern: 'seeds' },
   chicken: { shell: '#fff8ec', mark: '#e3c79c', pattern: 'speckles' },
   fish: { shell: '#cdeef0', mark: '#8fd0d6', pattern: 'scales' },
+  rabbit: { shell: '#e7f3dc', mark: '#f2994a', pattern: 'carrots' },
+  koala: { shell: '#e6e9ee', mark: '#7fb98a', pattern: 'leaves' },
+  penguin: { shell: '#cfe0f5', mark: '#ffffff', pattern: 'snow' },
+  fox: { shell: '#fde3c8', mark: '#ee8f4a', pattern: 'zigzag' },
 };
 
 function eggPattern(kind, mark) {
@@ -273,6 +380,43 @@ function eggPattern(kind, mark) {
         <path d="M34 54 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0"/>
         <path d="M32 66 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0"/>
         <path d="M36 78 q4 5 8 0 q4 5 8 0 q4 5 8 0 q4 5 8 0"/></g>`;
+    case 'carrots':
+      return [
+        [40, 44, -18],
+        [60, 54, 20],
+        [42, 68, 12],
+        [61, 78, -14],
+      ]
+        .map(
+          ([x, y, r]) => `<g transform="rotate(${r} ${x} ${y})"><path d="M${x - 3} ${y - 3} h6 l-3 10 z" fill="${mark}"/>
+            <path d="M${x} ${y - 3} l-2 -4 M${x} ${y - 3} v-4.6 M${x} ${y - 3} l2 -4" stroke="#6fae69" stroke-width="1.5" stroke-linecap="round"/></g>`,
+        )
+        .join('');
+    case 'leaves':
+      return `<g fill="${mark}">${[
+        [40, 46, -35],
+        [59, 50, 30],
+        [47, 62, 80],
+        [62, 70, -20],
+        [38, 74, 20],
+        [52, 80, -60],
+      ]
+        .map(([x, y, r]) => `<path d="M${x} ${y - 6} q5 6 0 12 q-5 -6 0 -12 z" transform="rotate(${r} ${x} ${y})"/>`)
+        .join('')}</g>`;
+    case 'snow':
+      return `<g stroke="${mark}" stroke-width="1.7" stroke-linecap="round">${[
+        [40, 46, 4.2],
+        [60, 52, 3.4],
+        [46, 64, 3.8],
+        [63, 72, 4.2],
+        [37, 76, 3.2],
+        [52, 82, 3],
+      ]
+        .map(([x, y, r]) => [0, 60, 120].map((a) => `<path d="M${x - r} ${y} h${r * 2}" transform="rotate(${a} ${x} ${y})"/>`).join(''))
+        .join('')}</g>`;
+    case 'zigzag':
+      return `<g fill="none" stroke="${mark}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M30 50 l7 -6 l7 6 l7 -6 l7 6 l7 -6 l7 6"/><path d="M24 68 l7 -6 l7 6 l7 -6 l7 6 l7 -6 l7 6 l7 -6"/><path d="M32 84 l7 -6 l7 6 l7 -6 l7 6 l7 -6"/></g>`;
     default:
       return '';
   }
@@ -348,6 +492,19 @@ const FOOD = {
   corn: `<ellipse cx="50" cy="56" rx="8" ry="15" fill="#ffd34d" stroke="#d49a1c" stroke-width="2"/>
     <g fill="#f5b81f">${[48, 54, 60, 66].map((y) => `<circle cx="47" cy="${y - 4}" r="1.6"/><circle cx="53" cy="${y - 4}" r="1.6"/>`).join('')}</g>
     <path d="M42 66 q-6 -10 -2 -20 q6 10 10 24 z M58 66 q6 -10 2 -20 q-6 10 -10 24 z" fill="#7cc16a" stroke="#4f9a44" stroke-width="1.6"/>`,
+  carrot: `<path d="M38 50 C46 46 52 48 54 52 L66 70 C60 70 46 62 38 50 Z" fill="#f2994a" stroke="#c96a1c" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M46 55 l4 -2 M51 61 l4 -2" stroke="#c96a1c" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M40 50 q-8 -2 -8 -10 q8 0 9 8 q0 -8 6 -11 q3 7 -4 12 z" fill="#7cc16a" stroke="#4f9a44" stroke-width="1.6" stroke-linejoin="round"/>`,
+  leaves: `<path d="M50 70 V46" stroke="#8a6a4a" stroke-width="2" stroke-linecap="round"/>
+    <g fill="#8fcf9a" stroke="#4f9a5c" stroke-width="1.6" stroke-linejoin="round">
+      <path d="M50 48 q-3 -7 0 -12 q3 5 0 12 z"/><path d="M50 54 q-12 -1 -15 -9 q11 0 15 9 z"/><path d="M50 54 q12 -1 15 -9 q-11 0 -15 9 z"/>
+      <path d="M50 64 q-12 0 -16 -8 q12 -1 16 8 z"/><path d="M50 64 q12 0 16 -8 q-12 -1 -16 8 z"/></g>`,
+  shrimp: `<path d="M36 60 C34 48 46 42 56 46 C64 49 66 58 60 63 C56 66 50 64 50 60 C50 57 54 56 55 58" fill="#ffab9a" stroke="#d96f5e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 60 l-5 5 M36 60 l-1 7" stroke="#d96f5e" stroke-width="2" stroke-linecap="round"/>
+    <path d="M42 48 q2 6 -2 10 M48 46 q2 6 -1 11" stroke="#d96f5e" stroke-width="1.4" fill="none" stroke-linecap="round"/><circle cx="57" cy="52" r="1.3" fill="#2c3e50"/>`,
+  apple: `<path d="M50 48 C58 42 66 48 65 58 C64 67 58 71 50 69 C42 71 36 67 35 58 C34 48 42 42 50 48 Z" fill="#ef5b5b" stroke="#b93a3a" stroke-width="2"/>
+    <path d="M50 48 q0 -5 3 -8" stroke="#6b4226" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M53 42 q6 -4 9 0 q-5 3 -9 0 z" fill="#7cc16a" stroke="#4f9a44" stroke-width="1.4"/>
+    <ellipse cx="42" cy="54" rx="2" ry="3.4" fill="#fff" opacity=".5" transform="rotate(20 42 54)"/>`,
   flakes: `<g fill="#f59a5a" stroke="#c66a30" stroke-width="1.2">
     <path d="M40 50 l6 -2 l2 5 l-6 2 z"/><path d="M52 46 l6 1 l-1 5 l-6 -1 z"/><path d="M46 58 l6 -1 l1 5 l-6 1 z"/><path d="M58 56 l5 3 l-3 4 l-5 -3 z"/></g>`,
 };

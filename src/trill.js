@@ -290,8 +290,14 @@ export function emptyStats() {
     // { 'A:12:whole': { done: ['two', 'three'], best: 9.6, runs: 4, last: '2026-11-12' } }
     sets: {},
     runs: 0,
+    // One line a judged take, newest last, for the stats page:
+    // { d: '2026-11-13', k: 'A:12:whole', s: 'four', r: 6.4, e: 81, p: 1 }
+    log: [],
   };
 }
+
+/** The most takes the log keeps: months of practice, and still a small save. */
+export const LOG_LIMIT = 300;
 
 export function loadStats(profileId, store = localStorage) {
   const base = emptyStats();
@@ -315,7 +321,18 @@ export function loadStats(profileId, store = localStorage) {
         last: typeof value.last === 'string' ? value.last : '',
       };
     }
-    return { v: 1, opts, sets, runs: Math.max(0, Math.round(Number(parsed.runs)) || 0) };
+    const log = (Array.isArray(parsed.log) ? parsed.log : [])
+      .filter((x) => x && typeof x === 'object' && typeof x.k === 'string' && STEPS.some((st) => st.id === x.s))
+      .map((x) => ({
+        d: typeof x.d === 'string' ? x.d : '',
+        k: x.k,
+        s: x.s,
+        r: Math.max(0, Number(x.r) || 0),
+        e: Math.max(0, Math.min(100, Math.round(Number(x.e)) || 0)),
+        p: x.p ? 1 : 0,
+      }))
+      .slice(-LOG_LIMIT);
+    return { v: 1, opts, sets, runs: Math.max(0, Math.round(Number(parsed.runs)) || 0), log };
   } catch {
     return base;
   }
@@ -359,7 +376,69 @@ export function recordRun(stats, notes, step, result, dayKey = '') {
     set.best = Math.round(result.rate * 10) / 10;
   }
   stats.sets[key] = set;
+  if (result.cycles >= MIN_CYCLES) {
+    if (!Array.isArray(stats.log)) stats.log = [];
+    stats.log.push({
+      d: dayKey,
+      k: key,
+      s: step.id,
+      r: Math.round(result.rate * 10) / 10,
+      e: Math.round(result.even),
+      p: result.verdict.pass ? 1 : 0,
+    });
+    if (stats.log.length > LOG_LIMIT) stats.log.splice(0, stats.log.length - LOG_LIMIT);
+  }
   return { newStep, newBest, best: set.best };
+}
+
+/**
+ * What the stats page shows, worked out from the save: totals, each pair of
+ * fingers side by side, every string against every pair, and the latest takes.
+ * Nothing here is a grade: it is where the practice has gone and where it has not.
+ */
+export function summary(stats) {
+  const log = Array.isArray(stats.log) ? stats.log : [];
+  const days = new Set(log.map((x) => x.d).filter(Boolean));
+  for (const set of Object.values(stats.sets)) if (set.last) days.add(set.last);
+  const mean = (list) => (list.length ? Math.round(list.reduce((a, b) => a + b, 0) / list.length) : null);
+  const pairs = PAIRS.map((pair) => {
+    const sets = Object.entries(stats.sets).filter(([key]) => key.split(':')[1] === pair.id);
+    const mine = log.filter((x) => x.k.split(':')[1] === pair.id);
+    return {
+      id: pair.id,
+      runs: sets.reduce((n, [, set]) => n + set.runs, 0),
+      steps: sets.reduce((n, [, set]) => Math.max(n, set.done.length), 0),
+      best: sets.reduce((n, [, set]) => Math.max(n, set.best), 0),
+      even: mean(mine.slice(-10).map((x) => x.e)),
+    };
+  });
+  const grid = STRINGS.map((string) => ({
+    string: string.id,
+    cells: PAIRS.map((pair) => {
+      const sets = Object.entries(stats.sets).filter(([key]) => key.startsWith(`${string.id}:${pair.id}:`));
+      return {
+        pair: pair.id,
+        steps: sets.reduce((n, [, set]) => Math.max(n, set.done.length), 0),
+        runs: sets.reduce((n, [, set]) => n + set.runs, 0),
+      };
+    }),
+  }));
+  // The pair that has had the least: fewest steps, then fewest takes. Only named
+  // once there is something to compare it with.
+  const tried = pairs.filter((p) => p.runs > 0);
+  const least = [...pairs].sort((a, b) => a.steps - b.steps || a.runs - b.runs)[0];
+  const most = [...pairs].sort((a, b) => b.steps - a.steps || b.runs - a.runs)[0];
+  const behind = tried.length && (most.steps > least.steps || most.runs >= least.runs + 3) ? least.id : null;
+  return {
+    runs: stats.runs,
+    days: days.size,
+    best: pairs.reduce((n, p) => Math.max(n, p.best), 0),
+    steps: Object.values(stats.sets).reduce((n, set) => n + set.done.length, 0),
+    pairs,
+    grid,
+    behind,
+    recent: log.slice(-24),
+  };
 }
 
 /** The step to offer next: the first not yet done, or the free one. */

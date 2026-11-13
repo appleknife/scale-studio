@@ -59,7 +59,7 @@
         P.hatch(p, 0, 0.9);
         eq('a hatchling is a baby', P.stageOf(p.pet), 'baby');
         eq('a high roll is the plain colour', p.pet.variant, 'plain');
-        eq('the pet book has it', P.dexCount(p), { found: 1, total: 10 });
+        eq('the pet book has it', P.dexCount(p), { found: 1, total: P.SPECIES.length * 2 });
         eq('no growing before it has a name', P.earn(p, { kind: 'scale', id: 'D', dayKey: '2026-11-06' }).grew, null);
         eq('…and its growth did not move', p.pet.growth, 0);
         P.name(p, 'Mochi');
@@ -373,6 +373,8 @@
         const sameDay = P.earn(q, { kind: 'scale', id: 'D', dayKey: '2026-11-10' });
         eq('more practice the same day does not use the plan up', [sameDay.kept, q.plan && q.plan.cue], [null, 'afterDinner']);
         const before = q.notes;
+        // The day's wish is drawn at random; pin it to G so that D is never the wished-for key.
+        P.ensureWish(q, '2026-11-13', () => 0);
         const later = P.earn(q, { kind: 'scale', id: 'D', dayKey: '2026-11-13' });
         eq('practice on a later day keeps it — three days on is as good as one', later.kept, 'afterDinner');
         eq('keeping a plan pays nothing extra', q.notes - before, later.amount);

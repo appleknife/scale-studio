@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611131615';
+import * as Pet from './pet.js?v=202611131640';
 import {
   petMarkup,
   eggMarkup,
@@ -30,8 +30,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611131615';
-import { t, getLang } from './i18n.js?v=202611131615';
+} from './petart.js?v=202611131640';
+import { t, getLang } from './i18n.js?v=202611131640';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -47,6 +47,10 @@ const SOUNDS = {
   hamster: ['pet.say.hamster1', 'pet.say.hamster2'],
   chicken: ['pet.say.chicken1', 'pet.say.chicken2'],
   fish: ['pet.say.fish1', 'pet.say.fish2'],
+  rabbit: ['pet.say.rabbit1', 'pet.say.rabbit2'],
+  koala: ['pet.say.koala1', 'pet.say.koala2'],
+  penguin: ['pet.say.penguin1', 'pet.say.penguin2'],
+  fox: ['pet.say.fox1', 'pet.say.fox2'],
 };
 
 const NAMES = {
@@ -55,6 +59,10 @@ const NAMES = {
   hamster: ['Peanut', 'Nibbles', 'Bachy', 'Dumpling'],
   chicken: ['Sunny', 'Peep', 'Nugget', 'Vivaldi'],
   fish: ['Bubbles', 'Coral', 'Fin', 'Elgar'],
+  rabbit: ['Clover', 'Hops', 'Thumper', 'Brahms'],
+  koala: ['Gumnut', 'Snooze', 'Pebble', 'Dvořák'],
+  penguin: ['Waddle', 'Pip', 'Snowy', 'Grieg'],
+  fox: ['Maple', 'Ember', 'Rusty', 'Paganini'],
 };
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -203,18 +211,33 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       scheduleEggWobble();
       return;
     }
-    // Five eggs on a long cushion, to choose from.
+    // The eggs to choose from: five on a long cushion at the front, the rest on
+    // a shelf behind them.
+    const FRONT = 5;
+    const back = Math.max(0, Pet.SPECIES.length - FRONT);
+    const backLeft = 200 - (back * 68) / 2;
+    if (back) {
+      stage.append(
+        node('rect', { x: backLeft - 12, y: 158, width: back * 68 + 24, height: 12, rx: 5, fill: '#d9a979', stroke: '#a9774c', 'stroke-width': 2 }),
+        node('path', { d: `M${backLeft + 6} 170 v10 M${backLeft + back * 68 - 6} 170 v10`, stroke: '#a9774c', 'stroke-width': 4, 'stroke-linecap': 'round' }),
+      );
+    }
     stage.append(
       node('rect', { x: 26, y: 246, width: 348, height: 26, rx: 13, fill: '#f6cfc4', stroke: '#e0a99b', 'stroke-width': 2 }),
       node('path', { d: 'M40 259 h320', stroke: '#fbe4dd', 'stroke-width': 3, 'stroke-dasharray': '2 8', 'stroke-linecap': 'round' }),
     );
-    Pet.SPECIES.forEach((species, i) => {
-      const x = 32 + i * 68;
+    // back row first, so the front eggs are drawn over the shelf's edge
+    const inOrder = [...Pet.SPECIES.slice(FRONT), ...Pet.SPECIES.slice(0, FRONT)];
+    inOrder.forEach((species) => {
+      const i = Pet.SPECIES.indexOf(species);
+      const front = i < FRONT;
+      const x = front ? 32 + i * 68 : backLeft + (i - FRONT) * 68;
+      const y = front ? 180 : 93;
       const g = node(
         'g',
         {
           class: `egg-pick${picked === species ? ' is-picked' : ''}${picked && picked !== species ? ' is-dim' : ''}`,
-          transform: `translate(${x} 180) scale(.68)`,
+          transform: `translate(${x} ${y}) scale(.68)`,
           role: 'button',
           tabindex: '0',
           'data-species': species,
