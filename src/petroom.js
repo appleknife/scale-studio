@@ -15,7 +15,7 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611131110';
+import * as Pet from './pet.js?v=202611131615';
 import {
   petMarkup,
   eggMarkup,
@@ -30,8 +30,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611131110';
-import { t, getLang } from './i18n.js?v=202611131110';
+} from './petart.js?v=202611131615';
+import { t, getLang } from './i18n.js?v=202611131615';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -103,7 +103,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   // The bowl and the bed are wherever they have been dragged to.
   const bowlAt = () => ({ x: BOWL.x + Pet.itemAt(pet, 'bowl').x, y: BOWL.y });
   const bedAt = () => ({ x: BED.x + Pet.itemAt(pet, 'bed').x, y: BED.y });
-  const roomArt = () => roomMarkup({ placed: pet.placed, wall: pet.wall, fish: isFish(), hour: timeNow(), where: pet.where });
+  const roomArt = () => roomMarkup({ placed: pet.placed, wall: pet.wall, floor: pet.floor, fish: isFish(), hour: timeNow(), where: pet.where });
 
   const layers = {};
 

@@ -208,6 +208,16 @@
         P.buy(p, 'wall-mint');
         P.buy(p, 'wall-dots');
         eq('one wallpaper at a time', [P.isPlaced(p, 'wall-mint'), P.isPlaced(p, 'wall-dots')], [false, true]);
+        p.notes = 500;
+        P.buy(p, 'floor-tiles');
+        P.buy(p, 'floor-dark');
+        eq('one floor at a time, and the wallpaper stays up', [P.isPlaced(p, 'floor-tiles'), P.isPlaced(p, 'floor-dark'), P.isPlaced(p, 'wall-dots')], [false, true, true]);
+        P.place(p, 'floor-dark', false);
+        eq('a floor can be taken up again', p.floor, null);
+        P.buy(p, 'piano');
+        eq('new furniture is put out when bought', P.isPlaced(p, 'piano'), true);
+        eq('and can be dragged, within the room', P.moveItem(p, 'piano', 9999, 50), { x: P.ITEM_RANGE.piano.x[1], y: 0 });
+        eq('every thing that can be put out has a name and can be bought', P.ITEMS.every((i) => i.cost > 0 && i.slot), true);
         p.notes = 3;
         eq('too few notes, no lamp', P.buy(p, 'lamp'), false);
       }
