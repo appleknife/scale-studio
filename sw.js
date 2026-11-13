@@ -23,7 +23,7 @@
 // — the publish routine does both from one number. Without that, a student keeps
 // whatever was cached the first time, which is the same stale-code trap the
 // stamps exist to avoid.
-const VERSION = '202611122010';
+const VERSION = '202611131110';
 const SHELL = 'scale-studio-shell-' + VERSION;
 // The recordings and the score renderer do not change from one publish to the
 // next, so their cache is not named after VERSION: a new version used to throw
@@ -142,6 +142,22 @@ self.addEventListener('fetch', (event) => {
     // of the download: cache first, and only fetched when something needs them.
     event.respondWith(
       caches.open(SAMPLES).then((cache) => fresh(cache, request)),
+    );
+    return;
+  }
+
+  if (url.pathname.includes('/library/')) {
+    // The teacher's pieces: the newest list when there is a connection (a piece
+    // can be added without publishing a new version), the kept copy when not.
+    event.respondWith(
+      caches.open(SAMPLES).then((cache) =>
+        fetch(request)
+          .then((response) => {
+            if (response && response.status === 200) cache.put(url.pathname, response.clone()).catch(() => {});
+            return response;
+          })
+          .catch(async () => (await cache.match(url.pathname)) || Response.error()),
+      ),
     );
     return;
   }
