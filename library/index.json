@@ -10,6 +10,23 @@
       "bars": 38,
       "notes": 275,
       "credit": "Sample. Scanned from the Mutopia Project edition, typeset by Hajo Dezelski (CC BY-SA 3.0)."
+    },
+    {
+      "id": "scanner-test-page",
+      "title": "Scanner test page",
+      "composer": "Claude",
+      "file": "scanner-test-page.musicxml",
+      "scanned": true,
+      "pages": 1,
+      "bars": 16,
+      "notes": 49,
+      "leftOut": [
+        {
+          "page": 1,
+          "label": "Bonus Exercise: bow lifts and slurs",
+          "lines": 2
+        }
+      ]
     }
   ],
   "inbox": "https://github.com/appleknife/scale-studio/upload/main/library/inbox"
