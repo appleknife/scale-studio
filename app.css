@@ -6497,6 +6497,72 @@ select,
   background: rgba(47, 93, 78, 0.08);
 }
 
+.listen-bar.is-in {
+  border-color: rgba(47, 93, 78, 0.45);
+  background: rgba(47, 93, 78, 0.07);
+}
+
+.listen-bar.is-out {
+  background: rgba(255, 253, 248, 0.6);
+}
+
+.listen-bar.is-now {
+  border-color: #c07a1c;
+  background: rgba(192, 122, 28, 0.16);
+}
+
+.listen-section,
+.listen-hear {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 10px 0 4px;
+}
+
+.listen-range {
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.listen-bar-select {
+  font: inherit;
+  padding: 5px 8px;
+  margin: 0 2px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.listen-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.listen-speed-range {
+  width: 150px;
+  accent-color: #2f5d4e;
+}
+
+.listen-speed-out {
+  min-width: 62px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.listen-hear .ghost-btn.is-on {
+  border-color: #c07a1c;
+}
+
+.listen-weak-text {
+  flex: 1;
+}
+
 .listen-noticed {
   margin: 18px 0 4px;
   font: 700 18px var(--serif);

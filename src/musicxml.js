@@ -282,6 +282,28 @@ export function readScore(xmlText, partId = null) {
 }
 
 /**
+ * Written bars `from`..`to` (indexes, either way round) as a score of their own:
+ * played once, straight through, the way a passage is practised. A bar that the
+ * whole piece visits more than once gives the notes of its first visit.
+ */
+export function sectionOf(score, from, to) {
+  const last = score.measures.length - 1;
+  const a = Math.max(0, Math.min(from, to, last));
+  const b = Math.min(last, Math.max(from, to, 0));
+  const order = [];
+  const notes = [];
+  let abs = 0;
+  for (let mi = a; mi <= b; mi++) {
+    order.push(mi);
+    const inBar = score.notes.filter((n) => n.measure === mi);
+    const first = inBar.reduce((low, n) => Math.min(low, n.pass), Infinity);
+    for (const n of inBar) if (n.pass === first) notes.push({ ...n, pass: 0, abs: abs + n.at });
+    abs += score.measures[mi].quarters;
+  }
+  return { ...score, order, notes, totalQuarters: abs, section: { from: a, to: b } };
+}
+
+/**
  * Written bars in playing order: a backward repeat sends the reader back to the
  * last forward repeat (or the start) `times − 1` more times, and a bar under a
  * numbered ending is only played on the passes it is numbered for.
