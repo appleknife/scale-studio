@@ -240,6 +240,56 @@
 
       log.push(`passages generated: ${checked}`);
 
+      // ── does it sound like a tune? ─────────────────────────────────────
+      // The leanings in docs/sight-reading-melody.md, measured. The floors sit
+      // well under what the generator does, so they catch a lean that has stopped
+      // working (or a weight looked up the wrong way round) without failing on
+      // an unlucky batch.
+      for (const level of SIGHT_LEVELS) {
+        const t = { n: 0, close: 0, held: 0, heldIn: 0, beat: 0, beatIn: 0, up: 0, down: 0, ti: 0, tiUp: 0, half: 0, halfV: 0, rock: 0 };
+        for (let seed = 9000; seed < 9300; seed += 1) {
+          const p = generatePassage({ level, seed });
+          const id = `L${level} seed ${seed}`;
+          t.n += 1;
+          if (!Array.isArray(p.harmony) || p.harmony.length !== 8) problems.push(`${id}: no chord for every bar`);
+          else if (p.harmony[0] !== 'I' || p.harmony[3] !== 'V' || p.harmony[6] !== 'V' || p.harmony[7] !== 'I') {
+            problems.push(`${id}: the chords are ${p.harmony.join(' ')}, which is not a question and an answer`);
+          }
+          const ev = [];
+          p.bars.forEach((bar, b) => bar.forEach((e) => { if (!e.rest && e.note) ev.push({ ...e, bar: b }); }));
+          const gap = Math.abs(ev[ev.length - 1].midi - ev[ev.length - 2].midi);
+          if (gap >= 1 && gap <= 2) t.close += 1;
+          ev.forEach((e, i) => {
+            const inChord = p.chords[e.bar].includes(e.note.degree);
+            if (e.dur >= 8) { t.held += 1; if (inChord) t.heldIn += 1; }
+            if (e.start % (p.perBar / 2) === 0) { t.beat += 1; if (inChord) t.beatIn += 1; }
+            const next = ev[i + 1];
+            if (!next) return;
+            const move = next.midi - e.midi;
+            if (move === 1 || move === 2) t.up += 1;
+            if (move === -1 || move === -2) t.down += 1;
+            if (e.note.degree === 6 && !e.accidental && !next.accidental) { t.ti += 1; if (move === 1) t.tiUp += 1; }
+            const c = ev[i + 2];
+            const d = ev[i + 3];
+            if (c && d && e.midi === c.midi && next.midi === d.midi && e.midi !== next.midi) t.rock += 1;
+          });
+          const bar4 = p.bars[3].filter((e) => !e.rest && e.note);
+          if (bar4.length) { t.half += 1; if ([4, 1, 6].includes(bar4[bar4.length - 1].note.degree)) t.halfV += 1; }
+        }
+        const pc = (a, b) => (b ? Math.round((100 * a) / b) : 0);
+        const downShare = pc(t.down, t.up + t.down);
+        log.push(
+          `L${level} tune: closes by step ${pc(t.close, t.n)}% · held notes in the chord ${pc(t.heldIn, t.held)}% · strong beats in the chord ${pc(t.beatIn, t.beat)}% · ` +
+            `steps going down ${downShare}% · ti→do ${pc(t.tiUp, t.ti)}% · bar 4 on the dominant chord ${pc(t.halfV, t.half)}% · rocking ${(t.rock / t.n).toFixed(2)} a passage`,
+        );
+        if (pc(t.close, t.n) < (level === 1 ? 55 : 68)) problems.push(`L${level}: only ${pc(t.close, t.n)}% of passages reach the last note by step`);
+        if (pc(t.heldIn, t.held) < 58) problems.push(`L${level}: only ${pc(t.heldIn, t.held)}% of held notes belong to the bar's chord`);
+        if (pc(t.beatIn, t.beat) < 52) problems.push(`L${level}: only ${pc(t.beatIn, t.beat)}% of strong beats belong to the bar's chord`);
+        if (downShare < 35 || downShare > 65) problems.push(`L${level}: ${downShare}% of steps go down — a line should step both ways`);
+        if (pc(t.halfV, t.half) < 42) problems.push(`L${level}: bar 4 pauses on the dominant chord in only ${pc(t.halfV, t.half)}% of passages`);
+        if (t.rock / t.n > 1.4) problems.push(`L${level}: ${(t.rock / t.n).toFixed(2)} see-saws a passage`);
+      }
+
       // The teacher's figures from level IV up: an eighth and two sixteenths and
       // the reverse in a beat (almost every passage, never in cut time), a dotted
       // half most of the time where the metre holds one, a whole note rarely,

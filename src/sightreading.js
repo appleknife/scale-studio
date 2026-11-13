@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611131720';
-import { STAFF_GEOM } from './staff.js?v=202611131720';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611131750';
+import { STAFF_GEOM } from './staff.js?v=202611131750';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -375,7 +375,13 @@ function poolFor(key, [low, high]) {
 /** Semitone size of each degree step, used only for weighting. */
 const STEP_WEIGHTS = [0, 62, 26, 7, 4, 1, 0.5];
 
-function chooseStep(rng, allowed, directionBias, lastStep) {
+/**
+ * `lean(step)` is the musical nudge: a multiplier for each candidate, worked out
+ * by the caller from where the note falls (see "what makes it sound like a tune"
+ * in generatePassage). It only ever tilts the draw; every step the level allows
+ * stays possible. `momentum` is how strongly a stepwise line keeps its direction.
+ */
+function chooseStep(rng, allowed, directionBias, lastStep, lean = () => 1, momentum = 1.8) {
   // A leap is answered by a step back the other way. Every source says it the
   // same way — “leap up, step down” — and weighting it was not enough: only 30%
   // of leaps were actually resolved, because the arc kept pulling the line on.
@@ -383,7 +389,7 @@ function chooseStep(rng, allowed, directionBias, lastStep) {
   if (Math.abs(lastStep) >= 3) {
     const back = allowed.filter((s) => Math.sign(s) === -Math.sign(lastStep) && Math.abs(s) <= 2);
     if (back.length) {
-      const weights = back.map((s) => STEP_WEIGHTS[Math.abs(s)] || 1);
+      const weights = back.map((s) => (STEP_WEIGHTS[Math.abs(s)] || 1) * lean(s));
       const total = weights.reduce((a, b) => a + b, 0);
       let roll = rng() * total;
       for (let i = 0; i < back.length; i++) {
@@ -396,7 +402,11 @@ function chooseStep(rng, allowed, directionBias, lastStep) {
 
   const options = [];
   for (const step of allowed) {
-    let weight = STEP_WEIGHTS[step] || 0.3;
+    // By size, whichever way it goes. (This used to look the weight up by the
+    // signed step, so every downward move — step or sixth alike — got the same
+    // token weight: lines climbed by step and only ever came down by bouncing
+    // off the top of the range or by a leap.)
+    let weight = STEP_WEIGHTS[Math.abs(step)] || 0.3;
     if (directionBias > 0 && Math.sign(step) === -1) weight *= 0.35;
     if (directionBias < 0 && Math.sign(step) === 1) weight *= 0.35;
     // Step momentum: a line that has just moved by a step tends to go on the same
@@ -404,9 +414,9 @@ function chooseStep(rng, allowed, directionBias, lastStep) {
     // intervals into a run a player can hear the shape of — and it is the other
     // half of the skip-reversal rule above, which deals with the leaps.
     if (Math.abs(lastStep) <= 2 && lastStep !== 0 && Math.sign(step) === Math.sign(lastStep)) {
-      weight *= 1.8;
+      weight *= momentum;
     }
-    options.push({ step, weight });
+    options.push({ step, weight: weight * lean(step) });
   }
   const total = options.reduce((a, o) => a + o.weight, 0);
   let roll = rng() * total;
@@ -416,6 +426,51 @@ function chooseStep(rng, allowed, directionBias, lastStep) {
   }
   return options[options.length - 1].step;
 }
+
+/* ── What makes it sound like a tune ───────────────────────────────────── */
+//
+// The level table says what a passage must contain. These say which of the many
+// passages that satisfy it tend to get drawn: the ones a listener hears as a
+// melody rather than as notes in a key. Each is a lean on the draw, taken from
+// how tonal melodies actually behave (see docs/sight-reading-melody.md):
+//
+//   - a tune implies chords. Each bar is given one, the middle of the passage
+//     pauses on the dominant and the end goes V–I; notes on the strong beats and
+//     notes that are held lean towards the bar's chord;
+//   - the unstable degrees go where the ear expects: the leading note up to the
+//     tonic, the fourth down to the third;
+//   - a held note is a stable one: not the fourth, not the leading note (except
+//     where the harmony is the dominant, which is what a half cadence is);
+//   - the last note is reached by step, from the note above or the note below;
+//   - a line does not rock between the same two notes;
+//   - fast notes run in one direction.
+//
+// Degrees are counted from 0: 0 is the tonic, 4 the dominant, 6 the leading note.
+const CHORDS = { I: [0, 2, 4], ii: [1, 3, 5], IV: [3, 5, 0], V: [4, 6, 1], vi: [5, 0, 2] };
+// Eight bars as two four-bar phrases: a question that stops on V, an answer that
+// closes V–I. The first bar is always the tonic, so the opening note is at home.
+const HARMONY_PLANS = [
+  ['I', 'I', 'IV', 'V', 'I', 'IV', 'V', 'I'],
+  ['I', 'V', 'I', 'V', 'I', 'IV', 'V', 'I'],
+  ['I', 'IV', 'I', 'V', 'vi', 'IV', 'V', 'I'],
+  ['I', 'I', 'ii', 'V', 'I', 'ii', 'V', 'I'],
+  ['I', 'vi', 'IV', 'V', 'I', 'vi', 'V', 'I'],
+  ['I', 'IV', 'V', 'V', 'I', 'IV', 'V', 'I'],
+];
+const LEAN = {
+  chordOnBeat: 2.2, // a strong beat lands in the bar's chord
+  chordHeld: 2.4, // so does a note that is held
+  unstableHeld: 0.3, // the fourth or the leading note, held against the harmony
+  leadingUp: 6, // 7 → 8
+  leadingElsewhere: 0.55,
+  fourthDown: 2.4, // 4 → 3
+  rocking: 0.08, // A B A B
+  turningBack: 0.5, // A B A: fine once, as a neighbour note, but not the habit
+  towardsClose: 3, // the last notes head for the tonic's neighbours
+  runMomentum: 3.2, // sixteenths keep going the way they are going
+  parallelRhythm: 0.5, // bar 5 takes bar 1's rhythm: the answer starts like the question
+  halfCadence: 0.85, // bar 4 ends on a note of the dominant chord
+};
 
 /* ── Generating ────────────────────────────────────────────────────────── */
 
@@ -598,8 +653,25 @@ export function generatePassage({ level = 5, seed = null } = {}) {
       );
       if (usable.length) pattern = pick(rng, usable);
     }
+    // The answer begins like the question: bar 5 often takes bar 1's rhythm. Only
+    // a plain bar is copied — a figure or a beat of sixteenths is counted, and
+    // copying one would add to the count.
+    const opening = bars[0] ? bars[0].map((e) => e.dur) : null;
+    const openingPattern = opening && patterns.find((p) => p.length === opening.length && p.every((d, i) => d === opening[i]));
+    if (
+      !pattern &&
+      b === BAR_COUNT / 2 &&
+      openingPattern &&
+      openingPattern !== previous &&
+      !figureBars.has(0) &&
+      !runBarSet.has(0) &&
+      !hasRunOfFour(openingPattern) &&
+      chance(rng, LEAN.parallelRhythm)
+    ) {
+      pattern = openingPattern;
+    }
     if (pattern) {
-      // the run bar is settled
+      // settled: a figure, the run, or the opening's rhythm coming back
     } else if (b === BAR_COUNT - 1) {
       // close on something that can hold: a half note or a dotted quarter
       const endings = pool_.filter((p) => p[p.length - 1] >= 6);
@@ -819,11 +891,24 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   let prev = home;
   let lastStep = 0;
 
+  // The chords this passage implies, one a bar.
+  const harmonyNames = pick(rng, HARMONY_PLANS);
+  const harmony = harmonyNames.map((name) => CHORDS[name]);
+  const chordAt = (event) => harmony[barOf.get(event) || 0];
+  const strongBeat = (event) => event.start % (perBar / 2) === 0;
+  const trail = []; // pool indexes already written, newest last
+  const arch = 2 + Math.floor(rng() * 2); // how far a phrase rises above its register, in scale steps
+
   sounding.forEach((event, i) => {
     const bar = barOf.get(event) || 0;
     const zone = Math.max(lowest, Math.min(peak, home + zones[phraseOf(event)]));
     const opensPhrase = i > 0 && bar % 2 === 0;
-    const directionBias = Math.sign(zone - prev);
+    // Inside its register a phrase rises and comes back: the arch is the commonest
+    // shape a phrase has, and without it a line whose register is the bottom of the
+    // range simply sits on the floor.
+    const through = ((bar % 2) * perBar + event.start) / (2 * perBar);
+    const aim = Math.max(lowest, Math.min(peak, zone + Math.round(arch * Math.sin(Math.PI * through))));
+    const directionBias = Math.sign(aim - prev);
 
     if (i === 0) {
       // open on the tonic, or on the third or fifth above it
@@ -863,10 +948,37 @@ export function generatePassage({ level = 5, seed = null } = {}) {
         next = best;
         step = next - prev;
       } else {
-        step = chooseStep(rng, allowed, directionBias, lastStep);
-        next = prev + step;
-        if (next < lowest || next > peak) next = prev - step;
-        next = Math.max(lowest, Math.min(peak, next));
+        // Where a step would actually land, range and all — the lean judges the
+        // note, not the move.
+        const landing = (st) => {
+          let at = prev + st;
+          if (at < lowest || at > peak) at = prev - st;
+          return Math.max(lowest, Math.min(peak, at));
+        };
+        const chord = chordAt(event);
+        const from = pool[prev].degree;
+        const toGo = sounding.length - 1 - i; // notes left before the last one
+        const lean = (st) => {
+          const at = landing(st);
+          const to = pool[at].degree;
+          const move = at - prev;
+          let w = 1;
+          const inChord = chord.includes(to);
+          if (strongBeat(event) && inChord) w *= LEAN.chordOnBeat;
+          if (event.dur >= 6) w *= inChord ? LEAN.chordHeld : to === 3 || to === 6 ? LEAN.unstableHeld : 1;
+          if (from === 6) w *= move === 1 ? LEAN.leadingUp : LEAN.leadingElsewhere;
+          if (from === 3 && move === -1) w *= LEAN.fourthDown;
+          if (trail.length >= 2 && at === trail[trail.length - 2]) {
+            w *= trail.length >= 3 && prev === trail[trail.length - 3] ? LEAN.rocking : LEAN.turningBack;
+          }
+          // The close is reached by step, so the note before it wants to be the
+          // tonic's upper or lower neighbour, and the one before that to be near.
+          if (toGo === 1) w *= to === 1 || to === 6 ? LEAN.towardsClose * 2 : to === 0 ? 0.25 : 1;
+          else if (toGo === 2) w *= [0, 1, 2, 5, 6].includes(to) ? LEAN.towardsClose / 2 : 1;
+          return w;
+        };
+        step = chooseStep(rng, allowed, directionBias, lastStep, lean, event.dur <= 1 ? LEAN.runMomentum : 1.8);
+        next = landing(step);
       }
       // No augmented fourth: the one interval every melody text forbids. A
       // fourth between F and B is the usual accident; take the step next door
@@ -882,6 +994,7 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     const note = pool[prev];
     event.note = note;
     event.midi = note.midi;
+    trail.push(prev);
   });
 
   const setNote = (event, note) => {
@@ -931,14 +1044,8 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     return Boolean((before && before.midi === note.midi) || (after && after.midi === note.midi));
   };
 
-  // ── the middle of the phrase may close on the dominant ─────────────────
-  // Before the interval pass, so any leap it introduces gets repaired.
   const halfBar = bars[BAR_COUNT / 2 - 1];
   const lastOfHalf = halfBar[halfBar.length - 1];
-  if (!lastOfHalf.rest && lastOfHalf.note && chance(rng, 0.5)) {
-    const dominants = pool.filter((n) => n.degree === 4 && neighbourOk(lastOfHalf, n));
-    if (dominants.length) setNote(lastOfHalf, pick(rng, dominants));
-  }
 
   // ── keep every interval inside the level's vocabulary ─────────────────
   // One pass, backwards, and it only ever moves the *earlier* note of a pair —
@@ -997,6 +1104,21 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     for (const [fromBar, toBar] of pairs) {
       if (restateBar(fromBar, toBar)) break;
     }
+  }
+
+  // ── the middle of the phrase may close on the dominant ─────────────────
+  // After the motive has been restated (which may rewrite bar 4), and it only
+  // ever moves a third at most, so it cannot break the level's interval limit.
+  // A half cadence: the question ends on a note of the dominant chord — the fifth
+  // most of all, then the second — and the nearest one, so that getting there is
+  // a step or a third and not a jump to wherever a dominant happened to be.
+  if (!lastOfHalf.rest && lastOfHalf.note && !CHORDS.V.includes(lastOfHalf.note.degree) && chance(rng, LEAN.halfCadence)) {
+    const rank = { 4: 0, 1: 0.6, 6: 2.5 };
+    const near = pool
+      .filter((n) => n.degree in rank && Math.abs(n.midi - lastOfHalf.midi) <= Math.min(5, spec.maxSemis) && !samePitch(lastOfHalf, n) && neighbourOk(lastOfHalf, n))
+      .map((n) => ({ n, cost: Math.abs(n.midi - lastOfHalf.midi) + rank[n.degree] }))
+      .sort((a, b) => a.cost - b.cost);
+    if (near.length) setNote(lastOfHalf, near[0].n);
   }
 
   // ── every leap is answered by a step back ──────────────────────────────
@@ -1058,9 +1180,10 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   };
 
   const nearestChordTone = (event) => {
+    const chord = chordAt(event);
     const options = pool.filter(
       (n) =>
-        [0, 2, 4].includes(n.degree) &&
+        chord.includes(n.degree) &&
         Math.abs(n.midi - event.midi) <= 2 &&
         !samePitch(event, n) &&
         neighbourOk(event, n),
@@ -1078,7 +1201,8 @@ export function generatePassage({ level = 5, seed = null } = {}) {
     // a passing note is still free to sit elsewhere on the beat.
     if (event.start % (perBar / 2) !== 0) continue;
     if (i === sounding.length - 1) continue; // never the cadence
-    if ([0, 2, 4].includes(event.note.degree)) continue;
+    if (chordAt(event).includes(event.note.degree)) continue;
+    if (event === lastOfHalf) continue; // the half cadence was chosen on purpose
     if (resolvesALeap(i)) continue; // answering a leap outranks the harmony
     // Nor may this move a note a leap lands on: shortening the leap would break
     // the step back that has just been put in place after it.
@@ -1111,6 +1235,49 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // The harmony and peak passes can shorten a leap or break the step back that
   // followed it, so the leap rule gets the last word.
   answerLeaps();
+
+  // ── the close ──────────────────────────────────────────────────────────
+  // The last note is the tonic; the note before it should be its neighbour, so
+  // the passage ends the way tunes end: re–do from above or ti–do from below. A
+  // close reached by a leap, or by repeating the tonic, is left only when the
+  // level's limits or the line before it leave no room for the step.
+  {
+    const end = sounding.length - 1;
+    const final = sounding[end];
+    const pen = sounding[end - 1];
+    const before = sounding[end - 2];
+    const at = pool.findIndex((n) => n.midi === final.midi);
+    const gap = pen ? Math.abs(pen.midi - final.midi) : 0;
+    if (pen && before && at >= 0 && !(gap >= 1 && gap <= 2)) {
+      const top_ = Math.max(...sounding.map((e) => e.midi));
+      const fits = (n) =>
+        n &&
+        n.midi !== before.midi &&
+        n.midi < Math.max(top_, final.midi + 3) &&
+        Math.abs(n.midi - before.midi) <= Math.min(spec.maxSemis, 5) &&
+        Math.abs(n.midi - before.midi) !== 6 &&
+        // it must not undo the answer to a leap that lands on the note before it
+        !(end >= 3 && Math.abs(before.midi - sounding[end - 3].midi) >= 4 &&
+          !(Math.sign(n.midi - before.midi) === -Math.sign(before.midi - sounding[end - 3].midi) && Math.abs(n.midi - before.midi) <= 2));
+      const above = pool[at + 1];
+      const below = pool[at - 1];
+      // whichever neighbour is nearer to where the line already is
+      const order = Math.abs((above?.midi ?? 999) - pen.midi) <= Math.abs((below?.midi ?? -999) - pen.midi) ? [above, below] : [below, above];
+      const neighbour = order.find(fits);
+      if (neighbour) setNote(pen, neighbour);
+      else if (above && before.midi === above.midi && end >= 3) {
+        // The line is already on the note above (… re, do | do): walk down to the
+        // close instead, mi–re–do, if the note before that leaves room.
+        const third = pool[at + 2];
+        const earlier = sounding[end - 3];
+        const gap3 = third ? Math.abs(third.midi - earlier.midi) : 99;
+        if (third && third.midi !== earlier.midi && gap3 <= Math.min(spec.maxSemis, 5) && gap3 !== 6 && third.midi < Math.max(top_, final.midi + 5)) {
+          setNote(before, third);
+          setNote(pen, above);
+        }
+      }
+    }
+  }
 
   // ── accidentals (level IV and up) ──────────────────────────────────────
   // Last, and only where they do not push the line outside its vocabulary.
@@ -1316,6 +1483,11 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   return {
     level,
     seed: actualSeed,
+    // The chords the melody was drawn against, one a bar ('I', 'IV', 'V', …) and
+    // as scale degrees counted from 0. Nothing is printed from this; the tests
+    // and anyone curious can see what the line was leaning on.
+    harmony: harmonyNames,
+    chords: harmony,
     key: { id: keyId, name: key.variants[0].name, fifths: key.variants[0].fifths },
     meter,
     perBar,
