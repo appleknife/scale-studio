@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
 
 concurrency:
   group: scan-inbox
@@ -30,8 +29,6 @@ jobs:
       - name: Read what is waiting
         run: python tools/inbox.py
       - name: Publish the library
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "scale-studio-scanner"
           git config user.email "actions@users.noreply.github.com"
@@ -40,5 +37,3 @@ jobs:
           git commit -m "Library: pieces read from the inbox"
           git pull --rebase origin main
           git push origin HEAD:main
-          # A push made by this workflow does not rebuild the site by itself.
-          gh api -X POST "repos/${{ github.repository }}/pages/builds" || true
