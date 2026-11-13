@@ -11,12 +11,12 @@
 // score is drawn by OpenSheetMusicDisplay (BSD-3, vendor/), loaded only when a
 // score is opened, so the rest of the app never pays for it.
 
-import { readScore, readScoreFile, listParts, parseXml, sectionOf } from './musicxml.js?v=202611131640';
-import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611131640';
-import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611131640';
-import { t } from './i18n.js?v=202611131640';
+import { readScore, readScoreFile, listParts, parseXml, sectionOf } from './musicxml.js?v=202611131720';
+import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611131720';
+import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611131720';
+import { t } from './i18n.js?v=202611131720';
 
-const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611131640';
+const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611131720';
 const MAX_SECONDS = 600; // ten minutes: enough for any audition piece
 const MIN_SECONDS = 5;
 const MIN_SECTION_SECONDS = 1.5; // a single bar is a fair thing to practise
@@ -107,7 +107,7 @@ export function createListenView(deps) {
       <div class="listen-bars" aria-hidden="true"></div>
     </div>
     <div class="listen-results"></div>
-    <input class="listen-file" type="file" accept=".musicxml,.xml,.mxl,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml" hidden />`;
+    <input class="listen-file" type="file" accept=".musicxml,.xml,.mxl,.pdf,.jpg,.jpeg,.png,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,application/pdf,image/jpeg,image/png" hidden />`;
   const body = root.querySelector('.listen-body');
   const resultsEl = root.querySelector('.listen-results');
   const scoreWrap = root.querySelector('.listen-score-wrap');
@@ -132,6 +132,7 @@ export function createListenView(deps) {
            <button class="quiet-btn" type="button" data-act="pick">${t('listen.otherScore')}</button>
            <button class="quiet-btn" type="button" data-act="noscore">${t('listen.noScore')}</button></p>
          ${scannedHtml()}
+         ${paperHtml()}
          ${sectionHtml()}
          <p class="listen-hint">${
            section
@@ -155,7 +156,8 @@ export function createListenView(deps) {
                 <button class="ghost-btn" type="button" data-act="pick">${t('listen.pickScore')}</button>
               </div>
               ${libraryHtml()}
-            </div>`
+            </div>
+            ${paperHtml()}`
       }
       <ul class="listen-tips">
         <li>${t('listen.tipQuiet')}</li>
@@ -172,7 +174,8 @@ export function createListenView(deps) {
   /** Said plainly wherever a scanned score is used: a machine read it, and machines misread. */
   function scannedHtml() {
     if (!source?.piece?.scanned) return '';
-    return `<p class="listen-scanned">${t('listen.scannedNote')}${
+    const left = Array.isArray(source.piece.leftOut) ? source.piece.leftOut.reduce((n, x) => n + (Number(x.lines) || 0), 0) : 0;
+    return `<p class="listen-scanned">${t('listen.scannedNote')}${left ? ` ${t('listen.scannedLeftOut', { n: left })}` : ''}${
       source.piece.credit ? ` <span class="listen-credit">${esc(source.piece.credit)}</span>` : ''
     }</p>`;
   }
@@ -265,12 +268,16 @@ export function createListenView(deps) {
   /* ── The teacher's pieces ────────────────────────────────────────────── */
 
   let pieces = []; // library/index.json: what the teacher has put in the app
+  let inbox = ''; // where a teacher drops a PDF or photos to have them read
+  let paperNote = false; // a PDF or photo was chosen: say what happens to those
 
   async function loadLibrary() {
     try {
       const res = await fetch('library/index.json', { cache: 'no-cache' });
       if (!res.ok) return;
-      const list = (await res.json()).pieces;
+      const index = await res.json();
+      const list = index.pieces;
+      inbox = typeof index.inbox === 'string' && /^https:\/\//.test(index.inbox) ? index.inbox : '';
       pieces = Array.isArray(list) ? list.filter((p) => p && p.file && p.title) : [];
       if (pieces.length && panel === 'start' && !source) paint();
     } catch {
@@ -310,8 +317,27 @@ export function createListenView(deps) {
     }
   }
 
+  /** A PDF or a photo cannot be read on this device; say so, and say where it can. */
+  function paperHtml() {
+    if (!paperNote) return '';
+    return `<div class="listen-scanned listen-paper" role="status">
+        <p>${t('listen.paperNote')}</p>
+        <p>${t('listen.paperTeacher')}${
+          inbox ? ` <a href="${esc(inbox)}" target="_blank" rel="noopener">${t('listen.paperInbox')}</a>` : ''
+        }</p>
+      </div>`;
+  }
+
   async function openFile(file, piece = null) {
     if (!file) return;
+    if (!piece && (/\.(pdf|jpe?g|png|webp|heic)$/i.test(file.name) || /^(application\/pdf|image\/)/.test(file.type))) {
+      fileInput.value = '';
+      paperNote = true;
+      if (panel === 'start') paint();
+      root.querySelector('.listen-paper')?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    paperNote = false;
     status(t('listen.reading'));
     try {
       const xml = await readScoreFile(file);

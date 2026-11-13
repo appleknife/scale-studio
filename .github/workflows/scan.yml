@@ -1,0 +1,44 @@
+name: Read the Listen inbox
+
+# A PDF or photo dropped into library/inbox is read into the Listen library.
+on:
+  push:
+    branches: [main]
+    paths: ['library/inbox/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: scan-inbox
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+      - run: pip install -r tools/requirements.txt
+      - name: Read what is waiting
+        run: python tools/inbox.py
+      - name: Publish the library
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "scale-studio-scanner"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A library
+          if git diff --cached --quiet; then echo "Nothing new."; exit 0; fi
+          git commit -m "Library: pieces read from the inbox"
+          git pull --rebase origin main
+          git push origin HEAD:main
+          # A push made by this workflow does not rebuild the site by itself.
+          gh api -X POST "repos/${{ github.repository }}/pages/builds" || true
