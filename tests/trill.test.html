@@ -193,6 +193,34 @@
         eq('a damaged save is tidied, not trusted', [odd.opts.string, odd.opts.pair, odd.opts.bpm, odd.sets['A:12:whole']], ['A', '12', T.TEMPO.max, { done: ['two'], best: 0, runs: 0, last: '' }]);
       }
 
+      // ── the stats page ──
+      {
+        const stats = T.emptyStats();
+        eq('nothing played: nothing to show, and nobody is behind', [T.summary(stats).runs, T.summary(stats).behind], [0, null]);
+        const take = (string, pair, step, rate, even, ok, day) =>
+          T.recordRun(stats, T.notesFor(string, pair, ''), T.stepById(step), { rate, even, cycles: 12, verdict: { id: ok ? 'good' : 'uneven', pass: ok } }, day);
+        take('A', '12', 'two', 2, 90, true, '2026-11-10');
+        take('A', '12', 'three', 3, 80, true, '2026-11-10');
+        take('A', '12', 'free', 7.5, 78, true, '2026-11-11');
+        take('D', '12', 'two', 2, 60, false, '2026-11-11');
+        take('A', '34', 'two', 2, 74, true, '2026-11-12');
+        const sum = T.summary(stats);
+        eq('takes and days are counted', [sum.runs, sum.days], [5, 3]);
+        eq('each pair shows its steps, best pace and takes', sum.pairs.map((p) => [p.id, p.steps, p.best, p.runs]), [['01', 0, 0, 0], ['12', 3, 7.5, 4], ['23', 0, 0, 0], ['34', 1, 0, 1]]);
+        eq('evenness is the average of the recent takes on that pair', sum.pairs[1].even, 77);
+        eq('the grid has every string against every pair', [sum.grid.length, sum.grid[2].cells[1].steps, sum.grid[1].cells[1].steps, sum.grid[1].cells[1].runs], [4, 3, 0, 1]);
+        eq('the pair with the least practice is named', sum.behind, '01');
+        eq('a take with no trill in it is counted but not charted', (T.recordRun(stats, T.notesFor('A', '12', ''), T.stepById('two'), { rate: 0, even: 0, cycles: 1, verdict: { id: 'short', pass: false } }, '2026-11-12'), [stats.runs, stats.log.length]), [6, 5]);
+        for (let i = 0; i < T.LOG_LIMIT + 20; i += 1) take('E', '23', 'two', 2, 80, true, '2026-11-13');
+        eq('the log is kept to a size', stats.log.length, T.LOG_LIMIT);
+        const store = { m: {}, getItem(k) { return this.m[k] || null; }, setItem(k, v) { this.m[k] = v; } };
+        T.saveStats('s', stats, store);
+        eq('and survives a save and a load', T.loadStats('s', store).log.length, T.LOG_LIMIT);
+        store.setItem(T.storageKey('old'), '{"sets":{"A:12:whole":{"done":["two"],"best":6,"runs":3,"last":"2026-11-01"}},"runs":3}');
+        const old = T.summary(T.loadStats('old', store));
+        eq('a save from before the log still fills the page', [old.runs, old.days, old.pairs[1].steps, old.pairs[1].even], [3, 1, 1, null]);
+      }
+
       document.getElementById('report').textContent = problems.length ? `TRILL FAILED\n${problems.join('\n')}` : `TRILL OK\n${log.join('\n')}`;
       document.title = problems.length ? 'TRILL FAILED' : 'TRILL OK';
 

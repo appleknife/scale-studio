@@ -46,7 +46,7 @@
 //     scoring, so the book tells a student they are getting somewhere without
 //     ever grading them.
 
-export const SPECIES = ['dog', 'cat', 'hamster', 'chicken', 'fish'];
+export const SPECIES = ['dog', 'cat', 'hamster', 'chicken', 'fish', 'rabbit', 'koala', 'penguin', 'fox'];
 
 /** The moments a plan can name: things that happen every day, to hang practice on. */
 export const PLAN_CUES = ['morning', 'afterSchool', 'afterDinner', 'beforeBed'];
@@ -122,6 +122,10 @@ export const FAVOURITE = {
   hamster: 'seeds',
   chicken: 'corn',
   fish: 'flakes',
+  rabbit: 'carrot',
+  koala: 'leaves',
+  penguin: 'shrimp',
+  fox: 'apple',
 };
 
 /** Decorations: bought once, then put out or put away at will. */

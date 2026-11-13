@@ -13,9 +13,9 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611131615';
-import { t } from './i18n.js?v=202611131615';
-import { hearLevel } from './pitch.js?v=202611131615';
+import * as Trill from './trill.js?v=202611131640';
+import { t } from './i18n.js?v=202611131640';
+import { hearLevel } from './pitch.js?v=202611131640';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -55,6 +55,7 @@ export function createTrillView(deps) {
     cancelAnimationFrame(raf);
     if (panel === 'play') paintPlay();
     else if (panel === 'done') paintDone();
+    else if (panel === 'stats') paintStats();
     else paintPick();
   }
 
@@ -125,6 +126,7 @@ export function createTrillView(deps) {
       </div>
       <div class="trill-actions">
         <button class="primary-btn" type="button" data-act="start">${t('trill.start')}</button>
+        <button class="quiet-btn" type="button" data-act="stats">${t('trill.stats.open')}</button>
       </div>
       ${set && set.best ? `<p class="trill-best">${t('trill.best', { n: oneDp(set.best) })}</p>` : ''}
       <details class="trill-tips">
@@ -505,7 +507,90 @@ export function createTrillView(deps) {
         ${v.pass && next ? `<button class="primary-btn" type="button" data-act="next" data-next="${next.id}">${t(next.per ? 'trill.next' : 'trill.next.free', { n: next.per })}</button>` : ''}
         <button class="${v.pass && next ? 'quiet-btn' : 'primary-btn'}" type="button" data-act="again">${t('trill.again')}</button>
         <button class="quiet-btn" type="button" data-act="change">${t('trill.change')}</button>
+        <button class="quiet-btn" type="button" data-act="stats">${t('trill.stats.open')}</button>
       </div>`;
+  }
+
+  // ── Stats ──────────────────────────────────────────────────────────────
+
+  function paintStats() {
+    const sum = Trill.summary(stats);
+    const total = Trill.STEPS.length;
+    const backRow = `<div class="trill-actions"><button class="primary-btn" type="button" data-act="change">${t('trill.stats.back')}</button></div>`;
+    if (!sum.runs) {
+      body.innerHTML = `<h3 class="trill-stats-title">${t('trill.stats.title')}</h3><p class="trill-howto">${t('trill.stats.empty')}</p>${backRow}`;
+      return;
+    }
+    const tile = (label, value, sub) =>
+      `<div class="trill-tile"><span class="trill-tile-label">${label}</span><b>${value}</b><span class="trill-tile-sub">${sub}</span></div>`;
+    const dots = (n) =>
+      `<span class="trill-dots" role="img" aria-label="${esc(t('trill.stats.stepsOf', { n, total }))}">${Trill.STEPS.map((_, i) => `<i class="${i < n ? 'is-on' : ''}"></i>`).join('')}</span>`;
+    const pairRows = sum.pairs
+      .map(
+        (p) => `<tr${p.runs ? '' : ' class="is-untried"'}>
+          <th scope="row">${t(`trill.pair.${p.id}`)}</th>
+          <td>${dots(p.steps)}</td>
+          <td>${p.best ? oneDp(p.best) : '–'}</td>
+          <td>${p.even == null ? '–' : `${p.even}%`}</td>
+          <td>${p.runs}</td></tr>`,
+      )
+      .join('');
+    const grid = sum.grid
+      .map(
+        (row) =>
+          `<tr><th scope="row">${esc(row.string)}</th>${row.cells
+            .map(
+              (c) =>
+                `<td><button class="trill-cell lv-${c.steps}${c.runs ? '' : ' is-untried'}" type="button" data-go-string="${row.string}" data-go-pair="${c.pair}"
+                   aria-label="${esc(t('trill.stats.cellAria', { s: row.string, pair: t(`trill.pair.${c.pair}`), n: c.steps, total }))}">${c.runs ? `${c.steps}/${total}` : '·'}</button></td>`,
+            )
+            .join('')}</tr>`,
+      )
+      .join('');
+    // The last takes, as a line: how even each one was, with the pass mark drawn.
+    const pts = sum.recent;
+    let chart = '';
+    if (pts.length >= 2) {
+      const W = 300;
+      const H = 90;
+      const x = (i) => 8 + (i * (W - 16)) / (pts.length - 1);
+      const y = (e) => H - 10 - (Math.max(30, Math.min(100, e)) - 30) * ((H - 20) / 70);
+      chart = `
+        <h4 class="trill-stats-sub">${t('trill.stats.recent', { n: pts.length })}</h4>
+        <svg class="trill-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('trill.stats.chartAria'))}">
+          <path class="trill-chart-pass" d="M0 ${y(Trill.EVEN_PASS)} H${W}"/>
+          <text class="trill-chart-text" x="2" y="${H - 1}">┄ ${t('trill.stats.passLine')}</text>
+          <path class="trill-chart-line" d="${pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p.e).toFixed(1)}`).join(' ')}"/>
+          ${pts.map((p, i) => `<circle class="${p.p ? 'is-pass' : 'is-miss'}" cx="${x(i).toFixed(1)}" cy="${y(p.e).toFixed(1)}" r="3.4"/>`).join('')}
+        </svg>
+        <p class="trill-stats-note">${t('trill.stats.chartNote')}</p>`;
+    }
+    body.innerHTML = `
+      <h3 class="trill-stats-title">${t('trill.stats.title')}</h3>
+      <div class="trill-tiles">
+        ${tile(t('trill.stats.takes'), sum.runs, t('trill.stats.days', { n: sum.days }))}
+        ${tile(t('trill.stats.steps'), sum.steps, t('trill.stats.steps.sub'))}
+        ${tile(t('trill.stats.fastest'), sum.best ? oneDp(sum.best) : '–', t(sum.best ? 'trill.m.pace.sec' : 'trill.stats.fastest.none'))}
+      </div>
+      ${
+        sum.behind
+          ? `<p class="trill-stats-nudge">${t('trill.stats.behind', { pair: t(`trill.pair.${sum.behind}`) })}
+               <button class="quiet-btn small" type="button" data-go-pair="${sum.behind}">${t('trill.stats.go', { pair: t(`trill.pair.${sum.behind}`) })}</button></p>`
+          : ''
+      }
+      <h4 class="trill-stats-sub">${t('trill.stats.byPair')}</h4>
+      <div class="trill-table-wrap"><table class="trill-table">
+        <thead><tr><th scope="col">${t('trill.label.fingers')}</th><th scope="col">${t('trill.stats.col.steps')}</th><th scope="col">${t('trill.stats.col.best')}</th><th scope="col">${t('trill.stats.col.even')}</th><th scope="col">${t('trill.stats.col.takes')}</th></tr></thead>
+        <tbody>${pairRows}</tbody>
+      </table></div>
+      <h4 class="trill-stats-sub">${t('trill.stats.grid')}</h4>
+      <div class="trill-table-wrap"><table class="trill-grid">
+        <thead><tr><th></th>${Trill.PAIRS.map((p) => `<th scope="col">${t(`trill.pair.${p.id}`)}</th>`).join('')}</tr></thead>
+        <tbody>${grid}</tbody>
+      </table></div>
+      <p class="trill-stats-note">${t('trill.stats.gridNote', { total })}</p>
+      ${chart}
+      ${backRow}`;
   }
 
   // ── Wiring ─────────────────────────────────────────────────────────────
@@ -517,6 +602,19 @@ export function createTrillView(deps) {
       stopRun();
       panel = 'pick';
       deps.onBack();
+    } else if (b.dataset.goPair) {
+      // from the stats page: straight to that pair (and string, from the grid)
+      if (b.dataset.goString) stats.opts.string = b.dataset.goString;
+      stats.opts.pair = b.dataset.goPair;
+      stats.opts.spacing = '';
+      stepId = null;
+      panel = 'pick';
+      save();
+      paint();
+    } else if (b.dataset.act === 'stats') {
+      panel = 'stats';
+      paint();
+      root.scrollIntoView({ block: 'start' });
     } else if (b.dataset.string) {
       stats.opts.string = b.dataset.string;
       stepId = null;
