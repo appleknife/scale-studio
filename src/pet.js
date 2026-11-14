@@ -156,7 +156,21 @@ export const ITEMS = [
   { id: 'wall-lilac', cost: 15, slot: 'wall' },
   { id: 'floor-tiles', cost: 16, slot: 'floor' },
   { id: 'floor-dark', cost: 16, slot: 'floor' },
+  // Christmas: in the shop only while the season lasts (see season.js). What is
+  // bought is kept, and can be put out in July if its owner likes.
+  { id: 'xmas-tree', cost: 20, slot: 'xmas-tree', season: 'xmas' },
+  { id: 'xmas-presents', cost: 10, slot: 'xmas-presents', season: 'xmas' },
+  { id: 'xmas-snowman', cost: 12, slot: 'xmas-snowman', season: 'xmas' },
+  { id: 'xmas-wreath', cost: 8, slot: 'xmas-wreath', season: 'xmas' },
+  { id: 'xmas-stockings', cost: 8, slot: 'xmas-stockings', season: 'xmas' },
+  { id: 'xmas-garland', cost: 10, slot: 'xmas-garland', season: 'xmas' },
+  { id: 'wall-snow', cost: 15, slot: 'wall', season: 'xmas' },
 ];
+
+/** What the shop has on its shelves: everything in season, and anything already owned. */
+export function inShop(pet, item, season = null) {
+  return !item.season || item.season === season || pet.owned.includes(item.id);
+}
 
 /**
  * How far each thing in the room may be dragged from where it is first put down,
@@ -182,9 +196,15 @@ export const ITEM_RANGE = {
   beanbag: { x: [-26, 300], y: [-14, 6] },
   bookshelf: { x: [-212, 134], y: [0, 0] },
   piano: { x: [-138, 182], y: [0, 0] },
+  'xmas-tree': { x: [-218, 108], y: [0, 0] },
+  'xmas-presents': { x: [-166, 166], y: [-12, 4] },
+  'xmas-snowman': { x: [-50, 294], y: [-12, 4] },
+  'xmas-wreath': { x: [-228, 128], y: [-40, 96] },
+  'xmas-stockings': { x: [-4, 340], y: [-50, 78] },
 };
 
 const FISH_SPOTS = {
+  'xmas-presents': { x: 120, y: 0 },
   piano: { x: -138, y: 0 },
   bookshelf: { x: 134, y: 0 },
   poster: { x: -26, y: -58 },
@@ -726,9 +746,10 @@ export function feed(pet, snackId, now = Date.now(), dayKey = dayKeyOf(now)) {
   return { ...snack, learned, boostStarted };
 }
 
-export function buy(pet, itemId) {
+export function buy(pet, itemId, season = null) {
   const item = ITEMS.find((i) => i.id === itemId);
   if (!item || pet.owned.includes(itemId) || pet.notes < item.cost) return false;
+  if (item.season && item.season !== season) return false; // out of season: not for sale
   pet.notes -= item.cost;
   pet.owned.push(itemId);
   place(pet, itemId, true);

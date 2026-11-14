@@ -15,7 +15,8 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611131750';
+import * as Pet from './pet.js?v=202611141150';
+import { currentSeason } from './season.js?v=202611141150';
 import {
   petMarkup,
   eggMarkup,
@@ -30,8 +31,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611131750';
-import { t, getLang } from './i18n.js?v=202611131750';
+} from './petart.js?v=202611141150';
+import { t, getLang } from './i18n.js?v=202611141150';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -108,10 +109,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   // The time the room goes by: the clock, or `?hour=21` to see the evening at noon.
   const timeNow = () => (Number.isFinite(hour) ? hour : clockNow());
+  const season = currentSeason(); // what the shop has on its shelves just now
   // The bowl and the bed are wherever they have been dragged to.
   const bowlAt = () => ({ x: BOWL.x + Pet.itemAt(pet, 'bowl').x, y: BOWL.y });
   const bedAt = () => ({ x: BED.x + Pet.itemAt(pet, 'bed').x, y: BED.y });
-  const roomArt = () => roomMarkup({ placed: pet.placed, wall: pet.wall, floor: pet.floor, fish: isFish(), hour: timeNow(), where: pet.where });
+  const roomArt = () => roomMarkup({ placed: pet.placed, wall: pet.wall, floor: pet.floor, season, fish: isFish(), hour: timeNow(), where: pet.where });
 
   const layers = {};
 
@@ -787,7 +789,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   function buyOrToggle(itemId) {
     if (pet.owned.includes(itemId)) Pet.place(pet, itemId);
-    else if (!Pet.buy(pet, itemId)) return;
+    else if (!Pet.buy(pet, itemId, season)) return;
     save();
     drawRoom();
     paintNotes();
@@ -1116,7 +1118,12 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   }
 
   function decorTray() {
-    return `${confirmRow('item')}<div class="pet-tray is-decor">${Pet.ITEMS.filter((i) => !(isFish() && i.id === 'bed') && !(isFish() && i.id === 'ball')).map((item) => {
+    const seasonal = season && Pet.ITEMS.some((i) => i.season === season && !pet.owned.includes(i.id));
+    const note = seasonal ? `<p class="pet-season-note">${t(`pet.season.${season}`)}</p>` : '';
+    const shelf = Pet.ITEMS.filter((i) => Pet.inShop(pet, i, season) && !(isFish() && i.id === 'bed') && !(isFish() && i.id === 'ball'));
+    // what is only here for a while goes first, so nobody misses it
+    shelf.sort((a, b) => Number(Boolean(b.season && !pet.owned.includes(b.id))) - Number(Boolean(a.season && !pet.owned.includes(a.id))));
+    return `${confirmRow('item')}${note}<div class="pet-tray is-decor">${shelf.map((item) => {
       const owned = pet.owned.includes(item.id);
       const out = Pet.isPlaced(pet, item.id);
       const can = owned || pet.notes >= item.cost;
@@ -1126,7 +1133,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
           : t('pet.item.away')
         : `♪ ${item.cost}${can ? '' : `<span class="tray-need">${t('pet.need', { n: item.cost - pet.notes })}</span>`}`;
       const picked = pending?.kind === 'item' && pending.id === item.id;
-      return `<button class="tray-item${out ? ' is-out' : ''}${picked ? ' is-picked' : ''}" type="button" data-item="${item.id}" ${can ? '' : 'disabled'} aria-pressed="${out || picked}">
+      return `<button class="tray-item${out ? ' is-out' : ''}${picked ? ' is-picked' : ''}${item.season && !owned ? ' is-seasonal' : ''}" type="button" data-item="${item.id}" ${can ? '' : 'disabled'} aria-pressed="${out || picked}">
         ${itemIcon(item.id)}
         <span class="tray-name">${t(`pet.item.${item.id}`)}</span>
         <span class="tray-cost">${label}</span></button>`;
