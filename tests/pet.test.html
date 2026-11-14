@@ -218,6 +218,21 @@
         eq('new furniture is put out when bought', P.isPlaced(p, 'piano'), true);
         eq('and can be dragged, within the room', P.moveItem(p, 'piano', 9999, 50), { x: P.ITEM_RANGE.piano.x[1], y: 0 });
         eq('every thing that can be put out has a name and can be bought', P.ITEMS.every((i) => i.cost > 0 && i.slot), true);
+        {
+          const S = await import('../src/season.js');
+          const on = (y, m, d) => S.seasonOn(new Date(y, m - 1, d));
+          eq('Christmas runs from 1 November to 6 January', [on(2026, 10, 31), on(2026, 11, 1), on(2026, 12, 25), on(2027, 1, 6), on(2027, 1, 7), on(2027, 7, 4)], [null, 'xmas', 'xmas', 'xmas', null, null]);
+          eq('the address can show or hide it', [S.currentSeason(new Date(2027, 6, 4), '?season=xmas'), S.currentSeason(new Date(2026, 11, 25), '?season=off'), S.currentSeason(new Date(2026, 11, 25), '')], ['xmas', null, 'xmas']);
+        }
+        // Christmas things: for sale only in season, kept for good once bought.
+        const tree = P.ITEMS.find((i) => i.id === 'xmas-tree');
+        eq('out of season a Christmas thing is not on the shelf', P.inShop(p, tree, null), false);
+        eq('and cannot be bought', [P.buy(p, 'xmas-tree'), P.buy(p, 'xmas-tree', null), p.owned.includes('xmas-tree')], [false, false, false]);
+        eq('in season it is on the shelf', P.inShop(p, tree, 'xmas'), true);
+        eq('and can be bought', [P.buy(p, 'xmas-tree', 'xmas'), P.isPlaced(p, 'xmas-tree')], [true, true]);
+        eq('once bought it stays on the shelf, and in the room, after the season', [P.inShop(p, tree, null), P.isPlaced(p, 'xmas-tree')], [true, true]);
+        eq('it can be put away and out again in July', [P.place(p, 'xmas-tree', false), P.place(p, 'xmas-tree', true), P.isPlaced(p, 'xmas-tree')], [true, true, true]);
+        eq('it survives a save and a load', (() => { const st = { m: {}, getItem(k) { return this.m[k] || null; }, setItem(k, v) { this.m[k] = v; } }; P.savePet('s', p, st); return P.loadPet('s', st).owned.includes('xmas-tree'); })(), true);
         p.notes = 3;
         eq('too few notes, no lamp', P.buy(p, 'lamp'), false);
       }

@@ -547,6 +547,15 @@ const WALLS = {
       <ellipse cx="32" cy="40" rx="3.4" ry="2.5" transform="rotate(-20 32 40)"/><ellipse cx="41" cy="37" rx="3.4" ry="2.5" transform="rotate(-20 41 37)"/>
       <rect x="34.4" y="27" width="1.3" height="13"/><rect x="43.4" y="24" width="1.3" height="13"/><path d="M34.4 27 L44.7 24 v3.2 L34.4 30.2 Z"/></g></pattern>`,
   },
+  'wall-snow': {
+    fill: 'url(#wall-snow)',
+    pattern: `<pattern id="wall-snow" width="56" height="56" patternUnits="userSpaceOnUse">
+      <rect width="56" height="56" fill="#dcebf5"/>
+      <g stroke="#fff" stroke-width="1.6" stroke-linecap="round">
+        <path d="M14 8 v12 M8.8 11 l10.4 6 M8.8 17 l10.4 -6"/><path d="M42 34 v14 M35.9 37.5 l12.2 7 M35.9 44.5 l12.2 -7"/></g>
+      <g fill="#fff"><circle cx="36" cy="10" r="1.8"/><circle cx="10" cy="40" r="2.2"/><circle cx="24" cy="30" r="1.3"/><circle cx="50" cy="22" r="1.3"/></g>
+    </pattern>`,
+  },
   'wall-lilac': {
     fill: 'url(#wall-lilac)',
     pattern: `<pattern id="wall-lilac" width="30" height="30" patternUnits="userSpaceOnUse">
@@ -884,6 +893,94 @@ const ITEM_ART = {
       <g stroke="#b9b0a3" stroke-width=".7">${Array.from({ length: 10 }, (_, i) => `<path d="M${151 + i * 6} 186 v7"/>`).join('')}</g>
       <g fill="#2f241d">${[149, 155, 167, 173, 179, 191, 197].map((x) => `<rect x="${x}" y="186" width="3.4" height="4.4"/>`).join('')}</g>
     </g>`,
+  // ── Christmas ──
+  'xmas-tree': () => {
+    const baubles = [
+      [300, 150, '#e2483d'], [290, 170, '#f2c14e'], [311, 174, '#5b8fd0'], [283, 192, '#5b8fd0'], [301, 194, '#e2483d'], [318, 196, '#f2c14e'], [296, 134, '#f2c14e'],
+    ]
+      .map(([x, y, c], i) => `<circle class="fairy-bulb" style="animation-delay:${(i % 4) * 0.45}s" cx="${x}" cy="${y}" r="3.4" fill="${c}" stroke="rgba(60,40,20,.25)" stroke-width=".8"/>`)
+      .join('');
+    return `
+    <g class="room-xmas-tree" transform="translate(-44 0)">
+      <ellipse cx="300" cy="223" rx="30" ry="4.5" fill="rgba(60,40,20,.14)"/>
+      <rect x="295" y="204" width="10" height="12" fill="#8d5a2e" stroke="#6b4226" stroke-width="1.6"/>
+      <path d="M287 214 h26 l-3 9 h-20 z" fill="#c8372f" stroke="#8f1f1a" stroke-width="1.8" stroke-linejoin="round"/>
+      <g fill="#3f9a6b" stroke="#2c6e4f" stroke-width="2" stroke-linejoin="round">
+        <path d="M300 160 L332 206 H268 Z"/><path d="M300 134 L325 180 H275 Z"/><path d="M300 112 L318 150 H282 Z"/></g>
+      <g fill="none" stroke="#f6e7b0" stroke-width="1.6" stroke-linecap="round"><path d="M288 142 q12 8 24 2"/><path d="M281 168 q19 12 38 2"/><path d="M274 194 q26 14 52 2"/></g>
+      ${baubles}
+      <path d="M300 99 l3.2 6.8 l7.4 .8 l-5.5 5 l1.6 7.3 l-6.7 -3.8 l-6.7 3.8 l1.6 -7.3 l-5.5 -5 l7.4 -.8 z" fill="#f6c84c" stroke="#c9952a" stroke-width="1.4" stroke-linejoin="round"/>
+    </g>`;
+  },
+  'xmas-presents': () => `
+    <g class="room-xmas-presents">
+      <ellipse cx="200" cy="292" rx="34" ry="4.5" fill="rgba(60,40,20,.12)"/>
+      <rect x="170" y="266" width="30" height="25" rx="2" fill="#c8372f" stroke="#8f1f1a" stroke-width="2"/>
+      <path d="M185 266 v25 M170 277 h30" stroke="#f6d77a" stroke-width="3.4"/>
+      <path d="M185 266 c-8 -9 -14 -2 -6 1 M185 266 c8 -9 14 -2 6 1" fill="none" stroke="#f6d77a" stroke-width="2.6" stroke-linecap="round"/>
+      <rect x="203" y="274" width="26" height="17" rx="2" fill="#3f9a6b" stroke="#2c6e4f" stroke-width="2"/>
+      <path d="M216 274 v17" stroke="#fff" stroke-width="3"/>
+      <path d="M216 274 c-6 -7 -11 -1 -5 1 M216 274 c6 -7 11 -1 5 1" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+      <rect x="192" y="252" width="20" height="15" rx="2" fill="#5b8fd0" stroke="#3b6aa5" stroke-width="2"/>
+      <path d="M202 252 v15 M192 259 h20" stroke="#f6d77a" stroke-width="2.6"/>
+    </g>`,
+  'xmas-snowman': () => `
+    <g class="room-xmas-snowman" transform="translate(-98 0)">
+      <ellipse cx="176" cy="291" rx="22" ry="4" fill="rgba(60,40,20,.12)"/>
+      <circle cx="176" cy="274" r="16" fill="#fff" stroke="#b9c7d6" stroke-width="2"/>
+      <circle cx="176" cy="251" r="11.5" fill="#fff" stroke="#b9c7d6" stroke-width="2"/>
+      <path d="M166 262 q10 5 20 0 l1 4 q-11 5 -22 0 z" fill="#c8372f" stroke="#8f1f1a" stroke-width="1.4" stroke-linejoin="round"/>
+      <path d="M182 265 l3 11 l-5 0 z" fill="#c8372f" stroke="#8f1f1a" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle cx="172" cy="249" r="1.6" fill="#3b2c22"/><circle cx="180" cy="249" r="1.6" fill="#3b2c22"/>
+      <path d="M176 252 l9 2.4 l-9 1.6 z" fill="#f2994a" stroke="#c96a1c" stroke-width=".9" stroke-linejoin="round"/>
+      <path d="M171.5 256.5 q4.5 3 9 0" fill="none" stroke="#3b2c22" stroke-width="1.3" stroke-linecap="round"/>
+      <circle cx="176" cy="270" r="1.7" fill="#3b2c22"/><circle cx="176" cy="278" r="1.7" fill="#3b2c22"/>
+      <rect x="168" y="232" width="16" height="10" rx="1.5" fill="#3b2c22"/><rect x="164" y="240" width="24" height="3.4" rx="1.6" fill="#3b2c22"/>
+      <rect x="168" y="237.4" width="16" height="2.6" fill="#c8372f"/>
+    </g>`,
+  'xmas-wreath': () => {
+    const leaves = Array.from({ length: 14 }, (_, i) => {
+      const a = (i / 14) * Math.PI * 2;
+      const x = 250 + Math.cos(a) * 15;
+      const y = 70 + Math.sin(a) * 15;
+      return `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="6.4" ry="4" fill="${i % 2 ? '#3f9a6b' : '#2f7d55'}" transform="rotate(${((a * 180) / Math.PI + 90).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+    }).join('');
+    return `
+    <g class="room-xmas-wreath">
+      <path d="M250 48 v7" stroke="#8b7d6b" stroke-width="1.6"/>
+      ${leaves}
+      <g fill="#e2483d"><circle cx="238" cy="62" r="2.2"/><circle cx="262" cy="64" r="2.2"/><circle cx="240" cy="80" r="2.2"/><circle cx="259" cy="81" r="2.2"/></g>
+      <path d="M250 83 l-8 -5 v10 z M250 83 l8 -5 v10 z" fill="#c8372f" stroke="#8f1f1a" stroke-width="1.2" stroke-linejoin="round"/>
+      <path d="M248 84 l-4 9 M252 84 l4 9" stroke="#c8372f" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="250" cy="83" r="2.6" fill="#e2483d" stroke="#8f1f1a" stroke-width="1"/>
+    </g>`;
+  },
+  'xmas-stockings': () => {
+    const sock = (x, c, d) => `
+      <path d="M${x + 6} 66 v4" stroke="#8b7d6b" stroke-width="1.6"/>
+      <path d="M${x} 76 h12 v16 c0 7 -3 10 -9 10 h-6 c-6 0 -6 -9 0 -9 h3 z" fill="${c}" stroke="${d}" stroke-width="1.8" stroke-linejoin="round"/>
+      <rect x="${x - 1.5}" y="70" width="15" height="7.5" rx="2.5" fill="#fff" stroke="#c9d3dc" stroke-width="1.4"/>`;
+    return `
+    <g class="room-xmas-stockings">
+      <rect x="6" y="62" width="46" height="5" rx="2" fill="#c9976a" stroke="#9a6b43" stroke-width="1.4"/>
+      ${sock(14, '#c8372f', '#8f1f1a')}${sock(34, '#3f9a6b', '#2c6e4f')}
+    </g>`;
+  },
+  // Along the top of the wall, like the bunting: it stays where it is hung.
+  'xmas-garland': () => {
+    const bows = [50, 150, 250, 350]
+      .map((x) => {
+        const y = 6 + Math.sin(((x % 100) / 100) * Math.PI) * 15;
+        return `<path d="M${x} ${y} l-7 -4 v9 z M${x} ${y} l7 -4 v9 z" fill="#c8372f" stroke="#8f1f1a" stroke-width="1.1" stroke-linejoin="round"/><circle cx="${x}" cy="${y}" r="2.2" fill="#e2483d"/>`;
+      })
+      .join('');
+    return `
+    <g class="room-xmas-garland">
+      <path d="M0 4 Q50 36 100 6 Q150 36 200 6 Q250 36 300 6 Q350 36 400 4" fill="none" stroke="#2f7d55" stroke-width="9" stroke-linecap="round"/>
+      <path d="M0 4 Q50 36 100 6 Q150 36 200 6 Q250 36 300 6 Q350 36 400 4" fill="none" stroke="#4fae7c" stroke-width="4" stroke-dasharray="3 7" stroke-linecap="round"/>
+      ${bows}
+    </g>`;
+  },
   bowl: (fullness = 0) => `
     <g class="room-bowl">
       <ellipse cx="126" cy="274" rx="20" ry="4.5" fill="rgba(60,40,20,.12)"/>
@@ -924,7 +1021,17 @@ function fishbowl() {
  * The room, without the pet (the pet is added by the room controller so it can
  * move). `placed` is the list of decorations put out; `wall` the wallpaper.
  */
-export function roomMarkup({ placed = [], wall = null, floor = null, fish = false, hour = clockNow(), where = {} } = {}) {
+export function roomMarkup({ placed = [], wall = null, floor = null, fish = false, hour = clockNow(), where = {}, season = null } = {}) {
+  // At Christmas it snows outside whatever the weather: flakes in the pane and a
+  // drift on the sill, for as long as the season lasts.
+  const snow =
+    season === 'xmas'
+      ? `<g class="window-snow" pointer-events="none"><g fill="#fff">${[
+          [66, 52, 1.8], [84, 60, 1.4], [104, 50, 2], [122, 62, 1.5], [72, 78, 1.5], [94, 84, 1.9], [114, 80, 1.4], [128, 94, 1.8], [64, 100, 1.7], [84, 106, 1.3], [106, 102, 1.8],
+        ]
+          .map(([x, y, r], i) => `<circle class="snow-flake" style="animation-delay:${(i % 5) * 0.7}s" cx="${x}" cy="${y}" r="${r}"/>`)
+          .join('')}</g><path d="M57 119 q10 -7 20 -3 q9 -6 19 -1 q10 -6 21 -1 q9 -5 18 1 v5 h-78 z" fill="#fff" stroke="#d5e2ee" stroke-width="1"/></g>`
+      : '';
   const w = WALLS[wall] || WALLS.plain;
   const f = FLOORS[floor] || FLOORS.plain;
   const has = (id) => placed.includes(id);
@@ -949,7 +1056,10 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     <rect x="0" y="0" width="400" height="206" fill="url(#wall-light)" pointer-events="none"/>
     ${has('lights') ? ITEM_ART.lights() : ''}
     ${has('bunting') ? ITEM_ART.bunting() : ''}
-    ${has('window') ? item('window', ITEM_ART.window(hour)) : ''}
+    ${has('xmas-garland') ? ITEM_ART['xmas-garland']() : ''}
+    ${has('window') ? item('window', ITEM_ART.window(hour) + snow) : ''}
+    ${has('xmas-wreath') ? item('xmas-wreath', ITEM_ART['xmas-wreath']()) : ''}
+    ${has('xmas-stockings') ? item('xmas-stockings', ITEM_ART['xmas-stockings']()) : ''}
     ${has('picture') ? item('picture', ITEM_ART.picture()) : ''}
     ${has('poster') ? item('poster', ITEM_ART.poster()) : ''}
     ${has('clock') ? item('clock', ITEM_ART.clock(hour)) : ''}
@@ -968,6 +1078,7 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     ${has('rug') ? item('rug', ITEM_ART.rug()) : ''}
     ${has('piano') ? item('piano', ITEM_ART.piano()) : ''}
     ${has('bookshelf') ? item('bookshelf', ITEM_ART.bookshelf()) : ''}
+    ${has('xmas-tree') ? item('xmas-tree', ITEM_ART['xmas-tree']()) : ''}
     ${has('flowers') ? item('flowers', ITEM_ART.flowers()) : ''}
     ${has('bed') && !fish ? item('bed', ITEM_ART.bed()) : ''}
     ${has('stand') ? item('stand', ITEM_ART.stand()) : ''}
@@ -977,6 +1088,8 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     ${has('beanbag') ? item('beanbag', ITEM_ART.beanbag()) : ''}
     ${has('toybox') ? item('toybox', ITEM_ART.toybox()) : ''}
     ${has('metronome') ? item('metronome', ITEM_ART.metronome()) : ''}
+    ${has('xmas-snowman') ? item('xmas-snowman', ITEM_ART['xmas-snowman']()) : ''}
+    ${has('xmas-presents') ? item('xmas-presents', ITEM_ART['xmas-presents']()) : ''}
     ${dark > 0.02 ? `<rect class="room-night" x="0" y="0" width="400" height="300" fill="#1d2550" opacity="${(dark * 0.2).toFixed(3)}" pointer-events="none"/>` : ''}
     ${dark > 0.3 && has('lights') ? ITEM_ART.lights(true) : ''}
     ${
@@ -1015,6 +1128,12 @@ export function itemIcon(id) {
     beanbag: '22 240 76 54',
     bookshelf: '206 128 66 100',
     piano: '134 142 88 86',
+    'xmas-tree': '216 94 80 134',
+    'xmas-presents': '162 244 76 52',
+    'xmas-snowman': '52 228 52 68',
+    'xmas-wreath': '226 46 48 52',
+    'xmas-stockings': '2 58 54 48',
+    'xmas-garland': '0 -6 200 44',
   };
   if (id.startsWith('floor-')) {
     const f = FLOORS[id];

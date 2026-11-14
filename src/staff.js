@@ -3,8 +3,8 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202611131750';
-import { intonationLane } from './intonation.js?v=202611131750';
+import { CLEF_PATH } from './clef.js?v=202611141150';
+import { intonationLane } from './intonation.js?v=202611141150';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -323,4 +323,21 @@ export function renderStaff(
 
   part.push('</svg>');
   return part.join('');
+}
+
+/**
+ * The arrow beside a wrong note: which way the written note lies. One stroke
+ * with round ends and a round-cornered head, so it reads as drawn with the same
+ * pen as a slur rather than as a triangle stuck on a stick.
+ * `tip` and `tail` are y positions; `size` is the half-width of the head.
+ */
+export function followArrowMarkup(x, tip, tail, colour, size = 6) {
+  const back = tip < tail ? size * 1.05 : -size * 1.05; // from the tip back towards the tail
+  const w = Math.max(2, size * 0.42);
+  return (
+    `<g fill="none" stroke="${colour}" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="M ${x} ${tail} L ${x} ${tip}" stroke-width="${w.toFixed(2)}"/>` +
+    `<path d="M ${x - size} ${tip + back} Q ${x - size * 0.42} ${tip + back * 0.36} ${x} ${tip} Q ${x + size * 0.42} ${tip + back * 0.36} ${x + size} ${tip + back}" stroke-width="${w.toFixed(2)}"/>` +
+    `</g>`
+  );
 }

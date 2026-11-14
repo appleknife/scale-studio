@@ -5,11 +5,12 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611131750';
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611131750';
-import { CLEF_PATH } from './clef.js?v=202611131750';
-import { hearLevel } from './pitch.js?v=202611131750';
-import { t } from './i18n.js?v=202611131750';
+import * as Sprint from './sprint.js?v=202611141150';
+import { STAFF_GEOM, accidentalAt, followArrowMarkup } from './staff.js?v=202611141150';
+import { currentSeason } from './season.js?v=202611141150';
+import { CLEF_PATH } from './clef.js?v=202611141150';
+import { hearLevel } from './pitch.js?v=202611141150';
+import { t } from './i18n.js?v=202611141150';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -44,6 +45,9 @@ export function createSprintView(deps) {
   let tick = 0;
   let lastResult = null;
   let clearArmed = false; // "clear my sprint history" waits for a second tap
+  // Christmas mode: on offer while the season lasts, and on unless switched off.
+  const season = currentSeason();
+  const festive = () => season === 'xmas' && stats?.opts.festive !== false;
 
   root.innerHTML = `
     <button class="back-btn" type="button" data-act="back"><span aria-hidden="true">←</span> ${t('sprint.back')}</button>
@@ -162,6 +166,12 @@ export function createSprintView(deps) {
         }
         <label class="switch-row"><input type="checkbox" data-opt="helper" ${o.helper ? 'checked' : ''}/>
           <span><b>${t('sprint.opt.helper')}</b><span class="switch-sub">${t('sprint.opt.helper.sub')}</span></span></label>
+        ${
+          season === 'xmas'
+            ? `<label class="switch-row sprint-festive"><input type="checkbox" data-opt="festive" ${o.festive !== false ? 'checked' : ''}/>
+                <span><b>${t('sprint.opt.festive')}</b><span class="switch-sub">${t('sprint.opt.festive.sub')}</span></span></label>`
+            : ''
+        }
       </div>
       <div class="sprint-actions">
         <button class="primary-btn" type="button" data-act="start" ${enough ? '' : 'disabled'}>${t('sprint.start')}</button>
@@ -411,7 +421,8 @@ export function createSprintView(deps) {
     );
     const colour = state === 'right' ? RIGHT : state === 'wrong' ? WRONG : INK;
     if (n.alter) parts.push(accidentalAt(n.alter, x - 25, y, colour, 1.6));
-    parts.push(`<ellipse cx="${x}" cy="${y}" rx="10.6" ry="7.8" transform="rotate(-18 ${x} ${y})" fill="${colour}"/>`);
+    const xmas = festive();
+    if (!xmas) parts.push(`<ellipse cx="${x}" cy="${y}" rx="10.6" ry="7.8" transform="rotate(-18 ${x} ${y})" fill="${colour}"/>`);
     // a stem, the way it would be printed: down from the middle line up
     const up = pos < 4;
     parts.push(
@@ -419,10 +430,29 @@ export function createSprintView(deps) {
         ? `<line x1="${x + 9.6}" x2="${x + 9.6}" y1="${y - 2}" y2="${y - 63}" stroke="${colour}" stroke-width="1.8"/>`
         : `<line x1="${x - 9.6}" x2="${x - 9.6}" y1="${y + 2}" y2="${y + 63}" stroke="${colour}" stroke-width="1.8"/>`,
     );
-    // The lane and the dot: drawn once, moved by paintGhost.
+    if (xmas) {
+      // The note head is a bauble: the same size and in the same place, so it is
+      // read exactly as a note is, with a gold cap where the stem leaves it.
+      const bauble = state === 'right' ? RIGHT : state === 'wrong' ? WRONG : '#c8372f';
+      const rim = state ? colour : '#8f1f1a';
+      const capX = up ? x + 8.2 : x - 8.2;
+      const capY = up ? y - 5.6 : y + 5.6;
+      parts.push(
+        `<circle cx="${x}" cy="${y}" r="9.6" fill="${bauble}" stroke="${rim}" stroke-width="1.4"/>` +
+          `<path d="M ${x - 8.6} ${y + 1.2} q 8.6 4.2 17.2 0" fill="none" stroke="#f6d77a" stroke-width="1.8" stroke-linecap="round"/>` +
+          `<path d="M ${x - 5.6} ${y - 3.4} q 1.6 -3.4 5 -4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".8"/>` +
+          `<circle cx="${capX}" cy="${capY}" r="2.9" fill="#e8b93c" stroke="#a87a12" stroke-width="1"/>`,
+      );
+    }
+    // The lane and the marker: drawn once, moved by paintGhost. At Christmas the
+    // lane is a candy cane and the marker a star.
+    const marker = xmas
+      ? `<path d="M0 -10 L2.6 -3.4 L9.6 -3 L4.2 1.6 L6 8.4 L0 4.6 L-6 8.4 L-4.2 1.6 L-9.6 -3 L-2.6 -3.4 Z"/>`
+      : `<circle r="7.5"/>`;
     parts.push(
-      `<g class="sprint-ghost" style="display:none"><line class="sprint-lane" x1="${DOT_X}" x2="${DOT_X}" y1="6" y2="${NOTE_H - 8}"/>` +
-        `<circle class="sprint-dot" cx="${DOT_X}" cy="0" r="7.5"/></g>`,
+      `<g class="sprint-ghost${xmas ? ' is-xmas' : ''}" style="display:none"><line class="sprint-lane" x1="${DOT_X}" x2="${DOT_X}" y1="6" y2="${NOTE_H - 8}"/>` +
+        (xmas ? `<line class="sprint-lane-stripe" x1="${DOT_X}" x2="${DOT_X}" y1="6" y2="${NOTE_H - 8}"/>` : '') +
+        `<g class="sprint-dot" transform="translate(${DOT_X} 0)">${marker}</g></g>`,
     );
     if (state === 'wrong' && run?.miss) {
       // the same arrow the scale screen uses: which way the written note lies
@@ -430,20 +460,16 @@ export function createSprintView(deps) {
       const dirUp = run.miss.dir === 'up';
       const tip = dirUp ? y - 18 : y + 18;
       const tail = dirUp ? y + 12 : y - 12;
-      const back = dirUp ? 8 : -8;
-      parts.push(
-        `<g class="follow-arrow is-${run.miss.dir}"><line x1="${ax}" y1="${tail}" x2="${ax}" y2="${tip + back * 0.7}" stroke="${WRONG}" stroke-width="3" stroke-linecap="round"/>` +
-          `<path d="M ${ax - 7} ${tip + back} L ${ax} ${tip} L ${ax + 7} ${tip + back} Z" fill="${WRONG}"/></g>`,
-      );
+      parts.push(`<g class="follow-arrow is-${run.miss.dir}">${followArrowMarkup(ax, tip, tail, WRONG, 7.5)}</g>`);
     }
     return `<svg class="sprint-note" viewBox="0 ${NOTE_BOTTOM - 150} ${NOTE_W} ${NOTE_H}" aria-hidden="true">${parts.join('')}</svg>`;
   }
 
   function paintPlay() {
     body.innerHTML = `
-      <div class="sprint-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${run.deck.length}" aria-valuenow="0"><span class="sprint-fill"></span></div>
+      <div class="sprint-progress${festive() ? ' is-xmas' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="${run.deck.length}" aria-valuenow="0"><span class="sprint-fill"></span></div>
       <div class="sprint-meta"><span class="sprint-left"></span><span class="sprint-clock">0.0 s</span></div>
-      <div class="sprint-stage"></div>
+      <div class="sprint-stage${festive() ? ' is-xmas' : ''}"></div>
       <p class="sprint-status" aria-live="polite"></p>
       <div class="sprint-actions"><button class="quiet-btn" type="button" data-act="stop">${t('sprint.stop')}</button></div>`;
     paintNote();
@@ -456,9 +482,9 @@ export function createSprintView(deps) {
     const stage = body.querySelector('.sprint-stage');
     if (!stage) return;
     const id = run.deck[run.index];
-    stage.innerHTML = noteSvg(id, run.miss ? 'wrong' : null);
+    stage.innerHTML = (festive() ? fairyLights() : '') + noteSvg(id, run.miss ? 'wrong' : null);
     stage.dataset.note = id; // which note is up, for tests and assistive tech
-    const svg = stage.querySelector('svg');
+    const svg = stage.querySelector('svg.sprint-note');
     svg.classList.remove('is-in');
     void svg.getBoundingClientRect();
     if (!run.miss) svg.classList.add('is-in');
@@ -503,7 +529,7 @@ export function createSprintView(deps) {
     const y = Math.max(10, Math.min(NOTE_H - 12, NOTE_BOTTOM - pos * NOTE_STEP));
     layer.style.display = '';
     const dot = layer.querySelector('.sprint-dot');
-    dot.setAttribute('cy', y.toFixed(1));
+    dot.setAttribute('transform', `translate(${DOT_X} ${y.toFixed(1)})`);
     dot.classList.toggle('is-on', on);
   }
 
@@ -532,25 +558,57 @@ export function createSprintView(deps) {
     else el.textContent = '';
   }
 
-  /** A soft two-note bell, above the violin's range so the ear never takes it for a note. */
+  /** A string of lights along the top of the Christmas stage. */
+  function fairyLights() {
+    const colours = ['#e2483d', '#f2c14e', '#3f9a6b', '#5b8fd0'];
+    const bulbs = Array.from({ length: 9 }, (_, i) => {
+      const bx = 22 + i * 32;
+      const by = 9 + Math.sin(((bx % 128) / 128) * Math.PI) * 9;
+      return `<ellipse class="fairy-bulb" style="animation-delay:${(i % 4) * 0.35}s" cx="${bx}" cy="${(by + 5).toFixed(1)}" rx="3.6" ry="4.6" fill="${colours[i % 4]}"/>`;
+    }).join('');
+    return `<svg class="sprint-lights" viewBox="0 0 300 32" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 6 Q32 26 64 8 Q96 26 128 8 Q160 26 192 8 Q224 26 256 8 Q280 22 300 6" fill="none" stroke="#5c6b63" stroke-width="1.2"/>${bulbs}</svg>`;
+  }
+
+  /**
+   * The bell for a right note, above the violin's range so the ear never takes
+   * it for a note. Each strike is a sine with a quieter octave over it, which a
+   * phone's small speaker carries far better than the bare sine did; it is also
+   * several times louder than it was. At Christmas it is three quick sleigh bells.
+   */
   function chime() {
     const ctx = deps.getMic()?.ctx;
     if (!ctx) return;
     const now = ctx.currentTime;
-    for (const [f, at, g] of [
-      [1760, 0, 0.09],
-      [2637, 0.06, 0.06],
-    ]) {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = f;
-      gain.gain.setValueAtTime(0.0001, now + at);
-      gain.gain.linearRampToValueAtTime(g, now + at + 0.008);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + at + 0.28);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now + at);
-      osc.stop(now + at + 0.3);
+    const strikes = festive()
+      ? [
+          [2093, 0, 0.3],
+          [2637, 0.07, 0.26],
+          [3136, 0.14, 0.24],
+        ]
+      : [
+          [1760, 0, 0.34],
+          [2637, 0.07, 0.26],
+        ];
+    const out = ctx.createGain();
+    out.gain.value = 1;
+    out.connect(ctx.destination);
+    for (const [f, at, g] of strikes) {
+      for (const [mult, share] of [
+        [1, 1],
+        [2, 0.28],
+      ]) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = f * mult;
+        gain.gain.setValueAtTime(0.0001, now + at);
+        gain.gain.linearRampToValueAtTime(g * share, now + at + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + at + 0.42);
+        osc.connect(gain).connect(out);
+        osc.start(now + at);
+        osc.stop(now + at + 0.45);
+      }
     }
   }
 
@@ -662,7 +720,8 @@ export function createSprintView(deps) {
   function burst(anchor) {
     if (!anchor || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const box = anchor.getBoundingClientRect();
-    const glyphs = ['♪', '♫', '★', '♬'];
+    const xmas = festive();
+    const glyphs = xmas ? ['❄', '★', '♪', '✦'] : ['♪', '♫', '★', '♬'];
     for (let i = 0; i < 14; i++) {
       const n = document.createElement('span');
       n.className = 'note-burst';
@@ -675,7 +734,7 @@ export function createSprintView(deps) {
       n.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
       n.style.setProperty('--spin', `${(Math.random() - 0.5) * 90}deg`);
       n.style.animationDelay = `${300 + i * 25}ms`;
-      n.style.color = ['#e0708a', '#e8a33d', '#4f9a7c', '#6a7fd0'][i % 4];
+      n.style.color = (xmas ? ['#7fb6dd', '#e8b93c', '#c8372f', '#3f9a6b'] : ['#e0708a', '#e8a33d', '#4f9a7c', '#6a7fd0'])[i % 4];
       document.body.appendChild(n);
       n.addEventListener('animationend', () => n.remove());
     }
