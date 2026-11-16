@@ -97,21 +97,21 @@ function hairFront(style, h) {
     case 'hair-none':
       return '';
     case 'hair-spiky':
-      return `<path d="M27 34 C26 26 29 20 33 17 L34 8 L41 15 L46 5 L51 14 L58 6 L61 16 L69 11 L68 21 C72 25 74 30 73 35 C66 30 58 27 50 27 C41 27 33 30 27 34 Z" ${a}/>`;
+      return `<path d="M25.4 34 C24.6 25 27 17 31 13 L32 3 L39.6 10.6 L45 0 L51 9.6 L58 1 L61.4 11.4 L70 6 L69.4 16 C73.4 21 75.2 28 74.6 35 C66 30 58 27 50 27 C41 27 33 30 25.4 34 Z" ${a}/>`;
     case 'hair-curly':
-      return `<g ${a}><circle cx="36" cy="19" r="9"/><circle cx="50" cy="15" r="9.5"/><circle cx="64" cy="19" r="9"/></g>
+      return `<g ${a}><circle cx="29.6" cy="26" r="7.6"/><circle cx="70.4" cy="26" r="7.6"/><circle cx="36" cy="17" r="9.4"/><circle cx="64" cy="17" r="9.4"/><circle cx="50" cy="13" r="10"/></g>
         <path d="M30 30 C36 24 64 24 70 30 C64 22 36 22 30 30 Z" fill="${h.fill}"/>`;
     case 'hair-long':
     case 'hair-braids':
       // parted in the middle
-      return `<path d="M27 37 C24 14 76 14 73 37 C70 28 60 22 50 21 C40 22 30 28 27 37 Z" ${a}/><path d="M50 14.5 v7" stroke="${h.line}" stroke-width="1.4" stroke-linecap="round"/>`;
+      return `<path d="M25.4 37 C21 3 79 3 74.6 37 C71 28 60 22 50 21 C40 22 29 28 25.4 37 Z" ${a}/><path d="M50 12 v9" stroke="${h.line}" stroke-width="1.4" stroke-linecap="round"/>`;
     case 'hair-pony':
     case 'hair-buns':
-      return `<path d="M27 36 C24 13 76 13 73 36 C68 27 60 23 50 23 C40 23 32 27 27 36 Z" ${a}/>`;
+      return `<path d="M25.4 36 C21 3 79 3 74.6 36 C69 27 60 23 50 23 C40 23 31 27 25.4 36 Z" ${a}/>`;
     case 'hair-bob':
-      return `<path d="M27 38 C23 13 77 13 73 38 C71 30 66 26 58 25 C50 30 38 31 27 38 Z" ${a}/>`;
+      return `<path d="M25.4 38 C20 3 80 3 74.6 38 C72 30 66 26 58 25 C50 30 38 31 25.4 38 Z" ${a}/>`;
     default: // short
-      return `<path d="M27 35 C24 13 76 13 73 35 C70 28 64 24 57 23 C48 28 36 28 27 35 Z" ${a}/>`;
+      return `<path d="M25.4 35 C21 3 79 3 74.6 35 C71 28 64 24 57 23 C48 28 36 28 25.4 35 Z" ${a}/>`;
   }
 }
 
@@ -165,17 +165,17 @@ function hat(style) {
     case 'hat-bow':
       return `<g transform="translate(64 17) rotate(18)"><path d="M0 0 l-9 -5.5 v11 z M0 0 l9 -5.5 v11 z" fill="#e0685c" stroke="#a83a30" stroke-width="1.4" stroke-linejoin="round"/><circle r="2.8" fill="#f08a7e" stroke="#a83a30" stroke-width="1.2"/></g>`;
     case 'hat-cap':
-      return `<path d="M28 27 C28 8 72 8 72 27 Z" fill="#5b8fd0" stroke="#3b6aa5" stroke-width="1.8" stroke-linejoin="round"/>
-        <path d="M70 26.4 C80 25 87 28 88 31.6 C82 32 76 31 70 29.4 Z" fill="#4a7dbd" stroke="#3b6aa5" stroke-width="1.6" stroke-linejoin="round"/><circle cx="50" cy="11.4" r="2" fill="#3b6aa5"/>`;
+      return `<path d="M24.6 27 C24 0 76 0 75.4 27 Z" fill="#5b8fd0" stroke="#3b6aa5" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M72 26.4 C82 25 89 28 90 31.6 C84 32 78 31 72 29.6 Z" fill="#4a7dbd" stroke="#3b6aa5" stroke-width="1.6" stroke-linejoin="round"/><circle cx="50" cy="6.8" r="2" fill="#3b6aa5"/>`;
     case 'hat-beanie':
-      return `<path d="M27.4 29 C26 8 74 8 72.6 29 Z" fill="#f2a64a" stroke="#b9732a" stroke-width="1.8" stroke-linejoin="round"/>
-        <rect x="25.4" y="24.4" width="49.2" height="8" rx="4" fill="#f8c27c" stroke="#b9732a" stroke-width="1.6"/><circle cx="50" cy="7.4" r="5.2" fill="#fff6ea" stroke="#c9b592" stroke-width="1.4"/>`;
+      return `<path d="M24.8 29 C22 -1 78 -1 75.2 29 Z" fill="#f2a64a" stroke="#b9732a" stroke-width="1.8" stroke-linejoin="round"/>
+        <rect x="23.4" y="24.4" width="53.2" height="8" rx="4" fill="#f8c27c" stroke="#b9732a" stroke-width="1.6"/><circle cx="50" cy="3.4" r="5.2" fill="#fff6ea" stroke="#c9b592" stroke-width="1.4"/>`;
     case 'hat-crown':
-      return `<path d="M32 26 L30 8 L40 17 L50 4 L60 17 L70 8 L68 26 Z" fill="#f6c84c" stroke="#c9952a" stroke-width="1.8" stroke-linejoin="round"/>
-        <circle cx="50" cy="20" r="2.4" fill="#e0685c"/><circle cx="39.6" cy="21.4" r="1.7" fill="#5b8fd0"/><circle cx="60.4" cy="21.4" r="1.7" fill="#5b8fd0"/>`;
+      return `<g transform="translate(0 -6)"><path d="M32 26 L30 8 L40 17 L50 4 L60 17 L70 8 L68 26 Z" fill="#f6c84c" stroke="#c9952a" stroke-width="1.8" stroke-linejoin="round"/>
+        <circle cx="50" cy="20" r="2.4" fill="#e0685c"/><circle cx="39.6" cy="21.4" r="1.7" fill="#5b8fd0"/><circle cx="60.4" cy="21.4" r="1.7" fill="#5b8fd0"/></g>`;
     case 'hat-santa':
-      return `<path d="M28.6 27 C30 8 60 2 78 20 C72 18 70 22 72.4 27 Z" fill="#c8372f" stroke="#8f1f1a" stroke-width="1.8" stroke-linejoin="round"/>
-        <rect x="25.6" y="23.4" width="48.8" height="8.4" rx="4.2" fill="#fff" stroke="#c9d3dc" stroke-width="1.5"/><circle cx="79.4" cy="21.6" r="5" fill="#fff" stroke="#c9d3dc" stroke-width="1.5"/>`;
+      return `<path d="M24.8 27 C25 0 62 -6 80 18 C74 17 72 22 75.2 27 Z" fill="#c8372f" stroke="#8f1f1a" stroke-width="1.8" stroke-linejoin="round"/>
+        <rect x="23.2" y="23.4" width="53.6" height="8.4" rx="4.2" fill="#fff" stroke="#c9d3dc" stroke-width="1.5"/><circle cx="81.4" cy="19.6" r="5" fill="#fff" stroke="#c9d3dc" stroke-width="1.5"/>`;
     default:
       return '';
   }
@@ -262,7 +262,7 @@ const MOVE_GLYPH = { 'move-wave': '👋', 'move-jump': '⤴', 'move-bow': '🙇'
 /** A shop tile's picture: the student's own figure with the thing on, cropped to where it shows. */
 export function avatarItemIcon(avatar, item) {
   if (item.slot === 'move') return `<span class="av-move-icon" aria-hidden="true">${MOVE_GLYPH[item.id] || '✨'}</span>`;
-  const box = item.slot === 'top' ? '20 52 60 60' : '14 -2 78 66';
+  const box = item.slot === 'top' ? '20 52 60 60' : '12 -10 78 72';
   const wear = { [item.slot]: item.id };
   // a hat is shown without the hat already worn; a haircut without any hat
   if (item.slot === 'hair') wear.hat = null;
@@ -271,5 +271,5 @@ export function avatarItemIcon(avatar, item) {
 
 /** The whole figure, standing still, for the "Me" tab. */
 export function avatarPortrait(avatar, cls = '') {
-  return `<svg class="av-portrait" viewBox="2 -4 96 136" aria-hidden="true">${avatarMarkup(avatar, { cls })}</svg>`;
+  return `<svg class="av-portrait" viewBox="2 -12 96 144" aria-hidden="true">${avatarMarkup(avatar, { cls })}</svg>`;
 }
