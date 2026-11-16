@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611161720';
-import { currentSeason } from './season.js?v=202611161720';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611161720';
+import * as Pet from './pet.js?v=202611161735';
+import { currentSeason } from './season.js?v=202611161735';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611161735';
 import {
   petMarkup,
   eggMarkup,
@@ -32,8 +32,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611161720';
-import { t, getLang } from './i18n.js?v=202611161720';
+} from './petart.js?v=202611161735';
+import { t, getLang } from './i18n.js?v=202611161735';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -137,6 +137,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   function drawRoom() {
     const svg = els.svg;
     svg.innerHTML = '';
+    // Everything that was drawn is gone with the old picture. A layer left over
+    // here is a node that is no longer in the room: placing something "in front
+    // of the pet" would be placing it in front of a pet that is not there.
+    for (const key of Object.keys(layers)) layers[key] = null;
     layers.room = node('g', { class: 'room-base' }, roomArt());
     skyStep = Math.floor(timeNow() * 12);
     layers.stage = node('g', { class: 'room-stage' });
@@ -196,8 +200,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       avatarMarkup(pet.avatar),
     );
     placeAvatar();
-    // before the pet, so the pet walks in front of it
-    if (layers.petPos) layers.stage.insertBefore(layers.av, layers.petPos);
+    // before the pet, so the pet walks in front of it — if the pet is in this
+    // picture yet (when the whole room is redrawn, the avatar is drawn first)
+    if (layers.petPos && layers.petPos.parentNode === layers.stage) layers.stage.insertBefore(layers.av, layers.petPos);
     else layers.stage.append(layers.av);
     layers.av.addEventListener('pointerdown', (event) => {
       if (busy) return;

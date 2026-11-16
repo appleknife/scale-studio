@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pet room: redrawing</title>
+    <style>
+      body { font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; margin: 20px; background: #faf7f1; color: #221e19; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; white-space: pre-wrap; }
+      iframe { width: 420px; height: 760px; border: 1px solid #e8dfd1; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <iframe id="app" title="the app"></iframe>
+    <script type="module">
+      // The room is redrawn from scratch whenever something in it changes: a pet
+      // swapped, furniture put out, a haircut. Every one of those has to leave the
+      // pet — and the avatar, if it is in the room — on the screen. (Swapping pets
+      // with the avatar in the room once left the room empty: the avatar was being
+      // placed in front of the pet from the picture before.)
+      import * as Pet from '../src/pet.js';
+
+      const problems = [];
+      const log = [];
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const kept = { ...localStorage };
+      const frame = document.getElementById('app');
+      try {
+        const load = () => new Promise((done) => { frame.onload = done; frame.src = `../index.html?season=off&lang=en&t=${Date.now()}`; });
+        await load();
+        await wait(600);
+        const profile = JSON.parse(localStorage.getItem('scale-studio.journal.v2') || '{}').current;
+        const p = Pet.emptyPet();
+        Pet.chooseEgg(p, 'cat');
+        for (let i = 0; i < Pet.HATCH_TAKES; i += 1) Pet.earn(p, { kind: 'scale', id: 'G', dayKey: '2026-11-10' });
+        Pet.hatch(p, Date.now(), 0.9);
+        Pet.name(p, 'Mochi');
+        p.notes = 40;
+        Pet.buy(p, 'rug');
+        const friend = (species, name) => ({ ...JSON.parse(JSON.stringify(p.pet)), species, name });
+        p.friends = [friend('dog', 'Biscuit'), friend('fish', 'Bubbles')];
+        Pet.setAvatar(p, { in: true });
+        Pet.savePet(profile, p);
+        await load();
+        await wait(600);
+
+        const win = frame.contentWindow;
+        const doc = frame.contentDocument;
+        const errors = [];
+        win.addEventListener('error', (e) => errors.push(e.message));
+        const here = (what) => {
+          const pet = Boolean(doc.querySelector('.pet-pos .pet'));
+          const avatar = Boolean(doc.querySelector('.av-pos .av'));
+          log.push(`${what}: pet ${pet ? 'shown' : 'MISSING'}, avatar ${avatar ? 'shown' : 'not shown'}`);
+          return [pet, avatar];
+        };
+        const expect = (what, want) => {
+          const got = here(what);
+          if (got[0] !== want[0] || got[1] !== want[1]) problems.push(`${what}: pet/avatar shown is ${JSON.stringify(got)}, wanted ${JSON.stringify(want)}`);
+          for (const e of errors.splice(0)) problems.push(`${what}: ${e}`);
+        };
+        const tab = async (name) => {
+          const b = doc.querySelector(`.pet-tab[data-tray="${name}"]`);
+          if (b.getAttribute('aria-selected') !== 'true') b.click();
+          await wait(250);
+        };
+        const tap = async (selector) => {
+          const b = doc.querySelector(selector);
+          if (!b) throw new Error(`nothing to tap at ${selector}`);
+          b.click();
+          await wait(500);
+        };
+
+        doc.getElementById('openPetBtn').click();
+        await wait(1200);
+        expect('the room, opened', [true, true]);
+        await tab('pets');
+        await tap('[data-friend="0"]');
+        expect('swapped to another pet', [true, true]);
+        await tap('[data-friend="1"]');
+        expect('swapped to the fish', [true, true]);
+        await tap('[data-friend="0"]');
+        expect('swapped back', [true, true]);
+        await tab('decorate');
+        await tap('.tray-item[data-item="rug"]');
+        expect('furniture put away', [true, true]);
+        await tap('.tray-item[data-item="rug"]');
+        expect('furniture put out', [true, true]);
+        await tab('me');
+        await tap('[data-av="hair-bob"]');
+        expect('a haircut', [true, true]);
+        await tap('[data-me-skin="s5"]');
+        expect('a different skin tone', [true, true]);
+        await tap('[data-me-in]');
+        expect('the avatar leaves the room', [true, false]);
+        await tab('pets');
+        await tap('[data-friend="0"]');
+        expect('swapped with the avatar out', [true, false]);
+        await tab('me');
+        await tap('[data-me-in]');
+        expect('the avatar comes back', [true, true]);
+        // the pet is drawn after the avatar, so it walks in front of it
+        const stage = [...doc.querySelector('.room-stage').children].map((n) => n.getAttribute('class'));
+        if (stage.indexOf('av-pos') > stage.indexOf('pet-pos')) problems.push(`the avatar is drawn over the pet: ${stage.join(', ')}`);
+      } catch (err) {
+        problems.push(`threw: ${err && err.stack ? err.stack : err}`);
+      } finally {
+        // leave the browser's storage as it was found
+        localStorage.clear();
+        for (const [k, v] of Object.entries(kept)) localStorage.setItem(k, v);
+      }
+
+      document.getElementById('report').textContent = problems.length ? `PETROOM FAILED\n${problems.join('\n')}\n\n${log.join('\n')}` : `PETROOM OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'PETROOM FAILED' : 'PETROOM OK';
+      fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'petroom', problems, log: log.join('\n') }, null, 2) });
+    </script>
+  </body>
+</html>
