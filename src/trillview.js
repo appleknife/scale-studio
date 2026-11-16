@@ -13,9 +13,9 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611161630';
-import { t } from './i18n.js?v=202611161630';
-import { hearLevel } from './pitch.js?v=202611161630';
+import * as Trill from './trill.js?v=202611161700';
+import { t } from './i18n.js?v=202611161700';
+import { hearLevel } from './pitch.js?v=202611161700';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -27,7 +27,7 @@ export function createTrillView(deps) {
   const root = deps.root;
   let stats = null;
   let panel = 'pick'; // 'pick' | 'play' | 'done'
-  let stepId = null; // the step chosen; null = the next one not yet done
+  let stepId = null; // the step chosen; null = the free trill, which opens the screen
   let run = null;
   let listening = false;
   let ticket = 0;
@@ -46,7 +46,7 @@ export function createTrillView(deps) {
   const body = root.querySelector('.trill-body');
 
   const notesNow = () => Trill.notesFor(stats.opts.string, stats.opts.pair, stats.opts.spacing);
-  const stepNow = () => (stepId ? Trill.stepById(stepId) : Trill.nextStep(stats, notesNow()));
+  const stepNow = () => Trill.stepById(stepId || 'free');
   const save = () => Trill.saveStats(deps.profileId(), stats);
   const finger = (n) => t(`trill.finger.${n}`);
   const oneDp = (n) => (Math.round(n * 10) / 10).toFixed(1);
