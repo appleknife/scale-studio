@@ -218,6 +218,63 @@
         eq('new furniture is put out when bought', P.isPlaced(p, 'piano'), true);
         eq('and can be dragged, within the room', P.moveItem(p, 'piano', 9999, 50), { x: P.ITEM_RANGE.piano.x[1], y: 0 });
         eq('every thing that can be put out has a name and can be bought', P.ITEMS.every((i) => i.cost > 0 && i.slot), true);
+        // ── every way of practising pays ──
+        {
+          const day = '2026-11-16';
+          const pay = (kind, extra = {}) => { const q = P.emptyPet(); P.ensureWish(q, day, () => 11); return [P.earn(q, { kind, id: kind === 'scale' ? 'G' : '', dayKey: day, ...extra }).amount, q.notes]; };
+          const first = P.EARN.take + P.EARN.firstOfDay + P.EARN.newKey;
+          eq('a first scale of the day pays the take, the first-of-day and the new-key bonus', pay('scale'), [first, first]);
+          eq('so does a first sight reading', pay('sight'), [first, first]);
+          eq('and a first sprint', pay('sprint'), [first, first]);
+          eq('and a first trill', pay('trill'), [first, first]);
+          eq('and a first piece in Listen (it used to pay nothing)', pay('piece'), [first, first]);
+          eq('a two-octave scale pays more', pay('scale', { octaves: 2 })[0], first + P.EARN.extraOctave);
+          eq('a sprint of only a few notes pays the token rate, with the day’s bonuses', pay('sprint', { small: true })[0], P.EARN.afterCap + P.EARN.firstOfDay + P.EARN.newKey);
+          const q = P.emptyPet();
+          P.ensureWish(q, day, () => 11);
+          const run = ['piece', 'piece', 'sprint', 'sprint', 'trill', 'trill', 'sight', 'sight'].map((kind) => P.earn(q, { kind, dayKey: day }).amount);
+          eq('each kind’s bonus is paid once a day, then the plain take', run, [first, P.EARN.take, P.EARN.take + P.EARN.newKey, P.EARN.take, P.EARN.take + P.EARN.newKey, P.EARN.take, P.EARN.take + P.EARN.newKey, P.EARN.take]);
+          eq('what was paid is what is in the purse', q.notes, run.reduce((a, b) => a + b, 0));
+          for (let i = 0; i < 40; i += 1) P.earn(q, { kind: 'piece', dayKey: day });
+          const atCap = q.day.earned;
+          eq('past the day’s cap a take pays the token rate', [atCap >= P.DAILY_CAP, P.earn(q, { kind: 'piece', dayKey: day }).amount], [true, P.EARN.afterCap]);
+          eq('a piece is remembered in the book', q.book.firsts.piece === day || Boolean(q.book.firsts.piece), true);
+          eq('a logged day and a kept recording pay once each', [P.earn(q, { kind: 'practice', dayKey: '2026-11-17' }).amount, P.earn(q, { kind: 'practice', dayKey: '2026-11-17' }).amount, P.earn(q, { kind: 'recording', dayKey: '2026-11-17' }).amount, P.earn(q, { kind: 'recording', dayKey: '2026-11-17' }).amount], [P.EARN.practice, 0, P.EARN.recording, 0]);
+        }
+
+        // ── the avatar ──
+        {
+          const a = P.emptyPet();
+          eq('a new save has a plain avatar, not yet in the room', [a.avatar.in, a.avatar.wear.hair, a.avatar.wear.top, a.avatar.wear.move, a.avatar.wear.hat], [false, 'hair-short', 'top-tee', 'move-wave', null]);
+          eq('one of each needed thing is free', ['hair', 'eyes', 'mouth', 'top', 'move'].every((slot) => P.AVATAR_ITEMS.some((i) => i.slot === slot && i.cost === 0)), true);
+          eq('skin and hair colour are free to change', [P.setAvatar(a, { skin: 's5', hairColour: 'blue' }).skin, a.avatar.hairColour, a.notes], ['s5', 'blue', 0]);
+          eq('a made-up skin or colour is refused', [P.setAvatar(a, { skin: 'green', hairColour: 'x' }).skin, a.avatar.hairColour], ['s5', 'blue']);
+          eq('a free haircut is put on without paying', [P.wear(a, 'hair-bob'), a.avatar.wear.hair], [true, 'hair-bob']);
+          eq('what is not owned cannot be worn', [P.wear(a, 'hat-crown'), a.avatar.wear.hat], [false, null]);
+          eq('nor bought without the notes', [P.buyAvatar(a, 'hat-crown'), a.owned.length], [false, 0]);
+          a.notes = 40;
+          eq('with the notes it is bought and put on', [P.buyAvatar(a, 'hat-crown'), a.notes, a.avatar.wear.hat, P.avatarOwns(a, 'hat-crown')], [true, 15, 'hat-crown', true]);
+          eq('it is not paid for twice', [P.buyAvatar(a, 'hat-crown'), a.notes], [false, 15]);
+          eq('a hat comes off when tapped again, and goes back on', [P.wear(a, 'hat-crown'), a.avatar.wear.hat, P.wear(a, 'hat-crown'), a.avatar.wear.hat], [true, null, true, 'hat-crown']);
+          eq('a haircut does not come off when tapped again', [P.wear(a, 'hair-bob'), a.avatar.wear.hair], [true, 'hair-bob']);
+          eq('a move is bought and becomes the move', [P.buyAvatar(a, 'move-jump'), a.avatar.wear.move, a.notes], [true, 'move-jump', 7]);
+          eq('a Christmas thing is for sale only in season', [P.buyAvatar(a, 'top-xmas', null), P.avatarInShop(a, P.AVATAR_ITEMS.find((i) => i.id === 'top-xmas'), null)], [false, false]);
+          a.notes = 30;
+          eq('and kept once bought', [P.buyAvatar(a, 'top-xmas', 'xmas'), P.avatarInShop(a, P.AVATAR_ITEMS.find((i) => i.id === 'top-xmas'), null), a.avatar.wear.top], [true, true, 'top-xmas']);
+          eq('it stands where it is put, inside the room', [P.setAvatar(a, { in: true, x: 9999 }).x, P.setAvatar(a, { x: -5 }).x, a.avatar.in], [P.AVATAR_X[1], P.AVATAR_X[0], true]);
+          const st = { m: {}, getItem(k) { return this.m[k] || null; }, setItem(k, v) { this.m[k] = v; } };
+          P.savePet('av', a, st);
+          const back = P.loadPet('av', st);
+          eq('all of it survives a save and a load', [back.avatar.skin, back.avatar.wear.hat, back.avatar.wear.move, back.avatar.wear.top, back.avatar.in], ['s5', 'hat-crown', 'move-jump', 'top-xmas', true]);
+          st.setItem(P.storageKey('old'), JSON.stringify({ notes: 12, owned: ['rug'], placed: ['rug'], avatar: { wear: { hat: 'hat-crown', hair: 'nonsense' }, skin: 's3' } }));
+          const old = P.loadPet('old', st);
+          eq('a save that claims what it does not own is given the plain set', [old.avatar.wear.hat, old.avatar.wear.hair, old.avatar.skin, old.notes], [null, 'hair-short', 's3', 12]);
+          st.setItem(P.storageKey('older'), JSON.stringify({ notes: 5 }));
+          eq('a save from before the avatar gets one', P.loadPet('older', st).avatar.wear.top, 'top-tee');
+          eq('every avatar thing has a slot and a price', P.AVATAR_ITEMS.every((i) => P.AVATAR_SLOTS.includes(i.slot) && i.cost >= 0), true);
+          eq('no avatar thing shares a name with the furniture', P.AVATAR_ITEMS.some((i) => P.ITEMS.some((f) => f.id === i.id)), false);
+        }
+
         {
           const S = await import('../src/season.js');
           const on = (y, m, d) => S.seasonOn(new Date(y, m - 1, d));

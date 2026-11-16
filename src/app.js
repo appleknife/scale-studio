@@ -1,18 +1,19 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611141150';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611141150';
-import { createInk } from './ink.js?v=202611141150';
-import { createFollower } from './follow.js?v=202611141150';
-import { createPetRoom } from './petroom.js?v=202611141150';
-import { createBuddy } from './buddy.js?v=202611141150';
-import { createSprintView } from './sprintview.js?v=202611141150';
-import { createTrillView } from './trillview.js?v=202611141150';
-import { createListenView } from './listenview.js?v=202611141150';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611161630';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611161630';
+import { createInk } from './ink.js?v=202611161630';
+import { createFollower } from './follow.js?v=202611161630';
+import { createPetRoom } from './petroom.js?v=202611161630';
+import { SPRINT_FULL } from './pet.js?v=202611161630';
+import { createBuddy } from './buddy.js?v=202611161630';
+import { createSprintView } from './sprintview.js?v=202611161630';
+import { createTrillView } from './trillview.js?v=202611161630';
+import { createListenView } from './listenview.js?v=202611161630';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611141150';
+window.__scaleStudioVersion = '202611161630';
 import {
   PitchDetector,
   midiToFreq,
@@ -20,16 +21,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611141150';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611141150';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611141150';
-import { generatePassage } from './sightreading.js?v=202611141150';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611141150';
-import { renderScore } from './score.js?v=202611141150';
-import { summariseIntonation } from './intonation.js?v=202611141150';
-import * as Journal from './journal.js?v=202611141150';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611141150';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611141150';
+} from './pitch.js?v=202611161630';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611161630';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611161630';
+import { generatePassage } from './sightreading.js?v=202611161630';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611161630';
+import { renderScore } from './score.js?v=202611161630';
+import { summariseIntonation } from './intonation.js?v=202611161630';
+import * as Journal from './journal.js?v=202611161630';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611161630';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611161630';
 import {
   STRINGS,
   FIFTHS,
@@ -38,7 +39,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611141150';
+} from './tuner.js?v=202611161630';
 
 const LANG = initLang();
 
@@ -2403,7 +2404,9 @@ sprintView = createSprintView({
     // Every finished sprint counts, however short or quick: the trial filter
     // that guards scale takes (a cough, a tap) cannot happen here — a sprint
     // only finishes when every note on its list was played.
-    noteTake('sprint');
+    // A sprint of only a few notes still counts, but pays the token rate: see
+    // `small` in Pet.earn.
+    noteTake('sprint', null, 0, null, { small: (result?.played ?? 99) < SPRINT_FULL });
   },
   onBack: () => goHome(),
 });
@@ -2522,7 +2525,7 @@ function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null, wished
   const topped = bonus + wished;
   const extra = [
     bonus
-      ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : kind === 'sprint' ? 'pet.toast.newSprint' : kind === 'trill' ? 'pet.toast.newTrill' : 'pet.toast.newScale', { n: bonus })}</span>`
+      ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : kind === 'sprint' ? 'pet.toast.newSprint' : kind === 'trill' ? 'pet.toast.newTrill' : kind === 'piece' ? 'pet.toast.newPiece' : 'pet.toast.newScale', { n: bonus })}</span>`
       : '',
     wished
       ? `<span class="pet-toast-bonus pet-toast-wish">${t('pet.toast.keywish', { key: esc(keyName(wishId)) })}</span>`
@@ -3420,7 +3423,7 @@ el.statSort.addEventListener('click', (event) => {
 });
 
 /** A finished take logs itself: nothing to type, and nothing to forget. */
-function noteTake(tag, cardId = null, score = 0, details = null) {
+function noteTake(tag, cardId = null, score = 0, details = null, { small = false } = {}) {
   const today = todayKey();
   // A test run — a tap, a cough, a sibling — is recorded so nobody loses the fact
   // that it happened, but it is not allowed to tick the day, move a best score,
@@ -3438,9 +3441,11 @@ function noteTake(tag, cardId = null, score = 0, details = null) {
 
   if (counted) Journal.logTake(journal, today, tag);
   // Real practice earns notes for the pet room; a false start earns nothing.
-  if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint' || tag === 'trill')) {
+  // (A piece played in Listen is practice like the rest; it used to log the day
+  // and pay nothing.)
+  if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint' || tag === 'trill' || tag === 'piece')) {
     const kind = tag === 'scales' ? 'scale' : tag;
-    const earned = petRoom.earnTake({ kind, id: cardId || '', dayKey: today, octaves: details?.octaves || 1 });
+    const earned = petRoom.earnTake({ kind, id: cardId || '', dayKey: today, octaves: details?.octaves || 1, small });
     petToast(earned.amount, earned.warmed, earned.bonus, kind, earned.grew, earned.wished, cardId || '');
   }
   if (cardId && counted) Journal.noteScale(journal, cardId, today, score);

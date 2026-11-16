@@ -15,8 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611141150';
-import { currentSeason } from './season.js?v=202611141150';
+import * as Pet from './pet.js?v=202611161630';
+import { currentSeason } from './season.js?v=202611161630';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611161630';
 import {
   petMarkup,
   eggMarkup,
@@ -31,12 +32,15 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611141150';
-import { t, getLang } from './i18n.js?v=202611141150';
+} from './petart.js?v=202611161630';
+import { t, getLang } from './i18n.js?v=202611161630';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
 const PET_SCALE = 0.8; // the 100-unit pet box, in room units
+const AV_SCALE = 0.68; // the avatar's 100 × 130 box, in room units
+// How long each of the avatar's moves runs, in ms (the CSS animations' lengths).
+const MOVE_MS = { wave: 1900, jump: 1300, bow: 1700, spin: 1300, dance: 2600, violin: 3400 };
 const FISH_SCALE = 0.62;
 const BOWL = { x: 126, y: 262 }; // the food bowl, for the land pets
 const BED = { x: 296, y: 266 };
@@ -148,6 +152,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       } else {
         ball = null;
       }
+      drawAvatar();
       layers.petPos = node('g', { class: 'pet-pos' });
       layers.petFlip = node('g', { class: 'pet-flip' });
       layers.pet = node('g', { class: 'pet-hit', role: 'button', tabindex: '0', 'aria-label': t('pet.aria.pat', { name: pet.pet.name || t(`pet.kind.${pet.pet.species}`) }) }, petMarkup(pet.pet.species, pet.pet.variant));
@@ -176,6 +181,72 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     } else {
       drawEggs();
     }
+  }
+
+  // ── The avatar in the room ─────────────────────────────────────────────
+
+  /** Puts the student's figure in the room (or takes it out), behind the pet. */
+  function drawAvatar() {
+    layers.av?.remove();
+    layers.av = null;
+    if (!pet.avatar.in || !pet.pet || choosing) return;
+    layers.av = node(
+      'g',
+      { class: 'av-pos', role: 'button', tabindex: '0', 'aria-label': t('av.aria') },
+      avatarMarkup(pet.avatar),
+    );
+    placeAvatar();
+    // before the pet, so the pet walks in front of it
+    if (layers.petPos) layers.stage.insertBefore(layers.av, layers.petPos);
+    else layers.stage.append(layers.av);
+    layers.av.addEventListener('pointerdown', (event) => {
+      if (busy) return;
+      event.stopPropagation(); // not the furniture underneath
+      beginDrag(event, { kind: 'avatar', el: layers.av, from: { x: pet.avatar.x } });
+    });
+    layers.av.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        doMove();
+      }
+    });
+  }
+
+  function placeAvatar(x = pet.avatar.x) {
+    if (!layers.av) return;
+    // the box's feet are at (50, 126)
+    layers.av.setAttribute('transform', `translate(${(x - 50 * AV_SCALE).toFixed(1)} ${(FLOOR_Y + 3 - 126 * AV_SCALE).toFixed(1)}) scale(${AV_SCALE})`);
+  }
+
+  /** Runs a move on a drawn figure: the class goes on, and comes off when it is over. */
+  function runMove(root, move) {
+    if (!root) return 0;
+    const name = String(move || 'move-wave').replace('move-', '');
+    for (const m of Object.keys(MOVE_MS)) root.classList.remove(`is-${m}`);
+    void root.getBoundingClientRect();
+    root.classList.add(`is-${name}`);
+    const ms = MOVE_MS[name] || 1800;
+    setTimeout(() => root.classList.remove(`is-${name}`), ms);
+    return ms;
+  }
+
+  /** The avatar does its move, and the pet — now and then — is delighted. */
+  function doMove() {
+    const ms = runMove(layers.av?.querySelector('.av'), pet.avatar.wear.move);
+    if (!ms) return;
+    lastTouch = Date.now();
+    if (busy || held || mode === 'sleep' || mode === 'walk') return;
+    later(() => {
+      if (busy || held || mode !== 'idle') return;
+      if (!isFish()) {
+        facing = pet.avatar.x > pos.x ? 1 : -1;
+        placePet();
+      }
+      setMode('happy');
+      hop();
+      hearts(2);
+      later(() => mode === 'happy' && !held && setMode('idle'), 1300);
+    }, Math.min(900, ms / 2));
   }
 
   function placePet() {
@@ -365,7 +436,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       else drag.el.classList.add('is-dragging');
     }
     event.preventDefault();
-    if (drag.kind === 'item') {
+    if (drag.kind === 'avatar') {
+      // along the floor only: it walks, it does not fly
+      drag.x = Math.min(Pet.AVATAR_X[1], Math.max(Pet.AVATAR_X[0], drag.from.x + dx));
+      placeAvatar(drag.x);
+    } else if (drag.kind === 'item') {
       const to = Pet.moveItem(pet, drag.id, drag.from.x + dx, drag.from.y + dy);
       drag.el.setAttribute('transform', `translate(${to.x} ${to.y})`);
       // its light goes with the lamp
@@ -396,6 +471,16 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         save();
         paintFoot();
         admire(done.id);
+      }
+      return;
+    }
+    if (done.kind === 'avatar') {
+      done.el.classList.remove('is-dragging');
+      if (done.moved) {
+        Pet.setAvatar(pet, { x: done.x });
+        save();
+      } else {
+        doMove();
       }
       return;
     }
@@ -868,6 +953,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
           <button class="pet-tab" type="button" role="tab" data-tray="feed" aria-selected="${tray === 'feed'}">${t('pet.feed')}</button>
           <button class="pet-tab" type="button" role="tab" data-tray="decorate" aria-selected="${tray === 'decorate'}">${t('pet.decorate')}</button>
           <button class="pet-tab" type="button" role="tab" data-tray="pets" aria-selected="${tray === 'pets'}">${t('pet.tab.pets')}</button>
+          <button class="pet-tab" type="button" role="tab" data-tray="me" aria-selected="${tray === 'me'}">${t('pet.tab.me')}</button>
           <button class="pet-tab" type="button" role="tab" data-tray="book" aria-selected="${tray === 'book'}">${t('pet.tab.book')}${
             Pet.bookSummary(pet).unseen && tray !== 'book' ? `<span class="pet-tab-dot" aria-label="${t('pet.book.new')}"></span>` : ''
           }</button>
@@ -875,6 +961,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         ${tray === 'feed' ? feedTray() : ''}
         ${tray === 'decorate' ? decorTray() : ''}
         ${tray === 'pets' ? petsTray() : ''}
+        ${tray === 'me' ? meTray() : ''}
         ${tray === 'book' ? bookTray() : ''}`;
       // Opening the book is reading it: what was new is marked this once.
       if (tray === 'book' && Pet.bookSummary(pet).unseen) {
@@ -953,6 +1040,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         return t('pet.mem.sprint');
       case 'trill':
         return t('pet.mem.trill');
+      case 'piece':
+        return t('pet.mem.piece');
       case 'takes':
         return t('pet.mem.takes', { n: entry.n });
       case 'days':
@@ -1140,6 +1229,74 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     }).join('')}</div>`;
   }
 
+  // ── "Me": the student's own figure ─────────────────────────────────────
+
+  const ME_GROUPS = [
+    ['hair', ['hair']],
+    ['face', ['eyes', 'mouth', 'extra']],
+    ['top', ['top']],
+    ['hat', ['hat']],
+    ['move', ['move']],
+  ];
+
+  function meTray() {
+    const a = pet.avatar;
+    const swatches = (kind, list, current, fill) =>
+      `<div class="me-swatches" role="group" aria-label="${esc(t(`av.${kind}`))}">${list
+        .map(
+          (id) =>
+            `<button class="me-swatch${id === current ? ' is-on' : ''}" type="button" data-me-${kind}="${id}" style="background:${fill(id)}" aria-pressed="${id === current}" aria-label="${esc(t(`av.${kind}.${id}`))}"></button>`,
+        )
+        .join('')}</div>`;
+    const tile = (item) => {
+      const owned = Pet.avatarOwns(pet, item.id);
+      const on = a.wear[item.slot] === item.id;
+      const can = owned || pet.notes >= item.cost;
+      const picked = pending?.kind === 'avatar' && pending.id === item.id;
+      const label = owned
+        ? on
+          ? t(item.slot === 'move' ? 'av.myMove' : 'av.on')
+          : t(item.slot === 'move' ? 'av.use' : 'av.wear')
+        : `♪ ${item.cost}${can ? '' : `<span class="tray-need">${t('pet.need', { n: item.cost - pet.notes })}</span>`}`;
+      return `<button class="tray-item av-item${on ? ' is-out' : ''}${picked ? ' is-picked' : ''}${item.season && !owned ? ' is-seasonal' : ''}" type="button" data-av="${item.id}" ${can ? '' : 'disabled'} aria-pressed="${on || picked}">
+        ${avatarItemIcon(a, item)}
+        <span class="tray-name">${t(`av.item.${item.id}`)}</span>
+        <span class="tray-cost">${label}</span></button>`;
+    };
+    const groups = ME_GROUPS.map(([name, slots]) => {
+      const items = Pet.AVATAR_ITEMS.filter((i) => slots.includes(i.slot) && Pet.avatarInShop(pet, i, season));
+      return `<h4 class="me-h">${t(`av.group.${name}`)}</h4><div class="pet-tray is-me">${items.map(tile).join('')}</div>`;
+    }).join('');
+    return `
+      <div class="me-top">
+        <div class="me-figure">${avatarPortrait(a)}</div>
+        <div class="me-side">
+          <label class="me-switch"><input type="checkbox" data-me-in ${a.in ? 'checked' : ''}/>
+            <span><b>${t('av.inRoom')}</b><span class="me-sub">${t('av.inRoom.sub', { name: esc(pet.pet.name) })}</span></span></label>
+          <button class="ghost-btn small" type="button" data-act="me-move">${t('av.doMove')}</button>
+          <span class="me-label">${t('av.skin')}</span>
+          ${swatches('skin', Pet.SKINS, a.skin, skinFill)}
+          <span class="me-label">${t('av.hair')}</span>
+          ${swatches('hair', Pet.HAIR_COLOURS, a.hairColour, hairFill)}
+        </div>
+      </div>
+      <p class="me-note">${t('av.note')}</p>
+      ${confirmRow('avatar')}
+      ${groups}`;
+  }
+
+  /** The figure changed: the one in the room and the one in the panel are redrawn. */
+  function avatarChanged(move = false) {
+    save();
+    drawAvatar();
+    paintNotes();
+    paintPanel();
+    if (move) {
+      runMove(els.panel.querySelector('.me-figure .av'), pet.avatar.wear.move);
+      doMove();
+    }
+  }
+
   /** The question sits above the tray; on a short screen, bring it into view. */
   function showConfirm() {
     const row = els.panel.querySelector('.pet-confirm');
@@ -1154,8 +1311,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const name =
       kind === 'snack'
         ? t(`pet.food.${Pet.snackFor(pet.pet.species, pending.id).look}`)
-        : t(`pet.item.${pending.id}`);
-    const cost = kind === 'snack' ? Pet.SNACKS.find((x) => x.id === pending.id).cost : Pet.ITEMS.find((x) => x.id === pending.id).cost;
+        : kind === 'avatar'
+          ? t(`av.item.${pending.id}`)
+          : t(`pet.item.${pending.id}`);
+    const cost = (kind === 'snack' ? Pet.SNACKS : kind === 'avatar' ? Pet.AVATAR_ITEMS : Pet.ITEMS).find((x) => x.id === pending.id).cost;
     return `<div class="pet-confirm" role="group">
       <span>${t(kind === 'snack' ? 'pet.confirm.snack' : 'pet.confirm.item', { name: esc(name), cost, left: pet.notes - cost })}</span>
       <span class="pet-confirm-btns">
@@ -1208,12 +1367,35 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     } else if (b.dataset.act === 'confirm-buy' && pending) {
       const { kind, id } = pending;
       pending = null;
+      if (kind === 'avatar') {
+        if (Pet.buyAvatar(pet, id, season)) avatarChanged(id.startsWith('move-'));
+        return;
+      }
       if (kind === 'snack') feed(id);
       else buyOrToggle(id);
       paintPanel();
     } else if (b.dataset.act === 'cancel-buy') {
       pending = null;
       paintPanel();
+    } else if (b.dataset.act === 'me-move') {
+      runMove(els.panel.querySelector('.me-figure .av'), pet.avatar.wear.move);
+      doMove();
+    } else if (b.dataset.meSkin) {
+      Pet.setAvatar(pet, { skin: b.dataset.meSkin });
+      avatarChanged();
+    } else if (b.dataset.meHair) {
+      Pet.setAvatar(pet, { hairColour: b.dataset.meHair });
+      avatarChanged();
+    } else if (b.dataset.av) {
+      // something owned (or free) is put on or taken off — no money moves
+      if (Pet.avatarOwns(pet, b.dataset.av)) {
+        pending = null;
+        if (Pet.wear(pet, b.dataset.av)) avatarChanged(b.dataset.av.startsWith('move-'));
+      } else {
+        pending = pending?.kind === 'avatar' && pending.id === b.dataset.av ? null : { kind: 'avatar', id: b.dataset.av };
+        paintPanel();
+        showConfirm();
+      }
     } else if (b.dataset.snack) {
       // tapping the picked one again lets it go
       pending = pending?.kind === 'snack' && pending.id === b.dataset.snack ? null : { kind: 'snack', id: b.dataset.snack };
@@ -1230,6 +1412,13 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         showConfirm();
       }
     }
+  });
+
+  els.panel.addEventListener('change', (event) => {
+    const box = event.target.closest('input[data-me-in]');
+    if (!box) return;
+    Pet.setAvatar(pet, { in: box.checked });
+    avatarChanged(box.checked);
   });
 
   els.panel.addEventListener('submit', (event) => {
@@ -1309,10 +1498,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
-  function earnTake({ kind = 'scale', id = '', dayKey = '', octaves = 1 } = {}) {
+  function earnTake({ kind = 'scale', id = '', dayKey = '', octaves = 1, small = false } = {}) {
     pet = Pet.loadPet(profileId());
     const key = dayKey || localDayKey();
-    const result = Pet.earn(pet, { kind, id, dayKey: key, octaves });
+    const result = Pet.earn(pet, { kind, id, dayKey: key, octaves, small });
     save();
     if (running) paintNotes();
     return result;

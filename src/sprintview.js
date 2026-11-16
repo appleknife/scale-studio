@@ -5,12 +5,12 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611141150';
-import { STAFF_GEOM, accidentalAt, followArrowMarkup } from './staff.js?v=202611141150';
-import { currentSeason } from './season.js?v=202611141150';
-import { CLEF_PATH } from './clef.js?v=202611141150';
-import { hearLevel } from './pitch.js?v=202611141150';
-import { t } from './i18n.js?v=202611141150';
+import * as Sprint from './sprint.js?v=202611161630';
+import { STAFF_GEOM, accidentalAt, followArrowMarkup } from './staff.js?v=202611161630';
+import { currentSeason } from './season.js?v=202611161630';
+import { CLEF_PATH } from './clef.js?v=202611161630';
+import { hearLevel } from './pitch.js?v=202611161630';
+import { t } from './i18n.js?v=202611161630';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -377,10 +377,11 @@ export function createSprintView(deps) {
     const result = Sprint.recordRun(stats, run.chosen, run.steps, Date.now(), { helper: run.helper });
     Sprint.saveStats(deps.profileId(), stats);
     lastResult = { ...result, helper: run.helper, chosen: run.chosen, opts: { ...stats.opts, helper: run.helper } };
+    const played = run.steps.length;
     run = null;
     panel = 'done';
     paint();
-    deps.onFinish(result);
+    deps.onFinish({ ...result, played });
   }
 
   /* ── The run, on screen ─────────────────────────────────────────────── */

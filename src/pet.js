@@ -87,6 +87,8 @@ export const TRICKS = ['spin', 'jump', 'dance', 'roll'];
 
 /** Notes a day before takes start earning only a little. */
 export const DAILY_CAP = 60;
+// A sprint with fewer notes than this is over in seconds, and pays the token rate.
+export const SPRINT_FULL = 6;
 
 export const EARN = {
   take: 3, // every counted take
@@ -167,6 +169,142 @@ export const ITEMS = [
   { id: 'wall-snow', cost: 15, slot: 'wall', season: 'xmas' },
 ];
 
+/* ── The avatar ────────────────────────────────────────────────────────── */
+//
+// The student's own figure, which can stand in the room with the pet. What it is
+// — skin, hair colour — is chosen freely: nobody pays to look like themselves.
+// What it wears, how its hair is cut, and the moves it knows are bought with
+// notes, with a plain set to start from that costs nothing.
+
+export const SKINS = ['s1', 's2', 's3', 's4', 's5', 's6'];
+export const HAIR_COLOURS = ['black', 'brown', 'chestnut', 'blond', 'red', 'grey', 'blue', 'pink'];
+// One of each kind is worn at a time. 'extra' and 'hat' may be empty.
+export const AVATAR_SLOTS = ['hair', 'eyes', 'mouth', 'extra', 'top', 'hat', 'move'];
+const OPTIONAL_SLOTS = new Set(['extra', 'hat']);
+
+export const AVATAR_ITEMS = [
+  { id: 'hair-short', slot: 'hair', cost: 0 },
+  { id: 'hair-bob', slot: 'hair', cost: 0 },
+  { id: 'hair-long', slot: 'hair', cost: 8 },
+  { id: 'hair-pony', slot: 'hair', cost: 8 },
+  { id: 'hair-curly', slot: 'hair', cost: 10 },
+  { id: 'hair-spiky', slot: 'hair', cost: 8 },
+  { id: 'hair-buns', slot: 'hair', cost: 12 },
+  { id: 'hair-braids', slot: 'hair', cost: 12 },
+  { id: 'hair-none', slot: 'hair', cost: 0 },
+
+  { id: 'eyes-dot', slot: 'eyes', cost: 0 },
+  { id: 'eyes-bright', slot: 'eyes', cost: 5 },
+  { id: 'eyes-lash', slot: 'eyes', cost: 5 },
+  { id: 'eyes-happy', slot: 'eyes', cost: 5 },
+  { id: 'mouth-smile', slot: 'mouth', cost: 0 },
+  { id: 'mouth-grin', slot: 'mouth', cost: 4 },
+  { id: 'mouth-o', slot: 'mouth', cost: 4 },
+  { id: 'extra-glasses', slot: 'extra', cost: 6 },
+  { id: 'extra-round', slot: 'extra', cost: 6 },
+  { id: 'extra-freckles', slot: 'extra', cost: 4 },
+  { id: 'extra-rosy', slot: 'extra', cost: 4 },
+
+  { id: 'top-tee', slot: 'top', cost: 0 },
+  { id: 'top-stripes', slot: 'top', cost: 6 },
+  { id: 'top-hoodie', slot: 'top', cost: 10 },
+  { id: 'top-overalls', slot: 'top', cost: 10 },
+  { id: 'top-dress', slot: 'top', cost: 12 },
+  { id: 'top-concert', slot: 'top', cost: 14 },
+  { id: 'top-xmas', slot: 'top', cost: 10, season: 'xmas' },
+
+  { id: 'hat-bow', slot: 'hat', cost: 6 },
+  { id: 'hat-cap', slot: 'hat', cost: 8 },
+  { id: 'hat-beanie', slot: 'hat', cost: 8 },
+  { id: 'hat-crown', slot: 'hat', cost: 25 },
+  { id: 'hat-santa', slot: 'hat', cost: 10, season: 'xmas' },
+
+  { id: 'move-wave', slot: 'move', cost: 0 },
+  { id: 'move-jump', slot: 'move', cost: 8 },
+  { id: 'move-bow', slot: 'move', cost: 8 },
+  { id: 'move-spin', slot: 'move', cost: 10 },
+  { id: 'move-dance', slot: 'move', cost: 12 },
+  { id: 'move-violin', slot: 'move', cost: 15 },
+];
+
+export const AVATAR_X = [34, 366]; // how far along the floor it can be stood
+
+export function freshAvatar() {
+  return {
+    in: false, // standing in the room
+    x: 318,
+    skin: 's2',
+    hairColour: 'brown',
+    wear: { hair: 'hair-short', eyes: 'eyes-dot', mouth: 'mouth-smile', extra: null, top: 'top-tee', hat: null, move: 'move-wave' },
+  };
+}
+
+const avatarItem = (id) => AVATAR_ITEMS.find((i) => i.id === id);
+
+/** Free things are everybody's; the rest are owned once bought. */
+export function avatarOwns(pet, id) {
+  const item = avatarItem(id);
+  return Boolean(item) && (item.cost === 0 || pet.owned.includes(id));
+}
+
+/** A saved avatar, made whole: unknown or unowned things fall back to the plain set. */
+function soundAvatar(pet) {
+  const base = freshAvatar();
+  const a = pet.avatar && typeof pet.avatar === 'object' ? pet.avatar : {};
+  const wear = { ...base.wear, ...(a.wear && typeof a.wear === 'object' ? a.wear : {}) };
+  for (const slot of AVATAR_SLOTS) {
+    const item = avatarItem(wear[slot]);
+    const ok = item && item.slot === slot && avatarOwns(pet, item.id);
+    if (!ok) wear[slot] = OPTIONAL_SLOTS.has(slot) ? null : base.wear[slot];
+  }
+  return {
+    in: Boolean(a.in),
+    x: Math.max(AVATAR_X[0], Math.min(AVATAR_X[1], Number.isFinite(Number(a.x)) ? Number(a.x) : base.x)),
+    skin: SKINS.includes(a.skin) ? a.skin : base.skin,
+    hairColour: HAIR_COLOURS.includes(a.hairColour) ? a.hairColour : base.hairColour,
+    wear,
+  };
+}
+
+/** Skin and hair colour (free), whether it is in the room, and where it stands. */
+export function setAvatar(pet, change = {}) {
+  const next = { ...change };
+  // something made up changes nothing, rather than resetting what was chosen
+  if ('skin' in next && !SKINS.includes(next.skin)) delete next.skin;
+  if ('hairColour' in next && !HAIR_COLOURS.includes(next.hairColour)) delete next.hairColour;
+  if ('x' in next && !Number.isFinite(Number(next.x))) delete next.x;
+  pet.avatar = soundAvatar({ ...pet, avatar: { ...pet.avatar, ...next, wear: pet.avatar.wear } });
+  return pet.avatar;
+}
+
+/**
+ * Put something on. A hat or a pair of glasses already on comes off instead.
+ * Returns false for something not owned.
+ */
+export function wear(pet, id) {
+  const item = avatarItem(id);
+  if (!item || !avatarOwns(pet, id)) return false;
+  const on = pet.avatar.wear[item.slot] === id;
+  pet.avatar.wear[item.slot] = on && OPTIONAL_SLOTS.has(item.slot) ? null : id;
+  return true;
+}
+
+/** Buy it and put it on. The same rules as the furniture: enough notes, and in season. */
+export function buyAvatar(pet, id, season = null) {
+  const item = avatarItem(id);
+  if (!item || avatarOwns(pet, id) || pet.notes < item.cost) return false;
+  if (item.season && item.season !== season) return false;
+  pet.notes -= item.cost;
+  pet.owned.push(id);
+  pet.avatar.wear[item.slot] = id;
+  return true;
+}
+
+/** On the avatar's shelves: free and bought things always, seasonal ones in season. */
+export function avatarInShop(pet, item, season = null) {
+  return !item.season || item.season === season || pet.owned.includes(item.id);
+}
+
 /** What the shop has on its shelves: everything in season, and anything already owned. */
 export function inShop(pet, item, season = null) {
   return !item.season || item.season === season || pet.owned.includes(item.id);
@@ -234,6 +372,7 @@ export function emptyPet() {
     dex: {}, // { [species]: { plain: n, rare: n } } — every hatch, ever
     // The memory book — see remember() — and the plan for next time.
     book: freshBook(),
+    avatar: freshAvatar(), // the student's own figure — see the avatar section
     where: {}, // { [item]: { x, y } } — how far each thing has been dragged
     tips: {}, // hints already taken up, so they stop being offered
     plan: null, // { cue, day } — when the student said they would practise next
@@ -247,6 +386,7 @@ export function emptyPet() {
  */
 function upgrade(p) {
   if (!Array.isArray(p.friends)) p.friends = [];
+  p.avatar = soundAvatar(p);
   if (!p.dex || typeof p.dex !== 'object') p.dex = {};
   if (p.pet) {
     if (!Number.isFinite(p.pet.growth)) p.pet.growth = GROW_TAKES;
@@ -336,6 +476,7 @@ function recordTake(p, { kind, id, dayKey, octaves, grew }) {
   if (kind === 'sight') add('sight', { kind: 'sight' });
   if (kind === 'sprint') add('sprint', { kind: 'sprint' });
   if (kind === 'trill') add('trill', { kind: 'trill' });
+  if (kind === 'piece') add('piece', { kind: 'piece' });
   for (const mark of TAKE_MARKS) {
     if (book.takes === mark) add(`takes:${mark}`, { kind: 'takes', n: mark });
   }
@@ -421,14 +562,14 @@ export function savePet(profileId, pet, storage = globalThis.localStorage) {
 }
 
 /**
- * Notes are earned by practice. `kind` is 'scale', 'sight' or 'sprint' for a
- * counted take, 'practice' for a day of practice logged by hand, and 'recording'
+ * Notes are earned by practice. `kind` is 'scale', 'sight', 'sprint', 'trill' or
+ * 'piece' (a piece played in Listen) for a counted take, 'practice' for a day of practice logged by hand, and 'recording'
  * for a take kept to listen back to; `id` is the scale's key for a scale.
  *
  * Returns what was earned in all, the part of it that was the new-key bonus, the
  * part that was the day's wish, whether the egg warmed, and whether the pet grew.
  */
-export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } = {}) {
+export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1, small = false } = {}) {
   if (pet.day.key !== dayKey) pet.day = freshDay(dayKey);
   const day = pet.day;
   ensureWish(pet, dayKey);
@@ -453,7 +594,8 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } 
     (kind === 'scale' && id && !day.keys.includes(id)) ||
     (kind === 'sight' && !day.sight) ||
     (kind === 'sprint' && !day.sprint) ||
-    (kind === 'trill' && !day.trill);
+    (kind === 'trill' && !day.trill) ||
+    (kind === 'piece' && !day.piece);
   // The new-key bonus stands apart from the cap, so it can be shown on its own.
   const bonus = fresh ? EARN.newKey : 0;
   // The wish: the key it asked for today, paid once — and paid even past the cap,
@@ -469,7 +611,11 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } 
   } else {
     // A two-octave scale is twice the playing of a one-octave one, and pays more.
     const extra = kind === 'scale' ? Math.max(0, Math.min(2, (Number(octaves) || 1) - 1)) * EARN.extraOctave : 0;
-    base = EARN.take + extra;
+    // `small` is a take that is over almost as soon as it starts — a sprint of
+    // only a few notes. It still counts (the day, the egg, the pet's growth and
+    // the day's first-time bonuses), but it pays the token rate, so that the
+    // quickest way to a day's notes is never the shortest possible exercise.
+    base = (small ? EARN.afterCap : EARN.take) + extra;
     if (!day.any) base += EARN.firstOfDay;
     base = Math.min(base, DAILY_CAP - day.earned + EARN.afterCap);
   }
@@ -479,6 +625,7 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1 } 
   if (kind === 'sight') day.sight = true;
   if (kind === 'sprint') day.sprint = true;
   if (kind === 'trill') day.trill = true;
+  if (kind === 'piece') day.piece = true;
   credit(pet, day, amount);
 
   let warmed = false;

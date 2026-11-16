@@ -3932,6 +3932,424 @@ select,
   }
 }
 
+
+/* ── The avatar ─────────────────────────────────────────────────────────── */
+.av-violin,
+.av-bow {
+  display: none;
+}
+
+.av.is-violin .av-violin,
+.av.is-violin .av-bow {
+  display: inline;
+}
+
+.av-pos {
+  cursor: grab;
+  touch-action: pan-y;
+  outline: none;
+}
+
+.av-pos.is-dragging {
+  cursor: grabbing;
+}
+
+.av-pos:focus-visible {
+  outline: none;
+}
+
+.av-pos:focus-visible .av-shadow {
+  fill: rgba(47, 93, 78, 0.45);
+}
+
+.av-all,
+.av-eyes {
+  transform-box: fill-box;
+}
+
+.av-all {
+  transform-origin: 50% 100%;
+}
+
+.av-eyes {
+  transform-origin: 50% 50%;
+}
+
+/* Standing about: it breathes, and blinks now and then. */
+.av:not(.is-still) .av-all {
+  animation: av-breathe 3.2s ease-in-out infinite;
+}
+
+.av:not(.is-still) .av-eyes {
+  animation: av-blink 4.6s linear infinite;
+}
+
+@keyframes av-breathe {
+  50% {
+    transform: translateY(-1.3px);
+  }
+}
+
+@keyframes av-blink {
+  0%,
+  95%,
+  100% {
+    transform: scaleY(1);
+  }
+  97% {
+    transform: scaleY(0.12);
+  }
+}
+
+/* The avatar's moves. Each runs once; petroom.js takes the class off after. */
+.av.is-wave .av-arm-r {
+  animation: av-wave 1.9s ease-in-out;
+}
+
+@keyframes av-wave {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  18%,
+  46%,
+  74% {
+    transform: rotate(-136deg);
+  }
+  32%,
+  60% {
+    transform: rotate(-100deg);
+  }
+  88% {
+    transform: rotate(-136deg);
+  }
+}
+
+.av.is-jump .av-all {
+  animation: av-jump 1.3s cubic-bezier(0.3, 0, 0.4, 1);
+}
+
+.av.is-jump .av-arm-l {
+  animation: av-arms-up-l 1.3s ease-in-out;
+}
+
+.av.is-jump .av-arm-r {
+  animation: av-arms-up-r 1.3s ease-in-out;
+}
+
+@keyframes av-jump {
+  0%,
+  45%,
+  100% {
+    transform: translateY(0);
+  }
+  22% {
+    transform: translateY(-26px);
+  }
+  70% {
+    transform: translateY(-15px);
+  }
+}
+
+@keyframes av-arms-up-l {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  20%,
+  75% {
+    transform: rotate(122deg);
+  }
+}
+
+@keyframes av-arms-up-r {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  20%,
+  75% {
+    transform: rotate(-122deg);
+  }
+}
+
+.av.is-bow .av-upper {
+  animation: av-bow 1.7s ease-in-out;
+}
+
+@keyframes av-bow {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  /* seen from the front, a bow is the top half folding down towards you */
+  30%,
+  62% {
+    transform: translateY(3px) scaleY(0.66);
+  }
+}
+
+.av.is-spin .av-all {
+  animation: av-spin 1.3s ease-in-out;
+}
+
+@keyframes av-spin {
+  0%,
+  50%,
+  100% {
+    transform: scaleX(1);
+  }
+  12.5%,
+  37.5%,
+  62.5%,
+  87.5% {
+    transform: scaleX(0.08);
+  }
+  25%,
+  75% {
+    transform: scaleX(-1);
+  }
+}
+
+.av.is-dance .av-all {
+  animation: av-dance 2.6s ease-in-out;
+}
+
+.av.is-dance .av-arm-l {
+  animation: av-dance-l 2.6s ease-in-out;
+}
+
+.av.is-dance .av-arm-r {
+  animation: av-dance-r 2.6s ease-in-out;
+}
+
+@keyframes av-dance {
+  0%,
+  100% {
+    transform: rotate(0) translateY(0);
+  }
+  12.5%,
+  62.5% {
+    transform: rotate(-8deg) translateY(-5px);
+  }
+  37.5%,
+  87.5% {
+    transform: rotate(8deg) translateY(-5px);
+  }
+  25%,
+  50%,
+  75% {
+    transform: rotate(0) translateY(0);
+  }
+}
+
+@keyframes av-dance-l {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  12.5%,
+  62.5% {
+    transform: rotate(150deg);
+  }
+  37.5%,
+  87.5% {
+    transform: rotate(40deg);
+  }
+}
+
+@keyframes av-dance-r {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  12.5%,
+  62.5% {
+    transform: rotate(-40deg);
+  }
+  37.5%,
+  87.5% {
+    transform: rotate(-150deg);
+  }
+}
+
+/* Violin up on the left shoulder, the right arm drawing the bow across. */
+.av.is-violin .av-arm-l {
+  animation: av-hold 3.4s ease-in-out;
+}
+
+.av.is-violin .av-arm-r {
+  animation: av-bowing 3.4s ease-in-out;
+}
+
+.av.is-violin .av-all {
+  animation: av-sway 3.4s ease-in-out;
+}
+
+@keyframes av-hold {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  8%,
+  92% {
+    transform: rotate(48deg);
+  }
+}
+
+@keyframes av-bowing {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  8%,
+  36%,
+  64%,
+  92% {
+    transform: rotate(62deg);
+  }
+  22%,
+  50%,
+  78% {
+    transform: rotate(98deg);
+  }
+}
+
+@keyframes av-sway {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  30%,
+  70% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .av .av-all,
+  .av .av-eyes,
+  .av .av-arm,
+  .av .av-upper {
+    animation: none !important;
+  }
+}
+
+/* The "Me" tab. */
+.me-top {
+  display: grid;
+  grid-template-columns: minmax(110px, 150px) 1fr;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 10px;
+}
+
+.me-figure {
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: linear-gradient(#f3ecdf, #ead9bf);
+  padding: 6px 4px 2px;
+}
+
+.av-portrait {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.me-side {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.me-switch {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  cursor: pointer;
+  font-size: 14.5px;
+  color: var(--ink);
+}
+
+.me-switch input {
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: #2f5d4e;
+  flex: none;
+}
+
+.me-sub {
+  display: block;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.me-label {
+  font: 600 12px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.me-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.me-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid rgba(60, 40, 20, 0.22);
+  cursor: pointer;
+  padding: 0;
+}
+
+.me-swatch.is-on {
+  border-color: #2f5d4e;
+  box-shadow: 0 0 0 3px rgba(47, 93, 78, 0.25);
+}
+
+.me-note {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.me-h {
+  margin: 16px 0 8px;
+  font: 700 13px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pet-tray.is-me {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+
+.av-icon {
+  width: 58px;
+  height: 50px;
+  overflow: hidden;
+}
+
+.av-move-icon {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 50px;
+  font-size: 30px;
+  line-height: 1;
+}
+
 .snow-flake {
   animation: snow-fall 3.4s linear infinite;
 }
