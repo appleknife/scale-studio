@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611161650';
-import { getLang, t } from './i18n.js?v=202611161650';
+import { median } from './pitch.js?v=202611161720';
+import { getLang, t } from './i18n.js?v=202611161720';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -252,6 +252,66 @@ export function foldTopRepeat(notes, topMidi) {
   return out;
 }
 
+/**
+ * Notes that were sounded more than once where the scale asks for them once.
+ *
+ * A repeat is the same pitch heard again straight away, with a break between the
+ * two that the listener could hear (a lift, a stop, a bow change that let the
+ * string go quiet). A smooth bow change on one note is one note, and is not seen
+ * here at all — so what this finds is what a listener would also call a repeat.
+ * The top note is not looked at: playing it twice to turn round is not a slip,
+ * and foldTopRepeat() has already made it one note.
+ *
+ * Each spot says which written note it was (`e`, an index into the scale),
+ * how many times it sounded, whether it was on the way up or down, and whether
+ * the player stopped before going again (`paused`) or simply bowed it twice.
+ * `backtracks` counts something different: going back a note and coming
+ * forward again (D E D E F♯).
+ */
+export function findRepeats(notes, pairs, expectedMidi, topIndex, stopThreshold = 0.3) {
+  const at = new Map(pairs.map((p) => [p.d, p.e])); // detected note → written note
+  const spots = [];
+  let i = 0;
+  while (i < notes.length) {
+    let j = i;
+    while (j + 1 < notes.length && notes[j + 1].midi === notes[i].midi && notes[j + 1].t0 - notes[j].t1 < 3) j += 1;
+    if (j > i) {
+      // which written note this is: the one a note of the run was matched to, or
+      // failing that the next written note of that pitch after what came before
+      let e = null;
+      for (let k = i; k <= j && e == null; k++) if (at.has(k)) e = at.get(k);
+      if (e == null) {
+        let before = -1;
+        for (let k = i - 1; k >= 0 && before < 0; k--) if (at.has(k)) before = at.get(k);
+        const next = expectedMidi.indexOf(notes[i].midi, before + 1);
+        e = next >= 0 ? next : expectedMidi.indexOf(notes[i].midi);
+      }
+      if (e != null && e >= 0 && e !== topIndex) {
+        let pause = 0;
+        for (let k = i + 1; k <= j; k++) pause = Math.max(pause, notes[k].t0 - notes[k - 1].t1);
+        spots.push({ e, times: j - i + 1, way: e < topIndex ? 'up' : 'down', first: e === 0, paused: pause > stopThreshold, gap: pause });
+      }
+    }
+    i = j + 1;
+  }
+  // Back a note and forward again: x y x y, which no scale contains. (The turn at
+  // the top is x y x and then somewhere new, so it is not caught by this.)
+  let backtracks = 0;
+  for (let k = 3; k < notes.length; k++) {
+    const [a, b, c, d] = [notes[k - 3].midi, notes[k - 2].midi, notes[k - 1].midi, notes[k].midi];
+    if (a === c && b === d && a !== b) {
+      backtracks += 1;
+      k += 1;
+    }
+  }
+  return {
+    spots,
+    extra: spots.reduce((n, s) => n + s.times - 1, 0), // how many soundings too many
+    paused: spots.filter((s) => s.paused).length,
+    backtracks,
+  };
+}
+
 function substitutionCost(detected, expected) {
   const diff = Math.abs(detected - expected);
   if (diff === 0) return 0;
@@ -451,6 +511,10 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     },
     detected: notes,
   };
+  // Notes sounded twice (or more) where the scale has them once.
+  result.repeats = findRepeats(notes, pairs, expectedMidi, topIndex, stopThreshold);
+  result.stats.repeats = result.repeats.extra;
+  for (const spot of result.repeats.spots) noteResults[spot.e].times = spot.times;
   // What this take says about the player, as opposed to how it scored.
   result.habits = listenNotes(noteResults, iois);
   result.tips = buildTips(result);
@@ -642,6 +706,53 @@ export function buildTips(result) {
       },
       // Ahead of intonation and rhythm: the right pitch comes before a centred one.
       0.3 + Math.min(0.2, wrongNotes.length * 0.02),
+    );
+  }
+
+  // The same note sounded twice. One is a slip and is left alone; two or more is
+  // worth a kind word, with where it happened and what it sounded like.
+  const rep = result.repeats;
+  if (rep && rep.extra >= 2) {
+    const zh = getLang() === 'zh';
+    const nameOf = (s) => result.scale.sequence[s.e].name;
+    const some = (list) => {
+      const names = [...new Set(list.map(nameOf))];
+      return names.length > 4 ? `${names.slice(0, 4).join(zh ? '、' : ', ')}${t('tip.wrong.more')}` : noteList(names);
+    };
+    const up = rep.spots.filter((s) => s.way === 'up' && !s.first);
+    const down = rep.spots.filter((s) => s.way === 'down');
+    const first = rep.spots.find((s) => s.first);
+    const most = rep.spots.reduce((a, b) => (b.times > a.times ? b : a), rep.spots[0]);
+    // Nearly every note, each exactly twice, is not a slip: it is how the scale was played.
+    const heard = Math.max(1, stats.exact + stats.wrong + stats.octaveErrors);
+    const everyNote = rep.spots.length >= 5 && rep.spots.length >= heard * 0.7;
+    const where = [
+      first ? t('tip.repeat.first', { note: nameOf(first), times: first.times }) : '',
+      up.length ? t('tip.repeat.up', { list: some(up) }) : '',
+      down.length ? t('tip.repeat.down', { list: some(down) }) : '',
+      most.times >= 3 ? t('tip.repeat.most', { note: nameOf(most), times: most.times }) : '',
+    ].join('');
+    const how =
+      rep.paused >= Math.ceil(rep.spots.length / 2)
+        ? t('tip.repeat.paused')
+        : rep.paused
+          ? t(rep.paused === 1 ? 'tip.repeat.mixedOne' : 'tip.repeat.mixed', { n: rep.paused })
+          : t('tip.repeat.quick');
+    push(
+      {
+        kind: 'repeat',
+        title: everyNote
+          ? t('tip.repeat.titleAll')
+          : rep.spots.length === 1
+            ? t('tip.repeat.titleOne', { note: nameOf(rep.spots[0]), times: rep.spots[0].times })
+            : t('tip.repeat.title', { n: rep.spots.length }),
+        text: everyNote
+          ? t('tip.repeat.textAll')
+          : `${where}${how}${rep.backtracks ? t(rep.backtracks === 1 ? 'tip.repeat.backOne' : 'tip.repeat.back', { n: rep.backtracks }) : ''}${t('tip.repeat.try')}`,
+      },
+      // Named ahead of intonation and rhythm when it is a habit: it is the thing
+      // to hear first, and nothing else settles until each note is played once.
+      0.26 + Math.min(0.22, rep.extra * 0.025),
     );
   }
 

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Repeated notes in a scale</title>
+    <style>
+      body { font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; margin: 20px; background: #faf7f1; color: #221e19; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // A scale played with chosen notes sounded twice: what the listener finds,
+      // and what it says about it. The takes are built as pitch frames, so this
+      // tests the analysis and the wording, not the microphone.
+      //
+      // The language comes from the address (?lang=), and changing it reloads the
+      // page: so the English checks run first, then the page goes round once more
+      // in Chinese, carrying what it found.
+      const lang = new URLSearchParams(location.search).get('lang');
+      if (!lang) location.replace(`${location.pathname}?lang=en`);
+      // The modules import i18n by its stamped name; the language has to be set on
+      // that same copy.
+      const stamp = (await (await fetch('../sw.js')).text()).match(/VERSION = '(\d+)'/)[1];
+      (await import(`../src/i18n.js?v=${stamp}`)).initLang();
+      const { analyzeTake } = await import('../src/analyze.js');
+      const { buildScale, MAJOR_KEYS } = await import('../src/music.js');
+      const { renderStaff } = await import('../src/staff.js');
+
+      const carried = JSON.parse(sessionStorage.getItem('repeats.test') || 'null');
+      const problems = carried ? carried.problems : [];
+      const log = carried ? carried.log : [];
+      const eq = (what, got, want) => {
+        if (JSON.stringify(got) !== JSON.stringify(want)) problems.push(`${what}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+      };
+      try {
+        const scale = buildScale(MAJOR_KEYS.find((c) => c.id === 'D') || MAJOR_KEYS[0], 0, 'major', 'melodic', 1);
+        const FR = 0.03;
+        const take = (plan) => {
+          const frames = [];
+          let t = 0;
+          const sil = (s) => { for (let i = 0; i < Math.round(s / FR); i++) { frames.push({ t, freq: 0, clarity: 0, rms: 0.0004 }); t += FR; } };
+          const tone = (midi, s) => { for (let i = 0; i < Math.round(s / FR); i++) { frames.push({ t, freq: 440 * 2 ** ((midi - 69) / 12), clarity: 0.95, rms: 0.05 }); t += FR; } };
+          sil(0.4);
+          scale.sequence.forEach((n, i) => {
+            const p = plan[i] || { times: 1 };
+            for (let k = 0; k < p.times; k++) {
+              tone(n.midi, p.times > 1 ? 0.33 : 0.6);
+              if (k < p.times - 1) sil(p.pause ? 0.7 : 0.09);
+            }
+            if ((plan.back || []).includes(i) && i > 0) {
+              tone(scale.sequence[i - 1].midi, 0.3);
+              tone(n.midi, 0.3);
+            }
+          });
+          sil(0.5);
+          return analyzeTake(frames, scale);
+        };
+        const spots = (r) => r.repeats.spots.map((s) => [scale.sequence[s.e].name, s.times, s.way, s.paused]);
+        const tip = (r) => r.tips.find((x) => x.kind === 'repeat');
+
+        if (lang === 'zh') {
+          const zh = take({ 1: { times: 2 }, 3: { times: 2 }, 10: { times: 2 } }).tips.find((x) => x.kind === 'repeat');
+          eq('the comment is in Chinese too', [/拉了不止一次/.test(zh.title), /上行：E4 和 G4。/.test(zh.text), /\{/.test(zh.text)], [true, true, false]);
+          throw { done: true };
+        }
+        const clean = take({});
+        eq('a clean scale has no repeats and no comment', [clean.stats.repeats, Boolean(tip(clean))], [0, false]);
+
+        const one = take({ 2: { times: 2 } });
+        eq('one repeated note is found', spots(one), [['F♯4', 2, 'up', false]]);
+        eq('but a single slip is not commented on', Boolean(tip(one)), false);
+
+        const top = take({ 7: { times: 2 } });
+        eq('the top note played twice to turn round is not a repeat', [top.stats.repeats, top.score], [0, 100]);
+
+        const some = take({ 1: { times: 2 }, 3: { times: 2 }, 5: { times: 2 }, 10: { times: 2 } });
+        eq('each repeated note is found, with the way it was going', spots(some), [['E4', 2, 'up', false], ['G4', 2, 'up', false], ['B4', 2, 'up', false], ['A4', 2, 'down', false]]);
+        eq('the comment counts them', tip(some)?.title, '4 notes were played more than once');
+        eq('and says which, up and down', [/On the way up: E4, G4 and B4\./.test(tip(some).text), /On the way down: A4\./.test(tip(some).text)], [true, true]);
+        eq('and that they were quick', /extra bow on the same note/.test(tip(some).text), true);
+        eq('and is kind about it', /very common/.test(tip(some).text) && /not a wrong note/.test(tip(some).text), true);
+        eq('the notes are marked on the result', some.notes.filter((n) => n.times > 1).map((n) => n.note.name), ['E4', 'G4', 'B4', 'A4']);
+        eq('and on the staff', (renderStaff(scale.sequence, { times: some.notes.map((n) => n.times || 1) }).match(/staff-times/g) || []).length, 4);
+        eq('a staff with no repeats carries no marks', (renderStaff(scale.sequence, { times: clean.notes.map((n) => n.times || 1) }).match(/staff-times/g) || []).length, 0);
+
+        const paused = take({ 0: { times: 2, pause: true }, 4: { times: 2, pause: true }, 11: { times: 3, pause: true } });
+        eq('a stop before the repeat is told apart from an extra bow', spots(paused).map((s) => s[3]), [true, true, true]);
+        eq('the first note is named as a test note', /The first note, D4, was played 2 times/.test(tip(paused).text), true);
+        eq('a note played three times is named', /G4 came 3 times in a row/.test(tip(paused).text), true);
+        eq('and the stop is described', /little stop first/.test(tip(paused).text), true);
+
+        const back = take({ 2: { times: 2 }, 12: { times: 2 }, back: [4] });
+        eq('going back a note and forward again is counted separately', [back.repeats.backtracks, /went back a note/.test(tip(back).text)], [1, true]);
+
+        const all = {};
+        scale.sequence.forEach((_, i) => { all[i] = { times: 2 }; });
+        const twice = take(all);
+        eq('every note played twice is not treated as a slip', tip(twice)?.title, 'It sounds like every note was played twice');
+        eq('and has no back-steps in it', twice.repeats.backtracks, 0);
+
+        log.push(tip(some).title, tip(some).text, '', tip(paused).title, tip(paused).text, '', tip(twice).title, tip(twice).text);
+      } catch (err) {
+        if (!(err && err.done)) problems.push(`threw: ${err && err.stack ? err.stack : err}`);
+      }
+      if (lang === 'en') {
+        sessionStorage.setItem('repeats.test', JSON.stringify({ problems, log }));
+        location.replace(`${location.pathname}?lang=zh`);
+        await new Promise(() => {}); // the Chinese pass reports
+      }
+      sessionStorage.removeItem('repeats.test');
+      try {
+        localStorage.setItem('scaleStudio.lang', 'en'); // leave the next test in English
+      } catch {
+        /* nothing to tidy */
+      }
+
+      document.getElementById('report').textContent = problems.length ? `REPEATS FAILED\n${problems.join('\n')}` : `REPEATS OK\n${log.join('\n')}`;
+      document.title = problems.length ? 'REPEATS FAILED' : 'REPEATS OK';
+      fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'repeats', problems, log: log.join('\n') }, null, 2) });
+    </script>
+  </body>
+</html>
