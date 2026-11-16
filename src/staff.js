@@ -3,8 +3,8 @@
 // Deliberately dependency-free: five lines, a G clef, a key signature, note
 // heads with stems, ledger lines, courtesy accidentals and note names.
 
-import { CLEF_PATH } from './clef.js?v=202611161650';
-import { intonationLane } from './intonation.js?v=202611161650';
+import { CLEF_PATH } from './clef.js?v=202611161720';
+import { intonationLane } from './intonation.js?v=202611161720';
 
 const LINE_GAP = 11;
 const STEPS = LINE_GAP / 2;
@@ -166,6 +166,9 @@ export function renderStaff(
     // One entry per note: cents above or below centre, or null for a note that
     // was not heard. Present only on the result screen.
     intonation = null,
+    // One entry per note: how many times it was sounded, where that is more than
+    // once. A small "×2" is written over those notes on the result screen.
+    times = null,
   } = {},
 ) {
   const noteSpacing = 34;
@@ -289,6 +292,14 @@ export function renderStaff(
     part.push(
       `<ellipse class="staff-head" data-i="${i}" data-stem="${stemUp ? 'up' : 'down'}" cx="${x}" cy="${y}" rx="6.9" ry="5.1" fill="${color}" transform="rotate(-20 ${x} ${y})"/>`,
     );
+
+    if (times && times[i] > 1) {
+      // above the note, clear of the staff and of a stem that points up
+      const top = Math.min(stemUp ? stemY2 : y, STAFF_TOP) - 9;
+      part.push(
+        `<text class="staff-times" x="${x}" y="${top}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#a0621a">×${times[i]}</text>`,
+      );
+    }
 
     if (labels) {
       part.push(

@@ -2170,6 +2170,10 @@ h3 {
 .tip[data-kind="rhythm"] {
   border-left-color: var(--accent-2);
 }
+.tip[data-kind="repeat"] {
+  border-left-color: #c9892f;
+}
+
 .tip[data-kind="flow"] {
   border-left-color: #7d8fa8;
 }
