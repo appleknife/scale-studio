@@ -438,6 +438,33 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* The log's readiness, in the same corner when today's count is not there:
+   a scale is ready after two clean days; one clean day is on its way. */
+.key-ready {
+  position: absolute;
+  top: 10px;
+  right: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.key-ready.is-ready {
+  background: var(--accent-wash);
+  border-color: #c9ddd1;
+  color: var(--accent);
+}
+
+:root[data-theme='dark'] .key-ready.is-ready {
+  border-color: #3f5c4f;
+}
+
 .key-name {
   font-family: var(--serif);
   font-size: 25px;
@@ -2044,7 +2071,8 @@ h3 {
 .eyebrow {
   margin: 0 0 6px;
   font-size: 11px;
-  letter-spacing: 0.14em;
+  font-weight: 600;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -2085,21 +2113,27 @@ h3 {
 
 .metric-label {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   margin-bottom: 9px;
 }
 
 .metric-value {
   font-family: var(--serif);
-  font-size: 15px;
+  font-size: 23px;
+  line-height: 1.05;
   letter-spacing: 0;
   text-transform: none;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-name {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .metric-bar {
@@ -2436,6 +2470,9 @@ dialog .primary-btn {
   outline: 2px solid var(--accent-2);
   outline-offset: 2px;
   border-radius: 6px;
+  /* A paper-coloured gap under the ring, so it reads on any background —
+     green rings sit on green washes in a few places. */
+  box-shadow: 0 0 0 5px var(--paper);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6815,13 +6852,6 @@ select,
   color: inherit;
   text-align: left;
   cursor: pointer;
-}
-
-.metric .metric-label {
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
 }
 
 .sight-parts .part-btn {

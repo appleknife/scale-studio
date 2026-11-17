@@ -1,19 +1,19 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171705';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171705';
-import { createInk } from './ink.js?v=202611171705';
-import { createFollower } from './follow.js?v=202611171705';
-import { createPetRoom } from './petroom.js?v=202611171705';
-import { SPRINT_FULL } from './pet.js?v=202611171705';
-import { createBuddy } from './buddy.js?v=202611171705';
-import { createSprintView } from './sprintview.js?v=202611171705';
-import { createTrillView } from './trillview.js?v=202611171705';
-import { createListenView } from './listenview.js?v=202611171705';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171850';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171850';
+import { createInk } from './ink.js?v=202611171850';
+import { createFollower } from './follow.js?v=202611171850';
+import { createPetRoom } from './petroom.js?v=202611171850';
+import { SPRINT_FULL } from './pet.js?v=202611171850';
+import { createBuddy } from './buddy.js?v=202611171850';
+import { createSprintView } from './sprintview.js?v=202611171850';
+import { createTrillView } from './trillview.js?v=202611171850';
+import { createListenView } from './listenview.js?v=202611171850';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611171705';
+window.__scaleStudioVersion = '202611171850';
 import {
   PitchDetector,
   midiToFreq,
@@ -21,16 +21,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611171705';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171705';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171705';
-import { generatePassage } from './sightreading.js?v=202611171705';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171705';
-import { renderScore } from './score.js?v=202611171705';
-import { summariseIntonation } from './intonation.js?v=202611171705';
-import * as Journal from './journal.js?v=202611171705';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171705';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171705';
+} from './pitch.js?v=202611171850';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171850';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171850';
+import { generatePassage } from './sightreading.js?v=202611171850';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171850';
+import { renderScore } from './score.js?v=202611171850';
+import { summariseIntonation } from './intonation.js?v=202611171850';
+import * as Journal from './journal.js?v=202611171850';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171850';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171850';
 import {
   STRINGS,
   FIFTHS,
@@ -39,7 +39,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611171705';
+} from './tuner.js?v=202611171850';
 
 const LANG = initLang();
 
@@ -447,9 +447,21 @@ function renderGrid() {
         ? `<span class="key-today" aria-hidden="true">×${times}</span>
           <span class="visually-hidden">${times === 1 ? t('card.today.one') : t('card.today', { n: times })}</span>`
         : '';
+      // The log knows whether a scale is ready: two clean days. When today's
+      // count is showing it takes the corner instead — what happened today is
+      // the more useful thing to read.
+      const entry = journal.scales[card.id];
+      const cleanDays = entry && Array.isArray(entry.days) ? entry.days.length : 0;
+      const readyBadge = times
+        ? ''
+        : cleanDays >= Journal.READY_DAYS
+          ? `<span class="key-ready is-ready">${t('log.ready')}</span>`
+          : cleanDays === 1
+            ? `<span class="key-ready">${t('card.clean.one')}</span>`
+            : '';
       return `
         <button class="key-card${times ? ' is-practised' : ''}" type="button" data-id="${card.id}">
-          ${badge}
+          ${badge}${readyBadge}
           <span class="key-name">${names}${suffix}</span>
           <span class="sig-glyphs" aria-hidden="true">${glyphs || '&nbsp;'}</span>
           <span class="key-sub">${t('card.sub', {
@@ -4925,8 +4937,11 @@ function renderResult(result) {
   const compared = result.compared ? compareLine(result.compared) : '';
   el.resultSub.textContent = compared ? `${sub} · ${compared}` : sub;
 
-  const ringColour =
-    result.score >= 90 ? '#2f5d4e' : result.score >= 75 ? '#44796a' : result.score >= 60 ? '#b0843f' : '#a4534a';
+  // One colour ladder for every number on this screen, so the ring and the four
+  // parts read as the same language.
+  const scoreColour = (score) =>
+    score >= 90 ? '#2f5d4e' : score >= 75 ? '#44796a' : score >= 60 ? '#b0843f' : '#a4534a';
+  const ringColour = scoreColour(result.score);
   el.ringValue.style.stroke = ringColour;
   el.ringValue.style.strokeDasharray = String(RING_CIRCUMFERENCE);
   el.ringValue.style.strokeDashoffset = String(RING_CIRCUMFERENCE);
@@ -4944,10 +4959,13 @@ function renderResult(result) {
   // score it is (see explainPart).
   el.breakdown.innerHTML = metrics
     .map(
-      ([label, value, key]) => `
-        <div class="metric" data-explain="${key}">
-          <button class="metric-label" type="button" aria-expanded="false"><span>${label} <span class="explain-i" aria-hidden="true">ⓘ</span></span><span class="metric-value">${Math.round(value * 100)}%</span></button>
-          <div class="metric-bar"><span style="width:0%"></span></div>
+      ([label, value, key]) =>
+        `<div class="metric" data-explain="${key}">
+          <button class="metric-label" type="button" aria-expanded="false">
+            <span class="metric-value" style="color:${scoreColour(value * 100)}">${Math.round(value * 100)}%</span>
+            <span class="metric-name">${label} <span class="explain-i" aria-hidden="true">ⓘ</span></span>
+          </button>
+          <div class="metric-bar"><span style="width:0%;background:${scoreColour(value * 100)}"></span></div>
           <p class="explain-text" hidden>${t(`explain.${key}`)}</p>
         </div>`,
     )
