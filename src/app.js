@@ -411,7 +411,10 @@ function showView(name) {
   if (name !== 'sprint' && sprintView) sprintView.stop();
   if (name !== 'trill' && trillView) trillView.stop();
   if (name !== 'listen' && listenView) listenView.stop();
-  if (name !== 'sight') stopSightReplay();
+  if (name !== 'sight') {
+    stopSightReplay();
+    stopHearing();
+  }
   if (name === 'choose') paintMenuPet();
   Object.entries(el.views).forEach(([key, node]) => {
     node.hidden = key !== name;
@@ -5247,6 +5250,8 @@ paintOffline();
 
 function cancelListening() {
   micTicket += 1;
+  stopHearing();
+  stopSightReplay();
   listenBuddy?.listen(false);
   if (state.mic) {
     state.mic.close();
@@ -5268,7 +5273,12 @@ function hashFor() {
 }
 
 function applyHash() {
-  const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+  let raw;
+  try {
+    raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+  } catch {
+    return false;
+  }
   if (!raw) return false;
   const [mode, cardId] = raw.split('/');
   if ((mode === 'major' || mode === 'minor') && cardId) {
