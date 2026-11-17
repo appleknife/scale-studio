@@ -37,7 +37,10 @@
 
       const frame = document.getElementById('frame');
       const loaded = new Promise((resolve) => frame.addEventListener('load', resolve, { once: true }));
-      frame.src = '../index.html#major/G';
+      // `?lang=en` pins the language: an earlier test in the same browser
+      // profile can leave a stored `zh`, and the hint checks below are
+      // English-text checks.
+      frame.src = '../index.html?lang=en#major/G';
       await loaded;
       const d = frame.contentDocument;
       const w = frame.contentWindow;
