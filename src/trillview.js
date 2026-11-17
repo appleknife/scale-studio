@@ -13,9 +13,9 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611171545';
-import { t } from './i18n.js?v=202611171545';
-import { hearLevel } from './pitch.js?v=202611171545';
+import * as Trill from './trill.js?v=202611171615';
+import { t } from './i18n.js?v=202611171615';
+import { hearLevel } from './pitch.js?v=202611171615';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -278,6 +278,8 @@ export function createTrillView(deps) {
   /** One frame from the microphone. */
   function frame(f) {
     if (!run || !listening) return;
+    // One clock only: a frame from earlier than the last one is not this take's.
+    if (run.lastT != null && f.t < run.lastT) return;
     run.lastT = f.t;
     run.lastAt = performance.now();
     if (run.beat0 == null) {

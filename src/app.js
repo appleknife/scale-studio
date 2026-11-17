@@ -1,19 +1,19 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171545';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171545';
-import { createInk } from './ink.js?v=202611171545';
-import { createFollower } from './follow.js?v=202611171545';
-import { createPetRoom } from './petroom.js?v=202611171545';
-import { SPRINT_FULL } from './pet.js?v=202611171545';
-import { createBuddy } from './buddy.js?v=202611171545';
-import { createSprintView } from './sprintview.js?v=202611171545';
-import { createTrillView } from './trillview.js?v=202611171545';
-import { createListenView } from './listenview.js?v=202611171545';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171615';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171615';
+import { createInk } from './ink.js?v=202611171615';
+import { createFollower } from './follow.js?v=202611171615';
+import { createPetRoom } from './petroom.js?v=202611171615';
+import { SPRINT_FULL } from './pet.js?v=202611171615';
+import { createBuddy } from './buddy.js?v=202611171615';
+import { createSprintView } from './sprintview.js?v=202611171615';
+import { createTrillView } from './trillview.js?v=202611171615';
+import { createListenView } from './listenview.js?v=202611171615';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611171545';
+window.__scaleStudioVersion = '202611171615';
 import {
   PitchDetector,
   midiToFreq,
@@ -21,16 +21,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611171545';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171545';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171545';
-import { generatePassage } from './sightreading.js?v=202611171545';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171545';
-import { renderScore } from './score.js?v=202611171545';
-import { summariseIntonation } from './intonation.js?v=202611171545';
-import * as Journal from './journal.js?v=202611171545';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171545';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171545';
+} from './pitch.js?v=202611171615';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171615';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171615';
+import { generatePassage } from './sightreading.js?v=202611171615';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171615';
+import { renderScore } from './score.js?v=202611171615';
+import { summariseIntonation } from './intonation.js?v=202611171615';
+import * as Journal from './journal.js?v=202611171615';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171615';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171615';
 import {
   STRINGS,
   FIFTHS,
@@ -39,7 +39,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611171545';
+} from './tuner.js?v=202611171615';
 
 const LANG = initLang();
 
@@ -2387,15 +2387,7 @@ petRoom = createPetRoom({
 sprintView = createSprintView({
   root: el.views.sprint,
   profileId: () => petProfileId(),
-  openMic: async () => {
-    cancelListening();
-    closeMic();
-    micTicket += 1;
-    const mic = await openMic(routeFrame);
-    state.mic = mic;
-    state.micMode = 'sprint';
-    return mic;
-  },
+  openMic: () => openMicFor('sprint'),
   closeMic: () => {
     micTicket += 1;
     closeMic();
@@ -2424,15 +2416,7 @@ el.openSprintBtn.addEventListener('click', () => {
 trillView = createTrillView({
   root: el.views.trill,
   profileId: () => petProfileId(),
-  openMic: async () => {
-    cancelListening();
-    closeMic();
-    micTicket += 1;
-    const mic = await openMic(routeFrame);
-    state.mic = mic;
-    state.micMode = 'trill';
-    return mic;
-  },
+  openMic: () => openMicFor('trill'),
   closeMic: () => {
     micTicket += 1;
     closeMic();
@@ -2456,15 +2440,7 @@ listenView = createListenView({
   root: el.views.listen,
   player: () => player,
   readyViolin: () => readyViolin(),
-  openMic: async () => {
-    cancelListening();
-    closeMic();
-    micTicket += 1;
-    const mic = await openMic(routeFrame);
-    state.mic = mic;
-    state.micMode = 'listen';
-    return mic;
-  },
+  openMic: () => openMicFor('listen'),
   closeMic: () => {
     micTicket += 1;
     closeMic();
@@ -4280,7 +4256,7 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
       if (staleTicks > 10) ensurePulled();
       // Report the stale frame as silence: the needle should fall back to idle,
       // not keep pointing at a note that ended a while ago.
-      emit({ t: (performance.now() - startedAt) / 1000, freq: 0, clarity: 0, rms: 0 });
+      emit({ t: (performance.now() - startedAt) / 1000, freq: 0, clarity: 0, rms: 0 }, mic);
       return;
     }
     staleTicks = 0;
@@ -4301,7 +4277,7 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     } else {
       silentTicks = 0;
     }
-    emit({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms });
+    emit({ t: (performance.now() - startedAt) / 1000, freq, clarity, rms }, mic);
   }, 30);
 
   mic.holdScreen();
@@ -4420,6 +4396,8 @@ document.addEventListener('visibilitychange', () => {
 
 function micErrorMessage(err) {
   switch (err?.name) {
+    case 'Superseded':
+      return '';
     case 'NotAllowedError':
     case 'SecurityError':
       return t('mic.denied');
@@ -4440,7 +4418,39 @@ function micErrorMessage(err) {
  * The stream is opened once and shared, which is also what keeps iOS happy
  * between takes.
  */
-function routeFrame(frame) {
+/**
+ * Opens the microphone for one of the screens that drive it themselves (Note
+ * Sprint, the Trill Trainer, Listen). Opening takes a moment — longer on an iPad
+ * asking for permission — and if a second open starts meanwhile (Start tapped
+ * twice, Stop then Start) the first must not survive it: two microphones on two
+ * clocks feed one picture, and the trill trace turns into streaks. So the open
+ * that has been overtaken closes itself and steps aside quietly.
+ */
+async function openMicFor(mode) {
+  cancelListening();
+  closeMic();
+  micTicket += 1;
+  const ticket = micTicket;
+  const mic = await openMic(routeFrame);
+  if (ticket !== micTicket) {
+    mic.close();
+    const err = new Error('superseded');
+    err.name = 'Superseded';
+    throw err;
+  }
+  state.mic = mic;
+  state.micMode = mode;
+  return mic;
+}
+
+function routeFrame(frame, from) {
+  // Only the microphone the app is using may speak. Anything else is one that
+  // was opened and lost track of: it closes, rather than feeding a second
+  // clock into whatever is listening.
+  if (from && from !== state.mic) {
+    if (state.mic) from.close();
+    return;
+  }
   paintMicLevel(frame.rms);
   if (sprintView?.listening) return sprintView.frame(frame);
   if (trillView?.listening) return trillView.frame(frame);
