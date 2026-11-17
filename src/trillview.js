@@ -13,9 +13,9 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611171615';
-import { t } from './i18n.js?v=202611171615';
-import { hearLevel } from './pitch.js?v=202611171615';
+import * as Trill from './trill.js?v=202611171650';
+import { t } from './i18n.js?v=202611171650';
+import { hearLevel } from './pitch.js?v=202611171650';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -458,7 +458,7 @@ export function createTrillView(deps) {
   function finish() {
     listening = false;
     cancelAnimationFrame(raf);
-    deps.closeMic();
+    // The microphone stays open for Again; leaving the screen closes it.
     const result = Trill.analyse(run.frames, run.notes, { bpm: run.bpm, step: run.step });
     const filed = Trill.recordRun(stats, run.notes, run.step, result, new Date().toISOString().slice(0, 10));
     save();
@@ -681,6 +681,18 @@ export function createTrillView(deps) {
         stopRun();
         panel = 'pick';
       }
+      deps.releaseMic?.();
+    },
+    /** The microphone went quiet under a take (iOS took the audio away). */
+    micStalled() {
+      if (!run) return;
+      stopRun();
+      panel = 'pick';
+      paint();
+      const note = document.createElement('p');
+      note.className = 'trill-error';
+      note.textContent = t('trill.status.stalled');
+      body.prepend(note);
     },
     frame,
     get listening() {

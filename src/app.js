@@ -1,19 +1,19 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171615';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171615';
-import { createInk } from './ink.js?v=202611171615';
-import { createFollower } from './follow.js?v=202611171615';
-import { createPetRoom } from './petroom.js?v=202611171615';
-import { SPRINT_FULL } from './pet.js?v=202611171615';
-import { createBuddy } from './buddy.js?v=202611171615';
-import { createSprintView } from './sprintview.js?v=202611171615';
-import { createTrillView } from './trillview.js?v=202611171615';
-import { createListenView } from './listenview.js?v=202611171615';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171650';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171650';
+import { createInk } from './ink.js?v=202611171650';
+import { createFollower } from './follow.js?v=202611171650';
+import { createPetRoom } from './petroom.js?v=202611171650';
+import { SPRINT_FULL } from './pet.js?v=202611171650';
+import { createBuddy } from './buddy.js?v=202611171650';
+import { createSprintView } from './sprintview.js?v=202611171650';
+import { createTrillView } from './trillview.js?v=202611171650';
+import { createListenView } from './listenview.js?v=202611171650';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611171615';
+window.__scaleStudioVersion = '202611171650';
 import {
   PitchDetector,
   midiToFreq,
@@ -21,16 +21,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611171615';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171615';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171615';
-import { generatePassage } from './sightreading.js?v=202611171615';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171615';
-import { renderScore } from './score.js?v=202611171615';
-import { summariseIntonation } from './intonation.js?v=202611171615';
-import * as Journal from './journal.js?v=202611171615';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171615';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171615';
+} from './pitch.js?v=202611171650';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171650';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171650';
+import { generatePassage } from './sightreading.js?v=202611171650';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171650';
+import { renderScore } from './score.js?v=202611171650';
+import { summariseIntonation } from './intonation.js?v=202611171650';
+import * as Journal from './journal.js?v=202611171650';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171650';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171650';
 import {
   STRINGS,
   FIFTHS,
@@ -39,7 +39,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611171615';
+} from './tuner.js?v=202611171650';
 
 const LANG = initLang();
 
@@ -2422,6 +2422,12 @@ trillView = createTrillView({
     closeMic();
   },
   getMic: () => state.mic,
+  // Between takes the microphone stays open; leaving the screen hands it back.
+  releaseMic: () => {
+    if (state.micMode !== 'trill') return;
+    micTicket += 1;
+    closeMic();
+  },
   micError: (err) => micErrorMessage(err),
   audio: () => ({ ctx: player.context, out: player.output }),
   // A take with a real trill in it is practice: it ticks the day and feeds the pet.
@@ -4055,8 +4061,13 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     throw err;
   }
 
-  await unlocked;
-  await ctx.resume().catch(() => {});
+  // A resume can stay pending on iOS while the audio session is being rebuilt
+  // around the new stream — and then "Opening the microphone…" never ends. Wait
+  // a moment, not forever: if the context is still not running, the stall check
+  // below notices within a second and says so.
+  const patience = (ms) => new Promise((r) => setTimeout(r, ms));
+  await Promise.race([unlocked, patience(1500)]);
+  await Promise.race([ctx.resume().catch(() => {}), patience(1500)]);
 
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
@@ -4302,6 +4313,7 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
  * without a score, and the screen says what happened and what to do.
  */
 function onMicStalled() {
+  trillView?.micStalled();
   if (sight.phase !== 'idle') {
     stopSightTake(false);
     el.sightStatus.textContent = t('mic.paused');
@@ -4427,6 +4439,10 @@ function micErrorMessage(err) {
  * that has been overtaken closes itself and steps aside quietly.
  */
 async function openMicFor(mode) {
+  // The same screen asking again (the Trill Trainer's Again) keeps the
+  // microphone it has: closing and reopening between takes is what iOS handles
+  // worst, and a scale take has always kept its microphone for the same reason.
+  if (state.mic && state.micMode === mode && !state.mic.stalled) return state.mic;
   cancelListening();
   closeMic();
   micTicket += 1;

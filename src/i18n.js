@@ -430,6 +430,7 @@ export const S = {
   'trill.doing': ['{string} string: {low} ⇄ {high}', '{string} 弦：{low} ⇄ {high}'],
   'trill.doing.per': ['{n} to a beat, ♩ = {bpm}', '每拍 {n} 个，♩ = {bpm}'],
   'trill.status.opening': ['Opening the microphone…', '正在打开麦克风…'],
+  'trill.status.stalled': ['The microphone stopped answering. Tap Start to try again — if it keeps happening, close the app and open it again.', '麦克风没有反应了。点“开始”再试一次——如果一直这样，请关掉应用再重新打开。'],
   'trill.status.ready': ['Get ready — lower finger down, bow on the string.', '准备——下面的手指按好，弓放在弦上。'],
   'trill.status.go': ['Trill! {n} s to go', '颤！还有 {n} 秒'],
   'trill.m.pace': ['Pace', '速度'],
