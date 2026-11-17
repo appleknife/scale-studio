@@ -1,19 +1,19 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171650';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171650';
-import { createInk } from './ink.js?v=202611171650';
-import { createFollower } from './follow.js?v=202611171650';
-import { createPetRoom } from './petroom.js?v=202611171650';
-import { SPRINT_FULL } from './pet.js?v=202611171650';
-import { createBuddy } from './buddy.js?v=202611171650';
-import { createSprintView } from './sprintview.js?v=202611171650';
-import { createTrillView } from './trillview.js?v=202611171650';
-import { createListenView } from './listenview.js?v=202611171650';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171705';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171705';
+import { createInk } from './ink.js?v=202611171705';
+import { createFollower } from './follow.js?v=202611171705';
+import { createPetRoom } from './petroom.js?v=202611171705';
+import { SPRINT_FULL } from './pet.js?v=202611171705';
+import { createBuddy } from './buddy.js?v=202611171705';
+import { createSprintView } from './sprintview.js?v=202611171705';
+import { createTrillView } from './trillview.js?v=202611171705';
+import { createListenView } from './listenview.js?v=202611171705';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611171650';
+window.__scaleStudioVersion = '202611171705';
 import {
   PitchDetector,
   midiToFreq,
@@ -21,16 +21,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611171650';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171650';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171650';
-import { generatePassage } from './sightreading.js?v=202611171650';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171650';
-import { renderScore } from './score.js?v=202611171650';
-import { summariseIntonation } from './intonation.js?v=202611171650';
-import * as Journal from './journal.js?v=202611171650';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171650';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171650';
+} from './pitch.js?v=202611171705';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171705';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171705';
+import { generatePassage } from './sightreading.js?v=202611171705';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171705';
+import { renderScore } from './score.js?v=202611171705';
+import { summariseIntonation } from './intonation.js?v=202611171705';
+import * as Journal from './journal.js?v=202611171705';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171705';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171705';
 import {
   STRINGS,
   FIFTHS,
@@ -39,7 +39,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611171650';
+} from './tuner.js?v=202611171705';
 
 const LANG = initLang();
 
@@ -1393,6 +1393,7 @@ async function playSightReplay() {
   const replay = sight.replay;
   if (!replay) return;
   if (player.playing) stopHearing();
+  releaseIdleMic();
   const barTime = sightBarTime(replay, sight.pickedBar || 0);
   if (barTime == null) {
     el.sightStatus.textContent = t('sight.replayNoBar');
@@ -1433,6 +1434,28 @@ function paintPickedBar() {
   paintHearLabel();
 }
 
+/**
+ * Before anything plays back, hand back a microphone that is open but not
+ * listening. On iOS an open microphone keeps the page in "play-and-record", and
+ * playback in that mode comes out quietly — through the earpiece, or ducked
+ * under the voice processing — which is the example (or a recording) sounding
+ * far too soft after a take. The next Start opens the microphone again from its
+ * own tap, which is what iOS wants anyway.
+ */
+function releaseIdleMic() {
+  if (!state.mic) return;
+  const busy =
+    state.take ||
+    sight.phase !== 'idle' ||
+    state.tune?.listening ||
+    sprintView?.listening ||
+    trillView?.listening ||
+    listenView?.listening;
+  if (busy) return;
+  micTicket += 1;
+  closeMic();
+}
+
 function hearPassage() {
   if (player.playing) {
     stopHearing();
@@ -1441,6 +1464,7 @@ function hearPassage() {
   stopSightReplay();
   const passage = sight.passage;
   if (!passage) return;
+  releaseIdleMic();
   const fromBar = sight.pickedBar || 0;
   ensurePlayhead();
   sight.anchors = sightAnchors(passage, el.sightStaff.querySelector('svg'));
@@ -3772,6 +3796,7 @@ async function playTake(index) {
   }
   const take = recorder.takes[index];
   if (!take) return;
+  releaseIdleMic();
   try {
     const handle = await playRecording(take.blob, { wet: el.reverbToggle.checked ? 0.34 : 0 });
     recorder.playing = handle;
