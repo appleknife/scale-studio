@@ -13,11 +13,12 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611171850';
-import { analyseVibrato, vibratoVerdict, TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611171850';
-import { bowedVoice } from './playback.js?v=202611171850';
-import { t } from './i18n.js?v=202611171850';
-import { hearLevel } from './pitch.js?v=202611171850';
+import * as Trill from './trill.js?v=202611181200';
+import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181200';
+import * as Vibrato from './vibrato.js?v=202611181200';
+import { bowedVoice } from './playback.js?v=202611181200';
+import { t } from './i18n.js?v=202611181200';
+import { hearLevel } from './pitch.js?v=202611181200';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -52,14 +53,16 @@ export function createTrillView(deps) {
     <div class="trill-body"></div>`;
   const body = root.querySelector('.trill-body');
 
-  const vibProfile = () => `${deps.profileId() || 'default'}::vibrato`;
   const statsNow = () => (mode === 'vibrato' ? vstats : stats);
   const notesNow = () => {
     const o = statsNow().opts;
     return Trill.notesFor(o.string, o.pair, o.spacing);
   };
   const stepNow = () => Trill.stepById(stepId || 'free');
-  const save = () => Trill.saveStats(mode === 'vibrato' ? vibProfile() : deps.profileId(), statsNow());
+  const save = () => {
+    if (mode === 'vibrato') Vibrato.saveStats(deps.profileId(), vstats);
+    else Trill.saveStats(deps.profileId(), stats);
+  };
   const finger = (n) => t(`trill.finger.${n}`);
   const oneDp = (n) => (Math.round(n * 10) / 10).toFixed(1);
   const centsOf = (f, midi) => (69 + 12 * Math.log2(f.freq / 440) - midi) * 100;
@@ -160,6 +163,10 @@ export function createTrillView(deps) {
           <li>${t('trill.tips.down')}</li>
           <li>${t('trill.tips.pairs')}</li>
         </ul>
+      </details>
+      <details class="hear-note">
+        <summary data-i18n="hear.summary">What it can and can't hear</summary>
+        <p>${t('trill.limits')}</p>
       </details>`;
   }
 
@@ -174,7 +181,7 @@ export function createTrillView(deps) {
       (p) => `<button class="chip" type="button" data-pair="${p.id}" aria-pressed="${o.pair === p.id}">${t(`trill.pair.${p.id}`)}</button>`,
     ).join('');
     const ladder = Trill.STEPS.map((s) => {
-      const isDone = Trill.doneFor(vstats, notes).includes(s.id);
+      const isDone = Vibrato.doneFor(vstats, notes).includes(s.id);
       const on = s.id === step.id;
       return `<button class="trill-step${on ? ' is-on' : ''}${isDone ? ' is-done' : ''}" type="button" data-step="${s.id}" aria-pressed="${on}">
           <span class="trill-step-n">${s.per ? s.per : '∞'}</span>
@@ -227,7 +234,10 @@ export function createTrillView(deps) {
         <button class="quiet-btn" type="button" data-act="example">${t('vib.example')}</button>
         <button class="quiet-btn" type="button" data-act="stats">${t('trill.stats.open')}</button>
       </div>
-      <p class="trill-howto">${t('vib.limits')}</p>`;
+      <details class="hear-note">
+        <summary data-i18n="hear.summary">What it can and can't hear</summary>
+        <p>${t('vib.limits')}</p>
+      </details>`;
   }
 
   // ── Playing ────────────────────────────────────────────────────────────
@@ -607,19 +617,13 @@ export function createTrillView(deps) {
     let result;
     let filed;
     if (mode === 'vibrato') {
-      const m = analyseVibrato(run.frames, run.centre);
+      const m = Vibrato.analyseVibrato(run.frames, run.centre);
       const target = run.step.per ? (run.step.per * run.bpm) / 60 : null;
-      const verdict = vibratoVerdict(m, target);
-      // recordRun keeps the step ladder and capped log; best is evenness here
-      // rather than the trill's pace.
+      const verdict = Vibrato.vibratoVerdict(m, target);
+      // The vibrato save keeps the same step ladder, but a free take's best is
+      // its evenness rather than a pace.
       result = { ...m, even: m.evenness ?? 0, verdict };
-      filed = Trill.recordRun(vstats, run.notes, run.step, result, day);
-      const set = vstats.sets[Trill.setKey(run.notes)];
-      if (set && !run.step.per && m.evenness != null) {
-        filed.best = Math.round(m.evenness);
-        filed.newBest = filed.best > set.best;
-        set.best = Math.max(set.best, filed.best);
-      }
+      filed = Vibrato.recordRun(vstats, run.notes, run.step, result, day);
     } else {
       result = Trill.analyse(run.frames, run.notes, { bpm: run.bpm, step: run.step });
       filed = Trill.recordRun(stats, run.notes, run.step, result, day);
@@ -691,7 +695,9 @@ export function createTrillView(deps) {
         <button class="${v.pass && next ? 'quiet-btn' : 'primary-btn'}" type="button" data-act="again">${t('trill.again')}</button>
         <button class="quiet-btn" type="button" data-act="change">${t('trill.change')}</button>
         <button class="quiet-btn" type="button" data-act="stats">${t('trill.stats.open')}</button>
-      </div>`;
+      </div>
+      <p class="trill-howto">${t('vib.bridge.text')}</p>
+      <div class="trill-actions"><button class="quiet-btn" type="button" data-act="bridge">${t('vib.bridge.toVibrato')}</button></div>`;
   }
 
   function paintVibratoDone() {
@@ -723,7 +729,9 @@ export function createTrillView(deps) {
         <button class="${v.pass && next ? 'quiet-btn' : 'primary-btn'}" type="button" data-act="again">${t('trill.again')}</button>
         <button class="quiet-btn" type="button" data-act="change">${t('trill.change')}</button>
         <button class="quiet-btn" type="button" data-act="stats">${t('trill.stats.open')}</button>
-      </div>`;
+      </div>
+      <p class="trill-howto">${t('vib.bridge.back')}</p>
+      <div class="trill-actions"><button class="quiet-btn" type="button" data-act="bridge">${t('vib.bridge.toTrill')}</button></div>`;
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────
@@ -810,7 +818,7 @@ export function createTrillView(deps) {
   }
 
   function paintVibratoStats() {
-    const sum = Trill.summary(vstats);
+    const sum = Vibrato.summary(vstats);
     const backRow = `<div class="trill-actions"><button class="primary-btn" type="button" data-act="change">${t('trill.stats.back')}</button></div>`;
     if (!sum.runs) {
       body.innerHTML = `<h3 class="trill-stats-title">${t('vib.title')}</h3><p class="trill-howto">${t('trill.stats.empty')}</p>${backRow}`;
@@ -897,6 +905,18 @@ export function createTrillView(deps) {
       paint();
     } else if (b.dataset.act === 'example') {
       playExample();
+    } else if (b.dataset.act === 'bridge') {
+      // The trill just taught the impulse. Carry the same fingers, spacing and
+      // step into the other mode so the move across is one tap, not a re-setup.
+      const src = statsNow();
+      const dst = mode === 'trill' ? vstats : stats;
+      dst.opts = { ...dst.opts, ...src.opts };
+      mode = mode === 'trill' ? 'vibrato' : 'trill';
+      stepId = last ? last.step.id : null;
+      last = null;
+      panel = 'pick';
+      save();
+      paint();
     } else if (b.dataset.tempo) {
       const to = statsNow().opts.bpm + Number(b.dataset.tempo) * Trill.TEMPO.step;
       statsNow().opts.bpm = Math.min(Trill.TEMPO.max, Math.max(Trill.TEMPO.min, to));
@@ -934,7 +954,7 @@ export function createTrillView(deps) {
     open(which = 'trill') {
       mode = which === 'vibrato' ? 'vibrato' : 'trill';
       stats = Trill.loadStats(deps.profileId());
-      vstats = Trill.loadStats(vibProfile());
+      vstats = Vibrato.loadStats(deps.profileId());
       stepId = null;
       last = null;
       if (panel !== 'pick') panel = 'pick';

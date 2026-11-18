@@ -21,7 +21,11 @@
       // The measurement that Listen uses, and the one a trainer will use, are the
       // same code. Both are tested here with frames the app's own detector shape:
       // 30 ms apart, A4 as the centre, cents as a sinusoid around it.
-      import { vibratoOf, analyseVibrato, vibratoVerdict } from '../src/vibrato.js';
+      import {
+        vibratoOf, analyseVibrato, vibratoVerdict,
+        emptyStats, loadStats, saveStats, recordRun, summary, nextStep,
+      } from '../src/vibrato.js';
+      import { notesFor } from '../src/trill.js';
 
       const problems = [];
       const log = [];
@@ -97,6 +101,26 @@
         check(vibratoVerdict({ cycles: 8, rate: 4, evenness: 90, centreOffset: 0 }, 6).id === 'slow', 'a slow measured wave was not noticed');
         check(vibratoVerdict({ cycles: 8, rate: 9, evenness: 90, centreOffset: 0 }, 6).id === 'fast', 'a fast measured wave was not noticed');
         check(vibratoVerdict({ cycles: 2, rate: 6, evenness: 90, centreOffset: 0 }).id === 'none', 'two wiggles were called a vibrato');
+
+        // The vibrato save is its own file, and keeps width and centre in the
+        // log rather than borrowing the trill's pace-only record.
+        const data = new Map();
+        const store = {
+          getItem: (key) => (data.has(key) ? data.get(key) : null),
+          setItem: (key, value) => data.set(key, String(value)),
+        };
+        const who = 'vibrato-suite';
+        check(saveStats(who, emptyStats(), store), 'the vibrato save failed');
+        const saved = loadStats(who, store);
+        check(saved.opts.pair === '23' && saved.runs === 0, 'the vibrato save did not round-trip');
+        const notes = notesFor('A', '23', 'half');
+        const result = { rate: 4, width: 40, evenness: 91, centreOffset: 2, cycles: 8, verdict: { id: 'good', pass: true } };
+        const filed = recordRun(saved, notes, { id: 'four', per: 4 }, result, '2026-11-18');
+        check(filed.newStep && saved.sets['A:23:half'].done.includes('four'), 'a passed step was not ticked');
+        check(saved.log[0].e === 91 && saved.log[0].w === 40 && saved.log[0].o === 2, 'the log lost width or centre');
+        recordRun(saved, notes, { id: 'free', per: 0 }, { ...result, evenness: 95 }, '2026-11-18');
+        check(saved.sets['A:23:half'].best === 95, 'a free wave did not keep its best evenness');
+        check(summary(saved).steps >= 2 && nextStep(saved, notes).id !== 'four', 'the summary or ladder lost its steps');
       } catch (err) {
         problems.push(`the test threw: ${err && err.message}`);
       }

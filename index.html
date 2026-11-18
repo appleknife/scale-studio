@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611171850" />
+    <link rel="stylesheet" href="app.css?v=202611181200" />
   </head>
   <body>
     <div class="shell">
@@ -121,15 +121,9 @@
               </span>
             </button>
             <button class="menu-tile" id="openTrillBtn" type="button">
-              <span class="menu-title">Trill Trainer <span class="menu-new">New</span></span>
+              <span class="menu-title">Trill &amp; Vibrato <span class="menu-new">New</span></span>
               <span class="menu-sub">
-                Two fingers, one string. Build a trill from slow and even to fast, and watch your pitch draw the wave.
-              </span>
-            </button>
-            <button class="menu-tile" id="openVibratoBtn" type="button">
-              <span class="menu-title">Vibrato Trainer <span class="menu-new">New</span></span>
-              <span class="menu-sub">
-                One note, one bow. Watch your vibrato draw a wave inside the half step, and make it even.
+                Two fingers, one string. Trill between the notes, or roll around one inside the half step — and watch the wave get even.
               </span>
             </button>
             <button class="menu-tile" id="openListenBtn" type="button">
@@ -1193,13 +1187,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611171850"></script>
+    <script type="module" src="src/app.js?v=202611181200"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611171850';
+        var V = '202611181200';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;

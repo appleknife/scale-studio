@@ -1,19 +1,19 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611171850';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611171850';
-import { createInk } from './ink.js?v=202611171850';
-import { createFollower } from './follow.js?v=202611171850';
-import { createPetRoom } from './petroom.js?v=202611171850';
-import { SPRINT_FULL } from './pet.js?v=202611171850';
-import { createBuddy } from './buddy.js?v=202611171850';
-import { createSprintView } from './sprintview.js?v=202611171850';
-import { createTrillView } from './trillview.js?v=202611171850';
-import { createListenView } from './listenview.js?v=202611171850';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611181200';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611181200';
+import { createInk } from './ink.js?v=202611181200';
+import { createFollower } from './follow.js?v=202611181200';
+import { createPetRoom } from './petroom.js?v=202611181200';
+import { SPRINT_FULL } from './pet.js?v=202611181200';
+import { createBuddy } from './buddy.js?v=202611181200';
+import { createSprintView } from './sprintview.js?v=202611181200';
+import { createTrillView } from './trillview.js?v=202611181200';
+import { createListenView } from './listenview.js?v=202611181200';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611171850';
+window.__scaleStudioVersion = '202611181200';
 import {
   PitchDetector,
   midiToFreq,
@@ -21,16 +21,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611171850';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611171850';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611171850';
-import { generatePassage } from './sightreading.js?v=202611171850';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611171850';
-import { renderScore } from './score.js?v=202611171850';
-import { summariseIntonation } from './intonation.js?v=202611171850';
-import * as Journal from './journal.js?v=202611171850';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611171850';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611171850';
+} from './pitch.js?v=202611181200';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611181200';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611181200';
+import { generatePassage } from './sightreading.js?v=202611181200';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611181200';
+import { renderScore } from './score.js?v=202611181200';
+import { summariseIntonation } from './intonation.js?v=202611181200';
+import * as Journal from './journal.js?v=202611181200';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611181200';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611181200';
 import {
   STRINGS,
   FIFTHS,
@@ -39,7 +39,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611171850';
+} from './tuner.js?v=202611181200';
 
 const LANG = initLang();
 
@@ -65,7 +65,6 @@ const el = {
   },
   openSprintBtn: $('openSprintBtn'),
   openTrillBtn: $('openTrillBtn'),
-  openVibratoBtn: $('openVibratoBtn'),
   openListenBtn: $('openListenBtn'),
   openPetBtn: $('openPetBtn'),
   petBack: $('petBack'),
@@ -2486,10 +2485,6 @@ trillView = createTrillView({
 });
 el.openTrillBtn.addEventListener('click', () => {
   trillView.open('trill');
-  showView('trill');
-});
-el.openVibratoBtn.addEventListener('click', () => {
-  trillView.open('vibrato');
   showView('trill');
 });
 

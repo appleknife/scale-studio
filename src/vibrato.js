@@ -10,6 +10,8 @@
 // Both work on the app's ~30 ms pitch frames. The pitch inside a note is detrended
 // before anything is counted: a slow slide is intonation, not vibrato.
 
+import { STEPS, TEMPO, stringById, pairById } from './trill.js?v=202611181200';
+
 const median = (xs) => {
   if (!xs.length) return null;
   const s = xs.slice().sort((a, b) => a - b);
@@ -187,4 +189,135 @@ export function analyseVibrato(frames, centreMidi, { from = -Infinity, to = Infi
     result.evenness = clamp(100 - (0.6 * periodSpread + 0.4 * widthSpread) * 250);
   }
   return result;
+}
+
+/* ── What is remembered ─────────────────────────────────────────────────── */
+
+export function storageKey(profileId) {
+  return `scaleStudio.vibrato.v1.${profileId || 'default'}`;
+}
+
+export function emptyStats() {
+  return {
+    v: 1,
+    // The middle finger of the pair is the usual first vibrato finger.
+    opts: { string: 'A', pair: '23', spacing: 'half', bpm: TEMPO.start, click: true },
+    sets: {},
+    runs: 0,
+    log: [],
+  };
+}
+
+export const LOG_LIMIT = 300;
+const setKey = (notes) => `${notes.string}:${notes.pair}:${notes.spacing}`;
+
+export function loadStats(profileId, store = localStorage) {
+  const base = emptyStats();
+  try {
+    const raw = store.getItem(storageKey(profileId));
+    if (!raw) return base;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return base;
+    const opts = { ...base.opts, ...(parsed.opts && typeof parsed.opts === 'object' ? parsed.opts : {}) };
+    opts.string = stringById(opts.string).id;
+    opts.pair = pairById(opts.pair).id;
+    opts.bpm = Math.min(TEMPO.max, Math.max(TEMPO.min, Math.round(Number(opts.bpm)) || TEMPO.start));
+    opts.click = opts.click !== false;
+    const sets = {};
+    for (const [key, value] of Object.entries(parsed.sets && typeof parsed.sets === 'object' ? parsed.sets : {})) {
+      if (!value || typeof value !== 'object') continue;
+      sets[key] = {
+        done: Array.isArray(value.done) ? value.done.filter((id) => STEPS.some((s) => s.id === id)) : [],
+        best: Math.max(0, Math.round(Number(value.best)) || 0),
+        runs: Math.max(0, Math.round(Number(value.runs)) || 0),
+        last: typeof value.last === 'string' ? value.last : '',
+      };
+    }
+    const log = (Array.isArray(parsed.log) ? parsed.log : [])
+      .filter((x) => x && typeof x === 'object' && typeof x.k === 'string' && STEPS.some((s) => s.id === x.s))
+      .map((x) => ({
+        d: typeof x.d === 'string' ? x.d : '',
+        k: x.k,
+        s: x.s,
+        r: Math.max(0, Number(x.r) || 0),
+        w: Math.max(0, Math.round(Number(x.w)) || 0),
+        e: Math.max(0, Math.min(100, Math.round(Number(x.e)) || 0)),
+        o: Math.round(Number(x.o) || 0),
+        p: x.p ? 1 : 0,
+      }))
+      .slice(-LOG_LIMIT);
+    return { v: 1, opts, sets, runs: Math.max(0, Math.round(Number(parsed.runs)) || 0), log };
+  } catch {
+    return base;
+  }
+}
+
+export function saveStats(profileId, stats, store = localStorage) {
+  try {
+    store.setItem(storageKey(profileId), JSON.stringify(stats));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const doneFor = (stats, notes) => stats.sets[setKey(notes)]?.done || [];
+
+/** The first step not yet passed for these fingers, or the natural wave. */
+export function nextStep(stats, notes) {
+  const done = doneFor(stats, notes);
+  return STEPS.find((s) => !done.includes(s.id)) || STEPS[STEPS.length - 1];
+}
+
+/**
+ * File a take. A passed step is ticked; a free wave keeps its most even result
+ * rather than its rate — rate and width are style, evenness is the progress.
+ */
+export function recordRun(stats, notes, step, result, day = '') {
+  const key = setKey(notes);
+  const set = stats.sets[key] || { done: [], best: 0, runs: 0, last: '' };
+  set.runs += 1;
+  set.last = day;
+  stats.runs += 1;
+  const even = Math.round(result.evenness ?? 0);
+  let newStep = false;
+  let newBest = false;
+  if (result.verdict?.pass && !set.done.includes(step.id)) {
+    set.done.push(step.id);
+    newStep = true;
+  }
+  if (!step.per && result.verdict?.pass && even > set.best) {
+    newBest = set.best > 0;
+    set.best = even;
+  }
+  stats.sets[key] = set;
+  if (result.cycles >= 3) {
+    if (!Array.isArray(stats.log)) stats.log = [];
+    stats.log.push({
+      d: day,
+      k: key,
+      s: step.id,
+      r: Math.round((result.rate || 0) * 10) / 10,
+      w: Math.round(result.width || 0),
+      e: even,
+      o: Math.round(result.centreOffset || 0),
+      p: result.verdict?.pass ? 1 : 0,
+    });
+    if (stats.log.length > LOG_LIMIT) stats.log.splice(0, stats.log.length - LOG_LIMIT);
+  }
+  return { newStep, newBest, best: set.best };
+}
+
+export function summary(stats) {
+  const log = Array.isArray(stats.log) ? stats.log : [];
+  const days = new Set(log.map((x) => x.d).filter(Boolean));
+  const sets = Object.values(stats.sets || {});
+  for (const set of sets) if (set.last) days.add(set.last);
+  return {
+    runs: stats.runs,
+    days: days.size,
+    steps: sets.reduce((n, set) => n + set.done.length, 0),
+    best: sets.reduce((n, set) => Math.max(n, set.best), 0),
+    recent: log.slice(-24),
+  };
 }
