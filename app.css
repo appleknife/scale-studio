@@ -6241,7 +6241,11 @@ select,
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 10px 6px 4px;
-  max-width: 460px;
+  /* As big as the screen allows: the full width of a phone already, and on a
+     tablet as wide as the page — but never taller than the screen, so the
+     whole staff is in view at once (the picture is 440 wide by 360 tall). */
+  max-width: min(100%, 860px, calc((100vh - 150px) * 1.22));
+  max-width: min(100%, 860px, calc((100dvh - 150px) * 1.22));
   margin: 0 auto;
 }
 
