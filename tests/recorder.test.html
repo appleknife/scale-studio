@@ -33,7 +33,7 @@
       // without waiting for real time: an OfflineAudioContext renders faster than
       // it plays. A microphone cannot be driven headlessly, so this is what can
       // be checked — that the room is a room.
-      import { makeHallIR, canRecord } from '../src/recorder.js';
+      import { makeHallIR, canRecord, play } from '../src/recorder.js';
 
       const problems = [];
       const log = [];
@@ -103,6 +103,54 @@
         log.push(`level at 0.45s ${half.toFixed(4)}, at 2.3s ${late.toFixed(4)}`);
         if (!(half > 0.02)) problems.push(`a note has died by half a second (${half.toFixed(4)})`);
         if (!(late < half * 0.25)) problems.push('the room never goes quiet');
+      }
+
+      // Each playback gets its own send into the shared convolver. Stopping one
+      // must disconnect that send, or every earlier tail is folded into the next
+      // play and the reverb grows until it clips.
+      {
+        const disconnects = [];
+        const param = () => ({
+          value: 0,
+          setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {},
+        });
+        const node = (name) => ({
+          name,
+          connect: (dest) => dest,
+          disconnect: (dest) => disconnects.push([name, dest && dest.name]),
+          start() {}, stop() {},
+          gain: param(), frequency: param(), Q: param(),
+          threshold: param(), knee: param(), ratio: param(), attack: param(), release: param(),
+          buffer: null,
+        });
+        class FakeCtx {
+          constructor() {
+            this.sampleRate = rate;
+            this.currentTime = 0;
+            this.destination = node('destination');
+          }
+          make(name) { return node(name); }
+          createGain() { return this.make('gain'); }
+          createDynamicsCompressor() { return this.make('comp'); }
+          createConvolver() { return this.make('room'); }
+          createBufferSource() { return this.make('source'); }
+          createBiquadFilter() { return this.make('filter'); }
+          createBuffer(_ch, len) { return { getChannelData: () => new Float32Array(len) }; }
+          async decodeAudioData() { return { getChannelData: () => new Float32Array(rate / 10), duration: 0.1 }; }
+        }
+        const Original = window.AudioContext;
+        window.AudioContext = FakeCtx;
+        try {
+          const blob = new Blob([new Uint8Array(8)], { type: 'audio/wav' });
+          const first = await play(blob);
+          first.stop();
+          const sends = disconnects.filter(([from, to]) => from === 'room' && to === 'gain');
+          eq('a stopped playback disconnects its reverb send', sends.length, 1);
+        } catch (err) {
+          problems.push(`reverb teardown test threw: ${err.message}`);
+        } finally {
+          window.AudioContext = Original;
+        }
       }
 
       // A microphone cannot be opened in a headless run, so the live path can only

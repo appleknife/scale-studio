@@ -227,6 +227,9 @@
         eq('junk is refused', J.parse('not json at all'), null);
         eq('someone else\'s json is refused', J.parse('{"app":"other"}'), null);
         eq('a broken log is refused', J.parse('{"app":"scale-studio","kind":"practice-log"}'), null);
+        const withBadTakes = JSON.parse(text);
+        withBadTakes.state.takes = 5;
+        eq('a copy whose takes are not a list is refused', J.parse(JSON.stringify(withBadTakes)), null);
 
         // Loading a copy adds what is missing and leaves what is here. Loading it
         // a second time must land in exactly the same place, or a student who
@@ -263,6 +266,30 @@
         J.recordTake(theirs, { uid: 'b2', at: '2026-03-12T10:00:00Z', key: '2026-03-12', kind: 'sight', level: 6, score: 70 });
         const joined = J.merge(mine, theirs);
         eq('takes survive a load', joined.takes.map((t) => t.uid), ['a1', 'b2']);
+
+        // Two takes in one millisecond with no uid are still two takes.
+        const sameMs = J.emptyState();
+        sameMs.takes = [
+          { at: '2026-03-11T10:00:00.000Z', key: '2026-03-11', kind: 'scale', id: 'G', score: 90 },
+          { at: '2026-03-11T10:00:00.000Z', key: '2026-03-11', kind: 'scale', id: 'D', score: 91 },
+        ];
+        eq('two takes in one millisecond both survive a load', J.merge(J.emptyState(), sameMs).takes.length, 2);
+
+        // Once the log is full, a counter-based uid would repeat for every new
+        // take in the same millisecond.
+        const realNow = Date.now;
+        try {
+          Date.now = () => 1000;
+          const capped = J.emptyState();
+          capped.takes = Array.from({ length: 400 }, () => ({ at: '2026-03-11T10:00:00.000Z', uid: 'old' }));
+          J.recordTake(capped, { kind: 'scale', id: 'A', score: 92 });
+          const u1 = capped.takes.at(-1).uid;
+          J.recordTake(capped, { kind: 'scale', id: 'A', score: 92 });
+          const u2 = capped.takes.at(-1).uid;
+          eq('two takes at the cap get different uids', u1 !== u2, true);
+        } finally {
+          Date.now = realNow;
+        }
         eq('and a load of the same copy adds none', J.merge(mine, mine).takes.length, 1);
         eq('sight bests survive a load', joined.sight[5].best, 81);
         eq('the goal survives a load', J.goalKey(joined.goal), 'days:3');
@@ -458,6 +485,13 @@
         const strict = J.auditionProgress(s, ids);
         eq('V–VI counts every ready key', strict.done, 3);
         eq('and is not met by three', strict.met, false);
+
+        // An imported log can hold clean days in record order rather than date
+        // order. "Became ready" is the second earliest day, not days[1].
+        const jumbled = J.emptyState();
+        jumbled.scales.G = { days: ['2026-03-20', '2026-03-05', '2026-03-06'], best: 95 };
+        eq('the second clean day is in date order', J.readyBetween(jumbled, ['G'], '2026-03-06', '2026-03-10'), ['G']);
+        eq('a scale that became ready later is not counted earlier', J.readyBetween(jumbled, ['G'], '2026-03-01', '2026-03-05'), []);
 
         // A scale played once is not ready, at any level.
         const half = J.emptyState();

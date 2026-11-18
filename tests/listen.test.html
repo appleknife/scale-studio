@@ -26,9 +26,10 @@
       // a forward repeat, a tie across a barline, a grace note, a double stop, a
       // rest, a second voice, 1st and 2nd endings — the things MusicXML readers
       // get wrong — and the same score zipped as .mxl.
-      import { readScore, readMxl, sectionOf } from '../src/musicxml.js';
+      import { readScore, readMxl, sectionOf, unroll } from '../src/musicxml.js';
       import { analyzeScore, analyzeFree, vibratoOf, accompanimentOf } from '../src/listen.js';
       import { PitchDetector } from '../src/pitch.js';
+      import { createListenView } from '../src/listenview.js';
 
       const problems = [];
       const log = [];
@@ -67,6 +68,32 @@
         eq('a section is as long as its bars', part.totalQuarters, 9);
         eq('the 2nd ending alone is a section too', sectionOf(score, 4, 4).notes.length > 0, true);
         eq('the whole score is left as it was', score.order.length, 9);
+
+        // The backward repeat may sit on a later numbered ending rather than
+        // the first one. The first pass must still jump back from the first
+        // ending, or the later ending is never reached at all.
+        const lateRepeat = [
+          { forward: true, backward: false, times: 2, endings: null, endingEnds: false },
+          { forward: false, backward: false, times: 2, endings: [1], endingEnds: true },
+          { forward: false, backward: true, times: 2, endings: [2], endingEnds: true },
+        ];
+        eq('a repeat on the 2nd ending plays both endings', unroll(lateRepeat), [0, 1, 0, 2]);
+        const threeEndings = [
+          { forward: true, backward: false, times: 3, endings: null, endingEnds: false },
+          { forward: false, backward: false, times: 3, endings: [1], endingEnds: true },
+          { forward: false, backward: false, times: 3, endings: [2], endingEnds: true },
+          { forward: false, backward: true, times: 3, endings: [3], endingEnds: true },
+        ];
+        eq('three endings with the repeat on the last', unroll(threeEndings), [0, 1, 0, 2, 0, 3]);
+        // An ending with no repeat in its section must not borrow one from a
+        // later section and replay itself.
+        const laterSection = [
+          { forward: false, backward: false, times: 2, endings: [1], endingEnds: true },
+          { forward: false, backward: false, times: 2, endings: null, endingEnds: false },
+          { forward: true, backward: false, times: 2, endings: null, endingEnds: false },
+          { forward: false, backward: true, times: 2, endings: null, endingEnds: false },
+        ];
+        eq('an ending without a repeat does not borrow a later one', unroll(laterSection), [0, 1, 2, 3, 2, 3]);
 
         const mxl = await (await fetch('scores/test-piece.mxl')).arrayBuffer();
         const fromZip = readScore(await readMxl(mxl));
@@ -169,6 +196,44 @@
         log.push(`unclear share: solo ${solo.share.toFixed(2)}, with chord ${along.share.toFixed(2)}`);
         eq('a violin alone is not taken for accompaniment', solo.likely, false);
         eq('a violin over a piano chord is noticed', along.likely, true);
+
+        // A measure number is read straight from the XML attribute. It reaches
+        // the results card as innerHTML, so it must be escaped on the way.
+        const evil = '<img src=x onerror="window.__listenPwned=1">';
+        const attr = evil.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const escapedXml = `<?xml version="1.0"?>
+<score-partwise version="4.0">
+  <work><work-title>Escaping</work-title></work>
+  <part-list><score-part id="P1"><part-name>Violin</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="${attr}">
+      <attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+    </measure>
+    <measure number="2"><note><pitch><step>D</step><octave>4</octave></pitch><duration>4</duration></note></measure>
+  </part>
+</score-partwise>`;
+        const host = document.createElement('section');
+        document.body.appendChild(host);
+        const view = createListenView({
+          root: host,
+          player: () => null,
+          readyViolin: () => Promise.resolve(),
+          openMic: async () => { throw new Error('no mic in the test'); },
+          closeMic: () => {},
+          getMic: () => null,
+          micError: (e) => String(e),
+          onFinish: () => {},
+          onBack: () => {},
+        });
+        await view.__loadXml(escapedXml, 'escaping');
+        const silent = [];
+        for (let i = 0; i < 300; i++) silent.push({ t: i * FR, freq: 0, clarity: 0, rms: 0.0003 });
+        view.__analyse(silent);
+        const resultsEl = host.querySelector('.listen-results');
+        eq('a crafted measure number is not injected as HTML', resultsEl.querySelectorAll('img').length, 0);
+        eq('the crafted measure number is shown as text', resultsEl.textContent.includes(evil), true);
+        view.stop();
       } catch (err) {
         problems.push('exception: ' + err.message + ' ' + (err.stack || '').split('\n')[1]);
       }

@@ -33,6 +33,11 @@
       const log = [];
       fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'started' }) });
 
+      // A passage with no written notes must still produce a number, not NaN.
+      const emptyTarget = analyzeTake([], { sequence: [], octaves: 2 });
+      log.push(`an empty target scores ${emptyTarget.score}`);
+      if (!Number.isFinite(emptyTarget.score)) problems.push('an empty target produced a NaN score');
+
       /* ── 1. Scale data sanity ───────────────────────────────────────── */
 
       function checkScale(card, mode, form, variantIndex = 0) {

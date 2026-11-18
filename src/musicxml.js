@@ -332,8 +332,19 @@ export function unroll(repeats) {
       pass = 1;
       start = i + 1;
     }
-    // the last bar of a final ending closes its section too
+    // The last bar of a numbered ending closes this pass, even when the
+    // backward repeat is printed on a later ending rather than on this bar.
+    // Look ahead for it: before the last pass, jumping back here is the only
+    // way to reach that later ending at all. A section with no repeat still
+    // carries on, as before.
     if (playsHere && r.endingEnds && !r.backward) {
+      const back = repeats.findIndex((x, j) => j > i && x.backward);
+      const repeated = back >= 0 && repeats.slice(start, i + 1).some((x) => x.forward);
+      if (repeated && pass < repeats[back].times) {
+        pass += 1;
+        i = start;
+        continue;
+      }
       pass = 1;
       start = i + 1;
     }

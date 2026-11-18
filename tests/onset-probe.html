@@ -20,7 +20,7 @@
       //
       // Synthetic audio only models the physics — it is not a violin. The sweep
       // below chooses the detector's parameters; the next step is a real recording.
-      import { envelopeTrack, bowBoundaries } from '../src/onsets.js';
+      import { envelopeTrack, bowBoundaries, onsetsFromBuffer } from '../src/onsets.js';
 
       const SR = 44100;
       const lines = [];
@@ -186,10 +186,18 @@
         lines.push(`  minGap ${(minGap * 1000).toFixed(0)} ms — ${cells.join(' · ')}`);
       }
 
+      // The buffer helper must pass the filter settings through, not just hop
+      // and win: a caller supplying two poles and a state must get both back.
+      const filterState = { y: [], prevX: [] };
+      onsetsFromBuffer(new Float32Array(2000), SR, { poles: 2, state: filterState });
+      const forwarded = filterState.y.length === 2 && filterState.prevX.length === 2;
+      lines.push(`${forwarded ? '✓' : '✗'} onsetsFromBuffer forwards the high-pass settings`);
+      const problems = forwarded ? [] : ['onsetsFromBuffer dropped the high-pass settings'];
+
       document.getElementById('out').textContent = lines.join('\n');
       fetch('/result', {
         method: 'POST',
-        body: JSON.stringify({ stage: 'onset-probe', problems: [], log: lines.join('\n') }),
+        body: JSON.stringify({ stage: 'onset-probe', problems, log: lines.join('\n') }),
       });
     </script>
   </body>

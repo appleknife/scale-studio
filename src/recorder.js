@@ -223,6 +223,19 @@ export async function play(blob, { wet = 0.34, offset = 0 } = {}) {
       } catch {
         /* already stopped */
       }
+      // The convolver is shared by every playback, but each one has its own
+      // send. Leaving a spent send connected folds its tail into every later
+      // play, until the reverb keeps getting louder and clips.
+      try {
+        room.disconnect(send);
+      } catch {
+        /* already gone */
+      }
+      try {
+        send.disconnect();
+      } catch {
+        /* already gone */
+      }
     },
     ended,
     duration: buffer.duration,

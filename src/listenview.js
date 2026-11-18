@@ -859,7 +859,7 @@ export function createListenView(deps) {
         const r = a.worst.map(
           (b) =>
             `<li>${b.start != null ? playBtn(b.start, `bar:${b.measure}`) : ''}<span class="listen-weak-text">${t('listen.weakBar', {
-              n: b.number,
+              n: esc(b.number),
               right: b.exact,
               of: b.notes,
             })}</span>${
@@ -937,7 +937,7 @@ export function createListenView(deps) {
 
   const card = (title, html) => `<section class="sprint-card lb-card"><h4>${title}</h4>${html}</section>`;
   const steadyKey = (s) => (s >= 0.85 ? 'listen.steady' : s >= 0.65 ? 'listen.fairlySteady' : 'listen.unsteady');
-  const barList = (bars) => [...new Set(bars.map((b) => b.number))].slice(0, 6).join(', ');
+  const barList = (bars) => esc([...new Set(bars.map((b) => b.number))].slice(0, 6).join(', '));
   const legend = () =>
     `<p class="listen-legend">${['good', 'tune', 'wrong', 'missed']
       .map((k) => `<span><i style="background:${MARK[k]}"></i>${t(`listen.mark.${k}`)}</span>`)

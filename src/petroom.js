@@ -231,7 +231,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     void root.getBoundingClientRect();
     root.classList.add(`is-${name}`);
     const ms = MOVE_MS[name] || 1800;
-    setTimeout(() => root.classList.remove(`is-${name}`), ms);
+    later(() => root.classList.remove(`is-${name}`), ms);
     return ms;
   }
 
@@ -343,7 +343,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       h.style.animationDelay = `${i * 140}ms`;
       g.append(h);
       layers.fx.append(g);
-      setTimeout(() => g.remove(), 1700 + i * 140);
+      later(() => g.remove(), 1700 + i * 140);
     }
   }
 
@@ -359,7 +359,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       s.style.setProperty('--dy', `${Math.sin(a) * rand(28, 44)}px`);
       g.append(s);
       layers.fx.append(g);
-      setTimeout(() => g.remove(), 1300);
+      later(() => g.remove(), 1300);
     }
   }
 
@@ -367,7 +367,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     if (!running || mode !== 'sleep') return;
     const g = node('text', { class: 'fx-zzz', x: pos.x + 22, y: pos.y - (isFish() ? 20 : 60), 'font-size': 13 }, 'z');
     layers.fx.append(g);
-    setTimeout(() => g.remove(), 2600);
+    later(() => g.remove(), 2600);
     later(startZzz, 1300);
   }
 
@@ -376,7 +376,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       const c = node('circle', { class: 'fx-bubble', cx: pos.x - 18 + rand(-3, 3), cy: pos.y - 4, r: rand(2, 3.6), fill: 'none', stroke: '#fff', 'stroke-width': 1.4 });
       c.style.animationDelay = `${i * 260}ms`;
       layers.fx.append(c);
-      setTimeout(() => c.remove(), 2400);
+      later(() => c.remove(), 2400);
     }
   }
 
@@ -393,7 +393,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     b.classList.remove('is-pop');
     void b.offsetWidth;
     b.classList.add('is-pop');
-    bubbleTimer = setTimeout(() => {
+    bubbleTimer = later(() => {
       b.hidden = true;
     }, ms);
   }
@@ -693,9 +693,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     void g.getBoundingClientRect();
     g.classList.add(`trick-${id}`);
     say(line, 2000);
-    setTimeout(() => {
+    later(() => {
       g.classList.remove(`trick-${id}`);
-      if (!running) return;
       hearts(3);
       sparkles(pos.x, pos.y - (isFish() ? 10 : 36), 6);
       later(() => mode === 'happy' && setMode('idle'), 900);
@@ -721,8 +720,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     };
     requestAnimationFrame(roll);
     // …and the pet runs after it, pleased.
-    setTimeout(() => {
-      if (!running) return;
+    later(() => {
       walkTo(to + (to > pos.x ? -24 : 24), FLOOR_Y, () => {
         setMode('happy');
         hop();

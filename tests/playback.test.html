@@ -226,6 +226,44 @@
         for (const shape of shapes) voice.play(shape);
         log.push(`the voice took ${shapes.length} shapes: plain, slurred, accent, staccato, tied`);
 
+        // A sixteenth at 120 is shorter than attack + 0.02. The old sustain
+        // point was then scheduled after the fade to silence, so the gain
+        // jumped back up and the note ended in a click. A stub can read the
+        // automation without needing the audio thread to advance.
+        {
+          const events = [];
+          let gains = 0;
+          const param = (name) => ({
+            value: 0,
+            setValueAtTime: (_v, at) => events.push([name, 'set', at]),
+            linearRampToValueAtTime: (_v, at) => events.push([name, 'ramp', at]),
+            exponentialRampToValueAtTime() {},
+          });
+          const node = (name) => ({
+            connect: (dest) => dest,
+            disconnect() {},
+            start() {}, stop() {},
+            gain: param(name + '.gain'),
+            frequency: param(name + '.freq'),
+            detune: param(name + '.detune'),
+            Q: { value: 0 },
+            type: '',
+          });
+          const stub = {
+            sampleRate: 44100,
+            createGain: () => node('gain' + ++gains),
+            createBiquadFilter: () => node('filter'),
+            createOscillator: () => node('osc'),
+            createBufferSource: () => node('scrape'),
+            createBuffer: (_ch, len) => ({ getChannelData: () => new Float32Array(len) }),
+          };
+          const at = 10;
+          const duration = 0.0563;
+          bowedVoice(stub, node('dest')).play({ midi: 69, at, duration, gain: 0.7, staccato: true });
+          const late = events.some(([n, kind, time]) => n === 'gain1.gain' && kind === 'set' && time > at + duration + 1e-9);
+          check(!late, 'a short staccato note re-opens its gain after the note has ended');
+        }
+
         log.push(`schedule: ${plan.notes.length} notes over ${plan.seconds} s at a quarter = 60`);
         log.push(`crescendo ${rising.map((g) => g.toFixed(2)).join(' → ')}`);
       }

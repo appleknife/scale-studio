@@ -184,23 +184,19 @@ export async function loadBank(ctx, base = 'samples/', bank = emptyBank()) {
   const pending = bank.index.samples.filter((s) => !bank.buffers.has(s.id));
   await Promise.all(
     pending.map(async (sample) => {
-      const response = await fetch(bank.base + sample.file, { cache: 'force-cache' });
-      if (!response.ok) throw new Error(`sample: ${sample.file}`);
-      const bytes = await response.arrayBuffer();
-      let buffer;
       try {
-        buffer = await decodeOne(ctx, bytes);
+        const response = await fetch(bank.base + sample.file, { cache: 'force-cache' });
+        if (!response.ok) throw new Error(`sample: ${sample.file}`);
+        const bytes = await response.arrayBuffer();
+        const buffer = await decodeOne(ctx, bytes);
+        bank.buffers.set(sample.id, buffer);
       } catch {
-        // A browser without the AAC decoder does not always *reject* — some
-        // leave decodeAudioData unsettled for ever — and one take like that used
-        // to hold the whole bank waiting, so the recorded violin never arrived
-        // at all. A take that cannot be decoded is left out instead: the note it
-        // would have covered falls through to the synthesiser, which is the
-        // fallback a missing take already uses.
+        // A missing file, a browser without the AAC decoder, or one that never
+        // settles decodeAudioData: leave this take out rather than rejecting the
+        // whole bank. The note it covers falls through to the synthesiser, which
+        // is the fallback a missing or undecodable take already uses.
         bank.failed = (bank.failed || 0) + 1;
-        return;
       }
-      bank.buffers.set(sample.id, buffer);
     }),
   );
   return bank;

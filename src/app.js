@@ -746,8 +746,10 @@ function spinReels(animate = true) {
     const token = String(Number(reel.dataset.spin || 0) + 1);
     reel.dataset.spin = token;
 
+    let landed = false;
     const land = () => {
-      if (reel.dataset.spin !== token) return;
+      if (landed || reel.dataset.spin !== token) return;
+      landed = true;
       track.style.transform = `translateY(-${distance}px)`;
       reel.classList.add('is-landed');
       sig.textContent = `${keyGlyphs(target)} · ${t('oct.short', { n: target.octaves })}`;
@@ -808,6 +810,10 @@ function nextTestScale() {
   state.scale = state.test.scales[state.test.index];
   renderPractice();
   updateTestBar();
+  // A locked screen or a call can stall the microphone in the gap between
+  // scales. beginTake() would arm on a dead stream and wait for a note that
+  // never arrives; startListening() closes a stalled mic and reopens it.
+  if (state.mic?.stalled) return startListening();
   beginTake();
 }
 
@@ -2037,12 +2043,17 @@ function stopSightTake(analyse = true) {
   const keep = Boolean(analyse && take && take.started);
   if (take?.rec) {
     const rec = take.rec;
+    const passage = sight.passage;
     take.rec = null;
     rec.stop().then((blob) => {
       if (!keep || !blob || sight.take) return;
+      // A new page may have been drawn while MediaRecorder was stopping. This
+      // audio belongs to the page it started on, not to whatever is on screen
+      // now, where it would put the playhead in the wrong bars.
+      if (sight.passage !== passage) return;
       // Where the take began in the recording, in seconds — the bars are found
       // from there (see sightReplayOffset).
-      sight.replay = { blob, lead: Math.max(0, ((take.perfT0 || rec.startedAt) - rec.startedAt) / 1000), result: sight.result, passage: sight.passage };
+      sight.replay = { blob, lead: Math.max(0, ((take.perfT0 || rec.startedAt) - rec.startedAt) / 1000), result: sight.result, passage };
       paintReplayButton();
     });
   }
@@ -3731,7 +3742,12 @@ async function importLog(file) {
     return;
   }
   const before = Journal.totalDays(journal);
-  Object.assign(journal, Journal.merge(journal, copy.state));
+  try {
+    Object.assign(journal, Journal.merge(journal, copy.state));
+  } catch {
+    el.logStatus.textContent = t('log.loadBad');
+    return;
+  }
   saveJournal();
   renderLog();
   const added = Journal.totalDays(journal) - before;
@@ -4053,6 +4069,17 @@ function paintInkTools({ tool, canUndo }) {
  * microphone that rolls off the fundamental leaves a reading that wanders. At
  * 4096 there are fourteen periods to agree on, and the reading settles.
  */
+/** iOS routes playback by audio session; older browsers have no such API. */
+function setAudioSession(type) {
+  if ('audioSession' in navigator) {
+    try {
+      navigator.audioSession.type = type;
+    } catch {
+      /* older Safari — nothing to set */
+    }
+  }
+}
+
 async function openMic(emit, { windowSize = 2048 } = {}) {
   if (!navigator.mediaDevices?.getUserMedia) {
     const err = new Error('no-media');
@@ -4066,13 +4093,7 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
   // treated as a phone call: routed to the earpiece, ducked, or interrupted by
   // whatever else the phone wants to play. Not every browser has the Audio
   // Session API, hence the feature test.
-  if ('audioSession' in navigator) {
-    try {
-      navigator.audioSession.type = 'play-and-record';
-    } catch {
-      /* older Safari — nothing to set */
-    }
-  }
+  setAudioSession('play-and-record');
 
   // Create (and unlock) the audio context *inside* the click handler. iOS Safari
   // only lets audio start from a gesture, and awaiting getUserMedia first can
@@ -4095,6 +4116,10 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     });
   } catch (err) {
     ctx.close().catch(() => {});
+    // The session was set before asking for the stream. If permission was
+    // denied, nothing will close the stream and hand it back — do it here, or
+    // later playback stays routed to the earpiece.
+    setAudioSession('auto');
     throw err;
   }
 
@@ -4215,13 +4240,7 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
       // its *playback* to the earpiece — quietly — until capture starts again
       // (WebKit bug 218012, comment 49, seen on iOS 18.6), which is the example
       // and the metronome coming out of the wrong place after a take.
-      if ('audioSession' in navigator) {
-        try {
-          navigator.audioSession.type = 'auto';
-        } catch {
-          /* older Safari — nothing to hand back */
-        }
-      }
+      setAudioSession('auto');
     },
     /** Try to come back from an interruption — a call, a locked screen, a tab
      *  switch. iOS moves the context to "interrupted" and leaves it there. */
@@ -4593,6 +4612,7 @@ function beginTake() {
     ),
   };
   clearFollowMarks();
+  const armed = state.take;
 
   setStatus(true, t('status.listening'));
   el.listenHint.textContent = state.test ? t('hint.beginTest') : t('hint.playing');
@@ -4610,9 +4630,12 @@ function beginTake() {
 
   // If nothing at all reaches the microphone, say so rather than looking
   // broken — usually the wrong input is selected for the site.
+  // These hints belong to this take, not to whatever is armed when the timer
+  // finally fires — a quick finish and "Play it again" would otherwise show
+  // "no sound" on the fresh take almost at once.
   setTimeout(() => {
     const take = state.take;
-    if (state.phase === 'armed' && take && !take.started && (take.peak || 0) < 0.002) {
+    if (state.phase === 'armed' && take === armed && !take.started && (take.peak || 0) < 0.002) {
       el.listenHint.textContent = t('hint.noSound');
     }
   }, 4500);
@@ -4622,7 +4645,7 @@ function beginTake() {
   if (state.test) {
     setTimeout(() => {
       const take = state.take;
-      if (state.phase === 'armed' && take && !take.started) {
+      if (state.phase === 'armed' && take === armed && !take.started) {
         el.listenHint.textContent = t('hint.takeYourTime');
       }
     }, 45000);
@@ -5417,7 +5440,7 @@ renderLogBanner();
 // can be asked before anything personal appears.
 renderWho();
 
-if (params.has('help')) el.helpDialog.showModal();
+if (params.has('help') && el.helpDialog.showModal) el.helpDialog.showModal();
 if (params.has('pet')) openPet();
 el.openPetBtn.addEventListener('click', openPet);
 el.petBack.addEventListener('click', goHome);

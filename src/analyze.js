@@ -436,7 +436,8 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     else if (r.status === 'octave') credit += 0.4;
     else if (r.status === 'wrong') credit += 0.1;
   }
-  const accuracy = clamp(credit / expected.length - Math.min(0.08, extras.length * 0.015));
+  // An empty target (a passage with no written notes) would make the score NaN.
+  const accuracy = clamp(credit / Math.max(1, expected.length) - Math.min(0.08, extras.length * 0.015));
 
   // --- Intonation ---------------------------------------------------------
   const tuned = noteResults.filter((r) => r.status === 'exact');

@@ -36,7 +36,10 @@
       );
       // Beams are filled quads now, not thick lines: read the inner edge (the
       // first two vertices) of every path the renderer marked as a beam.
-      const beams = [...svg.querySelectorAll('path.score-beam')]
+      // A lone sixteenth carries a short *stub* of second beam whose whole
+      // purpose is to trail away from the stem into its group. Its free end is
+      // not meant to land on a stem; only the full beams are checked here.
+      const beams = [...svg.querySelectorAll('path.score-beam:not(.score-beam-stub)')]
         .map((p) => (p.getAttribute('d') || '').match(/-?\d+(\.\d+)?/g) || [])
         .filter((n) => n.length === 8)
         .map((n) => ({

@@ -154,6 +154,9 @@ export function bowBoundaries(
  * from the analyser instead.
  */
 export function onsetsFromBuffer(samples, sampleRate, options = {}) {
-  const { hop = 0.005, win = 0.02, ...rest } = options;
-  return bowBoundaries(envelopeTrack(samples, sampleRate, { hop, win }), rest).map((o) => o.t);
+  const { hop = 0.005, win = 0.02, sensitivity, minGap, metric, ...filter } = options;
+  return bowBoundaries(
+    envelopeTrack(samples, sampleRate, { hop, win, ...filter }),
+    { sensitivity, minGap, metric },
+  ).map((o) => o.t);
 }

@@ -620,8 +620,12 @@ export function clockNow(date = new Date()) {
 }
 
 const ITEM_ART = {
-  window(time) {
+  window(time, key = '') {
     const h = Number.isFinite(Number(time)) ? ((Number(time) % 24) + 24) % 24 : 12;
+    // The room and the shop tile can both be on the page at once. Fixed ids
+    // would make both url(#…) lookups resolve to whichever was drawn first.
+    const skyId = `win-sky${key}`;
+    const clipId = `win-clip${key}`;
     const s = skyAt(h);
     const r = (n) => Math.round(n * 10) / 10;
     // The sun crosses from the left of the pane at six to the right by half past
@@ -668,10 +672,10 @@ const ITEM_ART = {
         : '';
     return `
       <g class="room-window">
-        <linearGradient id="win-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.top}"/><stop offset="1" stop-color="${s.bottom}"/></linearGradient>
-        <rect x="54" y="44" width="84" height="74" rx="8" fill="url(#win-sky)"/>
-        <clipPath id="win-clip"><rect x="54" y="44" width="84" height="74" rx="8"/></clipPath>
-        <g clip-path="url(#win-clip)">${stars}${lights}${clouds}
+        <linearGradient id="${skyId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${s.top}"/><stop offset="1" stop-color="${s.bottom}"/></linearGradient>
+        <rect x="54" y="44" width="84" height="74" rx="8" fill="url(#${skyId})"/>
+        <clipPath id="${clipId}"><rect x="54" y="44" width="84" height="74" rx="8"/></clipPath>
+        <g clip-path="url(#${clipId})">${stars}${lights}${clouds}
           <path d="M54 118 q20 -16 42 -6 q22 -14 42 0 v10 h-84 z" fill="${mix('#9fd39a', '#2d5a4a', s.dark)}"/></g>
         <rect x="54" y="44" width="84" height="74" rx="8" fill="none" stroke="#fff" stroke-width="7"/>
         <path d="M96 44 v74 M54 81 h84" stroke="#fff" stroke-width="4"/>
@@ -1057,7 +1061,7 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     ${has('lights') ? ITEM_ART.lights() : ''}
     ${has('bunting') ? ITEM_ART.bunting() : ''}
     ${has('xmas-garland') ? ITEM_ART['xmas-garland']() : ''}
-    ${has('window') ? item('window', ITEM_ART.window(hour) + snow) : ''}
+    ${has('window') ? item('window', ITEM_ART.window(hour, '-room') + snow) : ''}
     ${has('xmas-wreath') ? item('xmas-wreath', ITEM_ART['xmas-wreath']()) : ''}
     ${has('xmas-stockings') ? item('xmas-stockings', ITEM_ART['xmas-stockings']()) : ''}
     ${has('picture') ? item('picture', ITEM_ART.picture()) : ''}
@@ -1148,7 +1152,7 @@ export function itemIcon(id) {
     return `<svg class="item-icon" viewBox="0 0 60 44" aria-hidden="true"><defs>${w.pattern}</defs>
       <rect width="60" height="44" rx="6" fill="${w.fill}"/></svg>`;
   }
-  const art = id === 'window' ? ITEM_ART.window(12) : ITEM_ART[id] ? ITEM_ART[id]() : '';
+  const art = id === 'window' ? ITEM_ART.window(12, '-icon') : ITEM_ART[id] ? ITEM_ART[id]() : '';
   return `<svg class="item-icon" viewBox="${views[id] || '0 0 400 300'}" aria-hidden="true">${art}</svg>`;
 }
 

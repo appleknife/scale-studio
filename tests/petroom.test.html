@@ -19,9 +19,21 @@
       // with the avatar in the room once left the room empty: the avatar was being
       // placed in front of the pet from the picture before.)
       import * as Pet from '../src/pet.js';
+      import { roomMarkup, itemIcon } from '../src/petart.js';
 
       const problems = [];
       const log = [];
+
+      // A window in the room and a window in the decor shop share the page.
+      // Their gradient and clip ids must not collide, or the shop icon picks
+      // up the room's daytime/night-time sky.
+      {
+        const both = `<svg>${roomMarkup({ placed: ['window'], hour: 22 })}</svg><svg>${itemIcon('window')}</svg>`;
+        const ids = [...both.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+        const dupes = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+        if (dupes.length) problems.push(`duplicate svg ids: ${dupes.join(', ')}`);
+        else log.push('the room window and its shop icon use distinct ids');
+      }
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
       const kept = { ...localStorage };
       const frame = document.getElementById('app');

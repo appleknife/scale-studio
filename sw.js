@@ -29,8 +29,9 @@ const SHELL = 'scale-studio-shell-' + VERSION;
 // next, so their cache is not named after VERSION: a new version used to throw
 // away 2 MB the device had been asked to keep, while the page went on saying it
 // was stored. Bump SAMPLES_REV by hand when a take is re-recorded or the file in
-// vendor/ is replaced.
-const SAMPLES_REV = '1';
+// vendor/ is replaced, and bump SAMPLES_REV in src/offline.js at the same time:
+// that one stamps the "stored" flag so devices are offered the new download.
+const SAMPLES_REV = '2';
 const SAMPLES = 'scale-studio-samples-r' + SAMPLES_REV;
 
 const BASE = [

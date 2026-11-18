@@ -79,7 +79,7 @@ export function recordTake(state, take) {
   const entry = {
     // A stable identity for this take, so one can be deleted later: two takes can
     // share a timestamp to the millisecond, and a timestamp is not a key.
-    uid: take.uid || `${Date.now().toString(36)}-${(state.takes.length + 1).toString(36)}`,
+    uid: take.uid || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
     at: take.at || new Date().toISOString(),
     key: take.key || dayKey(),
     kind: take.kind || 'scale',
@@ -561,7 +561,9 @@ export function readyBetween(state, ids = [], from = dayKey(), to = dayKey()) {
     if (!entry || !entry.days || entry.days.length < READY_DAYS) return false;
     // The day it *became* ready — the second clean day — not the latest day it
     // was played, or a scale polished for a month would count every week.
-    const completeOn = entry.days[READY_DAYS - 1];
+    // Imports and out-of-order takes can leave days in record order, so find
+    // the second earliest rather than trusting the array's order.
+    const completeOn = entry.days.slice().sort()[READY_DAYS - 1];
     return Boolean(completeOn) && completeOn >= from && completeOn <= to;
   });
 }
@@ -899,6 +901,10 @@ export function parse(text) {
     const state = { ...emptyState(), ...data.state };
     if (!state.days || typeof state.days !== 'object') return null;
     if (!Array.isArray(state.rests) || !state.scales || typeof state.scales !== 'object') return null;
+    // merge() spreads takes, so a non-array here would throw after the file had
+    // been accepted. Older logs carried no sight record; that one is optional.
+    if (!Array.isArray(state.takes)) return null;
+    if (!state.sight || typeof state.sight !== 'object' || Array.isArray(state.sight)) state.sight = {};
     return { profile: typeof data.profile === 'string' ? data.profile : null, state };
   } catch {
     return null;
@@ -959,7 +965,10 @@ export function merge(into, other) {
   const takes = [];
   for (const take of [...(into.takes || []), ...((other && other.takes) || [])]) {
     if (!take || typeof take !== 'object') continue;
-    const id = take.uid || take.at;
+    // Pre-uid takes have no identity of their own. Two of them can share a
+    // millisecond, so the timestamp alone is not a key — include what the take
+    // was, or a second take in the same instant is silently thrown away.
+    const id = take.uid || [take.at, take.kind, take.id, take.key, take.score].join('|');
     if (id && seen.has(id)) continue;
     if (id) seen.add(id);
     takes.push(take);

@@ -199,7 +199,10 @@ export function bowedVoice(ctx, destination) {
       const freq = 440 * Math.pow(2, (midi - 69) / 12);
       const attack = legato ? 0.02 : accent ? 0.012 : 0.045;
       const release = staccato ? 0.05 : tied ? 0.05 : 0.18;
-      const hold = Math.max(attack + 0.02, duration - release);
+      // A fast staccato note can be shorter than attack + 0.02. Left alone,
+      // the sustain point lands after the fade to silence, so the gain jumps
+      // back up and the note ends in a click. Never schedule it past the end.
+      const hold = Math.min(duration, Math.max(attack + 0.02, duration - release));
 
       const amp = ctx.createGain();
       amp.gain.setValueAtTime(0, at);

@@ -6,11 +6,13 @@
 
 const SAMPLES_KEY = 'scaleStudio.samplesOffline';
 const SAMPLE_BASE = 'samples/';
-// What the flag holds once a download has finished. It was 'yes' while the
-// service worker fetched the takes without keeping them, so a 'yes' from then
-// describes a cache that is empty: it no longer counts, and those devices are
-// offered the download again.
-const STORED = 'kept-1';
+// What the flag holds once a download has finished. It carries the same
+// revision as SAMPLES_REV in sw.js: a re-recorded take gets a new sample cache
+// there and a new flag here, so devices holding the old files are offered the
+// download again instead of being told they are ready. Keep the two in step.
+// ('yes' from an older build described an empty cache and no longer counts.)
+const SAMPLES_REV = '2';
+const STORED = 'kept-' + SAMPLES_REV;
 
 let registration = null;
 let onUpdate = null;
@@ -73,7 +75,9 @@ export function samplesStored() {
  * and the flag is only set when all of them arrived.
  */
 export async function downloadSamples(onProgress) {
-  const index = await (await fetch(`${SAMPLE_BASE}index.json`, { cache: 'force-cache' })).json();
+  // The list is what tells us which takes a revision needs, so it has to be
+  // the current one, not a copy left in the browser's HTTP cache.
+  const index = await (await fetch(`${SAMPLE_BASE}index.json`, { cache: 'no-store' })).json();
   const files = [index, ...index.samples];
   const total = files.length;
   let done = 0;

@@ -134,6 +134,11 @@
         check(/startOffline\(/.test(appJs), 'app.js never registers the worker');
         check(/downloadSamples\(/.test(appJs), 'nothing can download the violin for offline use');
         check(/samplesStored\(/.test(appJs), 'the app cannot tell whether the violin is stored');
+        const offJs = await (await fetch('../src/offline.js', { cache: 'no-store' })).text();
+        const workerRev = (swText.match(/SAMPLES_REV = '(\d+)'/) || [])[1];
+        const pageRev = (offJs.match(/SAMPLES_REV = '(\d+)'/) || [])[1];
+        check(Boolean(workerRev) && workerRev === pageRev, `sample revisions out of step: worker ${workerRev}, page ${pageRev}`);
+        check(/STORED = 'kept-' \+ SAMPLES_REV/.test(offJs), 'the stored flag does not carry the sample revision');
         log.push('the app registers the worker, can store the violin, and reports what it holds');
 
         document.getElementById('report').textContent = problems.length

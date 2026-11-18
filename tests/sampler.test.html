@@ -21,6 +21,7 @@
         rateFor,
         noteShape,
         loopPasses,
+        loadBank,
         LEVEL_GAIN,
         LEVEL_TILT,
         BANK_GAIN,
@@ -357,6 +358,38 @@
           check(underSame.want <= 0.7, 'a short note rang longer than the 0.7 s cap');
         }
       }
+
+      // One 404 used to reject the whole Promise.all, so the recorded violin
+      // never loaded even when the other takes were fine. A missing file must
+      // only cost itself.
+      {
+        const realFetch = window.fetch;
+        const realEncoder = window.AudioEncoder;
+        let fetches = 0;
+        window.AudioEncoder = { isConfigSupported: async () => ({ supported: true }) };
+        window.fetch = async (url) => {
+          fetches += 1;
+          return String(url).includes('index.json')
+            ? new Response(JSON.stringify({ samples: [{ id: 'gone', file: 'gone.m4a' }] }), { status: 200 })
+            : new Response('', { status: 404 });
+        };
+        const stubCtx = {
+          decodeAudioData: (_bytes, _ok, bad) => {
+            bad(new Error('no decoder in the test'));
+          },
+        };
+        try {
+          const bank = await loadBank(stubCtx, 'samples/');
+          check(fetches === 2, `the missing-sample test fetched ${fetches} files, not 2`);
+          check(bank.failed === 1, `one missing sample counted as ${bank.failed} failures`);
+        } catch (err) {
+          problems.push(`a missing sample rejected the whole bank: ${err.message}`);
+        } finally {
+          window.fetch = realFetch;
+          window.AudioEncoder = realEncoder;
+        }
+      }
+
       document.getElementById('report').textContent = problems.length
         ? `${problems.length} problems\n\n${[...new Set(problems)].join('\n')}\n\n${log.join('\n')}`
         : `SAMPLER OK\n${log.join('\n')}`;

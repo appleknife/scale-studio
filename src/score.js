@@ -930,7 +930,7 @@ function drawSystem(
       const oy = -ux * dir;
       const GAP2 = 3.4; // white between the two beams of a sixteenth run
 
-      const bar = (x1, y1, x2, y2) => {
+      const bar = (x1, y1, x2, y2, stub = false) => {
         // a hair of overlap, so the stem and the beam never leave a pale seam
         const inset = 0.35;
         const sx1 = x1 - ox * inset;
@@ -947,7 +947,7 @@ function drawSystem(
           y1: Math.max(...by) + 1,
         });
         return (
-          `<path class="score-beam" d="M${f(sx1)} ${f(sy1)} L${f(sx2)} ${f(sy2)} ` +
+          `<path class="score-beam${stub ? ' score-beam-stub' : ''}" d="M${f(sx1)} ${f(sy1)} L${f(sx2)} ${f(sy2)} ` +
           `L${f(sx2 + ox * BEAM)} ${f(sy2 + oy * BEAM)} ` +
           `L${f(sx1 + ox * BEAM)} ${f(sy1 + oy * BEAM)} Z" fill="${INK}"/>`
         );
@@ -976,7 +976,7 @@ function drawSystem(
           const slope = ux ? uy / ux : 0;
           const stub = 11;
           const y0 = beam.at(run[0]) + dy2;
-          part.push(bar(from, y0, from + toward * stub, y0 + slope * toward * stub));
+          part.push(bar(from, y0, from + toward * stub, y0 + slope * toward * stub, true));
         } else {
           part.push(bar(from, beam.at(run[0]) + dy2, to, beam.at(run[run.length - 1]) + dy2));
         }
