@@ -13,12 +13,12 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611181900';
-import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181900';
-import * as Vibrato from './vibrato.js?v=202611181900';
-import { bowedVoice } from './playback.js?v=202611181900';
-import { t } from './i18n.js?v=202611181900';
-import { hearLevel } from './pitch.js?v=202611181900';
+import * as Trill from './trill.js?v=202611181930';
+import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181930';
+import * as Vibrato from './vibrato.js?v=202611181930';
+import { bowedVoice } from './playback.js?v=202611181930';
+import { t } from './i18n.js?v=202611181930';
+import { hearLevel } from './pitch.js?v=202611181930';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -320,6 +320,11 @@ export function createTrillView(deps) {
     gain.gain.value = strong ? 3.2 : 2.4;
     src.connect(filter).connect(gain).connect(audio.out);
     src.start(Math.max(ctx.currentTime, when));
+    if (run) {
+      run.ticks = (run.ticks || []).filter((x) => x.endAt > ctx.currentTime);
+      src.endAt = Math.max(ctx.currentTime, when) + 0.06;
+      run.ticks.push(src);
+    }
   }
 
   /**
@@ -341,6 +346,7 @@ export function createTrillView(deps) {
   }
 
   async function start() {
+    if (run) stopRun();
     const mine = (ticket += 1);
     // A trill travels between two notes; a vibrato has one stopped centre note
     // and carries its own key (string:position:finger:placement).
@@ -367,6 +373,7 @@ export function createTrillView(deps) {
       takeFrom: 0,
       takeTo: 0,
       dot: null,
+      ticks: [], // clicks handed to the audio clock, so a stopped take can silence them
     };
     panel = 'play';
     paint();
@@ -385,19 +392,37 @@ export function createTrillView(deps) {
       body.prepend(note);
       return;
     }
-    if (mine !== ticket) {
-      deps.closeMic();
-      return;
-    }
+    // Overtaken (Stop, or another Start): the newer take owns the microphone now,
+    // and closing it here would leave that take waiting on a dead one forever.
+    if (mine !== ticket) return;
     listening = true;
   }
 
-  function stopRun() {
+  /**
+   * Ends a take. The microphone stays open (Stop then Start is the commonest
+   * restart, and closing and reopening at once is what iOS handles worst);
+   * leaving the screen hands it back, and a microphone that went quiet is
+   * closed so the next Start gets a fresh one.
+   */
+  function stopRun({ closeMic = false } = {}) {
     ticket += 1;
     listening = false;
     cancelAnimationFrame(raf);
-    if (run) deps.closeMic();
+    silenceTicks();
+    if (closeMic) deps.closeMic();
     run = null;
+  }
+
+  /** Clicks already handed to the audio clock for a take that has ended. */
+  function silenceTicks() {
+    for (const src of run?.ticks || []) {
+      try {
+        src.stop();
+      } catch {
+        /* not started yet, or done — either way silent now */
+      }
+    }
+    if (run) run.ticks = [];
   }
 
   /** One frame from the microphone. */
@@ -631,12 +656,14 @@ export function createTrillView(deps) {
       g.lineWidth = 2 * k;
       g.stroke();
     }
+    cancelAnimationFrame(raf);
     raf = requestAnimationFrame(draw);
   }
 
   function finish() {
     listening = false;
     cancelAnimationFrame(raf);
+    silenceTicks();
     // The microphone stays open for Again; leaving the screen closes it.
     const day = new Date().toISOString().slice(0, 10);
     let result;
@@ -1028,7 +1055,7 @@ export function createTrillView(deps) {
     /** The microphone went quiet under a take (iOS took the audio away). */
     micStalled() {
       if (!run) return;
-      stopRun();
+      stopRun({ closeMic: true });
       panel = 'pick';
       paint();
       const note = document.createElement('p');

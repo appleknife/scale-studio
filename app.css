@@ -6236,6 +6236,7 @@ select,
 }
 
 .sprint-picker-wrap {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -7876,4 +7877,45 @@ select,
 
 .tray-item.is-short.is-picked {
   opacity: 1;
+}
+
+/* Note Sprint picker: the notes a finger is about to change, and the bubble
+   above it naming them. */
+.sprint-cell.is-preview ellipse {
+  stroke: #1f4d3c;
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3;
+}
+
+.sprint-loupe {
+  position: absolute;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: #2f5d4e;
+  color: #fff;
+  font: 700 17px var(--sans);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  z-index: 3;
+}
+
+.sprint-loupe.is-off {
+  background: #6d6259;
+}
+
+.sprint-loupe::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-bottom: 0;
+  border-top-color: #2f5d4e;
+}
+
+.sprint-loupe.is-off::after {
+  border-top-color: #6d6259;
 }
