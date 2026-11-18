@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611181955';
-import { currentSeason } from './season.js?v=202611181955';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611181955';
+import * as Pet from './pet.js?v=202611182050';
+import { currentSeason } from './season.js?v=202611182050';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611182050';
 import {
   petMarkup,
   eggMarkup,
@@ -30,10 +30,11 @@ import {
   itemIcon,
   petIcon,
   petSilhouette,
+  lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611181955';
-import { t, getLang } from './i18n.js?v=202611181955';
+} from './petart.js?v=202611182050';
+import { t, getLang } from './i18n.js?v=202611182050';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -51,6 +52,7 @@ const SOUNDS = {
   cat: ['pet.say.cat1', 'pet.say.cat2'],
   hamster: ['pet.say.hamster1', 'pet.say.hamster2'],
   chicken: ['pet.say.chicken1', 'pet.say.chicken2'],
+  hen: ['pet.say.hen1', 'pet.say.hen2'], // the chick, grown up, has found her cluck
   fish: ['pet.say.fish1', 'pet.say.fish2'],
   rabbit: ['pet.say.rabbit1', 'pet.say.rabbit2'],
   koala: ['pet.say.koala1', 'pet.say.koala2'],
@@ -112,6 +114,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   let skyStep = -1; // which five minutes the window was last painted for
 
   // The time the room goes by: the clock, or `?hour=21` to see the evening at noon.
+  /** What to call an animal: a chick that has grown up is a hen. */
+  const kindOf = (a) => t(`pet.kind.${lookOf(a.species, Pet.stageOf(a))}`);
   const timeNow = () => (Number.isFinite(hour) ? hour : clockNow());
   const season = currentSeason(); // what the shop has on its shelves just now
   // The bowl and the bed are wherever they have been dragged to.
@@ -185,7 +189,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       drawAvatar();
       layers.petPos = node('g', { class: 'pet-pos' });
       layers.petFlip = node('g', { class: 'pet-flip' });
-      layers.pet = node('g', { class: 'pet-hit', role: 'button', tabindex: '0', 'aria-label': t('pet.aria.pat', { name: pet.pet.name || t(`pet.kind.${pet.pet.species}`) }) }, petMarkup(pet.pet.species, pet.pet.variant));
+      layers.pet = node('g', { class: 'pet-hit', role: 'button', tabindex: '0', 'aria-label': t('pet.aria.pat', { name: pet.pet.name || kindOf(pet.pet) }) }, petMarkup(pet.pet.species, pet.pet.variant, Pet.stageOf(pet.pet)));
       layers.petFlip.append(layers.pet);
       layers.petPos.append(layers.petFlip);
       layers.stage.append(layers.petPos);
@@ -573,7 +577,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         return;
       }
       hearts(2);
-      say(t(pick(['pet.say.whee', 'pet.say.again', ...SOUNDS[pet.pet.species]])), 1800);
+      say(t(pick(['pet.say.whee', 'pet.say.again', ...SOUNDS[lookOf(pet.pet.species, Pet.stageOf(pet.pet))]])), 1800);
       later(() => mode === 'happy' && !held && setMode('idle'), 1400);
     };
     if (fall < 2) {
@@ -706,7 +710,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     hop();
     hearts(3);
     if (isFish()) bubbles();
-    say(t(pick(SOUNDS[pet.pet.species])));
+    say(t(pick(SOUNDS[lookOf(pet.pet.species, Pet.stageOf(pet.pet))])));
     later(() => mode === 'happy' && setMode('idle'), 1500);
   }
 
@@ -924,7 +928,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   function paintHead() {
     if (pet.pet && pet.pet.name) {
       els.title.textContent = pet.pet.name;
-      els.lead.textContent = t('pet.lead.pet', { kind: t(`pet.kind.${pet.pet.species}`) });
+      els.lead.textContent = t('pet.lead.pet', { kind: kindOf(pet.pet) });
     } else {
       els.title.textContent = t('pet.title');
       els.lead.textContent = pet.pet
@@ -1176,8 +1180,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
             ? `<span class="tray-cost">${t('pet.bring.egg')}</span>`
             : `<span class="tray-cost is-act">${t('pet.bring')}</span>`;
         return `<button class="tray-item pet-card${here ? ' is-out' : ''}${a.variant === 'rare' ? ' is-rare' : ''}" type="button" ${here || egg ? 'disabled' : `data-friend="${index}"`}>
-          ${petIcon(a.species, '', a.variant)}
-          <span class="tray-name">${esc(a.name || t(`pet.kind.${a.species}`))}</span>
+          ${petIcon(a.species, '', a.variant, Pet.stageOf(a))}
+          <span class="tray-name">${esc(a.name || kindOf(a))}</span>
           <span class="tray-stage">${t(`pet.stage.${Pet.stageOf(a)}`)}${Pet.tricksOf(a).length ? ` · ★ ${Pet.tricksOf(a).length}` : ''}</span>
           ${action}</button>`;
       })
@@ -1535,7 +1539,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       hearts(5);
       hop();
       setMode('happy');
-      say(t(stage === 'grown' ? 'pet.grew.grown' : 'pet.grew.kid'), 3000);
+      say(t(stage === 'grown' ? (lookOf(pet.pet.species, 'grown') === 'hen' ? 'pet.grew.hen' : 'pet.grew.grown') : 'pet.grew.kid'), 3000);
       later(() => {
         busy = false;
         setMode('idle');
@@ -1660,10 +1664,14 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     earnPractice,
     earnRecording,
     progressLine,
+    /** Whether the pet is a chicken (which grows up into a hen). */
+    isChick() {
+      return Pet.loadPet(profileId()).pet?.species === 'chicken';
+    },
     /** The pet's portrait (or its egg), for the toast. */
     portrait() {
       const p = Pet.loadPet(profileId());
-      if (p.pet) return petIcon(p.pet.species, '', p.pet.variant);
+      if (p.pet) return petIcon(p.pet.species, '', p.pet.variant, Pet.stageOf(p.pet));
       if (p.egg) return `<svg class="pet-icon" viewBox="14 18 72 82" aria-hidden="true">${eggMarkup(p.egg.species, Math.min(3, p.egg.warmth))}</svg>`;
       return '';
     },

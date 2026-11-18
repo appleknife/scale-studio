@@ -24,6 +24,8 @@ const PALETTE = {
   dog: { body: '#f4ddc0', dark: '#8a5d3b', ear: '#c08b5c', spot: '#e8c49c', snout: '#fff8ee' },
   hamster: { body: '#f3b76a', dark: '#9a6226', belly: '#fff3df', inner: '#f6a7a0' },
   chicken: { body: '#ffe27c', dark: '#b8891c', wing: '#ffd14a', comb: '#f2665c', beak: '#f7a234' },
+  // the chick grown up: a russet hen
+  hen: { body: '#e9a562', dark: '#87501f', wing: '#d38a4c', belly: '#f8d6a6', tail: '#a95d2c', comb: '#ea4a3f', beak: '#f4b23a' },
   fish: { body: '#ff9e69', dark: '#b9542a', fin: '#ffc79d', scale: '#ffbe93' },
   rabbit: { body: '#f6ede2', dark: '#9c8672', belly: '#ffffff', inner: '#f8b5b5' },
   koala: { body: '#c5c9d1', dark: '#6f7682', belly: '#eef0f3', inner: '#f3b9c0', nose: '#4a4550' },
@@ -38,6 +40,8 @@ const RARE = {
   dog: { body: '#d6e8f7', dark: '#47678a', ear: '#8fb2d6', spot: '#b4d0ea', snout: '#f7fbff' },
   hamster: { body: '#f6f1ea', dark: '#8b7d6b', belly: '#ffffff', inner: '#f6a7a0' },
   chicken: { body: '#d3ecff', dark: '#4a78a8', wing: '#acd2fa', comb: '#f2665c', beak: '#f7a234' },
+  // a rare chick grows into a blue hen
+  hen: { body: '#c8dcf3', dark: '#45698f', wing: '#a5c2e6', belly: '#eaf2fc', tail: '#7d9cc4', comb: '#ea4a3f', beak: '#f4b23a' },
   fish: { body: '#8fd3ff', dark: '#2e7bb0', fin: '#c8ebff', scale: '#b8e3ff' },
   rabbit: { body: '#f9d5e0', dark: '#b06a85', belly: '#fff3f7', inner: '#f48fb1' },
   koala: { body: '#f3e2c0', dark: '#a5844a', belly: '#fff8e8', inner: '#f3b9c0', nose: '#6b4a2a' },
@@ -176,6 +180,36 @@ const SHAPES = {
       </g>`;
   },
 
+  // The chick, grown up. Same front-on pose and the same moving parts as the
+  // chick (bob, flapping wings, head), so everything the room does with a
+  // chick it does with a hen: a fuller body, a tall comb and a wattle, a fan of
+  // tail feathers behind, a pale breast (left plain: feather marks there read
+  // as a second, sleeping face).
+  hen(c) {
+    return `
+      <g stroke="#e08422" stroke-width="2.6" stroke-linecap="round" fill="none">
+        <path d="M43 86 v8 M43 94 l-5 2.6 M43 94 l5 2.6"/>
+        <path d="M57 86 v8 M57 94 l-5 2.6 M57 94 l5 2.6"/>
+      </g>
+      <g class="pet-bob">
+        <path d="M66 58 q8 -26 20 -24 q-1 9 -6 15 q9 -6 13 0 q-3 7 -10 11 q8 0 8 6 q-9 6 -22 4 z" fill="${c.tail}" stroke="${c.dark}" stroke-width="2" stroke-linejoin="round"/>
+        <g class="pet-wings">
+          <ellipse class="wing-l" cx="22" cy="68" rx="8.5" ry="14" fill="${c.wing}" stroke="${c.dark}" stroke-width="2"/>
+          <ellipse class="wing-r" cx="78" cy="68" rx="8.5" ry="14" fill="${c.wing}" stroke="${c.dark}" stroke-width="2"/>
+        </g>
+        <path d="M50 44 C68 44 79 55 79 68 C79 81 66 89 50 89 C34 89 21 81 21 68 C21 55 32 44 50 44 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+        <ellipse cx="50" cy="73" rx="17" ry="13" fill="${c.belly}"/>
+        <path d="M40.5 25 q-2 -10 6 -7 q3 -10 9.5 -2 q7.5 -5 6 6 q-1 4 -5 4 h-12.5 q-3.5 0 -4 -1 z" fill="${c.comb}" stroke="#c23b32" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="50" cy="39" r="16" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+        <g class="pet-head">
+          ${eyes(43.5, 56.5, 37.5, 3.9)}
+          ${blush(37.5, 62.5, 44, 3.6)}
+          <path d="M45.6 42.6 L54.4 42.6 L50 48.6 Z" fill="${c.beak}" stroke="#d27a1d" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M47.6 49 q2.4 8 4.8 0 z" fill="${c.comb}" stroke="#c23b32" stroke-width="1.4" stroke-linejoin="round"/>
+        </g>
+      </g>`;
+  },
+
   fish(c) {
     // Side on, facing left; the bowl gives it its room.
     return `
@@ -298,16 +332,20 @@ const SHAPES = {
 };
 
 /** One pet, in its own 100 × 100 box. `variant` is 'plain' or 'rare'. */
-export function petMarkup(species, variant = 'plain') {
-  const draw = SHAPES[species] || SHAPES.cat;
-  const paint = (variant === 'rare' ? RARE : PALETTE)[species] || PALETTE.cat;
-  return `<g class="pet pet-${species}${variant === 'rare' ? ' is-rare' : ''}">${draw(paint)}</g>`;
+/** What a pet looks like at a stage: a chick that has grown up is a hen. */
+export const lookOf = (species, stage) => (species === 'chicken' && stage === 'grown' ? 'hen' : species);
+
+export function petMarkup(species, variant = 'plain', stage = null) {
+  const look = lookOf(species, stage);
+  const draw = SHAPES[look] || SHAPES.cat;
+  const paint = (variant === 'rare' ? RARE : PALETTE)[look] || PALETTE.cat;
+  return `<g class="pet pet-${species}${look !== species ? ` is-${look}` : ''}${variant === 'rare' ? ' is-rare' : ''}">${draw(paint)}</g>`;
 }
 
 /** A pet's portrait, as a whole small SVG — for buttons, the toast and the corner buddy. */
-export function petIcon(species, label = '', variant = 'plain') {
+export function petIcon(species, label = '', variant = 'plain', stage = null) {
   const role = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
-  return `<svg class="pet-icon" viewBox="0 6 100 94" ${role}>${petMarkup(species, variant)}</svg>`;
+  return `<svg class="pet-icon" viewBox="0 6 100 94" ${role}>${petMarkup(species, variant, stage)}</svg>`;
 }
 
 /** A pet not yet found, for the pet book: its outline, filled in one flat colour. */
