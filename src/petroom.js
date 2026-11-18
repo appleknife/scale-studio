@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611181630';
-import { currentSeason } from './season.js?v=202611181630';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611181630';
+import * as Pet from './pet.js?v=202611181845';
+import { currentSeason } from './season.js?v=202611181845';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611181845';
 import {
   petMarkup,
   eggMarkup,
@@ -32,8 +32,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611181630';
-import { t, getLang } from './i18n.js?v=202611181630';
+} from './petart.js?v=202611181845';
+import { t, getLang } from './i18n.js?v=202611181845';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -117,7 +117,32 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   // The bowl and the bed are wherever they have been dragged to.
   const bowlAt = () => ({ x: BOWL.x + Pet.itemAt(pet, 'bowl').x, y: BOWL.y });
   const bedAt = () => ({ x: BED.x + Pet.itemAt(pet, 'bed').x, y: BED.y });
-  const roomArt = () => roomMarkup({ placed: pet.placed, wall: pet.wall, floor: pet.floor, season, fish: isFish(), hour: timeNow(), where: pet.where });
+  // A decoration picked in the shop is tried out in the room before it is
+  // bought: it stands where it would go (a wallpaper or a floor replaces the
+  // one there) until it is bought, let go, or another one is picked.
+  const previewItem = () => (pending?.kind === 'item' && !pet.owned.includes(pending.id) ? Pet.ITEMS.find((i) => i.id === pending.id) : null);
+  const roomArt = () => {
+    const look = previewItem();
+    const slot = look?.slot;
+    return roomMarkup({
+      placed: look && slot !== 'wall' && slot !== 'floor' ? [...pet.placed.filter((id) => id !== look.id), look.id] : pet.placed,
+      wall: slot === 'wall' ? look.id : pet.wall,
+      floor: slot === 'floor' ? look.id : pet.floor,
+      season,
+      fish: isFish(),
+      hour: timeNow(),
+      where: pet.where,
+    });
+  };
+  /** Repaints the room's furniture — with the item being tried out, if any. */
+  function paintFurniture() {
+    if (!layers.room) return;
+    layers.room.innerHTML = roomArt();
+    const look = previewItem();
+    if (look && look.slot !== 'wall' && look.slot !== 'floor') {
+      layers.room.querySelector(`.room-item[data-item="${look.id}"]`)?.classList.add('is-preview');
+    }
+  }
 
   const layers = {};
 
@@ -142,6 +167,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     // of the pet" would be placing it in front of a pet that is not there.
     for (const key of Object.keys(layers)) layers[key] = null;
     layers.room = node('g', { class: 'room-base' }, roomArt());
+    if (previewItem()) queueMicrotask(paintFurniture);
     skyStep = Math.floor(timeNow() * 12);
     layers.stage = node('g', { class: 'room-stage' });
     layers.fx = node('g', { class: 'room-fx', 'pointer-events': 'none' });
@@ -570,7 +596,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const step = Math.floor(timeNow() * 12);
     if (step !== skyStep && layers.room && !busy && !drag && !choosing && pet.pet) {
       skyStep = step;
-      layers.room.innerHTML = roomArt();
+      paintFurniture();
     }
     later(watchSky, 30000);
   }
@@ -1225,7 +1251,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
           : t('pet.item.away')
         : `♪ ${item.cost}${can ? '' : `<span class="tray-need">${t('pet.need', { n: item.cost - pet.notes })}</span>`}`;
       const picked = pending?.kind === 'item' && pending.id === item.id;
-      return `<button class="tray-item${out ? ' is-out' : ''}${picked ? ' is-picked' : ''}${item.season && !owned ? ' is-seasonal' : ''}" type="button" data-item="${item.id}" ${can ? '' : 'disabled'} aria-pressed="${out || picked}">
+      // Even what costs more than the jar holds can be tried out — something
+      // to save up for is worth seeing in the room.
+      return `<button class="tray-item${out ? ' is-out' : ''}${picked ? ' is-picked' : ''}${can ? '' : ' is-short'}${item.season && !owned ? ' is-seasonal' : ''}" type="button" data-item="${item.id}" aria-pressed="${out || picked}">
         ${itemIcon(item.id)}
         <span class="tray-name">${t(`pet.item.${item.id}`)}</span>
         <span class="tray-cost">${label}</span></button>`;
@@ -1318,6 +1346,21 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
           ? t(`av.item.${pending.id}`)
           : t(`pet.item.${pending.id}`);
     const cost = (kind === 'snack' ? Pet.SNACKS : kind === 'avatar' ? Pet.AVATAR_ITEMS : Pet.ITEMS).find((x) => x.id === pending.id).cost;
+    if (kind === 'item' && cost > pet.notes) {
+      return `<div class="pet-confirm is-preview" role="group">
+      <span>${t('pet.confirm.short', { name: esc(name), cost, n: cost - pet.notes })}</span>
+      <span class="pet-confirm-btns">
+        <button class="quiet-btn small" type="button" data-act="cancel-buy">${t('pet.confirm.putBack')}</button>
+      </span></div>`;
+    }
+    if (kind === 'item') {
+      return `<div class="pet-confirm is-preview" role="group">
+      <span>${t('pet.confirm.tryItem', { name: esc(name), cost, left: pet.notes - cost })}</span>
+      <span class="pet-confirm-btns">
+        <button class="primary-btn small" type="button" data-act="confirm-buy">${t('pet.confirm.buy')}</button>
+        <button class="quiet-btn small" type="button" data-act="cancel-buy">${t('pet.confirm.putBack')}</button>
+      </span></div>`;
+    }
     return `<div class="pet-confirm" role="group">
       <span>${t(kind === 'snack' ? 'pet.confirm.snack' : 'pet.confirm.item', { name: esc(name), cost, left: pet.notes - cost })}</span>
       <span class="pet-confirm-btns">
@@ -1329,6 +1372,12 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   els.panel.addEventListener('click', (event) => {
     const b = event.target.closest('button');
     if (!b) return;
+    const lookBefore = previewItem()?.id;
+    onPanelClick(b);
+    if (previewItem()?.id !== lookBefore && running) paintFurniture();
+  });
+
+  function onPanelClick(b) {
     if (b.dataset.act === 'egg') confirmEgg();
     else if (b.dataset.act === 'practise') onPractise();
     else if (b.dataset.act === 'choose-next') {
@@ -1415,7 +1464,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         showConfirm();
       }
     }
-  });
+  }
 
   els.panel.addEventListener('change', (event) => {
     const box = event.target.closest('input[data-me-in]');

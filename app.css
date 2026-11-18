@@ -7850,3 +7850,30 @@ select,
     animation: none;
   }
 }
+
+/* A decoration being tried out before it is bought: it breathes a little, so it
+   reads as "not yours yet". */
+.room-item.is-preview {
+  animation: preview-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes preview-breathe {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-item.is-preview {
+    animation: none;
+    opacity: 0.75;
+  }
+}
+
+.tray-item.is-short {
+  opacity: 0.6;
+}
+
+.tray-item.is-short.is-picked {
+  opacity: 1;
+}

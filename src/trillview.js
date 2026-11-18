@@ -13,12 +13,12 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611181630';
-import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181630';
-import * as Vibrato from './vibrato.js?v=202611181630';
-import { bowedVoice } from './playback.js?v=202611181630';
-import { t } from './i18n.js?v=202611181630';
-import { hearLevel } from './pitch.js?v=202611181630';
+import * as Trill from './trill.js?v=202611181845';
+import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181845';
+import * as Vibrato from './vibrato.js?v=202611181845';
+import { bowedVoice } from './playback.js?v=202611181845';
+import { t } from './i18n.js?v=202611181845';
+import { hearLevel } from './pitch.js?v=202611181845';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
