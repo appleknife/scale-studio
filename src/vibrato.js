@@ -10,7 +10,7 @@
 // Both work on the app's ~30 ms pitch frames. The pitch inside a note is detrended
 // before anything is counted: a slow slide is intonation, not vibrato.
 
-import { STRINGS, TEMPO, stringById } from './trill.js?v=202611181600';
+import { STRINGS, TEMPO, stringById } from './trill.js?v=202611181800';
 
 const median = (xs) => {
   if (!xs.length) return null;
@@ -210,7 +210,9 @@ export const FINGERS = [
   { id: '1', options: [{ id: 'low', semis: 1 }, { id: 'high', semis: 2 }] },
   { id: '2', options: [{ id: 'low', semis: 3 }, { id: 'high', semis: 4 }] },
   { id: '3', options: [{ id: 'normal', semis: 5 }, { id: 'high', semis: 6 }] },
-  { id: '4', options: [{ id: 'normal', semis: 7 }] },
+  // High 4 (F on A in first position, G♯ on A in third) is a natural
+  // placement in the higher positions and an extension down low.
+  { id: '4', options: [{ id: 'normal', semis: 7 }, { id: 'high', semis: 8 }] },
 ];
 
 // Free is first: a natural, even wave is the exercise, not the last rung.
