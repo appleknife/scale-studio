@@ -1063,6 +1063,13 @@ function fishbowl() {
  * The room, without the pet (the pet is added by the room controller so it can
  * move). `placed` is the list of decorations put out; `wall` the wallpaper.
  */
+// Where each thing on the floor has its feet, before it is moved (room units).
+// The floor's drawing order goes by these: further forward is drawn in front.
+const FOOT = {
+  flowers: 220, bookshelf: 226, piano: 227, 'xmas-tree': 228, stand: 273, plant: 273, lamp: 273,
+  bowl: 279, bed: 280, metronome: 290, beanbag: 292, 'xmas-snowman': 295, toybox: 297, 'xmas-presents': 297,
+};
+
 export function roomMarkup({ placed = [], wall = null, floor = null, fish = false, hour = clockNow(), where = {}, season = null } = {}) {
   // At Christmas it snows outside whatever the weather: flakes in the pane and a
   // drift on the sill, for as long as the season lasts.
@@ -1118,20 +1125,31 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     <rect x="0" y="196" width="400" height="9" fill="#f6e7d2"/>
     <rect x="0" y="204" width="400" height="2" fill="#d9bc93"/>
     ${has('rug') ? item('rug', ITEM_ART.rug()) : ''}
-    ${has('piano') ? item('piano', ITEM_ART.piano()) : ''}
-    ${has('bookshelf') ? item('bookshelf', ITEM_ART.bookshelf()) : ''}
-    ${has('xmas-tree') ? item('xmas-tree', ITEM_ART['xmas-tree']()) : ''}
-    ${has('flowers') ? item('flowers', ITEM_ART.flowers()) : ''}
-    ${has('bed') && !fish ? item('bed', ITEM_ART.bed()) : ''}
-    ${has('stand') ? item('stand', ITEM_ART.stand()) : ''}
-    ${has('plant') ? item('plant', ITEM_ART.plant()) : ''}
-    ${has('lamp') ? item('lamp', ITEM_ART.lamp()) : ''}
-    ${fish ? fishbowl() : item('bowl', ITEM_ART.bowl())}
-    ${has('beanbag') ? item('beanbag', ITEM_ART.beanbag()) : ''}
-    ${has('toybox') ? item('toybox', ITEM_ART.toybox()) : ''}
-    ${has('metronome') ? item('metronome', ITEM_ART.metronome()) : ''}
-    ${has('xmas-snowman') ? item('xmas-snowman', ITEM_ART['xmas-snowman']()) : ''}
-    ${has('xmas-presents') ? item('xmas-presents', ITEM_ART['xmas-presents']()) : ''}
+    ${
+      // What stands on the floor, back to front: whatever has its feet further
+      // forward is drawn later, so it is in front — wherever it was dragged to.
+      [
+        ['piano', () => ITEM_ART.piano()],
+        ['bookshelf', () => ITEM_ART.bookshelf()],
+        ['xmas-tree', () => ITEM_ART['xmas-tree']()],
+        ['flowers', () => ITEM_ART.flowers()],
+        ['bed', () => ITEM_ART.bed(), !fish],
+        ['stand', () => ITEM_ART.stand()],
+        ['plant', () => ITEM_ART.plant()],
+        ['lamp', () => ITEM_ART.lamp()],
+        ['bowl', null, true],
+        ['beanbag', () => ITEM_ART.beanbag()],
+        ['toybox', () => ITEM_ART.toybox()],
+        ['metronome', () => ITEM_ART.metronome()],
+        ['xmas-snowman', () => ITEM_ART['xmas-snowman']()],
+        ['xmas-presents', () => ITEM_ART['xmas-presents']()],
+      ]
+        .filter(([id, , show]) => (show === undefined ? has(id) : show))
+        .map(([id, art], order) => ({ id, art, order, foot: FOOT[id] + ((where && where[id] && where[id].y) || 0) }))
+        .sort((a, b) => a.foot - b.foot || a.order - b.order)
+        .map(({ id, art }) => (id === 'bowl' ? (fish ? fishbowl() : item('bowl', ITEM_ART.bowl())) : item(id, art())))
+        .join('')
+    }
     ${dark > 0.02 ? `<rect class="room-night" x="0" y="0" width="400" height="300" fill="#1d2550" opacity="${(dark * 0.2).toFixed(3)}" pointer-events="none"/>` : ''}
     ${dark > 0.3 && has('lights') ? ITEM_ART.lights(true) : ''}
     ${

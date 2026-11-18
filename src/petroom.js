@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611182050';
-import { currentSeason } from './season.js?v=202611182050';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611182050';
+import * as Pet from './pet.js?v=202611182140';
+import { currentSeason } from './season.js?v=202611182140';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611182140';
 import {
   petMarkup,
   eggMarkup,
@@ -33,8 +33,8 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611182050';
-import { t, getLang } from './i18n.js?v=202611182050';
+} from './petart.js?v=202611182140';
+import { t, getLang } from './i18n.js?v=202611182140';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -119,8 +119,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   const timeNow = () => (Number.isFinite(hour) ? hour : clockNow());
   const season = currentSeason(); // what the shop has on its shelves just now
   // The bowl and the bed are wherever they have been dragged to.
-  const bowlAt = () => ({ x: BOWL.x + Pet.itemAt(pet, 'bowl').x, y: BOWL.y });
-  const bedAt = () => ({ x: BED.x + Pet.itemAt(pet, 'bed').x, y: BED.y });
+  const bowlAt = () => ({ x: BOWL.x + Pet.itemAt(pet, 'bowl').x, y: BOWL.y + Pet.itemAt(pet, 'bowl').y });
+  const bedAt = () => ({ x: BED.x + Pet.itemAt(pet, 'bed').x, y: BED.y + Pet.itemAt(pet, 'bed').y });
   // A decoration picked in the shop is tried out in the room before it is
   // bought: it stands where it would go (a wallpaper or a floor replaces the
   // one there) until it is bought, let go, or another one is picked.
@@ -504,6 +504,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       if (done.moved) {
         pet.tips = { ...(pet.tips || {}), drag: true };
         save();
+        // moved forward or back: the floor is drawn again in its new order
+        if (Pet.ITEM_RANGE[done.id].y[0] !== Pet.ITEM_RANGE[done.id].y[1]) paintFurniture();
         paintFoot();
         admire(done.id);
       }
@@ -864,7 +866,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     // It eats from whichever side of the bowl there is room on.
     const at = bowlAt();
     const fromRight = at.x + 38 <= 372;
-    walkTo(at.x + (fromRight ? 38 : -38), FLOOR_Y, () => {
+    // beside the bowl, at its depth on the floor
+    walkTo(at.x + (fromRight ? 38 : -38), FLOOR_Y + (at.y - BOWL.y), () => {
       facing = fromRight ? -1 : 1;
       placePet();
       eat(snack, bowl);

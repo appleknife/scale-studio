@@ -312,31 +312,34 @@ export function inShop(pet, item, season = null) {
 
 /**
  * How far each thing in the room may be dragged from where it is first put down,
- * in room units (the room is 400 wide). Things on the floor slide along it; the
- * window and the picture go anywhere on the wall; the rug has a little depth.
- * The bowl counts as furniture here, though it is never bought.
+ * in room units (the room is 400 wide, the floor runs from y 204 to 300). Things
+ * on the floor go anywhere on it — back towards the wall or forward to its front
+ * edge (each range keeps the thing's feet on the floor and its top in the room);
+ * the room draws whatever stands further forward in front. Things on the wall go
+ * anywhere on the wall. The bowl counts as furniture here, though it is never
+ * bought.
  */
 export const ITEM_RANGE = {
   window: { x: [-44, 250], y: [-32, 64] },
   picture: { x: [-272, 54], y: [-42, 64] },
-  lamp: { x: [-336, 14], y: [0, 0] },
-  plant: { x: [-12, 342], y: [0, 0] },
-  stand: { x: [-66, 272], y: [0, 0] },
-  bed: { x: [-246, 54], y: [0, 0] },
-  rug: { x: [-76, 76], y: [-4, 10] },
-  bowl: { x: [-98, 246], y: [0, 0] },
+  lamp: { x: [-336, 14], y: [-59, 25] },
+  plant: { x: [-12, 342], y: [-59, 25] },
+  stand: { x: [-66, 272], y: [-59, 25] },
+  bed: { x: [-246, 54], y: [-66, 18] },
+  rug: { x: [-76, 76], y: [-36, 14] },
+  bowl: { x: [-98, 246], y: [-65, 19] },
   clock: { x: [-176, 176], y: [-26, 108] },
   poster: { x: [-154, 196], y: [-70, 58] },
   shelf: { x: [-2, 340], y: [-104, 36] },
-  flowers: { x: [-110, 250], y: [0, 0] },
-  metronome: { x: [-210, 156], y: [-10, 6] },
-  toybox: { x: [-320, 22], y: [-12, 4] },
-  beanbag: { x: [-26, 300], y: [-14, 6] },
-  bookshelf: { x: [-212, 134], y: [0, 0] },
-  piano: { x: [-138, 182], y: [0, 0] },
-  'xmas-tree': { x: [-218, 108], y: [0, 0] },
-  'xmas-presents': { x: [-166, 166], y: [-12, 4] },
-  'xmas-snowman': { x: [-50, 294], y: [-12, 4] },
+  flowers: { x: [-110, 250], y: [-6, 78] },
+  metronome: { x: [-210, 156], y: [-76, 8] },
+  toybox: { x: [-320, 22], y: [-83, 1] },
+  beanbag: { x: [-26, 300], y: [-78, 6] },
+  bookshelf: { x: [-212, 134], y: [-12, 72] },
+  piano: { x: [-138, 182], y: [-13, 71] },
+  'xmas-tree': { x: [-218, 108], y: [-14, 70] },
+  'xmas-presents': { x: [-166, 166], y: [-83, 1] },
+  'xmas-snowman': { x: [-50, 294], y: [-81, 3] },
   'xmas-wreath': { x: [-228, 128], y: [-40, 96] },
   'xmas-stockings': { x: [-4, 340], y: [-50, 78] },
 };
