@@ -20,6 +20,11 @@ const pct = (sorted, p) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.f
 const clamp = (v) => Math.max(0, Math.min(100, v));
 const centsFrom = (freq, midi) => (69 + 12 * Math.log2(freq / 440) - midi) * 100;
 
+/** A quarter-tone-wide wave is about 50 cents peak to peak. */
+export const TARGET_WIDTH = 50;
+/** Below this the wave reads as a wobble rather than a settled vibrato. */
+export const EVEN_PASS = 72;
+
 /** Detrend a run of {t, c} cents, and say what its straight line was. */
 function detrend(points) {
   const n = points.length;
@@ -104,6 +109,23 @@ export function vibratoSummary(frames, notes) {
     speed: rate == null ? null : rate < 5 ? 'slow' : rate > 7 ? 'fast' : 'medium',
     size: width == null ? null : width < 20 ? 'narrow' : width > 60 ? 'wide' : 'medium',
   };
+}
+
+/**
+ * The one thing to try next. Rate and width are matters of style and register,
+ * so they are shown as measurements rather than passed or failed; evenness and
+ * a settled centre are what make a vibrato sound professional.
+ */
+export function vibratoVerdict(m, targetRate = null) {
+  if (m.cycles < 3 || m.rate == null || m.evenness == null) return { id: 'none', pass: false };
+  if (m.evenness < EVEN_PASS) return { id: 'uneven', pass: false };
+  if (m.centreOffset != null && Math.abs(m.centreOffset) > 25) return { id: 'offcentre', pass: false };
+  if (targetRate) {
+    const ratio = m.rate / targetRate;
+    if (ratio < 0.8) return { id: 'slow', pass: false };
+    if (ratio > 1.2) return { id: 'fast', pass: false };
+  }
+  return { id: 'good', pass: true };
 }
 
 /**

@@ -65,6 +65,7 @@ const el = {
   },
   openSprintBtn: $('openSprintBtn'),
   openTrillBtn: $('openTrillBtn'),
+  openVibratoBtn: $('openVibratoBtn'),
   openListenBtn: $('openListenBtn'),
   openPetBtn: $('openPetBtn'),
   petBack: $('petBack'),
@@ -2457,9 +2458,10 @@ el.openSprintBtn.addEventListener('click', () => {
   showView('sprint');
 });
 
-// Trill Trainer: two fingers on one string, from two notes a beat up to a free
-// trill, with the pitch drawn as it goes. Same microphone router; its clicks go
-// through the shared player so the one volume slider governs them too.
+// Trill & Vibrato: one screen, two modes. A trill moves between two notes; a
+// vibrato rolls around the lower one inside the same half step. Both share the
+// microphone router, the count-in, the wave drawing and the step ladder; their
+// clicks go through the shared player so one volume slider governs them all.
 trillView = createTrillView({
   root: el.views.trill,
   profileId: () => petProfileId(),
@@ -2477,12 +2479,17 @@ trillView = createTrillView({
   },
   micError: (err) => micErrorMessage(err),
   audio: () => ({ ctx: player.context, out: player.output }),
-  // A take with a real trill in it is practice: it ticks the day and feeds the pet.
-  onFinish: () => noteTake('trill'),
+  // A take with a real wave in it is practice, whichever mode it was: it ticks
+  // the day and feeds the pet, filed under the mode that made it.
+  onFinish: (_last, mode) => noteTake(mode === 'vibrato' ? 'vibrato' : 'trill'),
   onBack: () => goHome(),
 });
 el.openTrillBtn.addEventListener('click', () => {
-  trillView.open();
+  trillView.open('trill');
+  showView('trill');
+});
+el.openVibratoBtn.addEventListener('click', () => {
+  trillView.open('vibrato');
   showView('trill');
 });
 
@@ -3475,7 +3482,7 @@ function noteTake(tag, cardId = null, score = 0, details = null, { small = false
   // Real practice earns notes for the pet room; a false start earns nothing.
   // (A piece played in Listen is practice like the rest; it used to log the day
   // and pay nothing.)
-  if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint' || tag === 'trill' || tag === 'piece')) {
+  if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint' || tag === 'trill' || tag === 'vibrato' || tag === 'piece')) {
     const kind = tag === 'scales' ? 'scale' : tag;
     const earned = petRoom.earnTake({ kind, id: cardId || '', dayKey: today, octaves: details?.octaves || 1, small });
     petToast(earned.amount, earned.warmed, earned.bonus, kind, earned.grew, earned.wished, cardId || '');
@@ -5446,6 +5453,10 @@ el.openPetBtn.addEventListener('click', openPet);
 el.petBack.addEventListener('click', goHome);
 paintMenuPet();
 if (params.has('draw')) drawThree();
+if (params.has('vibrato')) {
+  trillView.open('vibrato');
+  showView('trill');
+}
 if (params.has('log')) openTrack();
 if (params.has('statsdemo')) {
   // ?statsdemo seeds a few takes and opens the "Every take" tab, so the delete

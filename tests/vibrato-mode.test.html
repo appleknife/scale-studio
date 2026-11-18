@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Vibrato mode smoke test</title>
+    <style>
+      iframe { width: 1100px; height: 900px; border: 0; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <iframe id="f" src="../index.html?vibrato&lang=en"></iframe>
+    <script>
+      const problems = [];
+      const log = [];
+      const f = document.getElementById('f');
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      f.addEventListener('load', async () => {
+        const d = f.contentDocument;
+        const w = f.contentWindow;
+        w.addEventListener('error', (e) => problems.push(`runtime: ${e.message}`));
+        w.addEventListener('unhandledrejection', (e) => problems.push(`rejected: ${e.reason}`));
+        await wait(900);
+
+        const check = (ok, name) => { if (!ok) problems.push(name); return ok; };
+        check(!d.getElementById('view-trill').hidden, 'the vibrato deep link did not open the mode screen');
+        const tab = d.querySelector('.trill-modes [data-mode="vibrato"]');
+        check(Boolean(tab) && tab.getAttribute('aria-selected') === 'true', 'vibrato mode was not selected');
+        const body = d.querySelector('.trill-body');
+        check(/centre of the wave/i.test(body.textContent), 'the vibrato picker did not explain the centre note');
+        check(Boolean(body.querySelector('[data-act="example"]')), 'there is no example button');
+        check(Boolean(body.querySelector('[data-act="start"]')), 'there is no start button');
+        log.push('the vibrato picker opens with its own copy, an example and a start button');
+
+        d.querySelector('.trill-modes [data-mode="trill"]').click();
+        await wait(80);
+        check(/lower one stays down/i.test(body.textContent), 'switching back to trill did not restore its picker');
+        log.push('the mode toggle switches both ways without a reload');
+
+        const ok = !problems.length;
+        document.getElementById('report').textContent = ok
+          ? `VIBRATO MODE OK\n${log.join('\n')}`
+          : `VIBRATO MODE FAILED\n${problems.join('\n')}\n\n${log.join('\n')}`;
+        document.title = ok ? 'VIBRATO MODE OK' : 'VIBRATO MODE FAILED';
+        fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'vibrato-mode', problems, log: log.join('\n') }) });
+      });
+    </script>
+  </body>
+</html>

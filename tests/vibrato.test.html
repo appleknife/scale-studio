@@ -21,7 +21,7 @@
       // The measurement that Listen uses, and the one a trainer will use, are the
       // same code. Both are tested here with frames the app's own detector shape:
       // 30 ms apart, A4 as the centre, cents as a sinusoid around it.
-      import { vibratoOf, analyseVibrato } from '../src/vibrato.js';
+      import { vibratoOf, analyseVibrato, vibratoVerdict } from '../src/vibrato.js';
 
       const problems = [];
       const log = [];
@@ -88,6 +88,15 @@
         const v = vibratoOf(clean, note);
         near('Listen still finds the rate', v && v.rate, 6, 0.5);
         near('Listen still finds the width', v && v.width, 40, 9);
+
+        // Only evenness and a settled centre decide; rate and width are shown,
+        // not judged.
+        check(vibratoVerdict({ cycles: 8, rate: 6, evenness: 90, centreOffset: 2 }).id === 'good', 'an even centred wave was not passed');
+        check(vibratoVerdict({ cycles: 8, rate: 6, evenness: 60, centreOffset: 2 }).id === 'uneven', 'an uneven wave was not sent back');
+        check(vibratoVerdict({ cycles: 8, rate: 6, evenness: 90, centreOffset: 40 }).id === 'offcentre', 'a wave off the note was not noticed');
+        check(vibratoVerdict({ cycles: 8, rate: 4, evenness: 90, centreOffset: 0 }, 6).id === 'slow', 'a slow measured wave was not noticed');
+        check(vibratoVerdict({ cycles: 8, rate: 9, evenness: 90, centreOffset: 0 }, 6).id === 'fast', 'a fast measured wave was not noticed');
+        check(vibratoVerdict({ cycles: 2, rate: 6, evenness: 90, centreOffset: 0 }).id === 'none', 'two wiggles were called a vibrato');
       } catch (err) {
         problems.push(`the test threw: ${err && err.message}`);
       }

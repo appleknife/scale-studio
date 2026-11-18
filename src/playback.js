@@ -195,7 +195,7 @@ function bowNoise(ctx) {
  */
 export function bowedVoice(ctx, destination) {
   return {
-    play({ midi, at, duration, gain, legato = false, accent = false, staccato = false, tied = false }) {
+    play({ midi, at, duration, gain, legato = false, accent = false, staccato = false, tied = false, vibratoRate = 5.2, vibratoCents = 7 }) {
       const freq = 440 * Math.pow(2, (midi - 69) / 12);
       const attack = legato ? 0.02 : accent ? 0.012 : 0.045;
       const release = staccato ? 0.05 : tied ? 0.05 : 0.18;
@@ -238,10 +238,10 @@ export function bowedVoice(ctx, destination) {
       body.connect(amp).connect(destination);
 
       const lfo = ctx.createOscillator();
-      lfo.frequency.value = 5.2;
+      lfo.frequency.value = vibratoRate;
       const depth = ctx.createGain();
       depth.gain.setValueAtTime(0, at);
-      depth.gain.linearRampToValueAtTime(7, at + Math.min(0.3, duration * 0.6));
+      depth.gain.linearRampToValueAtTime(vibratoCents, at + Math.min(0.3, duration * 0.6));
       lfo.connect(depth);
       depth.connect(saw.detune);
       depth.connect(sawB.detune);

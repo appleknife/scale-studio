@@ -14,6 +14,8 @@
 // can be seen there first.
 
 import * as Trill from './trill.js?v=202611171850';
+import { analyseVibrato, vibratoVerdict, TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611171850';
+import { bowedVoice } from './playback.js?v=202611171850';
 import { t } from './i18n.js?v=202611171850';
 import { hearLevel } from './pitch.js?v=202611171850';
 
@@ -26,6 +28,11 @@ const LEAD = 0.5; // a breath between pressing Start and the first click
 export function createTrillView(deps) {
   const root = deps.root;
   let stats = null;
+  let vstats = null;
+  // One screen, one microphone lifecycle: a trill travels between two notes, a
+  // vibrato rolls around the lower of the same two. Everything below that is
+  // shared; only the target and what is measured change.
+  let mode = 'trill'; // 'trill' | 'vibrato'
   let panel = 'pick'; // 'pick' | 'play' | 'done'
   let stepId = null; // the step chosen; null = the free trill, which opens the screen
   let run = null;
@@ -45,11 +52,23 @@ export function createTrillView(deps) {
     <div class="trill-body"></div>`;
   const body = root.querySelector('.trill-body');
 
-  const notesNow = () => Trill.notesFor(stats.opts.string, stats.opts.pair, stats.opts.spacing);
+  const vibProfile = () => `${deps.profileId() || 'default'}::vibrato`;
+  const statsNow = () => (mode === 'vibrato' ? vstats : stats);
+  const notesNow = () => {
+    const o = statsNow().opts;
+    return Trill.notesFor(o.string, o.pair, o.spacing);
+  };
   const stepNow = () => Trill.stepById(stepId || 'free');
-  const save = () => Trill.saveStats(deps.profileId(), stats);
+  const save = () => Trill.saveStats(mode === 'vibrato' ? vibProfile() : deps.profileId(), statsNow());
   const finger = (n) => t(`trill.finger.${n}`);
   const oneDp = (n) => (Math.round(n * 10) / 10).toFixed(1);
+  const centsOf = (f, midi) => (69 + 12 * Math.log2(f.freq / 440) - midi) * 100;
+  const stepLabel = (id) => t(`${mode === 'vibrato' ? 'vib' : 'trill'}.step.${id}`);
+  const modeRow = () => `
+    <div class="segmented small trill-modes" role="tablist" aria-label="${esc(t('vib.mode.vibrato'))}">
+      <button type="button" role="tab" data-mode="trill" aria-selected="${mode === 'trill'}">${t('vib.mode.trill')}</button>
+      <button type="button" role="tab" data-mode="vibrato" aria-selected="${mode === 'vibrato'}">${t('vib.mode.vibrato')}</button>
+    </div>`;
 
   function paint() {
     cancelAnimationFrame(raf);
@@ -62,6 +81,7 @@ export function createTrillView(deps) {
   // ── Choosing ───────────────────────────────────────────────────────────
 
   function paintPick() {
+    if (mode === 'vibrato') return paintVibratoPick();
     const o = stats.opts;
     const notes = notesNow();
     const step = stepNow();
@@ -85,6 +105,7 @@ export function createTrillView(deps) {
     }).join('');
     body.innerHTML = `
       <p class="trill-howto">${t('trill.pick.howto')}</p>
+      ${modeRow()}
       <div class="trill-group">
         <span class="trill-label">${t('trill.label.string')}</span>
         <div class="chip-row">${strings}</div>
@@ -142,16 +163,86 @@ export function createTrillView(deps) {
       </details>`;
   }
 
+  function paintVibratoPick() {
+    const o = vstats.opts;
+    const notes = notesNow();
+    const step = stepNow();
+    const strings = Trill.STRINGS.map(
+      (s) => `<button class="chip" type="button" data-string="${s.id}" aria-pressed="${o.string === s.id}">${t('trill.string', { s: s.id })}</button>`,
+    ).join('');
+    const pairs = Trill.PAIRS.map(
+      (p) => `<button class="chip" type="button" data-pair="${p.id}" aria-pressed="${o.pair === p.id}">${t(`trill.pair.${p.id}`)}</button>`,
+    ).join('');
+    const ladder = Trill.STEPS.map((s) => {
+      const isDone = Trill.doneFor(vstats, notes).includes(s.id);
+      const on = s.id === step.id;
+      return `<button class="trill-step${on ? ' is-on' : ''}${isDone ? ' is-done' : ''}" type="button" data-step="${s.id}" aria-pressed="${on}">
+          <span class="trill-step-n">${s.per ? s.per : '∞'}</span>
+          <span class="trill-step-label">${stepLabel(s.id)}</span>
+          <span class="trill-step-tick" aria-hidden="true">${isDone ? '✓' : ''}</span>
+        </button>`;
+    }).join('');
+    body.innerHTML = `
+      <p class="trill-howto">${t('vib.pick.howto')}</p>
+      ${modeRow()}
+      <div class="trill-group">
+        <span class="trill-label">${t('trill.label.string')}</span>
+        <div class="chip-row">${strings}</div>
+      </div>
+      <div class="trill-group">
+        <span class="trill-label">${t('trill.label.fingers')}</span>
+        <div class="chip-row">${pairs}</div>
+      </div>
+      <div class="trill-group">
+        <span class="trill-label">${t('trill.label.spacing')}</span>
+        <div class="segmented small">
+          <button type="button" data-spacing="whole" aria-selected="${notes.spacing === 'whole'}">${t('trill.spacing.whole')}</button>
+          <button type="button" data-spacing="half" aria-selected="${notes.spacing === 'half'}">${t('trill.spacing.half')}</button>
+        </div>
+      </div>
+      <p class="trill-notes">
+        <span class="trill-note is-low"><b>${esc(notes.lowName.replace(/\d+$/, ''))}</b> ${t(notes.lowFinger === 0 ? 'trill.hold.open' : 'trill.hold', { finger: finger(notes.lowFinger) })}</span>
+      </p>
+      <div class="trill-group">
+        <span class="trill-label">${t('vib.label.step')}</span>
+        <div class="trill-ladder">${ladder}</div>
+      </div>
+      <p class="trill-ask">${
+        step.per
+          ? t('vib.ask.measured', { n: step.per, bpm: o.bpm, beats: Trill.TAKE_BEATS })
+          : t('vib.ask.free', { secs: Trill.FREE_SECONDS })
+      }</p>
+      <div class="trill-opts">
+        <div class="trill-tempo">
+          <span>${t('trill.tempo')}</span>
+          <button class="quiet-btn small" type="button" data-tempo="-1" aria-label="${t('trill.tempo.slower')}">−</button>
+          <b class="trill-bpm">♩ = ${o.bpm}</b>
+          <button class="quiet-btn small" type="button" data-tempo="1" aria-label="${t('trill.tempo.faster')}">+</button>
+        </div>
+        <label class="switch-row"><input type="checkbox" data-opt="click" ${o.click ? 'checked' : ''}/>
+          <span><b>${t('trill.opt.click')}</b><span class="switch-sub">${t('trill.opt.click.sub')}</span></span></label>
+      </div>
+      <div class="trill-actions">
+        <button class="primary-btn" type="button" data-act="start">${t('trill.start')}</button>
+        <button class="quiet-btn" type="button" data-act="example">${t('vib.example')}</button>
+        <button class="quiet-btn" type="button" data-act="stats">${t('trill.stats.open')}</button>
+      </div>
+      <p class="trill-howto">${t('vib.limits')}</p>`;
+  }
+
   // ── Playing ────────────────────────────────────────────────────────────
 
   function paintPlay() {
     const notes = run.notes;
+    const doing = mode === 'vibrato'
+      ? t('vib.doing', { string: run.notes.string, note: esc(notes.lowName.replace(/\d+$/, '')), n: run.step.per || '∞' })
+      : `${t('trill.doing', {
+          string: run.notes.string,
+          low: esc(notes.lowName.replace(/\d+$/, '')),
+          high: esc(notes.highName.replace(/\d+$/, '')),
+        })} · ${run.step.per ? t('trill.doing.per', { n: run.step.per, bpm: run.bpm }) : t('trill.step.free')}`;
     body.innerHTML = `
-      <p class="trill-doing">${t('trill.doing', {
-        string: run.notes.string,
-        low: esc(notes.lowName.replace(/\d+$/, '')),
-        high: esc(notes.highName.replace(/\d+$/, '')),
-      })} · ${run.step.per ? t('trill.doing.per', { n: run.step.per, bpm: run.bpm }) : t('trill.step.free')}</p>
+      <p class="trill-doing">${doing}</p>
       <div class="trill-stage">
         <canvas class="trill-canvas" aria-hidden="true"></canvas>
         <div class="trill-count" hidden></div>
@@ -224,13 +315,14 @@ export function createTrillView(deps) {
     const mine = (ticket += 1);
     const notes = notesNow();
     const step = stepNow();
-    const bpm = step.per ? stats.opts.bpm : Trill.TEMPO.start;
+    const bpm = step.per ? statsNow().opts.bpm : Trill.TEMPO.start;
     const beat = 60 / bpm;
     run = {
       notes,
       step,
       bpm,
-      click: stats.opts.click,
+      centre: notes.low, // the single note a vibrato rolls around
+      click: statsNow().opts.click,
       frames: [], // everything heard during the take itself
       trail: [], // { t, p } for the picture, count-in included
       lastT: null,
@@ -294,11 +386,18 @@ export function createTrillView(deps) {
 
     const mic = deps.getMic();
     const loud = f.rms > hearLevel(mic?.floor, f.clarity);
-    const p = loud ? Trill.placeOf(f, run.notes) : null;
-    run.trail.push({ t: f.t, p });
+    const p = loud && f.freq > 0 ? Trill.placeOf(f, run.notes) : null;
+    // The same frame feeds both pictures: the trill reads its place between two
+    // notes, the vibrato its distance in cents from the lower one.
+    const c = mode === 'vibrato' && p != null ? centsOf(f, run.centre) : null;
+    run.trail.push({ t: f.t, p, c });
     while (run.trail.length && run.trail[0].t < f.t - TRAIL_SECONDS - 0.5) run.trail.shift();
     // The dot glides: a little smoothing inside a note, none across the jump.
-    run.dot = p == null ? null : run.dot == null || Math.abs(p - run.dot) > 0.35 ? p : run.dot * 0.5 + p * 0.5;
+    if (mode === 'vibrato') {
+      run.dot = c == null ? null : run.dot == null || Math.abs(c - run.dot) > 60 ? c : run.dot * 0.5 + c * 0.5;
+    } else {
+      run.dot = p == null ? null : run.dot == null || Math.abs(p - run.dot) > 0.35 ? p : run.dot * 0.5 + p * 0.5;
+    }
 
     if (f.t >= run.takeFrom && f.t <= run.takeTo) {
       run.frames.push({ t: f.t, freq: loud ? f.freq : 0, clarity: f.clarity });
@@ -320,15 +419,15 @@ export function createTrillView(deps) {
         void run.countEl.offsetWidth;
         run.countEl.classList.add('is-pop');
       }
-      run.statusEl.textContent = t('trill.status.ready');
+      run.statusEl.textContent = t(mode === 'vibrato' ? 'vib.status.ready' : 'trill.status.ready');
     } else {
       run.countEl.hidden = true;
       const secs = Math.max(0, Math.ceil(run.takeTo - now));
-      run.statusEl.textContent = t('trill.status.go', { n: secs });
+      run.statusEl.textContent = t(mode === 'vibrato' ? 'vib.status.go' : 'trill.status.go', { n: secs });
     }
   }
 
-  /** The picture: two lines, the beats, the trail, the dot. */
+  /** The picture: the beats, the trail, the dot, and this mode's target lines. */
   function draw() {
     if (!run || !run.canvas || panel !== 'play') return;
     const c = run.canvas;
@@ -348,9 +447,13 @@ export function createTrillView(deps) {
     const nowX = w * 0.8;
     const pxPerSec = nowX / TRAIL_SECONDS;
     const x = (time) => nowX + (time - now) * pxPerSec;
+    const vib = mode === 'vibrato';
     const yLow = h * 0.74;
     const yHigh = h * 0.26;
-    const y = (p) => yLow + (yHigh - yLow) * p;
+    // A vibrato's axis is cents around one note; ±100¢ fills the same space the
+    // two notes used to. The half-step edges are visible on the page.
+    const yCents = (cents) => h * 0.5 - (cents / 100) * h * 0.32;
+    const y = vib ? yCents : (p) => yLow + (yHigh - yLow) * p;
 
     // the stretch of time that is being measured
     if (run.beat0 != null) {
@@ -378,22 +481,51 @@ export function createTrillView(deps) {
       g.globalAlpha = 1;
     }
 
-    // the two notes
-    g.lineWidth = 2 * k;
-    g.setLineDash([6 * k, 6 * k]);
-    for (const [yy, colour] of [
-      [yLow, muted],
-      [yHigh, gold],
-    ]) {
-      g.strokeStyle = colour;
+    if (vib) {
+      // A quarter-tone-wide wave is the shape to grow into; the dashed lines are
+      // the half-step edges it should stay inside.
+      g.fillStyle = accent;
+      g.globalAlpha = 0.08;
+      const top = yCents(TARGET_WIDTH / 2);
+      const bottom = yCents(-TARGET_WIDTH / 2);
+      g.fillRect(0, top, w, bottom - top);
+      g.globalAlpha = 1;
+      g.lineWidth = 2 * k;
+      g.setLineDash([6 * k, 6 * k]);
+      g.strokeStyle = line;
       g.globalAlpha = 0.7;
+      for (const cents of [-50, 50]) {
+        g.beginPath();
+        g.moveTo(0, yCents(cents));
+        g.lineTo(w, yCents(cents));
+        g.stroke();
+      }
+      g.setLineDash([]);
+      g.strokeStyle = gold;
+      g.globalAlpha = 0.9;
       g.beginPath();
-      g.moveTo(0, yy);
-      g.lineTo(w, yy);
+      g.moveTo(0, yCents(0));
+      g.lineTo(w, yCents(0));
       g.stroke();
+      g.globalAlpha = 1;
+    } else {
+      // the two notes
+      g.lineWidth = 2 * k;
+      g.setLineDash([6 * k, 6 * k]);
+      for (const [yy, colour] of [
+        [yLow, muted],
+        [yHigh, gold],
+      ]) {
+        g.strokeStyle = colour;
+        g.globalAlpha = 0.7;
+        g.beginPath();
+        g.moveTo(0, yy);
+        g.lineTo(w, yy);
+        g.stroke();
+      }
+      g.setLineDash([]);
+      g.globalAlpha = 1;
     }
-    g.setLineDash([]);
-    g.globalAlpha = 1;
 
     // the trail: where the pitch has been
     g.strokeStyle = accent;
@@ -404,13 +536,14 @@ export function createTrillView(deps) {
     let pen = false;
     let prev = null;
     for (const pt of run.trail) {
-      if (pt.p == null || (prev && pt.t - prev.t > 0.12)) {
+      const value = vib ? pt.c : pt.p;
+      if (value == null || (prev && pt.t - prev.t > 0.12)) {
         pen = false;
-        prev = pt.p == null ? null : pt;
-        if (pt.p == null) continue;
+        prev = value == null ? null : pt;
+        if (value == null) continue;
       }
       const px = x(pt.t);
-      const py = y(Math.max(-0.25, Math.min(1.25, pt.p)));
+      const py = y(vib ? Math.max(-100, Math.min(100, value)) : Math.max(-0.25, Math.min(1.25, value)));
       if (!pen) g.moveTo(px, py);
       else g.lineTo(px, py);
       pen = true;
@@ -418,21 +551,29 @@ export function createTrillView(deps) {
     }
     g.stroke();
 
-    // The names of the two notes, to the right of "now" where the trail never
-    // reaches, so the wave cannot run over them.
+    // Labels sit to the right of "now", where the trail never reaches.
     g.font = `600 ${13 * k}px ${css.getPropertyValue('--sans') || 'sans-serif'}`;
     g.textAlign = 'right';
     g.textBaseline = 'bottom';
-    g.fillStyle = gold;
-    g.fillText(run.notes.highName.replace(/\d+$/, ''), w - 10 * k, yHigh - 5 * k);
-    g.fillStyle = muted;
-    g.fillText(run.notes.lowName.replace(/\d+$/, ''), w - 10 * k, yLow - 5 * k);
-    g.font = `500 ${11 * k}px ${css.getPropertyValue('--sans') || 'sans-serif'}`;
-    g.textBaseline = 'top';
-    g.fillStyle = gold;
-    g.fillText(finger(run.notes.highFinger), w - 10 * k, yHigh + 5 * k);
-    g.fillStyle = muted;
-    g.fillText(finger(run.notes.lowFinger), w - 10 * k, yLow + 5 * k);
+    if (vib) {
+      g.fillStyle = gold;
+      g.fillText(run.notes.lowName.replace(/\d+$/, ''), w - 10 * k, yCents(0) - 5 * k);
+      g.font = `500 ${11 * k}px ${css.getPropertyValue('--sans') || 'sans-serif'}`;
+      g.textBaseline = 'top';
+      g.fillStyle = muted;
+      g.fillText('±50¢', w - 10 * k, yCents(50) - 5 * k);
+    } else {
+      g.fillStyle = gold;
+      g.fillText(run.notes.highName.replace(/\d+$/, ''), w - 10 * k, yHigh - 5 * k);
+      g.fillStyle = muted;
+      g.fillText(run.notes.lowName.replace(/\d+$/, ''), w - 10 * k, yLow - 5 * k);
+      g.font = `500 ${11 * k}px ${css.getPropertyValue('--sans') || 'sans-serif'}`;
+      g.textBaseline = 'top';
+      g.fillStyle = gold;
+      g.fillText(finger(run.notes.highFinger), w - 10 * k, yHigh + 5 * k);
+      g.fillStyle = muted;
+      g.fillText(finger(run.notes.lowFinger), w - 10 * k, yLow + 5 * k);
+    }
     g.textAlign = 'left';
 
     // "now", and the dot that rides the pitch
@@ -443,10 +584,13 @@ export function createTrillView(deps) {
     g.lineTo(nowX, h * 0.94);
     g.stroke();
     if (run.dot != null) {
-      const near = Math.min(Math.abs(run.dot), Math.abs(run.dot - 1)) * run.notes.interval * 100 < 28;
+      const near = vib
+        ? Math.abs(run.dot) <= TARGET_WIDTH / 2
+        : Math.min(Math.abs(run.dot), Math.abs(run.dot - 1)) * run.notes.interval * 100 < 28;
       g.fillStyle = near ? accent : ink;
       g.beginPath();
-      g.arc(nowX, y(Math.max(-0.25, Math.min(1.25, run.dot))), 9 * k, 0, Math.PI * 2);
+      const value = vib ? Math.max(-100, Math.min(100, run.dot)) : Math.max(-0.25, Math.min(1.25, run.dot));
+      g.arc(nowX, y(value), 9 * k, 0, Math.PI * 2);
       g.fill();
       g.strokeStyle = '#fff';
       g.lineWidth = 2 * k;
@@ -459,20 +603,57 @@ export function createTrillView(deps) {
     listening = false;
     cancelAnimationFrame(raf);
     // The microphone stays open for Again; leaving the screen closes it.
-    const result = Trill.analyse(run.frames, run.notes, { bpm: run.bpm, step: run.step });
-    const filed = Trill.recordRun(stats, run.notes, run.step, result, new Date().toISOString().slice(0, 10));
+    const day = new Date().toISOString().slice(0, 10);
+    let result;
+    let filed;
+    if (mode === 'vibrato') {
+      const m = analyseVibrato(run.frames, run.centre);
+      const target = run.step.per ? (run.step.per * run.bpm) / 60 : null;
+      const verdict = vibratoVerdict(m, target);
+      // recordRun keeps the step ladder and capped log; best is evenness here
+      // rather than the trill's pace.
+      result = { ...m, even: m.evenness ?? 0, verdict };
+      filed = Trill.recordRun(vstats, run.notes, run.step, result, day);
+      const set = vstats.sets[Trill.setKey(run.notes)];
+      if (set && !run.step.per && m.evenness != null) {
+        filed.best = Math.round(m.evenness);
+        filed.newBest = filed.best > set.best;
+        set.best = Math.max(set.best, filed.best);
+      }
+    } else {
+      result = Trill.analyse(run.frames, run.notes, { bpm: run.bpm, step: run.step });
+      filed = Trill.recordRun(stats, run.notes, run.step, result, day);
+    }
     save();
-    last = { result, filed, notes: run.notes, step: run.step, bpm: run.bpm };
+    last = { result, filed, notes: run.notes, step: run.step, bpm: run.bpm, mode };
     run = null;
     panel = 'done';
     paint();
-    // A take with a trill in it is practice, whatever was said about it.
-    if (result.cycles >= 4) deps.onFinish(last);
+    // A take with a real wave in it is practice, whatever was said about it.
+    if (result.cycles >= (mode === 'vibrato' ? 3 : 4)) deps.onFinish(last, mode);
+  }
+
+  /** A held note beneath an example wave, set to this step's rate and width. */
+  function playExample() {
+    const audio = deps.audio && deps.audio();
+    if (!audio || !audio.ctx) return;
+    const step = stepNow();
+    const rate = step.per ? (step.per * statsNow().opts.bpm) / 60 : 6;
+    bowedVoice(audio.ctx, audio.out).play({
+      midi: notesNow().low,
+      at: audio.ctx.currentTime + 0.05,
+      duration: 2.2,
+      gain: 0.5,
+      legato: true,
+      vibratoRate: rate,
+      vibratoCents: TARGET_WIDTH / 2,
+    });
   }
 
   // ── What was heard ─────────────────────────────────────────────────────
 
   function paintDone() {
+    if (last.mode === 'vibrato') return paintVibratoDone();
     const { result: r, filed, notes, step, bpm } = last;
     const v = r.verdict;
     const judged = r.cycles >= 4;
@@ -513,9 +694,42 @@ export function createTrillView(deps) {
       </div>`;
   }
 
+  function paintVibratoDone() {
+    const { result: r, filed, notes, step, bpm } = last;
+    const v = r.verdict;
+    const judged = r.cycles >= 3 && r.rate != null;
+    const next = Trill.STEPS[Trill.STEPS.findIndex((s) => s.id === step.id) + 1];
+    const tile = (label, value, sub, tone = '') =>
+      `<div class="trill-tile${tone ? ` is-${tone}` : ''}"><span class="trill-tile-label">${label}</span><b>${value}</b><span class="trill-tile-sub">${sub}</span></div>`;
+    const tiles = judged
+      ? `<div class="trill-tiles">
+          ${tile(t('vib.m.rate'), oneDp(r.rate), step.per ? t('vib.m.rate.per', { n: step.per * bpm / 60 }) : t('vib.m.rate.sec'))}
+          ${tile(t('vib.m.width'), Math.round(r.width), t('vib.m.width.cents', { n: Math.round(r.width) }))}
+          ${tile(t('vib.m.even'), `${Math.round(r.even)}%`, t(r.even >= 88 ? 'vib.m.even.very' : r.even >= EVEN_PASS ? 'vib.m.even.ok' : 'vib.m.even.no'), r.even >= EVEN_PASS ? 'good' : 'off')}
+          ${tile(t('vib.m.centre'), `${Math.round(r.centreOffset)}¢`, t('vib.m.centre.cents', { n: Math.round(r.centreOffset) }), Math.abs(r.centreOffset) <= 25 ? 'good' : 'off')}
+        </div>`
+      : '';
+    const note = notes.lowName.replace(/\d+$/, '');
+    body.innerHTML = `
+      <div class="trill-done${v.pass ? ' is-pass' : ''}">
+        <p class="trill-verdict">${t(`vib.v.${v.id}.title`)}</p>
+        <p class="trill-advice">${t(`vib.v.${v.id}.text`, { note, finger: finger(notes.lowFinger), n: step.per, bpm, cents: Math.round(r.centreOffset || 0) })}</p>
+        ${filed.newStep && step.per ? `<p class="trill-badge">${t('vib.done.step', { n: step.per })}</p>` : ''}
+        ${filed.newBest ? `<p class="trill-badge">${t('vib.done.best', { n: filed.best })}</p>` : ''}
+      </div>
+      ${tiles}
+      <div class="trill-actions">
+        ${v.pass && next ? `<button class="primary-btn" type="button" data-act="next" data-next="${next.id}">${t(next.per ? 'vib.next' : 'vib.next.free', { n: next.per })}</button>` : ''}
+        <button class="${v.pass && next ? 'quiet-btn' : 'primary-btn'}" type="button" data-act="again">${t('trill.again')}</button>
+        <button class="quiet-btn" type="button" data-act="change">${t('trill.change')}</button>
+        <button class="quiet-btn" type="button" data-act="stats">${t('trill.stats.open')}</button>
+      </div>`;
+  }
+
   // ── Stats ──────────────────────────────────────────────────────────────
 
   function paintStats() {
+    if (mode === 'vibrato') return paintVibratoStats();
     const sum = Trill.summary(stats);
     const total = Trill.STEPS.length;
     const backRow = `<div class="trill-actions"><button class="primary-btn" type="button" data-act="change">${t('trill.stats.back')}</button></div>`;
@@ -595,6 +809,42 @@ export function createTrillView(deps) {
       ${backRow}`;
   }
 
+  function paintVibratoStats() {
+    const sum = Trill.summary(vstats);
+    const backRow = `<div class="trill-actions"><button class="primary-btn" type="button" data-act="change">${t('trill.stats.back')}</button></div>`;
+    if (!sum.runs) {
+      body.innerHTML = `<h3 class="trill-stats-title">${t('vib.title')}</h3><p class="trill-howto">${t('trill.stats.empty')}</p>${backRow}`;
+      return;
+    }
+    const tile = (label, value, sub) =>
+      `<div class="trill-tile"><span class="trill-tile-label">${label}</span><b>${value}</b><span class="trill-tile-sub">${sub}</span></div>`;
+    const pts = sum.recent;
+    let chart = '';
+    if (pts.length >= 2) {
+      const W = 300;
+      const H = 90;
+      const x = (i) => 8 + (i * (W - 16)) / (pts.length - 1);
+      const y = (e) => H - 10 - (Math.max(30, Math.min(100, e)) - 30) * ((H - 20) / 70);
+      chart = `
+        <h4 class="trill-stats-sub">${t('trill.stats.recent', { n: pts.length })}</h4>
+        <svg class="trill-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('trill.stats.chartAria'))}">
+          <path class="trill-chart-pass" d="M0 ${y(EVEN_PASS)} H${W}"/>
+          <text class="trill-chart-text" x="2" y="${H - 1}">┄ ${t('trill.stats.passLine')}</text>
+          <path class="trill-chart-line" d="${pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p.e).toFixed(1)}`).join(' ')}"/>
+          ${pts.map((p, i) => `<circle class="${p.p ? 'is-pass' : 'is-miss'}" cx="${x(i).toFixed(1)}" cy="${y(p.e).toFixed(1)}" r="3.4"/>`).join('')}
+        </svg>`;
+    }
+    body.innerHTML = `
+      <h3 class="trill-stats-title">${t('vib.title')}</h3>
+      <div class="trill-tiles">
+        ${tile(t('trill.stats.takes'), sum.runs, t('trill.stats.days', { n: sum.days }))}
+        ${tile(t('trill.stats.steps'), sum.steps, t('trill.stats.steps.sub'))}
+        ${tile(t('vib.m.even'), sum.best || '–', t('vib.done.best', { n: sum.best || 0 }))}
+      </div>
+      ${chart}
+      ${backRow}`;
+  }
+
   // ── Wiring ─────────────────────────────────────────────────────────────
 
   root.addEventListener('click', (ev) => {
@@ -604,11 +854,20 @@ export function createTrillView(deps) {
       stopRun();
       panel = 'pick';
       deps.onBack();
+    } else if (b.dataset.mode) {
+      // The two modes share the screen and the microphone. Switching while a
+      // take is armed would feed the wrong target into it, so stop first.
+      if (run) stopRun();
+      mode = b.dataset.mode === 'vibrato' ? 'vibrato' : 'trill';
+      stepId = null;
+      last = null;
+      panel = 'pick';
+      paint();
     } else if (b.dataset.goPair) {
       // from the stats page: straight to that pair (and string, from the grid)
-      if (b.dataset.goString) stats.opts.string = b.dataset.goString;
-      stats.opts.pair = b.dataset.goPair;
-      stats.opts.spacing = '';
+      if (b.dataset.goString) statsNow().opts.string = b.dataset.goString;
+      statsNow().opts.pair = b.dataset.goPair;
+      statsNow().opts.spacing = '';
       stepId = null;
       panel = 'pick';
       save();
@@ -618,27 +877,29 @@ export function createTrillView(deps) {
       paint();
       root.scrollIntoView({ block: 'start' });
     } else if (b.dataset.string) {
-      stats.opts.string = b.dataset.string;
+      statsNow().opts.string = b.dataset.string;
       stepId = null;
       save();
       paint();
     } else if (b.dataset.pair) {
-      stats.opts.pair = b.dataset.pair;
-      stats.opts.spacing = ''; // each pair comes in its usual spacing first
+      statsNow().opts.pair = b.dataset.pair;
+      statsNow().opts.spacing = ''; // each pair comes in its usual spacing first
       stepId = null;
       save();
       paint();
     } else if (b.dataset.spacing) {
-      stats.opts.spacing = b.dataset.spacing;
+      statsNow().opts.spacing = b.dataset.spacing;
       stepId = null;
       save();
       paint();
     } else if (b.dataset.step) {
       stepId = b.dataset.step;
       paint();
+    } else if (b.dataset.act === 'example') {
+      playExample();
     } else if (b.dataset.tempo) {
-      const to = stats.opts.bpm + Number(b.dataset.tempo) * Trill.TEMPO.step;
-      stats.opts.bpm = Math.min(Trill.TEMPO.max, Math.max(Trill.TEMPO.min, to));
+      const to = statsNow().opts.bpm + Number(b.dataset.tempo) * Trill.TEMPO.step;
+      statsNow().opts.bpm = Math.min(Trill.TEMPO.max, Math.max(Trill.TEMPO.min, to));
       save();
       paint();
     } else if (b.dataset.act === 'start' || b.dataset.act === 'again') {
@@ -661,7 +922,7 @@ export function createTrillView(deps) {
   root.addEventListener('change', (ev) => {
     const box = ev.target.closest('input[data-opt]');
     if (!box || !stats) return;
-    stats.opts[box.dataset.opt] = box.checked;
+    statsNow().opts[box.dataset.opt] = box.checked;
     save();
   });
 
@@ -670,9 +931,12 @@ export function createTrillView(deps) {
   });
 
   return {
-    open() {
+    open(which = 'trill') {
+      mode = which === 'vibrato' ? 'vibrato' : 'trill';
       stats = Trill.loadStats(deps.profileId());
+      vstats = Trill.loadStats(vibProfile());
       stepId = null;
+      last = null;
       if (panel !== 'pick') panel = 'pick';
       paint();
     },
