@@ -57,6 +57,7 @@ const BASE = [
   'src/sprintview.js',
   'src/trill.js',
   'src/trillview.js',
+  'src/vibrato.js',
   'src/listen.js',
   'src/listenview.js',
   'src/musicxml.js',

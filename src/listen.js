@@ -22,6 +22,12 @@
 //     but mostly unclear is most likely playing along with something.
 
 import { segmentNotes, align } from './analyze.js?v=202611171850';
+import { vibratoOf, vibratoSummary } from './vibrato.js?v=202611171850';
+
+// Kept here as well: the Listen suite and older imports reach these through
+// listen.js. The measurement itself lives in vibrato.js so a trainer can use
+// the same code without pulling in the whole scorer.
+export { vibratoOf, vibratoSummary };
 
 const median = (xs) => {
   if (!xs.length) return null;
@@ -40,73 +46,6 @@ export function stringOf(midi) {
   if (midi < 69) return 'D';
   if (midi < 76) return 'A';
   return 'E';
-}
-
-/* ── Vibrato ───────────────────────────────────────────────────────────── */
-
-/**
- * The vibrato of one held note: { rate (Hz), width (cents, peak to peak) } or
- * null when there is none. The pitch inside the note, less its slow drift, is
- * counted for wobbles in the 4–8.5 Hz band.
- */
-export function vibratoOf(frames, note) {
-  if (note.t1 - note.t0 < 0.35) return null;
-  const inside = frames.filter(
-    (f) => f.t >= note.t0 && f.t <= note.t1 && f.freq > 0 && f.clarity >= 0.5,
-  );
-  if (inside.length < 10) return null;
-  const trim = Math.floor(inside.length * 0.12);
-  const core = inside.slice(trim, inside.length - trim);
-  if (core.length < 8) return null;
-  const cents = core.map((f) => (69 + 12 * Math.log2(f.freq / 440) - note.pitch) * 100);
-  // drop octave slips and other outliers before measuring
-  const clean = cents.map((c) => (Math.abs(c) > 120 ? 0 : c));
-  // remove the slow drift: a straight line through the note
-  const ts = core.map((f) => f.t);
-  const n = ts.length;
-  const mt = ts.reduce((a, b) => a + b, 0) / n;
-  const mc = clean.reduce((a, b) => a + b, 0) / n;
-  let num = 0;
-  let den = 0;
-  for (let i = 0; i < n; i++) {
-    num += (ts[i] - mt) * (clean[i] - mc);
-    den += (ts[i] - mt) ** 2;
-  }
-  const slope = den ? num / den : 0;
-  const flat = clean.map((c, i) => c - (mc + slope * (ts[i] - mt)));
-  // a light smoothing, so frame jitter is not counted as wobble
-  const sm = flat.map((v, i) => (flat[i - 1] ?? v) * 0.25 + v * 0.5 + (flat[i + 1] ?? v) * 0.25);
-  let crossings = 0;
-  for (let i = 1; i < sm.length; i++) if (Math.sign(sm[i]) !== Math.sign(sm[i - 1]) && sm[i] !== 0) crossings++;
-  const span = ts[ts.length - 1] - ts[0];
-  if (span <= 0) return null;
-  const rate = crossings / 2 / span;
-  const sorted = sm.slice().sort((a, b) => a - b);
-  // The smoothing shrinks a wobble as well as the jitter: by 0.5 + 0.5·cos(2π·f·dt)
-  // at f Hz, about 0.7 at 6 Hz with 30 ms frames. Put that back.
-  const dt = span / (ts.length - 1);
-  const gain = 0.5 + 0.5 * Math.cos(2 * Math.PI * rate * dt);
-  const width = (pct(sorted, 0.95) - pct(sorted, 0.05)) / Math.max(0.3, gain);
-  if (rate < 4 || rate > 8.5 || width < 12 || crossings < 5) return null;
-  return { rate, width };
-}
-
-function vibratoSummary(frames, notes) {
-  const held = notes.filter((n) => n.t1 - n.t0 >= 0.35);
-  const found = held.map((n) => vibratoOf(frames, n)).filter(Boolean);
-  if (held.length < 3) return { held: held.length, used: found.length, share: null, rate: null, width: null };
-  const rate = median(found.map((v) => v.rate));
-  const width = median(found.map((v) => v.width));
-  return {
-    held: held.length,
-    used: found.length,
-    share: found.length / held.length,
-    rate,
-    width,
-    // in words, against the violin's usual ~6 Hz and ~30 cents
-    speed: rate == null ? null : rate < 5 ? 'slow' : rate > 7 ? 'fast' : 'medium',
-    size: width == null ? null : width < 20 ? 'narrow' : width > 60 ? 'wide' : 'medium',
-  };
 }
 
 /* ── Loudness, stops, accompaniment ───────────────────────────────────── */

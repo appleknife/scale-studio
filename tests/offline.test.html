@@ -66,6 +66,7 @@
         log.push(`shell list: ${files.length} entries`);
         check(files.length > 15, `the shell list has only ${files.length} entries`);
         check(files.includes('index.html'), 'the shell list does not include the page itself');
+        check(files.includes('src/vibrato.js'), 'the vibrato measurement is not cached for offline use');
 
         const missing = [];
         for (const file of files) {

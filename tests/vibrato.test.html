@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Vibrato measurement</title>
+    <style>
+      body { font: 13px/1.5 ui-monospace, monospace; margin: 16px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', {
+          method: 'POST',
+          body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }),
+        });
+      });
+    </script>
+    <script type="module">
+      // The measurement that Listen uses, and the one a trainer will use, are the
+      // same code. Both are tested here with frames the app's own detector shape:
+      // 30 ms apart, A4 as the centre, cents as a sinusoid around it.
+      import { vibratoOf, analyseVibrato } from '../src/vibrato.js';
+
+      const problems = [];
+      const log = [];
+      const check = (ok, name) => {
+        if (!ok) problems.push(name);
+        return ok;
+      };
+      const near = (name, got, want, tol) => {
+        const ok = got != null && Math.abs(got - want) <= tol;
+        log.push(`${ok ? '✓' : '✗'} ${name}: ${got == null ? 'null' : got.toFixed(1)} (want ${want} ± ${tol})`);
+        if (!ok) problems.push(name);
+      };
+
+      const FR = 0.03;
+      function tone({ seconds = 3, rate = 6, width = 40, offset = 0, drift = 0, wobble = 0, centre = 69 }) {
+        const out = [];
+        for (let i = 0; i * FR <= seconds; i++) {
+          const t = i * FR;
+          // A slow modulation of the phase makes the cycles uneven without
+          // changing their average rate or the width of the wave.
+          const phase = 2 * Math.PI * rate * t + wobble * Math.sin(2 * Math.PI * 0.7 * t);
+          const cents = offset + drift * t + (width / 2) * Math.sin(phase);
+          out.push({
+            t,
+            freq: 440 * 2 ** ((centre + cents / 100 - 69) / 12),
+            clarity: 0.95,
+            rms: 0.05,
+          });
+        }
+        return out;
+      }
+
+      try {
+        const clean = tone({});
+        const a = analyseVibrato(clean, 69);
+        near('rate of a 6 Hz vibrato', a.rate, 6, 0.4);
+        near('width of a 40 cent vibrato', a.width, 40, 8);
+        near('well centred', a.centreOffset, 0, 2);
+        check(a.evenness >= 90, `an even vibrato scored ${a.evenness}`);
+        check(a.cycles >= 15, `only ${a.cycles} cycles found in three seconds`);
+        check(a.held > 2.5 && a.held <= 3, `held span ${a.held} is wrong`);
+
+        const sharp = analyseVibrato(tone({ offset: 20 }), 69);
+        near('a wave sitting sharp is reported, not corrected', sharp.centreOffset, 20, 2);
+
+        near('a narrow wave', analyseVibrato(tone({ width: 20 }), 69).width, 20, 7);
+        near('a wide wave', analyseVibrato(tone({ width: 60 }), 69).width, 60, 9);
+
+        const uneven = analyseVibrato(tone({ wobble: 1.2 }), 69);
+        log.push(`evenness: even ${a.evenness.toFixed(1)} · uneven ${uneven.evenness.toFixed(1)}`);
+        check(uneven.evenness < a.evenness - 10, 'uneven cycles were not penalised');
+        near('uneven playing still has the same average rate', uneven.rate, 6, 0.5);
+
+        const drift = analyseVibrato(tone({ width: 0, drift: 20 }), 69);
+        check(drift.rate == null && drift.cycles === 0, 'a slow slide was counted as vibrato');
+        near('a straight but sharp note still reports its centre', drift.centreOffset, 30, 3);
+
+        const late = analyseVibrato(tone({ seconds: 6 }), 69, { from: 3, to: 6 });
+        near('a take window measures only its own part', late.rate, 6, 0.5);
+
+        // The Listen path must be unchanged by the extraction.
+        const note = { t0: 0, t1: 3, pitch: 69 };
+        check(vibratoOf(tone({ width: 0 }), note) === null, 'a still note was called vibrato');
+        const v = vibratoOf(clean, note);
+        near('Listen still finds the rate', v && v.rate, 6, 0.5);
+        near('Listen still finds the width', v && v.width, 40, 9);
+      } catch (err) {
+        problems.push(`the test threw: ${err && err.message}`);
+      }
+
+      const ok = !problems.length;
+      document.getElementById('report').textContent = ok
+        ? `VIBRATO OK\n${log.join('\n')}`
+        : `VIBRATO FAILED\n${problems.join('\n')}\n\n${log.join('\n')}`;
+      document.title = ok ? 'VIBRATO OK' : 'VIBRATO FAILED';
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'vibrato', problems, log: log.join('\n') }),
+      });
+    </script>
+  </body>
+</html>
