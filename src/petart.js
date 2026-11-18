@@ -49,15 +49,17 @@ const RARE = {
   fox: { body: '#e6eef7', dark: '#6f87a3', belly: '#ffffff', tip: '#9fb4cc' },
 };
 
+// The open eyes sit in a group of their own, which the room shifts a little
+// towards whatever the pet is looking at (a finger, a bird at the window).
 const eyes = (lx, rx, y, r = 4.3) => `
-  <g class="pet-eyes">
+  <g class="pet-look"><g class="pet-eyes">
     <circle cx="${lx}" cy="${y}" r="${r}" fill="${INK}"/>
     <circle cx="${rx}" cy="${y}" r="${r}" fill="${INK}"/>
     <circle cx="${lx - r * 0.32}" cy="${y - r * 0.36}" r="${r * 0.36}" fill="#fff"/>
     <circle cx="${rx - r * 0.32}" cy="${y - r * 0.36}" r="${r * 0.36}" fill="#fff"/>
     <circle cx="${lx + r * 0.35}" cy="${y + r * 0.32}" r="${r * 0.16}" fill="#fff"/>
     <circle cx="${rx + r * 0.35}" cy="${y + r * 0.32}" r="${r * 0.16}" fill="#fff"/>
-  </g>
+  </g></g>
   <g class="pet-happy" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round">
     <path d="M${lx - 4} ${y + 1.5} q4 -5.5 8 0"/>
     <path d="M${rx - 4} ${y + 1.5} q4 -5.5 8 0"/>
@@ -222,11 +224,11 @@ const SHAPES = {
         </g>
         <path d="M46 56 q6 8 12 1 q-5 -2 -12 -1 z" fill="${c.fin}" stroke="${c.dark}" stroke-width="1.8" stroke-linejoin="round"/>
         <g class="pet-head">
-          <g class="pet-eyes">
+          <g class="pet-look"><g class="pet-eyes">
             <circle cx="37" cy="46" r="5.2" fill="${INK}"/>
             <circle cx="35.3" cy="44.2" r="1.9" fill="#fff"/>
             <circle cx="38.8" cy="47.8" r=".9" fill="#fff"/>
-          </g>
+          </g></g>
           <path class="pet-happy" d="M32.6 47 q4.4 -5.6 8.8 0" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>
           <path class="pet-sleep" d="M32.6 46 q4.4 3.6 8.8 0" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>
           <ellipse cx="38" cy="55" rx="4.2" ry="2.6" fill="${BLUSH}" opacity=".55"/>
@@ -1091,7 +1093,9 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     const at = where && where[id];
     return `${Math.round((at && at.x) || 0)} ${Math.round((at && at.y) || 0)}`;
   };
-  const item = (id, art) => `<g class="room-item" data-item="${id}" transform="translate(${off(id)})">${art}</g>`;
+  // The outer group is where it has been dragged to; the inner one is what a
+  // tap squashes and springs (the art inside keeps its own transforms).
+  const item = (id, art) => `<g class="room-item" data-item="${id}" transform="translate(${off(id)})"><g class="room-poke">${art}</g></g>`;
   return `
     <defs>
       ${w.pattern}

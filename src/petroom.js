@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611182140';
-import { currentSeason } from './season.js?v=202611182140';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611182140';
+import * as Pet from './pet.js?v=202611182230';
+import { currentSeason } from './season.js?v=202611182230';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611182230';
 import {
   petMarkup,
   eggMarkup,
@@ -33,8 +33,8 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611182140';
-import { t, getLang } from './i18n.js?v=202611182140';
+} from './petart.js?v=202611182230';
+import { t, getLang } from './i18n.js?v=202611182230';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -187,6 +187,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         ball = null;
       }
       drawAvatar();
+      // A soft shadow that stays on the floor: it shrinks and fades when the
+      // pet hops or is carried, which is what makes either read as a lift.
+      layers.shade = isFish() ? null : node('ellipse', { class: 'pet-shade', cx: 0, cy: 0, rx: 22, ry: 4.6 });
+      if (layers.shade) layers.stage.append(layers.shade);
       layers.petPos = node('g', { class: 'pet-pos' });
       layers.petFlip = node('g', { class: 'pet-flip' });
       layers.pet = node('g', { class: 'pet-hit', role: 'button', tabindex: '0', 'aria-label': t('pet.aria.pat', { name: pet.pet.name || kindOf(pet.pet) }) }, petMarkup(pet.pet.species, pet.pet.variant, Pet.stageOf(pet.pet)));
@@ -293,6 +297,36 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const ay = (isFish() ? 50 : 96) * s;
     layers.petPos.setAttribute('transform', `translate(${(pos.x - ax).toFixed(1)} ${(pos.y - ay).toFixed(1)}) scale(${s})`);
     layers.petFlip.setAttribute('transform', facing === -1 ? 'translate(100 0) scale(-1 1)' : '');
+    if (layers.shade) {
+      // on the floor under the pet, smaller the higher it is held
+      const ground = Math.max(pos.y, FLOOR_Y);
+      const lift = Math.min(1, Math.max(0, (ground - pos.y) / 160));
+      const k = s / PET_SCALE;
+      layers.shade.setAttribute('transform', `translate(${pos.x.toFixed(1)} ${(ground + 1).toFixed(1)}) scale(${(k * (1 - lift * 0.55)).toFixed(3)})`);
+      layers.shade.style.opacity = String(0.9 - lift * 0.6);
+    }
+  }
+
+  /**
+   * Eyes towards a point in the room — a finger, a bird, a piano being played.
+   * A little way only (a pupil's width), then back to the front after a while.
+   */
+  let lookTimer = 0;
+  function lookAt(x, y, hold = 1400) {
+    if (!layers.pet || mode === 'sleep') return;
+    const s = (isFish() ? FISH_SCALE : PET_SCALE) * (STAGE_SCALE[Pet.stageOf(pet.pet)] || 1);
+    const headY = pos.y - (isFish() ? 4 : 62) * s;
+    const dx = x - pos.x;
+    const dy = y - headY;
+    const d = Math.hypot(dx, dy) || 1;
+    const reach = Math.min(1, d / 60) * 1.9;
+    const lx = ((dx / d) * reach * facing).toFixed(2);
+    const ly = ((dy / d) * reach * 0.8).toFixed(2);
+    layers.pet.querySelectorAll('.pet-look').forEach((g) => g.setAttribute('transform', `translate(${lx} ${ly})`));
+    clearTimeout(lookTimer);
+    lookTimer = setTimeout(() => {
+      layers.pet?.querySelectorAll('.pet-look').forEach((g) => g.removeAttribute('transform'));
+    }, hold);
   }
 
   function setMode(next) {
@@ -456,6 +490,17 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     beginDrag(event, { kind: 'item', id: el.dataset.item, el, from: Pet.itemAt(pet, el.dataset.item) });
   });
 
+  // The pet watches a finger (or the mouse) moving about the room.
+  let lastLook = 0;
+  els.svg.addEventListener('pointermove', (event) => {
+    if (drag || !pet.pet || choosing) return;
+    const now = performance.now();
+    if (now - lastLook < 60) return;
+    lastLook = now;
+    const at = roomPoint(event);
+    lookAt(at.x, at.y, 1200);
+  });
+
   els.svg.addEventListener('pointermove', (event) => {
     if (!drag || event.pointerId !== drag.pointer) return;
     const at = roomPoint(event);
@@ -501,6 +546,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     }
     if (done.kind === 'item') {
       done.el.classList.remove('is-dragging');
+      if (!done.moved) useItem(done.id, done.el);
       if (done.moved) {
         pet.tips = { ...(pet.tips || {}), drag: true };
         save();
@@ -529,6 +575,180 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   // Where each thing stands before it is dragged anywhere, for the pet to walk to.
   const ITEM_X = { lamp: 364, plant: 34, stand: 96, bed: 296, rug: 200, bowl: 126, window: 96, picture: 309 };
+
+  // ── Things in the room that do something when tapped ──────────────────
+
+  /** A tiny synth for the room's sounds (the piano, the metronome, the clock). */
+  let sfx = null;
+  function tone(freq, at, dur = 0.5, { type = 'triangle', vol = 0.22 } = {}) {
+    try {
+      sfx = sfx || new (window.AudioContext || window.webkitAudioContext)();
+      if (sfx.state === 'suspended') sfx.resume().catch(() => {});
+      const t0 = sfx.currentTime + at;
+      const o = sfx.createOscillator();
+      const g = sfx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.linearRampToValueAtTime(vol, t0 + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g).connect(sfx.destination);
+      o.start(t0);
+      o.stop(t0 + dur + 0.05);
+    } catch {
+      /* no audio here — the room still moves */
+    }
+  }
+  const NOTE_HZ = { C4: 261.6, D4: 293.7, E4: 329.6, F4: 349.2, G4: 392, A4: 440, B4: 493.9, C5: 523.3, D5: 587.3, E5: 659.3, G5: 784 };
+  // Short tunes everyone knows, all old enough to belong to everyone.
+  const TUNES = [
+    ['C4', 'C4', 'G4', 'G4', 'A4', 'A4', 'G4'], // Twinkle, Twinkle
+    ['E4', 'E4', 'F4', 'G4', 'G4', 'F4', 'E4', 'D4'], // Ode to Joy
+    ['E4', 'D4', 'C4', 'D4', 'E4', 'E4', 'E4'], // Mary Had a Little Lamb
+    ['C5', 'G4', 'E4', 'G4', 'C5', 'E5', 'D5', 'C5'], // a run up and down
+  ];
+
+  /** Where a thing in the room is drawn now, in room units. */
+  function itemBox(el) {
+    const b = el.getBBox();
+    const at = Pet.itemAt(pet, el.dataset.item);
+    return { x: b.x + at.x, y: b.y + at.y, w: b.width, h: b.height, cx: b.x + at.x + b.width / 2, cy: b.y + at.y + b.height / 2 };
+  }
+
+  /** Little notes rising out of something, as the hearts rise out of the pet. */
+  function notesFrom(x, y, n = 4) {
+    for (let i = 0; i < n; i += 1) {
+      const g = node('g', { class: 'fx-heart fx-note', transform: `translate(${(x + rand(-18, 18)).toFixed(1)} ${(y + rand(-4, 4)).toFixed(1)})` });
+      const s = node('text', { 'text-anchor': 'middle', fill: pick(['#6c5ce7', '#e17055', '#00a383', '#d63384']) });
+      s.textContent = pick(['♪', '♫', '♩']);
+      s.style.animationDelay = `${i * 260}ms`;
+      g.append(s);
+      layers.fx.append(g);
+      later(() => g.remove(), 1800 + i * 260);
+    }
+  }
+
+  /** A quick squash and spring, so everything answers a tap. */
+  function boing(el, cls = 'is-poked', ms = 600) {
+    const inner = el.querySelector(':scope > .room-poke') || el;
+    inner.classList.remove(cls);
+    void inner.getBoundingClientRect();
+    inner.classList.add(cls);
+    later(() => inner.classList.remove(cls), ms);
+  }
+
+  /** The pet goes over to something, if it is free to. */
+  function goSee(box, then) {
+    if (isFish() || busy || held || mode === 'sleep' || mode === 'eat') return false;
+    const beside = Math.min(360, Math.max(40, box.cx + (box.cx > pos.x ? -box.w / 2 - 22 : box.w / 2 + 22)));
+    walkTo(beside, FLOOR_Y, () => {
+      facing = box.cx > pos.x ? 1 : -1;
+      placePet();
+      then?.();
+    }, 110);
+    return true;
+  }
+
+  function useItem(id, el) {
+    if (!pet.pet || choosing) return;
+    lastTouch = Date.now();
+    const box = itemBox(el);
+    lookAt(box.cx, box.cy, 1800);
+    if (mode === 'sleep' && id !== 'bed') setMode('idle');
+    switch (id) {
+      case 'piano': {
+        boing(el);
+        const tune = pick(TUNES);
+        tune.forEach((n, i) => tone(NOTE_HZ[n], i * 0.28, 0.7));
+        notesFrom(box.cx, box.y + 4, Math.min(6, tune.length));
+        // the pet comes over and enjoys the music
+        goSee(box, () => {
+          setMode('happy');
+          hearts(2);
+          say(t('pet.say.music'), 1800);
+          later(() => mode === 'happy' && setMode('idle'), 1600);
+        });
+        break;
+      }
+      case 'metronome': {
+        boing(el, 'is-fast', 2600);
+        for (let i = 0; i < 6; i += 1) tone(i % 3 === 0 ? 1760 : 1320, i * 0.4, 0.06, { type: 'square', vol: 0.05 });
+        break;
+      }
+      case 'clock':
+        boing(el);
+        tone(NOTE_HZ.G5, 0, 0.9, { type: 'sine', vol: 0.16 });
+        tone(NOTE_HZ.E5, 0.45, 1.1, { type: 'sine', vol: 0.16 });
+        say(t('pet.say.tick'), 1500);
+        break;
+      case 'beanbag':
+        boing(el, 'is-squish', 700);
+        // flops onto it
+        if (!isFish() && !busy && !held && mode !== 'eat') {
+          walkTo(box.cx, FLOOR_Y + Math.min(0, Pet.itemAt(pet, 'beanbag').y), () => {
+            hop();
+            setMode('happy');
+            say(t('pet.say.comfy'), 1800);
+            later(() => mode === 'happy' && setMode('idle'), 1500);
+          }, 110);
+        }
+        break;
+      case 'bed':
+        boing(el, 'is-squish', 700);
+        if (!isFish() && mode !== 'sleep' && !busy && !held) {
+          say(t('pet.say.sleepy'), 1400);
+          later(() => {
+            const bed = bedAt();
+            walkTo(bed.x, bed.y, () => setMode('sleep'), 60);
+          }, 600);
+        }
+        break;
+      case 'toybox': {
+        boing(el);
+        const toy = node('g', { class: 'fx-toy', transform: `translate(${box.cx.toFixed(1)} ${(box.y + 8).toFixed(1)})` });
+        toy.innerHTML = pick([
+          '<circle r="7" fill="#ffd166" stroke="#d9a62e" stroke-width="1.6"/><path d="M-7 0 h14" stroke="#e07a5f" stroke-width="2"/>',
+          '<path d="M0 -8 L2.4 -2.4 L8 -2 L3.6 1.8 L5 7.6 L0 4.4 L-5 7.6 L-3.6 1.8 L-8 -2 L-2.4 -2.4 Z" fill="#fff1a8" stroke="#d9b02e" stroke-width="1.4"/>',
+          '<rect x="-6" y="-6" width="12" height="12" rx="2" fill="#a6d8a9" stroke="#5e9e63" stroke-width="1.6"/><text y="4" text-anchor="middle" font-size="9" font-weight="700" fill="#2f5d34">A</text>',
+        ]);
+        layers.fx.append(toy);
+        later(() => toy.remove(), 1300);
+        goSee(box, () => {
+          hop();
+          later(hop, 350);
+          setMode('happy');
+          say(t('pet.say.toy'), 1600);
+          later(() => mode === 'happy' && setMode('idle'), 1400);
+        });
+        break;
+      }
+      case 'window': {
+        // a bird flies past outside, and the pet watches it go
+        const bird = node('g', { class: 'fx-bird' });
+        bird.innerHTML = '<path d="M-6 0 q3 -4 6 0 q3 -4 6 0" fill="none" stroke="#3d4a5c" stroke-width="1.8" stroke-linecap="round"/>';
+        bird.setAttribute('transform', `translate(${(box.x + 10).toFixed(1)} ${(box.y + box.h * 0.35).toFixed(1)})`);
+        bird.style.setProperty('--fly', `${Math.max(30, box.w - 20)}px`);
+        layers.fx.append(bird);
+        later(() => bird.remove(), 1700);
+        for (let i = 0; i <= 4; i += 1) later(() => lookAt(box.x + 10 + ((box.w - 20) * i) / 4, box.y + box.h * 0.35, 500), i * 320);
+        later(() => say(t('pet.say.bird'), 1500), 500);
+        break;
+      }
+      case 'plant':
+      case 'flowers':
+      case 'xmas-tree':
+        boing(el, 'is-sway', 1200);
+        sparkles(box.cx, box.y + 10, 5);
+        break;
+      case 'lamp':
+        boing(el);
+        tone(2200, 0, 0.03, { type: 'square', vol: 0.04 });
+        break;
+      default:
+        boing(el);
+        sparkles(box.cx, box.cy, 4);
+    }
+  }
 
   /** Something has been moved: now and then the pet trots over to see, and approves. */
   function admire(id) {
@@ -656,9 +876,15 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         else walkTo(rand(70, 340), FLOOR_Y, null, 62);
       } else if (roll < 0.7 && Pet.wantsSnack(pet)) {
         say(`${t('pet.wish')} ${foodIcon(Pet.snackFor(pet.pet.species, 'treat').look)}`, 2600);
-      } else if (roll < 0.8) {
+      } else if (roll < 0.76) {
         hop();
-      } else if (roll < 0.88 && pet.pet.variant === 'rare') {
+      } else if (roll < 0.84) {
+        // looks one way, then the other, as if it heard something
+        lookAt(pos.x - 120, pos.y - 90, 900);
+        later(() => lookAt(pos.x + 120, pos.y - 70, 900), 1000);
+      } else if (roll < 0.88) {
+        stretch();
+      } else if (roll < 0.92 && pet.pet.variant === 'rare') {
         // A rare one shimmers now and then, just a little.
         sparkles(pos.x, pos.y - (isFish() ? 10 : 36), 6);
       }
@@ -673,9 +899,37 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     void root.getBoundingClientRect();
     root.classList.add('is-hop');
     setTimeout(() => root.classList.remove('is-hop'), 700);
+    if (layers.shade) {
+      const sh = layers.shade;
+      sh.classList.remove('is-hop');
+      void sh.getBoundingClientRect();
+      sh.classList.add('is-hop');
+      setTimeout(() => sh.classList.remove('is-hop'), 700);
+    }
+  }
+
+  /** A stretch: up tall, then down into a little squash — before a nap, or just because. */
+  function stretch() {
+    const root = layers.pet?.querySelector('.pet');
+    if (!root) return;
+    root.classList.remove('is-stretch');
+    void root.getBoundingClientRect();
+    root.classList.add('is-stretch');
+    setTimeout(() => root.classList.remove('is-stretch'), 1300);
   }
 
   function goToSleep() {
+    if (!isFish() && mode !== 'sleep' && !goToSleep.yawned) {
+      // a yawn and a stretch first, then off to bed
+      goToSleep.yawned = true;
+      stretch();
+      say(t('pet.say.sleepy'), 1400);
+      later(() => {
+        goToSleep.yawned = false;
+        if (mode === 'idle' && !held && !busy) goToSleep();
+      }, 1500);
+      return;
+    }
     if (!isFish() && pet.placed.includes('bed')) {
       const bed = bedAt();
       walkTo(bed.x, bed.y, () => setMode('sleep'), 50);

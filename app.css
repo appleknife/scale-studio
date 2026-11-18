@@ -7923,3 +7923,166 @@ select,
 .sprint-loupe.is-off::after {
   border-top-color: #6d6259;
 }
+
+/* ── Pet room: shadow, glances, stretches, things that answer a tap ────── */
+
+.pet-shade {
+  fill: rgba(60, 40, 20, 0.16);
+  pointer-events: none;
+  transform-box: fill-box;
+}
+
+.pet-shade.is-hop {
+  animation: shade-hop 0.7s ease-out;
+}
+
+@keyframes shade-hop {
+  30% {
+    opacity: 0.35;
+    rx: 16;
+  }
+}
+
+.pet .pet-look {
+  transition: transform 0.25s ease-out;
+}
+
+.pet.is-stretch {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pet-stretch 1.2s ease-in-out;
+}
+
+@keyframes pet-stretch {
+  35% {
+    transform: scale(0.94, 1.1);
+  }
+  65% {
+    transform: scale(1.08, 0.9);
+  }
+}
+
+.room-poke {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.room-poke.is-poked {
+  animation: item-poke 0.55s ease-out;
+}
+
+@keyframes item-poke {
+  25% {
+    transform: scale(1.06, 0.92);
+  }
+  55% {
+    transform: scale(0.97, 1.05);
+  }
+}
+
+.room-poke.is-squish {
+  animation: item-squish 0.7s ease-out;
+}
+
+@keyframes item-squish {
+  30% {
+    transform: scale(1.12, 0.84);
+  }
+  60% {
+    transform: scale(0.96, 1.06);
+  }
+}
+
+.room-poke.is-sway {
+  animation: item-sway 1.2s ease-in-out;
+}
+
+@keyframes item-sway {
+  25% {
+    transform: rotate(-5deg);
+  }
+  60% {
+    transform: rotate(4deg);
+  }
+  85% {
+    transform: rotate(-1.5deg);
+  }
+}
+
+.room-poke.is-fast .metro-arm {
+  animation-duration: 0.4s;
+}
+
+.fx-note text {
+  font: 700 15px var(--sans);
+  animation: heart-up 1.6s ease-out forwards;
+  opacity: 0;
+}
+
+.fx-toy > * {
+  animation: toy-pop 1.2s cubic-bezier(0.2, 0.8, 0.4, 1) forwards;
+}
+
+@keyframes toy-pop {
+  0% {
+    transform: translateY(6px) scale(0.4);
+    opacity: 0;
+  }
+  35% {
+    transform: translateY(-34px) scale(1.1) rotate(160deg);
+    opacity: 1;
+  }
+  75% {
+    transform: translateY(-4px) scale(1) rotate(320deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(4px) scale(0.6) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.fx-bird > path {
+  animation: bird-fly 1.6s ease-in-out forwards;
+}
+
+@keyframes bird-fly {
+  0% {
+    transform: translate(0, 0) scaleY(1);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  25% {
+    transform: translate(calc(var(--fly) * 0.25), -4px) scaleY(-0.6);
+  }
+  50% {
+    transform: translate(calc(var(--fly) * 0.5), 2px) scaleY(1);
+  }
+  75% {
+    transform: translate(calc(var(--fly) * 0.75), -5px) scaleY(-0.6);
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--fly), -2px) scaleY(1);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet.is-stretch,
+  .room-poke.is-poked,
+  .room-poke.is-squish,
+  .room-poke.is-sway,
+  .fx-toy > *,
+  .fx-bird > path,
+  .pet-shade.is-hop {
+    animation: none;
+  }
+  .pet .pet-look {
+    transition: none;
+  }
+}
