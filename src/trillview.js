@@ -13,12 +13,12 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611181845';
-import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181845';
-import * as Vibrato from './vibrato.js?v=202611181845';
-import { bowedVoice } from './playback.js?v=202611181845';
-import { t } from './i18n.js?v=202611181845';
-import { hearLevel } from './pitch.js?v=202611181845';
+import * as Trill from './trill.js?v=202611181900';
+import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181900';
+import * as Vibrato from './vibrato.js?v=202611181900';
+import { bowedVoice } from './playback.js?v=202611181900';
+import { t } from './i18n.js?v=202611181900';
+import { hearLevel } from './pitch.js?v=202611181900';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -301,18 +301,23 @@ export function createTrillView(deps) {
     const audio = deps.audio && deps.audio();
     if (!audio || !audio.ctx) return;
     const ctx = audio.ctx;
-    const length = Math.floor(ctx.sampleRate * 0.03);
+    // Loud enough to hear over a violin under your chin: a wider band of noise
+    // that dies away fast (a woodblock's crack, not a hiss), about 12 dB above
+    // the first version — which sat 6 dB under the sight-reading click, and on
+    // an iPad, with the microphone open, under the violin as well.
+    const length = Math.floor(ctx.sampleRate * 0.05);
     const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
     const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 2;
+    const fall = ctx.sampleRate * 0.012;
+    for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / fall);
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = strong ? 2600 : 1900;
-    filter.Q.value = 1.2;
+    filter.frequency.value = strong ? 2400 : 1800;
+    filter.Q.value = 0.7;
     const gain = ctx.createGain();
-    gain.gain.value = strong ? 0.9 : 0.6;
+    gain.gain.value = strong ? 3.2 : 2.4;
     src.connect(filter).connect(gain).connect(audio.out);
     src.start(Math.max(ctx.currentTime, when));
   }
