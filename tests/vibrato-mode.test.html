@@ -36,7 +36,7 @@
         check(Boolean(body.querySelector('[data-position="1"]')), 'first position is missing');
         const firstStep = body.querySelector('.trill-ladder .trill-step');
         check(Boolean(firstStep) && firstStep.dataset.step === 'free' && firstStep.classList.contains('is-on'), 'free is not the first, selected step');
-        check(/F♯/.test(body.querySelector('.trill-notes').textContent), 'the default centre note is not F♯');
+        check(/E/.test(body.querySelector('.trill-notes').textContent), 'the default centre note is not E');
         check(!/open string/i.test(body.querySelector('.trill-notes').textContent), 'the centre note is shown as an open string');
         check(!body.querySelector('[data-tempo]'), 'the click and tempo are shown for the free vibrato');
         check(Boolean(body.querySelector('[data-act="example"]')), 'there is no example button');

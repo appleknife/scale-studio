@@ -120,7 +120,11 @@
         check(centreFor({ ...first, placement: 'low' }).name === 'B♭', 'low 1 on A is not B♭');
         check(centreFor({ ...first, finger: '2', placement: 'low' }).name === 'C', 'low 2 on A is not C');
         check(centreFor({ ...first, finger: '2', placement: 'high' }).name === 'C♯', 'high 2 on A is not C♯');
-        check(centreFor({ ...first, position: '3' }).name === 'E', 'third-position high 1 on A is not E');
+        check(centreFor({ ...first, position: '3' }).name === 'D', 'third-position high 1 on A is not D');
+        check(centreFor({ string: 'G', position: '3', finger: '1', placement: 'high' }).name === 'C', 'third-position high 1 on G is not C');
+        check(centreFor({ string: 'D', position: '3', finger: '1', placement: 'high' }).name === 'G', 'third-position high 1 on D is not G');
+        check(centreFor({ string: 'E', position: '3', finger: '1', placement: 'high' }).name === 'A', 'third-position high 1 on E is not A');
+        check(centreFor({ string: 'A', position: '3', finger: '2', placement: 'high' }).name === 'E', 'third-position high 2 on A is not E');
 
         const opens = { G: 55, D: 62, A: 69, E: 76 };
         let openTouched = false;

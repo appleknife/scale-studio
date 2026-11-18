@@ -10,7 +10,7 @@
 // Both work on the app's ~30 ms pitch frames. The pitch inside a note is detrended
 // before anything is counted: a slow slide is intonation, not vibrato.
 
-import { STRINGS, TEMPO, stringById } from './trill.js?v=202611181400';
+import { STRINGS, TEMPO, stringById } from './trill.js?v=202611181600';
 
 const median = (xs) => {
   if (!xs.length) return null;
@@ -196,9 +196,11 @@ export function analyseVibrato(frames, centreMidi, { from = -Infinity, to = Infi
 // Third position is the starting point: the hand has room to rock, and a low
 // first finger no longer rolls off toward the open string. First position stays
 // available for players who cannot reach the third yet. The offsets are
-// semitones above the open string; third position sits a fifth higher.
+// semitones above the open string. A hand in third position puts finger 1
+// where finger 3 sat in first position — on A, D5 instead of B4 — so the shift
+// from first position is three semitones, not five.
 export const POSITIONS = [
-  { id: '3', semitones: 5 },
+  { id: '3', semitones: 3 },
   { id: '1', semitones: 0 },
 ];
 
