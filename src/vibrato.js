@@ -10,7 +10,7 @@
 // Both work on the app's ~30 ms pitch frames. The pitch inside a note is detrended
 // before anything is counted: a slow slide is intonation, not vibrato.
 
-import { STEPS, TEMPO, stringById, pairById } from './trill.js?v=202611181200';
+import { STRINGS, TEMPO, stringById } from './trill.js?v=202611181400';
 
 const median = (xs) => {
   if (!xs.length) return null;
@@ -191,6 +191,64 @@ export function analyseVibrato(frames, centreMidi, { from = -Infinity, to = Infi
   return result;
 }
 
+/* ── Which note ─────────────────────────────────────────────────────────── */
+
+// Third position is the starting point: the hand has room to rock, and a low
+// first finger no longer rolls off toward the open string. First position stays
+// available for players who cannot reach the third yet. The offsets are
+// semitones above the open string; third position sits a fifth higher.
+export const POSITIONS = [
+  { id: '3', semitones: 5 },
+  { id: '1', semitones: 0 },
+];
+
+// A stopped finger has one or two places. There is deliberately no "open" and
+// no whole-step spread: a vibrato lives inside the half step around its note.
+export const FINGERS = [
+  { id: '1', options: [{ id: 'low', semis: 1 }, { id: 'high', semis: 2 }] },
+  { id: '2', options: [{ id: 'low', semis: 3 }, { id: 'high', semis: 4 }] },
+  { id: '3', options: [{ id: 'normal', semis: 5 }, { id: 'high', semis: 6 }] },
+  { id: '4', options: [{ id: 'normal', semis: 7 }] },
+];
+
+// Free is first: a natural, even wave is the exercise, not the last rung.
+export const STEPS = [
+  { id: 'free', per: 0 },
+  { id: 'two', per: 2 },
+  { id: 'three', per: 3 },
+  { id: 'four', per: 4 },
+  { id: 'six', per: 6 },
+  { id: 'eight', per: 8 },
+];
+
+const NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'B♭', 'B'];
+export const nameOf = (midi) => NAMES[((midi % 12) + 12) % 12];
+
+export const stepById = (id) => STEPS.find((s) => s.id === id) || STEPS[0];
+export const positionById = (id) => POSITIONS.find((p) => p.id === id) || POSITIONS[0];
+export const fingerById = (id) => FINGERS.find((f) => f.id === id) || FINGERS[1];
+export const placementById = (finger, id) =>
+  finger.options.find((o) => o.id === id) || finger.options[0];
+
+/** The one stopped note a vibrato rolls around, and its half-step neighbours. */
+export function centreFor(opts) {
+  const open = (STRINGS.find((s) => s.id === opts.string) || STRINGS[2]).midi;
+  const position = positionById(opts.position);
+  const finger = fingerById(opts.finger);
+  const placement = placementById(finger, opts.placement);
+  const midi = open + position.semitones + placement.semis;
+  return {
+    midi,
+    name: nameOf(midi),
+    below: nameOf(midi - 1),
+    above: nameOf(midi + 1),
+    finger: finger.id,
+    placement: placement.id,
+    position: position.id,
+    string: (STRINGS.find((s) => s.id === opts.string) || STRINGS[2]).id,
+  };
+}
+
 /* ── What is remembered ─────────────────────────────────────────────────── */
 
 export function storageKey(profileId) {
@@ -200,8 +258,9 @@ export function storageKey(profileId) {
 export function emptyStats() {
   return {
     v: 1,
-    // The middle finger of the pair is the usual first vibrato finger.
-    opts: { string: 'A', pair: '23', spacing: 'half', bpm: TEMPO.start, click: true },
+    // Third position, second finger: the hand has room and the finger is a
+    // comfortable one to start a vibrato with.
+    opts: { string: 'A', position: '3', finger: '2', placement: 'high', bpm: TEMPO.start, click: true },
     sets: {},
     runs: 0,
     log: [],
@@ -209,7 +268,7 @@ export function emptyStats() {
 }
 
 export const LOG_LIMIT = 300;
-const setKey = (notes) => `${notes.string}:${notes.pair}:${notes.spacing}`;
+export const setKey = (opts) => `${opts.string}:${opts.position}:${opts.finger}:${opts.placement}`;
 
 export function loadStats(profileId, store = localStorage) {
   const base = emptyStats();
@@ -220,7 +279,9 @@ export function loadStats(profileId, store = localStorage) {
     if (!parsed || typeof parsed !== 'object') return base;
     const opts = { ...base.opts, ...(parsed.opts && typeof parsed.opts === 'object' ? parsed.opts : {}) };
     opts.string = stringById(opts.string).id;
-    opts.pair = pairById(opts.pair).id;
+    opts.position = positionById(opts.position).id;
+    opts.finger = fingerById(opts.finger).id;
+    opts.placement = placementById(fingerById(opts.finger), opts.placement).id;
     opts.bpm = Math.min(TEMPO.max, Math.max(TEMPO.min, Math.round(Number(opts.bpm)) || TEMPO.start));
     opts.click = opts.click !== false;
     const sets = {};
@@ -261,11 +322,11 @@ export function saveStats(profileId, stats, store = localStorage) {
   }
 }
 
-export const doneFor = (stats, notes) => stats.sets[setKey(notes)]?.done || [];
+export const doneFor = (stats, opts) => stats.sets[setKey(opts)]?.done || [];
 
-/** The first step not yet passed for these fingers, or the natural wave. */
-export function nextStep(stats, notes) {
-  const done = doneFor(stats, notes);
+/** The first step not yet passed for this note, or the natural wave. */
+export function nextStep(stats, opts) {
+  const done = doneFor(stats, opts);
   return STEPS.find((s) => !done.includes(s.id)) || STEPS[STEPS.length - 1];
 }
 
@@ -273,8 +334,8 @@ export function nextStep(stats, notes) {
  * File a take. A passed step is ticked; a free wave keeps its most even result
  * rather than its rate — rate and width are style, evenness is the progress.
  */
-export function recordRun(stats, notes, step, result, day = '') {
-  const key = setKey(notes);
+export function recordRun(stats, opts, step, result, day = '') {
+  const key = setKey(opts);
   const set = stats.sets[key] || { done: [], best: 0, runs: 0, last: '' };
   set.runs += 1;
   set.last = day;

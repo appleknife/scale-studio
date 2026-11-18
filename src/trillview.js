@@ -13,12 +13,12 @@
 // down too long draws a wave with flat tops. Most of what the result panel says
 // can be seen there first.
 
-import * as Trill from './trill.js?v=202611181200';
-import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181200';
-import * as Vibrato from './vibrato.js?v=202611181200';
-import { bowedVoice } from './playback.js?v=202611181200';
-import { t } from './i18n.js?v=202611181200';
-import { hearLevel } from './pitch.js?v=202611181200';
+import * as Trill from './trill.js?v=202611181400';
+import { TARGET_WIDTH, EVEN_PASS } from './vibrato.js?v=202611181400';
+import * as Vibrato from './vibrato.js?v=202611181400';
+import { bowedVoice } from './playback.js?v=202611181400';
+import { t } from './i18n.js?v=202611181400';
+import { hearLevel } from './pitch.js?v=202611181400';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -58,7 +58,9 @@ export function createTrillView(deps) {
     const o = statsNow().opts;
     return Trill.notesFor(o.string, o.pair, o.spacing);
   };
-  const stepNow = () => Trill.stepById(stepId || 'free');
+  const stepNow = () =>
+    mode === 'vibrato' ? Vibrato.stepById(stepId || 'free') : Trill.stepById(stepId || 'free');
+  const vibTarget = () => Vibrato.centreFor(vstats.opts);
   const save = () => {
     if (mode === 'vibrato') Vibrato.saveStats(deps.profileId(), vstats);
     else Trill.saveStats(deps.profileId(), stats);
@@ -172,16 +174,25 @@ export function createTrillView(deps) {
 
   function paintVibratoPick() {
     const o = vstats.opts;
-    const notes = notesNow();
+    const target = vibTarget();
     const step = stepNow();
     const strings = Trill.STRINGS.map(
       (s) => `<button class="chip" type="button" data-string="${s.id}" aria-pressed="${o.string === s.id}">${t('trill.string', { s: s.id })}</button>`,
     ).join('');
-    const pairs = Trill.PAIRS.map(
-      (p) => `<button class="chip" type="button" data-pair="${p.id}" aria-pressed="${o.pair === p.id}">${t(`trill.pair.${p.id}`)}</button>`,
+    // Third position first: it is where the hand has room to rock. First
+    // position stays here for players who cannot reach the third yet.
+    const positions = Vibrato.POSITIONS.map(
+      (p) => `<button class="chip" type="button" data-position="${p.id}" aria-pressed="${o.position === p.id}">${t(`vib.position.${p.id}`)}</button>`,
     ).join('');
-    const ladder = Trill.STEPS.map((s) => {
-      const isDone = Vibrato.doneFor(vstats, notes).includes(s.id);
+    const fingers = Vibrato.FINGERS.map(
+      (f) => `<button class="chip" type="button" data-finger="${f.id}" aria-pressed="${o.finger === f.id}">${finger(f.id)}</button>`,
+    ).join('');
+    const placements = Vibrato.fingerById(o.finger).options.map((choice) => {
+      const note = Vibrato.centreFor({ ...o, placement: choice.id });
+      return `<button class="chip" type="button" data-placement="${choice.id}" aria-pressed="${o.placement === choice.id}">${esc(note.name)} <span class="chip-sub">${t(`vib.place.${choice.id}`)}</span></button>`;
+    }).join('');
+    const ladder = Vibrato.STEPS.map((s) => {
+      const isDone = Vibrato.doneFor(vstats, o).includes(s.id);
       const on = s.id === step.id;
       return `<button class="trill-step${on ? ' is-on' : ''}${isDone ? ' is-done' : ''}" type="button" data-step="${s.id}" aria-pressed="${on}">
           <span class="trill-step-n">${s.per ? s.per : '∞'}</span>
@@ -197,19 +208,21 @@ export function createTrillView(deps) {
         <div class="chip-row">${strings}</div>
       </div>
       <div class="trill-group">
-        <span class="trill-label">${t('trill.label.fingers')}</span>
-        <div class="chip-row">${pairs}</div>
+        <span class="trill-label">${t('vib.position')}</span>
+        <div class="chip-row">${positions}</div>
       </div>
       <div class="trill-group">
-        <span class="trill-label">${t('trill.label.spacing')}</span>
-        <div class="segmented small">
-          <button type="button" data-spacing="whole" aria-selected="${notes.spacing === 'whole'}">${t('trill.spacing.whole')}</button>
-          <button type="button" data-spacing="half" aria-selected="${notes.spacing === 'half'}">${t('trill.spacing.half')}</button>
-        </div>
+        <span class="trill-label">${t('trill.label.fingers')}</span>
+        <div class="chip-row">${fingers}</div>
+      </div>
+      <div class="trill-group">
+        <span class="trill-label">${t('vib.placement')}</span>
+        <div class="chip-row">${placements}</div>
       </div>
       <p class="trill-notes">
-        <span class="trill-note is-low"><b>${esc(notes.lowName.replace(/\d+$/, ''))}</b> ${t(notes.lowFinger === 0 ? 'trill.hold.open' : 'trill.hold', { finger: finger(notes.lowFinger) })}</span>
+        <span class="trill-note is-low"><b>${esc(target.name)}</b> ${esc(t(`vib.position.${target.position}`))} · ${finger(target.finger)}</span>
       </p>
+      <p class="trill-ask">${t('vib.roll', { note: esc(target.name), below: esc(target.below) })}</p>
       <div class="trill-group">
         <span class="trill-label">${t('vib.label.step')}</span>
         <div class="trill-ladder">${ladder}</div>
@@ -219,6 +232,7 @@ export function createTrillView(deps) {
           ? t('vib.ask.measured', { n: step.per, bpm: o.bpm, beats: Trill.TAKE_BEATS })
           : t('vib.ask.free', { secs: Trill.FREE_SECONDS })
       }</p>
+      ${step.per ? `
       <div class="trill-opts">
         <div class="trill-tempo">
           <span>${t('trill.tempo')}</span>
@@ -228,7 +242,7 @@ export function createTrillView(deps) {
         </div>
         <label class="switch-row"><input type="checkbox" data-opt="click" ${o.click ? 'checked' : ''}/>
           <span><b>${t('trill.opt.click')}</b><span class="switch-sub">${t('trill.opt.click.sub')}</span></span></label>
-      </div>
+      </div>` : ''}
       <div class="trill-actions">
         <button class="primary-btn" type="button" data-act="start">${t('trill.start')}</button>
         <button class="quiet-btn" type="button" data-act="example">${t('vib.example')}</button>
@@ -245,7 +259,7 @@ export function createTrillView(deps) {
   function paintPlay() {
     const notes = run.notes;
     const doing = mode === 'vibrato'
-      ? t('vib.doing', { string: run.notes.string, note: esc(notes.lowName.replace(/\d+$/, '')), n: run.step.per || '∞' })
+      ? t('vib.doing', { string: run.target.string, note: esc(run.target.name), n: run.step.per || '∞' })
       : `${t('trill.doing', {
           string: run.notes.string,
           low: esc(notes.lowName.replace(/\d+$/, '')),
@@ -323,15 +337,19 @@ export function createTrillView(deps) {
 
   async function start() {
     const mine = (ticket += 1);
-    const notes = notesNow();
+    // A trill travels between two notes; a vibrato has one stopped centre note
+    // and carries its own key (string:position:finger:placement).
+    const notes = mode === 'vibrato' ? { ...vstats.opts } : notesNow();
+    const target = mode === 'vibrato' ? vibTarget() : null;
     const step = stepNow();
     const bpm = step.per ? statsNow().opts.bpm : Trill.TEMPO.start;
     const beat = 60 / bpm;
     run = {
       notes,
+      target,
       step,
       bpm,
-      centre: notes.low, // the single note a vibrato rolls around
+      centre: target ? target.midi : notes.low, // the single note a vibrato rolls around
       click: statsNow().opts.click,
       frames: [], // everything heard during the take itself
       trail: [], // { t, p } for the picture, count-in included
@@ -396,9 +414,11 @@ export function createTrillView(deps) {
 
     const mic = deps.getMic();
     const loud = f.rms > hearLevel(mic?.floor, f.clarity);
-    const p = loud && f.freq > 0 ? Trill.placeOf(f, run.notes) : null;
+    const p = mode === 'vibrato'
+      ? loud && f.freq > 0 ? 1 : null // only a loudness gate; the wave uses cents
+      : loud && f.freq > 0 ? Trill.placeOf(f, run.notes) : null;
     // The same frame feeds both pictures: the trill reads its place between two
-    // notes, the vibrato its distance in cents from the lower one.
+    // notes, the vibrato its distance in cents from its centre.
     const c = mode === 'vibrato' && p != null ? centsOf(f, run.centre) : null;
     run.trail.push({ t: f.t, p, c });
     while (run.trail.length && run.trail[0].t < f.t - TRAIL_SECONDS - 0.5) run.trail.shift();
@@ -567,11 +587,11 @@ export function createTrillView(deps) {
     g.textBaseline = 'bottom';
     if (vib) {
       g.fillStyle = gold;
-      g.fillText(run.notes.lowName.replace(/\d+$/, ''), w - 10 * k, yCents(0) - 5 * k);
+      g.fillText(run.target.name, w - 10 * k, yCents(0) - 5 * k);
       g.font = `500 ${11 * k}px ${css.getPropertyValue('--sans') || 'sans-serif'}`;
-      g.textBaseline = 'top';
       g.fillStyle = muted;
-      g.fillText('±50¢', w - 10 * k, yCents(50) - 5 * k);
+      g.fillText(run.target.above, w - 10 * k, yCents(50) - 3 * k);
+      g.fillText(run.target.below, w - 10 * k, yCents(-50) - 3 * k);
     } else {
       g.fillStyle = gold;
       g.fillText(run.notes.highName.replace(/\d+$/, ''), w - 10 * k, yHigh - 5 * k);
@@ -629,7 +649,7 @@ export function createTrillView(deps) {
       filed = Trill.recordRun(stats, run.notes, run.step, result, day);
     }
     save();
-    last = { result, filed, notes: run.notes, step: run.step, bpm: run.bpm, mode };
+    last = { result, filed, notes: run.notes, target: run.target, step: run.step, bpm: run.bpm, mode };
     run = null;
     panel = 'done';
     paint();
@@ -715,7 +735,7 @@ export function createTrillView(deps) {
           ${tile(t('vib.m.centre'), `${Math.round(r.centreOffset)}¢`, t('vib.m.centre.cents', { n: Math.round(r.centreOffset) }), Math.abs(r.centreOffset) <= 25 ? 'good' : 'off')}
         </div>`
       : '';
-    const note = notes.lowName.replace(/\d+$/, '');
+    const note = last.target ? last.target.name : finger(notes.lowFinger);
     body.innerHTML = `
       <div class="trill-done${v.pass ? ' is-pass' : ''}">
         <p class="trill-verdict">${t(`vib.v.${v.id}.title`)}</p>
@@ -900,18 +920,51 @@ export function createTrillView(deps) {
       stepId = null;
       save();
       paint();
+    } else if (b.dataset.position) {
+      vstats.opts.position = b.dataset.position;
+      stepId = null;
+      save();
+      paint();
+    } else if (b.dataset.finger) {
+      vstats.opts.finger = b.dataset.finger;
+      const options = Vibrato.fingerById(vstats.opts.finger).options;
+      if (!options.some((o) => o.id === vstats.opts.placement)) vstats.opts.placement = options[0].id;
+      stepId = null;
+      save();
+      paint();
+    } else if (b.dataset.placement) {
+      vstats.opts.placement = b.dataset.placement;
+      stepId = null;
+      save();
+      paint();
     } else if (b.dataset.step) {
       stepId = b.dataset.step;
       paint();
     } else if (b.dataset.act === 'example') {
       playExample();
     } else if (b.dataset.act === 'bridge') {
-      // The trill just taught the impulse. Carry the same fingers, spacing and
-      // step into the other mode so the move across is one tap, not a re-setup.
-      const src = statsNow();
-      const dst = mode === 'trill' ? vstats : stats;
-      dst.opts = { ...dst.opts, ...src.opts };
-      mode = mode === 'trill' ? 'vibrato' : 'trill';
+      // Carry the string and the beat across. The note models differ, so map
+      // the fingers instead of copying an options object that would not fit.
+      const string = statsNow().opts.string;
+      if (mode === 'trill') {
+        const held = (last && last.notes ? last.notes.lowFinger : 1) + 1;
+        vstats.opts = {
+          ...vstats.opts,
+          string,
+          finger: String(Math.min(4, Math.max(1, held))),
+          placement: 'high',
+        };
+        mode = 'vibrato';
+      } else {
+        const held = Number(vstats.opts.finger) || 2;
+        stats.opts = {
+          ...stats.opts,
+          string,
+          pair: ['01', '12', '23', '34'][Math.min(3, Math.max(0, held - 1))],
+          spacing: '',
+        };
+        mode = 'trill';
+      }
       stepId = last ? last.step.id : null;
       last = null;
       panel = 'pick';

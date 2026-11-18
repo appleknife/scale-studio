@@ -24,8 +24,8 @@
       import {
         vibratoOf, analyseVibrato, vibratoVerdict,
         emptyStats, loadStats, saveStats, recordRun, summary, nextStep,
+        centreFor, setKey, stepById, STEPS, POSITIONS, FINGERS,
       } from '../src/vibrato.js';
-      import { notesFor } from '../src/trill.js';
 
       const problems = [];
       const log = [];
@@ -112,15 +112,41 @@
         const who = 'vibrato-suite';
         check(saveStats(who, emptyStats(), store), 'the vibrato save failed');
         const saved = loadStats(who, store);
-        check(saved.opts.pair === '23' && saved.runs === 0, 'the vibrato save did not round-trip');
-        const notes = notesFor('A', '23', 'half');
+        check(saved.opts.position === '3' && saved.opts.finger === '2' && saved.runs === 0, 'the vibrato save did not round-trip');
+
+        // A string, first position: B / B♭ on finger 1, C / C♯ on finger 2.
+        const first = { string: 'A', position: '1', finger: '1', placement: 'high' };
+        check(centreFor(first).name === 'B', 'first-position high 1 on A is not B');
+        check(centreFor({ ...first, placement: 'low' }).name === 'B♭', 'low 1 on A is not B♭');
+        check(centreFor({ ...first, finger: '2', placement: 'low' }).name === 'C', 'low 2 on A is not C');
+        check(centreFor({ ...first, finger: '2', placement: 'high' }).name === 'C♯', 'high 2 on A is not C♯');
+        check(centreFor({ ...first, position: '3' }).name === 'E', 'third-position high 1 on A is not E');
+
+        const opens = { G: 55, D: 62, A: 69, E: 76 };
+        let openTouched = false;
+        for (const string of Object.keys(opens)) {
+          for (const position of POSITIONS) {
+            for (const f of FINGERS) {
+              for (const option of f.options) {
+                const note = centreFor({ string, position: position.id, finger: f.id, placement: option.id });
+                if (note.midi <= opens[string]) openTouched = true;
+              }
+            }
+          }
+        }
+        check(!openTouched, 'a vibrato target landed on an open string');
+        check(STEPS[0].id === 'free' && stepById('nonsense').id === 'free', 'free is not the default first step');
+
+        const opts = { string: 'A', position: '3', finger: '2', placement: 'high' };
+        const key = 'A:3:2:high';
+        check(setKey(opts) === key, 'the save key does not describe string, position, finger and placement');
         const result = { rate: 4, width: 40, evenness: 91, centreOffset: 2, cycles: 8, verdict: { id: 'good', pass: true } };
-        const filed = recordRun(saved, notes, { id: 'four', per: 4 }, result, '2026-11-18');
-        check(filed.newStep && saved.sets['A:23:half'].done.includes('four'), 'a passed step was not ticked');
+        const filed = recordRun(saved, opts, { id: 'four', per: 4 }, result, '2026-11-18');
+        check(filed.newStep && saved.sets[key].done.includes('four'), 'a passed step was not ticked');
         check(saved.log[0].e === 91 && saved.log[0].w === 40 && saved.log[0].o === 2, 'the log lost width or centre');
-        recordRun(saved, notes, { id: 'free', per: 0 }, { ...result, evenness: 95 }, '2026-11-18');
-        check(saved.sets['A:23:half'].best === 95, 'a free wave did not keep its best evenness');
-        check(summary(saved).steps >= 2 && nextStep(saved, notes).id !== 'four', 'the summary or ladder lost its steps');
+        recordRun(saved, opts, { id: 'free', per: 0 }, { ...result, evenness: 95 }, '2026-11-18');
+        check(saved.sets[key].best === 95, 'a free wave did not keep its best evenness');
+        check(summary(saved).steps >= 2 && nextStep(saved, opts).id !== 'four', 'the summary or ladder lost its steps');
       } catch (err) {
         problems.push(`the test threw: ${err && err.message}`);
       }

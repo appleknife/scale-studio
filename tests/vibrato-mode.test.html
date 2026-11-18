@@ -28,10 +28,20 @@
         const tab = d.querySelector('.trill-modes [data-mode="vibrato"]');
         check(Boolean(tab) && tab.getAttribute('aria-selected') === 'true', 'vibrato mode was not selected');
         const body = d.querySelector('.trill-body');
-        check(/centre of the wave/i.test(body.textContent), 'the vibrato picker did not explain the centre note');
+        check(/never an open string/i.test(body.textContent), 'the vibrato picker did not rule out open strings');
+        check(!body.querySelector('[data-spacing]'), 'the trill whole/half control is still on the vibrato picker');
+        check(!body.querySelector('[data-pair]'), 'trill finger pairs are still on the vibrato picker');
+        const third = body.querySelector('[data-position="3"]');
+        check(Boolean(third) && third.getAttribute('aria-pressed') === 'true', 'third position is not the default');
+        check(Boolean(body.querySelector('[data-position="1"]')), 'first position is missing');
+        const firstStep = body.querySelector('.trill-ladder .trill-step');
+        check(Boolean(firstStep) && firstStep.dataset.step === 'free' && firstStep.classList.contains('is-on'), 'free is not the first, selected step');
+        check(/F♯/.test(body.querySelector('.trill-notes').textContent), 'the default centre note is not F♯');
+        check(!/open string/i.test(body.querySelector('.trill-notes').textContent), 'the centre note is shown as an open string');
+        check(!body.querySelector('[data-tempo]'), 'the click and tempo are shown for the free vibrato');
         check(Boolean(body.querySelector('[data-act="example"]')), 'there is no example button');
         check(Boolean(body.querySelector('[data-act="start"]')), 'there is no start button');
-        log.push('the vibrato picker opens with its own copy, an example and a start button');
+        log.push('third position, high 2 on A, free first, no pairs or spacing, no open string');
 
         d.querySelector('.trill-modes [data-mode="trill"]').click();
         await wait(80);
