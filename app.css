@@ -5231,30 +5231,58 @@ select,
 
 .pet .pet-eyes {
   transform-origin: 50% 50%;
-  transition: transform 0.07s;
+  transition: transform 0.07s, opacity 0.16s ease;
 }
 
 .pet.is-blink .pet-eyes {
   transform: scaleY(0.1);
 }
 
+/* Expressions cross-fade instead of popping in on a display swap. */
 .pet .pet-happy,
 .pet .pet-sleep,
 .pet .pet-tongue {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
 }
 
 .pet.is-happy .pet-eyes,
 .pet.is-sleep .pet-eyes,
 .pet.is-eat .pet-eyes {
-  display: none;
+  opacity: 0;
 }
 
 .pet.is-happy .pet-happy,
 .pet.is-eat .pet-happy,
 .pet.is-sleep .pet-sleep,
 .pet.is-happy .pet-tongue {
-  display: inline;
+  opacity: 1;
+}
+
+/* A turn compresses the pet briefly so the mirrored flip is not a jump cut. */
+.pet-flip.is-turning .pet-hit {
+  animation: pet-turn 0.21s ease-in-out;
+}
+
+@keyframes pet-turn {
+  50% { transform: scaleX(0.18); }
+}
+
+/* The growth pulse lives on its own group: position and facing stay put. */
+.pet-scale {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.pet-scale.is-growing {
+  animation: pet-grow 0.5s ease-out;
+}
+
+@keyframes pet-grow {
+  0% { transform: scale(0.86); }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 .pet .pet-tail {
@@ -5432,6 +5460,12 @@ select,
 
 @media (prefers-reduced-motion: reduce) {
   .pet-hit[class*='trick-'] { animation: none; }
+  .pet-flip.is-turning .pet-hit,
+  .pet-scale.is-growing { animation: none; }
+  .pet .pet-happy,
+  .pet .pet-sleep,
+  .pet .pet-tongue,
+  .pet .pet-eyes { transition: none; }
 }
 
 .feed-info {

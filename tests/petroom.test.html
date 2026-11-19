@@ -94,10 +94,15 @@
         await tap('[data-friend="0"]');
         expect('swapped back', [true, true]);
         await tab('decorate');
+        // Decorating only replaces the scenery. The pet itself — and the
+        // breathing/tail/blink animations running on it — must survive.
+        const petBefore = doc.querySelector('.pet-hit');
         await tap('.tray-item[data-item="rug"]');
         expect('furniture put away', [true, true]);
+        if (doc.querySelector('.pet-hit') !== petBefore) problems.push('putting furniture away rebuilt the pet and restarted its animations');
         await tap('.tray-item[data-item="rug"]');
         expect('furniture put out', [true, true]);
+        if (doc.querySelector('.pet-hit') !== petBefore) problems.push('putting furniture out rebuilt the pet and restarted its animations');
         await tab('me');
         await tap('[data-av="hair-bob"]');
         expect('a haircut', [true, true]);

@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611181800';
-import { currentSeason } from './season.js?v=202611181800';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611181800';
+import * as Pet from './pet.js?v=202611182000';
+import { currentSeason } from './season.js?v=202611182000';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611182000';
 import {
   petMarkup,
   eggMarkup,
@@ -32,8 +32,8 @@ import {
   petSilhouette,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611181800';
-import { t, getLang } from './i18n.js?v=202611181800';
+} from './petart.js?v=202611182000';
+import { t, getLang } from './i18n.js?v=202611182000';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -94,6 +94,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   let running = false;
   let timers = [];
   let raf = 0;
+  let ballRaf = 0;
+  let queuedReaction = false;
   let mode = 'idle';
   let pos = { x: 210, y: FLOOR_Y };
   let facing = 1; // 1 = as drawn, -1 = mirrored
@@ -134,18 +136,38 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   // ── Drawing ────────────────────────────────────────────────────────────
 
-  function drawRoom() {
+  function drawRoom(keepActors = false) {
     const svg = els.svg;
-    svg.innerHTML = '';
-    // Everything that was drawn is gone with the old picture. A layer left over
-    // here is a node that is no longer in the room: placing something "in front
-    // of the pet" would be placing it in front of a pet that is not there.
-    for (const key of Object.keys(layers)) layers[key] = null;
-    layers.room = node('g', { class: 'room-base' }, roomArt());
-    skyStep = Math.floor(timeNow() * 12);
-    layers.stage = node('g', { class: 'room-stage' });
-    layers.fx = node('g', { class: 'room-fx', 'pointer-events': 'none' });
-    svg.append(layers.room, layers.stage, layers.fx);
+    if (!keepActors) {
+      svg.innerHTML = '';
+      // Everything that was drawn is gone with the old picture. A layer left over
+      // here is a node that is no longer in the room: placing something "in front
+      // of the pet" would be placing it in front of a pet that is not there.
+      for (const key of Object.keys(layers)) layers[key] = null;
+      layers.room = node('g', { class: 'room-base' }, roomArt());
+      skyStep = Math.floor(timeNow() * 12);
+      layers.stage = node('g', { class: 'room-stage' });
+      layers.fx = node('g', { class: 'room-fx', 'pointer-events': 'none' });
+      svg.append(layers.room, layers.stage, layers.fx);
+    } else {
+      // Only the scenery changed. Keep the actors: rebuilding the whole SVG used
+      // to restart every breathing, tail and blink loop, and delete live effects.
+      layers.room.innerHTML = roomArt();
+      skyStep = Math.floor(timeNow() * 12);
+      // A ball may have been bought or put away while the scenery was replaced.
+      const wantsBall = pet.pet && !choosing && pet.placed.includes('ball') && !isFish();
+      if (wantsBall && !layers.ball) {
+        ball = ball || { x: 250, y: FLOOR_Y - 8 };
+        layers.ball = node('g', { class: 'ball-pos', transform: `translate(${ball.x} ${ball.y})` }, ballMarkup());
+        layers.ball.addEventListener('pointerdown', kickBall);
+        layers.stage.append(layers.ball);
+      } else if (!wantsBall && layers.ball) {
+        layers.ball.remove();
+        layers.ball = null;
+        ball = null;
+      }
+      return;
+    }
 
     if (pet.pet && !choosing) {
       if (pet.placed.includes('ball') && !isFish()) {
@@ -159,7 +181,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       drawAvatar();
       layers.petPos = node('g', { class: 'pet-pos' });
       layers.petFlip = node('g', { class: 'pet-flip' });
-      layers.pet = node('g', { class: 'pet-hit', role: 'button', tabindex: '0', 'aria-label': t('pet.aria.pat', { name: pet.pet.name || t(`pet.kind.${pet.pet.species}`) }) }, petMarkup(pet.pet.species, pet.pet.variant));
+      // The inner scale group is free for the growth pulse: the outer groups
+      // carry position and facing and must not be overwritten by a keyframe.
+      layers.pet = node('g', { class: 'pet-hit', role: 'button', tabindex: '0', 'aria-label': t('pet.aria.pat', { name: pet.pet.name || t(`pet.kind.${pet.pet.species}`) }) }, `<g class="pet-scale">${petMarkup(pet.pet.species, pet.pet.variant)}</g>`);
       layers.petFlip.append(layers.pet);
       layers.petPos.append(layers.petFlip);
       layers.stage.append(layers.petPos);
@@ -230,28 +254,38 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     for (const m of Object.keys(MOVE_MS)) root.classList.remove(`is-${m}`);
     void root.getBoundingClientRect();
     root.classList.add(`is-${name}`);
-    const ms = MOVE_MS[name] || 1800;
+    // The stylesheet owns the timing; reading it back means a CSS tweak cannot
+    // silently desync the class removal. MOVE_MS is only the fallback.
+    const raw = (getComputedStyle(root).animationDuration || '').split(',')[0].trim();
+    const parsed = raw.endsWith('ms') ? parseFloat(raw) : parseFloat(raw) * 1000;
+    const ms = Number.isFinite(parsed) && parsed > 0 ? parsed : MOVE_MS[name] || 1800;
     later(() => root.classList.remove(`is-${name}`), ms);
     return ms;
   }
 
-  /** The avatar does its move, and the pet — now and then — is delighted. */
+  /** The reaction itself: turn toward the avatar, then a small celebration. */
+  function playMoveReaction() {
+    if (busy || held || mode !== 'idle') return;
+    if (!isFish()) {
+      facing = pet.avatar.x > pos.x ? 1 : -1;
+      placePet();
+    }
+    setMode('happy');
+    hop();
+    hearts(2);
+    later(() => mode === 'happy' && !held && setMode('idle'), 1300);
+  }
+
+  /** The avatar does its move; if the pet is busy, keep the reaction for later. */
   function doMove() {
     const ms = runMove(layers.av?.querySelector('.av'), pet.avatar.wear.move);
     if (!ms) return;
     lastTouch = Date.now();
-    if (busy || held || mode === 'sleep' || mode === 'walk') return;
-    later(() => {
-      if (busy || held || mode !== 'idle') return;
-      if (!isFish()) {
-        facing = pet.avatar.x > pos.x ? 1 : -1;
-        placePet();
-      }
-      setMode('happy');
-      hop();
-      hearts(2);
-      later(() => mode === 'happy' && !held && setMode('idle'), 1300);
-    }, Math.min(900, ms / 2));
+    if (busy || held || mode === 'sleep' || mode === 'walk' || mode !== 'idle') {
+      queuedReaction = true;
+      return;
+    }
+    later(playMoveReaction, Math.min(900, ms / 2));
   }
 
   function placePet() {
@@ -262,7 +296,17 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const ax = 50 * s;
     const ay = (isFish() ? 50 : 96) * s;
     layers.petPos.setAttribute('transform', `translate(${(pos.x - ax).toFixed(1)} ${(pos.y - ay).toFixed(1)}) scale(${s})`);
-    layers.petFlip.setAttribute('transform', facing === -1 ? 'translate(100 0) scale(-1 1)' : '');
+    const wanted = facing === -1 ? 'translate(100 0) scale(-1 1)' : '';
+    const current = layers.petFlip.getAttribute('transform') || '';
+    if (wanted !== current && !layers.petFlip.classList.contains('is-turning')) {
+      // A thin squash hides the mirrored flip; without it a mid-wander turn
+      // reads as a jump cut.
+      layers.petFlip.classList.add('is-turning');
+      later(() => layers.petFlip?.setAttribute('transform', wanted), 90);
+      later(() => layers.petFlip?.classList.remove('is-turning'), 210);
+    } else if (wanted !== current) {
+      layers.petFlip.setAttribute('transform', wanted);
+    }
   }
 
   function setMode(next) {
@@ -272,6 +316,12 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     if (!root) return;
     for (const m of ['idle', 'walk', 'eat', 'happy', 'sleep', 'born']) root.classList.toggle(`is-${m}`, m === next);
     if (next === 'sleep') startZzz();
+    else if (layers.fx) layers.fx.querySelectorAll('.fx-zzz').forEach((n) => n.remove());
+    // A move the pet was too busy to answer waits here instead of being lost.
+    if (next === 'idle' && queuedReaction) {
+      queuedReaction = false;
+      later(playMoveReaction, 120);
+    }
   }
 
   function drawEggs() {
@@ -716,9 +766,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       ball.x = from + (to - from) * e;
       const bounce = Math.abs(Math.sin(f * Math.PI * 2)) * 10 * (1 - f);
       layers.ball.setAttribute('transform', `translate(${ball.x.toFixed(1)} ${(ball.y - bounce).toFixed(1)}) rotate(${((ball.x - from) * 4).toFixed(0)})`);
-      if (f < 1) requestAnimationFrame(roll);
+      ballRaf = f < 1 ? requestAnimationFrame(roll) : 0;
     };
-    requestAnimationFrame(roll);
+    ballRaf = requestAnimationFrame(roll);
     // …and the pet runs after it, pleased.
     later(() => {
       walkTo(to + (to > pos.x ? -24 : 24), FLOOR_Y, () => {
@@ -879,7 +929,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     if (pet.owned.includes(itemId)) Pet.place(pet, itemId);
     else if (!Pet.buy(pet, itemId, season)) return;
     save();
-    drawRoom();
+    drawRoom(true); // scenery only: the pet keeps breathing while you decorate
     paintNotes();
     paintPanel();
     if (Pet.isPlaced(pet, itemId) && pet.pet) {
@@ -1484,6 +1534,13 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     later(() => {
       sparkles(pos.x, pos.y - (isFish() ? 10 : 40), 16);
       hearts(5);
+      const scaleNode = layers.pet?.querySelector('.pet-scale');
+      if (scaleNode) {
+        scaleNode.classList.remove('is-growing');
+        void scaleNode.getBoundingClientRect();
+        scaleNode.classList.add('is-growing');
+        later(() => scaleNode.classList.remove('is-growing'), 600);
+      }
       hop();
       setMode('happy');
       say(t(stage === 'grown' ? 'pet.grew.grown' : 'pet.grew.kid'), 3000);
@@ -1586,6 +1643,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     timers.forEach(clearTimeout);
     timers = [];
     cancelAnimationFrame(raf);
+    cancelAnimationFrame(ballRaf);
+    ballRaf = 0;
+    queuedReaction = false;
     if (els.bubble) els.bubble.hidden = true;
   }
 

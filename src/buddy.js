@@ -12,8 +12,8 @@
 // It never judges a score, never sulks, and stays out of the way: decorative to
 // a screen reader, and absent entirely for a student who has no pet or egg.
 
-import { loadPet } from './pet.js?v=202611181800';
-import { petMarkup, eggMarkup, HEART } from './petart.js?v=202611181800';
+import { loadPet } from './pet.js?v=202611182000';
+import { petMarkup, eggMarkup, HEART } from './petart.js?v=202611182000';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -26,8 +26,21 @@ export function createBuddy(host, { profileId }) {
   let notes = 0;
   let bopTimer = 0;
   let listening = false;
+  let timers = [];
+  const later = (fn, ms) => {
+    const id = setTimeout(() => {
+      timers = timers.filter((x) => x !== id);
+      fn();
+    }, ms);
+    timers.push(id);
+    return id;
+  };
 
   function refresh() {
+    // The old markup is about to be replaced; nothing should animate on it.
+    timers.forEach(clearTimeout);
+    timers = [];
+    host.classList.remove('is-hop', 'is-bop', 'is-curious');
     const pet = loadPet(profileId());
     let inner = '';
     if (pet.pet) {
@@ -61,14 +74,14 @@ export function createBuddy(host, { profileId }) {
     g.setAttribute('transform', `translate(${x} ${y})`);
     g.innerHTML = `<g class="${cls}">${markup}</g>`;
     fx.append(g);
-    setTimeout(() => g.remove(), 1600);
+    later(() => g.remove(), 1600);
   }
 
   function hop() {
     host.classList.remove('is-hop');
     void host.offsetWidth;
     host.classList.add('is-hop');
-    setTimeout(() => host.classList.remove('is-hop'), 700);
+    later(() => host.classList.remove('is-hop'), 700);
   }
 
   // A tap on the buddy is a pat.
@@ -94,7 +107,7 @@ export function createBuddy(host, { profileId }) {
       notes += 1;
       host.classList.add('is-bop');
       clearTimeout(bopTimer);
-      bopTimer = setTimeout(() => host.classList.remove('is-bop'), 170);
+      bopTimer = later(() => host.classList.remove('is-bop'), 170);
       // Every few notes, a little ♪ drifts up — more of them as the take goes on.
       if (notes % 4 === 0) {
         float(
@@ -114,10 +127,10 @@ export function createBuddy(host, { profileId }) {
       const root = host.querySelector('.pet');
       if (root) {
         root.classList.add('is-happy');
-        setTimeout(() => root.classList.remove('is-happy'), 1800);
+        later(() => root.classList.remove('is-happy'), 1800);
       }
       [0, 180, 360].forEach((delay, i) =>
-        setTimeout(() => float(`<path d="${HEART}" fill="${['#ff7f93', '#f9667d', '#ff9fb0'][i]}"/>`, 'buddy-heart', 36 + i * 14, 8), delay),
+        later(() => float(`<path d="${HEART}" fill="${['#ff7f93', '#f9667d', '#ff9fb0'][i]}"/>`, 'buddy-heart', 36 + i * 14, 8), delay),
       );
     },
 
@@ -127,7 +140,7 @@ export function createBuddy(host, { profileId }) {
       setListening(false);
       host.classList.add('is-curious');
       float('<text font-size="20" font-weight="700" fill="#8f9fd0">?</text>', 'buddy-note', 74, 14);
-      setTimeout(() => host.classList.remove('is-curious'), 1600);
+      later(() => host.classList.remove('is-curious'), 1600);
     },
   };
 }
