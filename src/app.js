@@ -1,19 +1,19 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611182000';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611182000';
-import { createInk } from './ink.js?v=202611182000';
-import { createFollower } from './follow.js?v=202611182000';
-import { createPetRoom } from './petroom.js?v=202611182000';
-import { SPRINT_FULL } from './pet.js?v=202611182000';
-import { createBuddy } from './buddy.js?v=202611182000';
-import { createSprintView } from './sprintview.js?v=202611182000';
-import { createTrillView } from './trillview.js?v=202611182000';
-import { createListenView } from './listenview.js?v=202611182000';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611182230';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611182230';
+import { createInk } from './ink.js?v=202611182230';
+import { createFollower } from './follow.js?v=202611182230';
+import { createPetRoom } from './petroom.js?v=202611182230';
+import { SPRINT_FULL } from './pet.js?v=202611182230';
+import { createBuddy } from './buddy.js?v=202611182230';
+import { createSprintView } from './sprintview.js?v=202611182230';
+import { createTrillView } from './trillview.js?v=202611182230';
+import { createListenView } from './listenview.js?v=202611182230';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611182000';
+window.__scaleStudioVersion = '202611182230';
 import {
   PitchDetector,
   midiToFreq,
@@ -21,16 +21,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611182000';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611182000';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611182000';
-import { generatePassage } from './sightreading.js?v=202611182000';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611182000';
-import { renderScore } from './score.js?v=202611182000';
-import { summariseIntonation } from './intonation.js?v=202611182000';
-import * as Journal from './journal.js?v=202611182000';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611182000';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611182000';
+} from './pitch.js?v=202611182230';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611182230';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611182230';
+import { generatePassage } from './sightreading.js?v=202611182230';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611182230';
+import { renderScore } from './score.js?v=202611182230';
+import { summariseIntonation } from './intonation.js?v=202611182230';
+import * as Journal from './journal.js?v=202611182230';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611182230';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611182230';
 import {
   STRINGS,
   FIFTHS,
@@ -39,7 +39,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611182000';
+} from './tuner.js?v=202611182230';
 
 const LANG = initLang();
 
@@ -1803,19 +1803,33 @@ function stopAssistAudio() {
   if (el.countIn) el.countIn.hidden = true;
 }
 
-/** One click, at a time on the audio clock, sharing the player's volume. */
+/**
+ * One click, at a time on the audio clock, sharing the player's volume.
+ *
+ * A woodblock's crack — a short burst of noise in a wide band, dying fast —
+ * rather than the soft sine beep it used to be: about 8 dB louder, and sharper, so it
+ * carries over a violin (and over an iPad's quieter output while the
+ * microphone is open), and with no pitch of its own. A beep at 880 Hz is an A,
+ * and the take is listening for notes.
+ */
 function clickAt(ctx, when, strength = 0.6) {
-  const osc = ctx.createOscillator();
+  const strong = strength >= 1;
+  const length = Math.floor(ctx.sampleRate * 0.05);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  const fall = ctx.sampleRate * 0.012;
+  for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / fall);
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = strong ? 2400 : 1800;
+  filter.Q.value = 0.7;
   const gain = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.value = strength >= 1 ? 1320 : 880;
-  gain.gain.setValueAtTime(0.0001, when);
-  gain.gain.linearRampToValueAtTime(strength >= 1 ? 0.5 : 0.34, when + 0.005);
-  gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.07);
-  osc.connect(gain).connect(player.output);
-  osc.start(when);
-  osc.stop(when + 0.09);
-  assistClicks.push(osc);
+  gain.gain.value = strong ? 4 : 3;
+  src.connect(filter).connect(gain).connect(player.output);
+  src.start(when);
+  assistClicks.push(src);
   // A long session should not accumulate stopped nodes in this list.
   if (assistClicks.length > 200) assistClicks = assistClicks.slice(-40);
 }
@@ -2548,7 +2562,7 @@ function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null, wished
   if (!amount || !el.petToast) return;
   const name = petRoom.name();
   const line = grew
-    ? t(grew === 'grown' ? 'pet.toast.grewUp' : 'pet.toast.grew', { name: esc(name) })
+    ? t(grew === 'grown' ? (petRoom.isChick?.() ? 'pet.toast.grewHen' : 'pet.toast.grewUp') : 'pet.toast.grew', { name: esc(name) })
     : warmed
       ? t('pet.toast.warm')
       : name

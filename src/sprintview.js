@@ -5,12 +5,12 @@
 // the personal best) and the student's own stats. The rules live in sprint.js;
 // this file draws and listens.
 
-import * as Sprint from './sprint.js?v=202611182000';
-import { STAFF_GEOM, accidentalAt, followArrowMarkup } from './staff.js?v=202611182000';
-import { currentSeason } from './season.js?v=202611182000';
-import { CLEF_PATH } from './clef.js?v=202611182000';
-import { hearLevel } from './pitch.js?v=202611182000';
-import { t } from './i18n.js?v=202611182000';
+import * as Sprint from './sprint.js?v=202611182230';
+import { STAFF_GEOM, accidentalAt, followArrowMarkup } from './staff.js?v=202611182230';
+import { currentSeason } from './season.js?v=202611182230';
+import { CLEF_PATH } from './clef.js?v=202611182230';
+import { hearLevel } from './pitch.js?v=202611182230';
+import { t } from './i18n.js?v=202611182230';
 
 const SVG = 'http://www.w3.org/2000/svg';
 const INK = '#221e19';
@@ -39,6 +39,7 @@ export function createSprintView(deps) {
   let stats = null;
   let panel = 'pick'; // 'pick' | 'play' | 'done' | 'stats'
   let picked = new Set();
+  let undo = []; // earlier choices, newest last
   let run = null; // the sprint in progress
   let listening = false;
   let ticket = 0;
@@ -150,7 +151,9 @@ export function createSprintView(deps) {
     const enough = count >= 2;
     body.innerHTML = `
       <p class="sprint-howto">${t('sprint.pick.howto')}</p>
-      <div class="chip-row sprint-presets">${presets}<button class="chip is-quiet" type="button" data-act="clear">${t('sprint.clear')}</button></div>
+      <div class="chip-row sprint-presets">${presets}<button class="chip is-quiet" type="button" data-act="clear">${t('sprint.clear')}</button>${
+        undo.length ? `<button class="chip is-quiet sprint-undo" type="button" data-act="undo">↶ ${t('sprint.undo')}</button>` : ''
+      }</div>
       <div class="sprint-picker-wrap">${pickerSvg()}</div>
       <p class="sprint-count">${t(count === 1 ? 'sprint.count.one' : 'sprint.count', { n: count })}</p>
       <div class="sprint-opts">
@@ -180,55 +183,136 @@ export function createSprintView(deps) {
     bindPicker(body.querySelector('.sprint-picker'));
   }
 
-  /** Tap a note, or drag across several: the first note touched decides on or off. */
+  /**
+   * Tap a note, or drag up or down a column to take a whole run of them; the
+   * first note touched decides on or off. Nothing changes until the finger
+   * lifts: until then the notes about to change are shown, and a bubble above
+   * the finger names them ("+ G4 – D5 · 5 notes") — the finger itself covers
+   * the note, which is how a wrong one used to get picked unseen. A drag fills
+   * every step between where it started and where it is, so a quick swipe
+   * misses nothing on the way. Undo takes back the last change, taps and
+   * presets and Clear alike.
+   */
   function bindPicker(svg) {
-    let painting = null; // true: turning on · false: turning off
-    const cellAt = (ev) => {
+    const wrap = svg.closest('.sprint-picker-wrap');
+    let drag = null; // { kind, from, to, on, pointerId }
+    let loupe = null;
+    const point = (ev) => {
       const box = svg.getBoundingClientRect();
-      const sx = ((ev.clientX - box.left) / box.width) * WIDTH;
-      const sy = ((ev.clientY - box.top) / box.height) * HEIGHT;
-      const kind = sx < 215 ? 'natural' : sx < 335 ? 'sharp' : 'flat';
-      if (!kind) return null;
-      const i = Math.round((TOP + (ROWS.length - 1) * STEP - sy) / STEP);
-      const row = ROWS[i];
-      return row && row[kind] ? row[kind].id : null;
+      return {
+        sx: ((ev.clientX - box.left) / box.width) * WIDTH,
+        sy: ((ev.clientY - box.top) / box.height) * HEIGHT,
+      };
     };
-    const setCell = (id, on) => {
-      if (!id || picked.has(id) === on) return;
-      if (on) picked.add(id);
-      else picked.delete(id);
+    const kindAt = (sx) => (sx < 215 ? 'natural' : sx < 335 ? 'sharp' : 'flat');
+    const rowAt = (sy) => Math.max(0, Math.min(ROWS.length - 1, Math.round((TOP + (ROWS.length - 1) * STEP - sy) / STEP)));
+    /** The notes a drag covers: every one of its column between its two ends. */
+    const covered = (d) => {
+      const out = [];
+      const lo = Math.min(d.from, d.to);
+      const hi = Math.max(d.from, d.to);
+      for (let i = lo; i <= hi; i++) if (ROWS[i][d.kind]) out.push(ROWS[i][d.kind]);
+      return out;
+    };
+    const paintCell = (id, on, preview) => {
       const g = svg.querySelector(`[data-id="${id}"]`);
       if (!g) return;
       g.classList.toggle('is-on', on);
+      g.classList.toggle('is-preview', preview);
       g.querySelectorAll('ellipse, path').forEach((n) => {
         if (n.getAttribute('fill') && n.getAttribute('fill') !== 'none') n.setAttribute('fill', on ? ON : GREY);
         if (n.getAttribute('stroke') && n.getAttribute('stroke') !== 'none') n.setAttribute('stroke', on ? ON : GREY);
       });
       g.querySelector('text')?.classList.toggle('is-on', on);
     };
+    const show = () => {
+      // everything back to how it is, then the drag's notes as they would be
+      svg.querySelectorAll('.sprint-cell').forEach((g) => paintCell(g.dataset.id, picked.has(g.dataset.id), false));
+      if (!drag) return;
+      for (const n of covered(drag)) if (picked.has(n.id) !== drag.on) paintCell(n.id, drag.on, true);
+    };
+    const showLoupe = (ev) => {
+      const notes = covered(drag).filter((n) => picked.has(n.id) !== drag.on);
+      if (!loupe) {
+        loupe = document.createElement('div');
+        loupe.className = 'sprint-loupe';
+        loupe.setAttribute('aria-hidden', 'true');
+        wrap.appendChild(loupe);
+      }
+      const sign = drag.on ? '+' : '−';
+      const name = (n) => noteName(n);
+      loupe.classList.toggle('is-off', !drag.on);
+      loupe.textContent = !notes.length
+        ? t(drag.on ? 'sprint.loupe.already' : 'sprint.loupe.notOn', { note: name(ROWS[drag.to][drag.kind] || ROWS[drag.from][drag.kind]) })
+        : notes.length === 1
+          ? `${sign} ${name(notes[0])}`
+          : `${sign} ${name(notes[0])} – ${name(notes[notes.length - 1])} · ${t('sprint.loupe.n', { n: notes.length })}`;
+      const box = wrap.getBoundingClientRect();
+      const x = Math.max(60, Math.min(box.width - 60, ev.clientX - box.left));
+      const y = Math.max(4, ev.clientY - box.top - 78);
+      loupe.style.left = `${x}px`;
+      loupe.style.top = `${y}px`;
+    };
+    const hideLoupe = () => {
+      loupe?.remove();
+      loupe = null;
+    };
     svg.addEventListener('pointerdown', (ev) => {
-      const id = cellAt(ev);
-      if (!id) return;
+      const { sx, sy } = point(ev);
+      const kind = kindAt(sx);
+      const row = rowAt(sy);
+      const n = ROWS[row][kind];
+      if (!n) return;
       ev.preventDefault();
-      painting = !picked.has(id);
-      setCell(id, painting);
+      drag = { kind, from: row, to: row, on: !picked.has(n.id), pointerId: ev.pointerId };
       svg.setPointerCapture(ev.pointerId);
+      show();
+      showLoupe(ev);
     });
     svg.addEventListener('pointermove', (ev) => {
-      if (painting == null) return;
-      setCell(cellAt(ev), painting);
+      if (!drag || ev.pointerId !== drag.pointerId) return;
+      const row = rowAt(point(ev).sy);
+      if (row !== drag.to) {
+        drag.to = row;
+        show();
+      }
+      showLoupe(ev);
     });
-    const end = () => {
-      if (painting == null) return;
-      painting = null;
+    const end = (ev, keep) => {
+      if (!drag || ev.pointerId !== drag.pointerId) return;
+      const d = drag;
+      drag = null;
+      hideLoupe();
+      const change = covered(d).filter((n) => picked.has(n.id) !== d.on);
+      if (!keep || !change.length) {
+        show();
+        return;
+      }
+      remember();
+      for (const n of change) {
+        if (d.on) picked.add(n.id);
+        else picked.delete(n.id);
+      }
       savePicked();
       // the count, the options and Start all follow the choice
       const scroll = window.scrollY;
       paintPick();
       window.scrollTo(0, scroll);
     };
-    svg.addEventListener('pointerup', end);
-    svg.addEventListener('pointercancel', end);
+    svg.addEventListener('pointerup', (ev) => end(ev, true));
+    // the system took the touch (a scroll, a call): nothing is changed
+    svg.addEventListener('pointercancel', (ev) => end(ev, false));
+  }
+
+  /** "F♯5", the way the picker's own column heads write it. */
+  function noteName(n) {
+    return `${n.letter}${n.alter > 0 ? '\u266F' : n.alter < 0 ? '\u266D' : ''}${n.octave}`;
+  }
+
+  /** The choice before a change, for Undo (a few steps back is plenty). */
+  function remember() {
+    undo.push([...picked]);
+    if (undo.length > 20) undo.shift();
   }
 
   function savePicked() {
@@ -837,13 +921,24 @@ export function createSprintView(deps) {
       paint();
     } else if (b.dataset.preset) {
       const p = Sprint.PRESETS.find((x) => x.id === b.dataset.preset);
+      remember();
       picked = new Set(p.notes);
       savePicked();
       paint();
     } else if (b.dataset.act === 'clear') {
+      if (picked.size) remember();
       picked = new Set();
       savePicked();
       paint();
+    } else if (b.dataset.act === 'undo') {
+      const before = undo.pop();
+      if (before) {
+        picked = new Set(before);
+        savePicked();
+        const scroll = window.scrollY;
+        paint();
+        window.scrollTo(0, scroll);
+      }
     } else if (b.dataset.length) {
       stats.opts.length = Number(b.dataset.length);
       Sprint.saveStats(deps.profileId(), stats);

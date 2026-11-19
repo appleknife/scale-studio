@@ -24,6 +24,8 @@ const PALETTE = {
   dog: { body: '#f4ddc0', dark: '#8a5d3b', ear: '#c08b5c', spot: '#e8c49c', snout: '#fff8ee' },
   hamster: { body: '#f3b76a', dark: '#9a6226', belly: '#fff3df', inner: '#f6a7a0' },
   chicken: { body: '#ffe27c', dark: '#b8891c', wing: '#ffd14a', comb: '#f2665c', beak: '#f7a234' },
+  // the chick grown up: a russet hen
+  hen: { body: '#e9a562', dark: '#87501f', wing: '#d38a4c', belly: '#f8d6a6', tail: '#a95d2c', comb: '#ea4a3f', beak: '#f4b23a' },
   fish: { body: '#ff9e69', dark: '#b9542a', fin: '#ffc79d', scale: '#ffbe93' },
   rabbit: { body: '#f6ede2', dark: '#9c8672', belly: '#ffffff', inner: '#f8b5b5' },
   koala: { body: '#c5c9d1', dark: '#6f7682', belly: '#eef0f3', inner: '#f3b9c0', nose: '#4a4550' },
@@ -38,6 +40,8 @@ const RARE = {
   dog: { body: '#d6e8f7', dark: '#47678a', ear: '#8fb2d6', spot: '#b4d0ea', snout: '#f7fbff' },
   hamster: { body: '#f6f1ea', dark: '#8b7d6b', belly: '#ffffff', inner: '#f6a7a0' },
   chicken: { body: '#d3ecff', dark: '#4a78a8', wing: '#acd2fa', comb: '#f2665c', beak: '#f7a234' },
+  // a rare chick grows into a blue hen
+  hen: { body: '#c8dcf3', dark: '#45698f', wing: '#a5c2e6', belly: '#eaf2fc', tail: '#7d9cc4', comb: '#ea4a3f', beak: '#f4b23a' },
   fish: { body: '#8fd3ff', dark: '#2e7bb0', fin: '#c8ebff', scale: '#b8e3ff' },
   rabbit: { body: '#f9d5e0', dark: '#b06a85', belly: '#fff3f7', inner: '#f48fb1' },
   koala: { body: '#f3e2c0', dark: '#a5844a', belly: '#fff8e8', inner: '#f3b9c0', nose: '#6b4a2a' },
@@ -45,15 +49,17 @@ const RARE = {
   fox: { body: '#e6eef7', dark: '#6f87a3', belly: '#ffffff', tip: '#9fb4cc' },
 };
 
+// The open eyes sit in a group of their own, which the room shifts a little
+// towards whatever the pet is looking at (a finger, a bird at the window).
 const eyes = (lx, rx, y, r = 4.3) => `
-  <g class="pet-eyes">
+  <g class="pet-look"><g class="pet-eyes">
     <circle cx="${lx}" cy="${y}" r="${r}" fill="${INK}"/>
     <circle cx="${rx}" cy="${y}" r="${r}" fill="${INK}"/>
     <circle cx="${lx - r * 0.32}" cy="${y - r * 0.36}" r="${r * 0.36}" fill="#fff"/>
     <circle cx="${rx - r * 0.32}" cy="${y - r * 0.36}" r="${r * 0.36}" fill="#fff"/>
     <circle cx="${lx + r * 0.35}" cy="${y + r * 0.32}" r="${r * 0.16}" fill="#fff"/>
     <circle cx="${rx + r * 0.35}" cy="${y + r * 0.32}" r="${r * 0.16}" fill="#fff"/>
-  </g>
+  </g></g>
   <g class="pet-happy" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round">
     <path d="M${lx - 4} ${y + 1.5} q4 -5.5 8 0"/>
     <path d="M${rx - 4} ${y + 1.5} q4 -5.5 8 0"/>
@@ -176,6 +182,36 @@ const SHAPES = {
       </g>`;
   },
 
+  // The chick, grown up. Same front-on pose and the same moving parts as the
+  // chick (bob, flapping wings, head), so everything the room does with a
+  // chick it does with a hen: a fuller body, a tall comb and a wattle, a fan of
+  // tail feathers behind, a pale breast (left plain: feather marks there read
+  // as a second, sleeping face).
+  hen(c) {
+    return `
+      <g stroke="#e08422" stroke-width="2.6" stroke-linecap="round" fill="none">
+        <path d="M43 86 v8 M43 94 l-5 2.6 M43 94 l5 2.6"/>
+        <path d="M57 86 v8 M57 94 l-5 2.6 M57 94 l5 2.6"/>
+      </g>
+      <g class="pet-bob">
+        <path d="M66 58 q8 -26 20 -24 q-1 9 -6 15 q9 -6 13 0 q-3 7 -10 11 q8 0 8 6 q-9 6 -22 4 z" fill="${c.tail}" stroke="${c.dark}" stroke-width="2" stroke-linejoin="round"/>
+        <g class="pet-wings">
+          <ellipse class="wing-l" cx="22" cy="68" rx="8.5" ry="14" fill="${c.wing}" stroke="${c.dark}" stroke-width="2"/>
+          <ellipse class="wing-r" cx="78" cy="68" rx="8.5" ry="14" fill="${c.wing}" stroke="${c.dark}" stroke-width="2"/>
+        </g>
+        <path d="M50 44 C68 44 79 55 79 68 C79 81 66 89 50 89 C34 89 21 81 21 68 C21 55 32 44 50 44 Z" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+        <ellipse cx="50" cy="73" rx="17" ry="13" fill="${c.belly}"/>
+        <path d="M40.5 25 q-2 -10 6 -7 q3 -10 9.5 -2 q7.5 -5 6 6 q-1 4 -5 4 h-12.5 q-3.5 0 -4 -1 z" fill="${c.comb}" stroke="#c23b32" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="50" cy="39" r="16" fill="${c.body}" stroke="${c.dark}" stroke-width="2.2"/>
+        <g class="pet-head">
+          ${eyes(43.5, 56.5, 37.5, 3.9)}
+          ${blush(37.5, 62.5, 44, 3.6)}
+          <path d="M45.6 42.6 L54.4 42.6 L50 48.6 Z" fill="${c.beak}" stroke="#d27a1d" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M47.6 49 q2.4 8 4.8 0 z" fill="${c.comb}" stroke="#c23b32" stroke-width="1.4" stroke-linejoin="round"/>
+        </g>
+      </g>`;
+  },
+
   fish(c) {
     // Side on, facing left; the bowl gives it its room.
     return `
@@ -188,11 +224,11 @@ const SHAPES = {
         </g>
         <path d="M46 56 q6 8 12 1 q-5 -2 -12 -1 z" fill="${c.fin}" stroke="${c.dark}" stroke-width="1.8" stroke-linejoin="round"/>
         <g class="pet-head">
-          <g class="pet-eyes">
+          <g class="pet-look"><g class="pet-eyes">
             <circle cx="37" cy="46" r="5.2" fill="${INK}"/>
             <circle cx="35.3" cy="44.2" r="1.9" fill="#fff"/>
             <circle cx="38.8" cy="47.8" r=".9" fill="#fff"/>
-          </g>
+          </g></g>
           <path class="pet-happy" d="M32.6 47 q4.4 -5.6 8.8 0" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round"/>
           <path class="pet-sleep" d="M32.6 46 q4.4 3.6 8.8 0" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linecap="round"/>
           <ellipse cx="38" cy="55" rx="4.2" ry="2.6" fill="${BLUSH}" opacity=".55"/>
@@ -298,16 +334,20 @@ const SHAPES = {
 };
 
 /** One pet, in its own 100 × 100 box. `variant` is 'plain' or 'rare'. */
-export function petMarkup(species, variant = 'plain') {
-  const draw = SHAPES[species] || SHAPES.cat;
-  const paint = (variant === 'rare' ? RARE : PALETTE)[species] || PALETTE.cat;
-  return `<g class="pet pet-${species}${variant === 'rare' ? ' is-rare' : ''}">${draw(paint)}</g>`;
+/** What a pet looks like at a stage: a chick that has grown up is a hen. */
+export const lookOf = (species, stage) => (species === 'chicken' && stage === 'grown' ? 'hen' : species);
+
+export function petMarkup(species, variant = 'plain', stage = null) {
+  const look = lookOf(species, stage);
+  const draw = SHAPES[look] || SHAPES.cat;
+  const paint = (variant === 'rare' ? RARE : PALETTE)[look] || PALETTE.cat;
+  return `<g class="pet pet-${species}${look !== species ? ` is-${look}` : ''}${variant === 'rare' ? ' is-rare' : ''}">${draw(paint)}</g>`;
 }
 
 /** A pet's portrait, as a whole small SVG — for buttons, the toast and the corner buddy. */
-export function petIcon(species, label = '', variant = 'plain') {
+export function petIcon(species, label = '', variant = 'plain', stage = null) {
   const role = label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"';
-  return `<svg class="pet-icon" viewBox="0 6 100 94" ${role}>${petMarkup(species, variant)}</svg>`;
+  return `<svg class="pet-icon" viewBox="0 6 100 94" ${role}>${petMarkup(species, variant, stage)}</svg>`;
 }
 
 /** A pet not yet found, for the pet book: its outline, filled in one flat colour. */
@@ -1025,6 +1065,13 @@ function fishbowl() {
  * The room, without the pet (the pet is added by the room controller so it can
  * move). `placed` is the list of decorations put out; `wall` the wallpaper.
  */
+// Where each thing on the floor has its feet, before it is moved (room units).
+// The floor's drawing order goes by these: further forward is drawn in front.
+const FOOT = {
+  flowers: 220, bookshelf: 226, piano: 227, 'xmas-tree': 228, stand: 273, plant: 273, lamp: 273,
+  bowl: 279, bed: 280, metronome: 290, beanbag: 292, 'xmas-snowman': 295, toybox: 297, 'xmas-presents': 297,
+};
+
 export function roomMarkup({ placed = [], wall = null, floor = null, fish = false, hour = clockNow(), where = {}, season = null } = {}) {
   // At Christmas it snows outside whatever the weather: flakes in the pane and a
   // drift on the sill, for as long as the season lasts.
@@ -1046,7 +1093,9 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     const at = where && where[id];
     return `${Math.round((at && at.x) || 0)} ${Math.round((at && at.y) || 0)}`;
   };
-  const item = (id, art) => `<g class="room-item" data-item="${id}" transform="translate(${off(id)})">${art}</g>`;
+  // The outer group is where it has been dragged to; the inner one is what a
+  // tap squashes and springs (the art inside keeps its own transforms).
+  const item = (id, art) => `<g class="room-item" data-item="${id}" transform="translate(${off(id)})"><g class="room-poke">${art}</g></g>`;
   return `
     <defs>
       ${w.pattern}
@@ -1080,20 +1129,31 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     <rect x="0" y="196" width="400" height="9" fill="#f6e7d2"/>
     <rect x="0" y="204" width="400" height="2" fill="#d9bc93"/>
     ${has('rug') ? item('rug', ITEM_ART.rug()) : ''}
-    ${has('piano') ? item('piano', ITEM_ART.piano()) : ''}
-    ${has('bookshelf') ? item('bookshelf', ITEM_ART.bookshelf()) : ''}
-    ${has('xmas-tree') ? item('xmas-tree', ITEM_ART['xmas-tree']()) : ''}
-    ${has('flowers') ? item('flowers', ITEM_ART.flowers()) : ''}
-    ${has('bed') && !fish ? item('bed', ITEM_ART.bed()) : ''}
-    ${has('stand') ? item('stand', ITEM_ART.stand()) : ''}
-    ${has('plant') ? item('plant', ITEM_ART.plant()) : ''}
-    ${has('lamp') ? item('lamp', ITEM_ART.lamp()) : ''}
-    ${fish ? fishbowl() : item('bowl', ITEM_ART.bowl())}
-    ${has('beanbag') ? item('beanbag', ITEM_ART.beanbag()) : ''}
-    ${has('toybox') ? item('toybox', ITEM_ART.toybox()) : ''}
-    ${has('metronome') ? item('metronome', ITEM_ART.metronome()) : ''}
-    ${has('xmas-snowman') ? item('xmas-snowman', ITEM_ART['xmas-snowman']()) : ''}
-    ${has('xmas-presents') ? item('xmas-presents', ITEM_ART['xmas-presents']()) : ''}
+    ${
+      // What stands on the floor, back to front: whatever has its feet further
+      // forward is drawn later, so it is in front — wherever it was dragged to.
+      [
+        ['piano', () => ITEM_ART.piano()],
+        ['bookshelf', () => ITEM_ART.bookshelf()],
+        ['xmas-tree', () => ITEM_ART['xmas-tree']()],
+        ['flowers', () => ITEM_ART.flowers()],
+        ['bed', () => ITEM_ART.bed(), !fish],
+        ['stand', () => ITEM_ART.stand()],
+        ['plant', () => ITEM_ART.plant()],
+        ['lamp', () => ITEM_ART.lamp()],
+        ['bowl', null, true],
+        ['beanbag', () => ITEM_ART.beanbag()],
+        ['toybox', () => ITEM_ART.toybox()],
+        ['metronome', () => ITEM_ART.metronome()],
+        ['xmas-snowman', () => ITEM_ART['xmas-snowman']()],
+        ['xmas-presents', () => ITEM_ART['xmas-presents']()],
+      ]
+        .filter(([id, , show]) => (show === undefined ? has(id) : show))
+        .map(([id, art], order) => ({ id, art, order, foot: FOOT[id] + ((where && where[id] && where[id].y) || 0) }))
+        .sort((a, b) => a.foot - b.foot || a.order - b.order)
+        .map(({ id, art }) => (id === 'bowl' ? (fish ? fishbowl() : item('bowl', ITEM_ART.bowl())) : item(id, art())))
+        .join('')
+    }
     ${dark > 0.02 ? `<rect class="room-night" x="0" y="0" width="400" height="300" fill="#1d2550" opacity="${(dark * 0.2).toFixed(3)}" pointer-events="none"/>` : ''}
     ${dark > 0.3 && has('lights') ? ITEM_ART.lights(true) : ''}
     ${

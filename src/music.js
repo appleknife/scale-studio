@@ -4,7 +4,7 @@
 // than raw MIDI numbers, so the staff can be drawn with the right accidentals
 // and the app can show enharmonic spellings (F♯ / G♭, C♯ / D♭, B / C♭).
 
-import { getLang, t } from './i18n.js?v=202611182000';
+import { getLang, t } from './i18n.js?v=202611182230';
 
 export const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const LETTER_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
@@ -61,7 +61,7 @@ export function makeNote(letter, alter, octave) {
 //
 // `also`, where given, is a second one-octave start that is just as usual, so
 // the student may play either: G from the open G or from the D string, A from
-// the G string or the open A. The practice screen offers both as Low and High,
+// the G string or the open A, B♭ from the G string or the A string. The practice screen offers both as Low and High,
 // and a mock audition accepts whichever octave was played.
 function variant(name, letter, alter, fifths, octave, oneOctave = null, also = null) {
   return { name, letter, alter, fifths, octave, oneOctave, also };
@@ -75,7 +75,7 @@ export const MAJOR_KEYS = [
   { id: 'G', variants: [variant('G', 4, 0, 1, 3, null, 4)] },
   { id: 'Ab', variants: [variant('A\u266D', 5, -1, -4, 3)] },
   { id: 'A', variants: [variant('A', 5, 0, 3, 3, 4, 3)] },
-  { id: 'Bb', variants: [variant('B\u266D', 6, -1, -2, 3)] },
+  { id: 'Bb', variants: [variant('B\u266D', 6, -1, -2, 3, null, 4)] },
   { id: 'B', variants: [variant('B', 6, 0, 5, 3), variant('C\u266D', 0, -1, -7, 4)] },
   { id: 'C', variants: [variant('C', 0, 0, 0, 4)] },
   { id: 'C#', variants: [variant('C\u266F', 0, 1, 7, 4), variant('D\u266D', 1, -1, -5, 4)] },

@@ -216,7 +216,7 @@
         eq('a floor can be taken up again', p.floor, null);
         P.buy(p, 'piano');
         eq('new furniture is put out when bought', P.isPlaced(p, 'piano'), true);
-        eq('and can be dragged, within the room', P.moveItem(p, 'piano', 9999, 50), { x: P.ITEM_RANGE.piano.x[1], y: 0 });
+        eq('and can be dragged, within the room', P.moveItem(p, 'piano', 9999, 9999), { x: P.ITEM_RANGE.piano.x[1], y: P.ITEM_RANGE.piano.y[1] });
         eq('every thing that can be put out has a name and can be bought', P.ITEMS.every((i) => i.cost > 0 && i.slot), true);
         // ── every way of practising pays ──
         {
@@ -376,7 +376,9 @@
       {
         const p = P.emptyPet();
         eq('nothing has been moved to begin with', P.itemAt(p, 'lamp'), { x: 0, y: 0 });
-        eq('a lamp slides along the floor, and only along it', P.moveItem(p, 'lamp', -120.4, 55), { x: -120, y: 0 });
+        eq('a lamp goes anywhere on the floor — along it, and forward and back', P.moveItem(p, 'lamp', -120.4, -20.2), { x: -120, y: -20 });
+        eq('…but no further forward than the front of the floor', P.moveItem(p, 'lamp', 0, 999).y, P.ITEM_RANGE.lamp.y[1]);
+        eq('…and not up the wall', P.moveItem(p, 'lamp', 0, -999).y, P.ITEM_RANGE.lamp.y[0]);
         eq('…and stops at the wall', P.moveItem(p, 'lamp', -9999, 0).x, P.ITEM_RANGE.lamp.x[0]);
         eq('the window goes up and down the wall as well', P.moveItem(p, 'window', 100, 40), { x: 100, y: 40 });
         eq('…but not off it', P.moveItem(p, 'window', 100, 999).y, P.ITEM_RANGE.window.y[1]);
