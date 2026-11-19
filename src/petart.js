@@ -1128,6 +1128,14 @@ export function roomMarkup({ placed = [], wall = null, floor = null, fish = fals
     }
     <rect x="0" y="196" width="400" height="9" fill="#f6e7d2"/>
     <rect x="0" y="204" width="400" height="2" fill="#d9bc93"/>
+    ${
+      dark < 0.3 && has('window')
+        ? `<g class="room-sun" pointer-events="none">
+            <path d="M62 200 L138 200 L196 300 L18 300 Z" fill="#fff6d8" opacity=".13"/>
+            ${[0, 1, 2, 3, 4].map((i) => `<circle class="room-mote" cx="${70 + i * 27}" cy="${214 + (i % 3) * 26}" r="${1.1 + (i % 2) * 0.8}" fill="#fff8dc" opacity=".55" style="animation-delay:-${(i * 1.3).toFixed(1)}s"/>`).join('')}
+          </g>`
+        : ''
+    }
     ${has('rug') ? item('rug', ITEM_ART.rug()) : ''}
     ${
       // What stands on the floor, back to front: whatever has its feet further

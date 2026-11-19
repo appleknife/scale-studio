@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611182230';
-import { currentSeason } from './season.js?v=202611182230';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611182230';
+import * as Pet from './pet.js?v=202611182400';
+import { currentSeason } from './season.js?v=202611182400';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611182400';
 import {
   petMarkup,
   eggMarkup,
@@ -33,8 +33,8 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611182230';
-import { t, getLang } from './i18n.js?v=202611182230';
+} from './petart.js?v=202611182400';
+import { t, getLang } from './i18n.js?v=202611182400';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -98,6 +98,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   let raf = 0;
   let ballRaf = 0;
   let queuedReaction = false;
+  let hungry = false;
   let mode = 'idle';
   let pos = { x: 210, y: FLOOR_Y };
   let facing = 1; // 1 = as drawn, -1 = mirrored
@@ -161,6 +162,12 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     }, ms);
     timers.push(id);
     return id;
+  };
+  // Hunger is a look, not a mode: it must not stop the pet wandering or being
+  // patted the way a real mode change would.
+  const setHungry = (on) => {
+    hungry = on;
+    layers.pet?.querySelector('.pet')?.classList.toggle('is-hungry', on);
   };
 
   // ── Drawing ────────────────────────────────────────────────────────────
@@ -241,6 +248,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       else if (pos.y !== FLOOR_Y) pos = { x: 210, y: FLOOR_Y };
       placePet();
       setMode(mode === 'sleep' ? 'sleep' : 'idle');
+      setHungry(hungry);
     } else {
       drawEggs();
     }
@@ -837,6 +845,13 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const start = performance.now();
     const land = () => {
       if (!running) return;
+      const squash = layers.pet?.querySelector('.pet-scale');
+      if (squash) {
+        squash.classList.remove('is-landing');
+        void squash.getBoundingClientRect();
+        squash.classList.add('is-landing');
+        later(() => squash.classList.remove('is-landing'), 430);
+      }
       hop();
       const bed = bedAt();
       if (pet.placed.includes('bed') && Math.abs(pos.x - bed.x) < 34) {
@@ -922,10 +937,13 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       goToSleep();
     } else if (mode === 'idle') {
       const roll = Math.random();
+      // A hungry pet looks hungry all the time, not only when it asks aloud.
+      const pining = Pet.wantsSnack(pet);
+      setHungry(pining);
       if (roll < 0.55) {
         if (isFish()) walkTo(rand(166, 234), rand(142, 190), null, 34);
         else walkTo(rand(70, 340), FLOOR_Y, null, 62);
-      } else if (roll < 0.7 && Pet.wantsSnack(pet)) {
+      } else if (roll < 0.7 && pining) {
         say(`${t('pet.wish')} ${foodIcon(Pet.snackFor(pet.pet.species, 'treat').look)}`, 2600);
       } else if (roll < 0.76) {
         hop();
@@ -935,9 +953,14 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         later(() => lookAt(pos.x + 120, pos.y - 70, 900), 1000);
       } else if (roll < 0.88) {
         stretch();
-      } else if (roll < 0.92 && pet.pet.variant === 'rare') {
-        // A rare one shimmers now and then, just a little.
-        sparkles(pos.x, pos.y - (isFish() ? 10 : 36), 6);
+      } else if (roll < 0.92) {
+        if (pet.pet.variant === 'rare') {
+          // A rare one shimmers now and then, just a little.
+          sparkles(pos.x, pos.y - (isFish() ? 10 : 36), 6);
+        } else {
+          // A quiet glance at something on the floor: no idle tick is empty.
+          lookAt(rand(40, 360), FLOOR_Y - rand(20, 90), 1000);
+        }
       }
     }
     later(wander, rand(3200, 6500));
@@ -1079,6 +1102,22 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     }
   }
 
+  /** A new crack is worth seeing: re-draw the egg and pop just that line. */
+  function crackPop() {
+    if (!layers.egg || !pet.egg) return;
+    const body = layers.egg.querySelector('.egg');
+    if (!body) return;
+    body.innerHTML = eggMarkup(pet.egg.species, Math.min(3, pet.egg.warmth));
+    const mark = body.querySelector('.egg-crack');
+    if (mark) {
+      mark.classList.remove('is-pop');
+      void mark.getBoundingClientRect();
+      mark.classList.add('is-pop');
+      later(() => mark.classList.remove('is-pop'), 700);
+    }
+    sparkles(200, 196, 6);
+  }
+
   function scheduleEggWobble() {
     later(() => {
       wobbleEgg();
@@ -1157,6 +1196,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     paintPanel();
     busy = true;
     lastTouch = Date.now();
+    setHungry(false);
     if (mode === 'sleep') setMode('idle');
 
     if (isFish()) {
@@ -1697,11 +1737,13 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       picked = null;
       drawRoom();
       paintPanel();
+      sparkles(200, 196, 5);
     } else if (b.dataset.act === 'unchoose') {
       choosing = false;
       picked = null;
       drawRoom();
       paintPanel();
+      hearts(1);
     } else if (b.dataset.act === 'rename') {
       renaming = true;
       paintPanel();
@@ -1720,6 +1762,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       Pet.clearPlan(pet);
       save();
       paintPanel();
+      hearts(2);
+      say(t('pet.plan.bye'), 2000);
     } else if (b.dataset.friend != null) switchPet(Number(b.dataset.friend));
     else if (b.dataset.name) {
       const input = els.panel.querySelector('#petNameInput');
@@ -1874,7 +1918,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const key = dayKey || localDayKey();
     const result = Pet.earn(pet, { kind, id, dayKey: key, octaves, small });
     save();
-    if (running) paintNotes();
+    if (running) {
+      paintNotes();
+      if (result.warmed && pet.egg && !pet.pet) crackPop();
+    }
     return result;
   }
 

@@ -641,6 +641,7 @@ export const S = {
   'pet.plan.set': ['Next time: {when}. {name} will be listening.', '下次：{when}。{name} 会等着听。'],
   'pet.plan.change': ['Change', '改一下'],
   'pet.plan.thanks': ['It’s a plan!', '说好啦！'],
+  'pet.plan.bye': ['We’ll see, then.', '那先这样吧。'],
   'pet.plan.kept': ['You came back, just like we planned!', '你回来了，跟我们说好的一样！'],
   'pet.book.day1': ['Practiced on 1 day', '练了 1 天'],
   'pet.book.days': ['Practiced on {n} days', '练了 {n} 天'],

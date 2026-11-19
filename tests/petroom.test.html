@@ -119,6 +119,20 @@
         // the pet is drawn after the avatar, so it walks in front of it
         const stage = [...doc.querySelector('.room-stage').children].map((n) => n.getAttribute('class'));
         if (stage.indexOf('av-pos') > stage.indexOf('pet-pos')) problems.push(`the avatar is drawn over the pet: ${stage.join(', ')}`);
+
+        // A low-fullness pet looks hungry; the wish used to be a bubble only.
+        const hungryPet = JSON.parse(JSON.stringify(p));
+        hungryPet.pet.fullness = 5;
+        hungryPet.pet.fedAt = 0;
+        Pet.savePet(profile, hungryPet);
+        await load();
+        await wait(400);
+        frame.contentDocument.getElementById('openPetBtn').click();
+        await wait(2300);
+        if (!frame.contentDocument.querySelector('.pet.is-hungry')) {
+          problems.push('a hungry pet never showed a hungry look');
+        }
+        log.push('a hungry pet shows the state on its face, not only in a bubble');
       } catch (err) {
         problems.push(`threw: ${err && err.stack ? err.stack : err}`);
       } finally {

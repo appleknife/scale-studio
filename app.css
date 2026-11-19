@@ -5285,6 +5285,31 @@ select,
   100% { transform: scale(1); }
 }
 
+/* A drop lands with a squash before the little hop; hunger is a slower,
+   heavier breath rather than a different state the pet has to leave. */
+.pet-scale.is-landing {
+  animation: pet-land 0.42s ease-out;
+}
+
+@keyframes pet-land {
+  0% { transform: translateY(-5px) scale(1.05, 0.93); }
+  55% { transform: scale(0.93, 1.08); }
+  100% { transform: scale(1); }
+}
+
+.pet.is-hungry .pet-bob {
+  animation: pet-hungry 1.7s ease-in-out infinite;
+}
+
+@keyframes pet-hungry {
+  0%, 100% { transform: scale(1, 1) translateY(0); }
+  45% { transform: scale(1.03, 0.95) translateY(1px); }
+}
+
+.pet.is-hungry .pet-eyes {
+  transform: translateY(1px) scaleY(0.86);
+}
+
 .pet .pet-tail {
   transform-origin: 0% 90%;
   animation: tail-wag 1.8s ease-in-out infinite;
@@ -5461,7 +5486,11 @@ select,
 @media (prefers-reduced-motion: reduce) {
   .pet-hit[class*='trick-'] { animation: none; }
   .pet-flip.is-turning .pet-hit,
-  .pet-scale.is-growing { animation: none; }
+  .pet-scale.is-growing,
+  .pet-scale.is-landing,
+  .pet.is-hungry .pet-bob,
+  .egg-crack.is-pop { animation: none; }
+  .pet.is-hungry .pet-eyes,
   .pet .pet-happy,
   .pet .pet-sleep,
   .pet .pet-tongue,
@@ -5543,6 +5572,21 @@ select,
 /* Eggs */
 .egg {
   transform-origin: 50% 100%;
+}
+
+.egg-crack {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.egg-crack.is-pop {
+  animation: egg-crack-pop 0.6s ease-out;
+}
+
+@keyframes egg-crack-pop {
+  0% { transform: scale(0.6); opacity: 0.2; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); }
 }
 
 .egg.is-wobble {
@@ -7977,6 +8021,28 @@ select,
   }
 }
 
+/* A little daylight on the floor, with dust slowly rising through it. */
+.room-sun {
+  animation: room-sun-breathe 9s ease-in-out infinite;
+}
+
+@keyframes room-sun-breathe {
+  50% { opacity: 0.75; }
+}
+
+.room-mote {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: room-mote 8s linear infinite;
+}
+
+@keyframes room-mote {
+  0% { transform: translate(0, 0); opacity: 0; }
+  20% { opacity: 0.55; }
+  80% { opacity: 0.4; }
+  100% { transform: translate(14px, -46px); opacity: 0; }
+}
+
 .pet .pet-look {
   transition: transform 0.25s ease-out;
 }
@@ -8113,7 +8179,9 @@ select,
   .room-poke.is-sway,
   .fx-toy > *,
   .fx-bird > path,
-  .pet-shade.is-hop {
+  .pet-shade.is-hop,
+  .room-sun,
+  .room-mote {
     animation: none;
   }
   .pet .pet-look {
