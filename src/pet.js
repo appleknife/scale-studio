@@ -178,9 +178,10 @@ export const ITEMS = [
 
 export const SKINS = ['s1', 's2', 's3', 's4', 's5', 's6'];
 export const HAIR_COLOURS = ['black', 'brown', 'chestnut', 'blond', 'red', 'grey', 'blue', 'pink'];
-// One of each kind is worn at a time. 'extra' and 'hat' may be empty.
-export const AVATAR_SLOTS = ['hair', 'eyes', 'mouth', 'extra', 'top', 'hat', 'move'];
-const OPTIONAL_SLOTS = new Set(['extra', 'hat']);
+// One of each kind is worn at a time. Glasses ('extra'), makeup and face paint,
+// an accessory and a hat may each be left off; they all go together.
+export const AVATAR_SLOTS = ['hair', 'eyes', 'mouth', 'extra', 'makeup', 'top', 'acc', 'hat', 'move'];
+const OPTIONAL_SLOTS = new Set(['extra', 'makeup', 'acc', 'hat']);
 
 export const AVATAR_ITEMS = [
   { id: 'hair-short', slot: 'hair', cost: 0 },
@@ -192,18 +193,44 @@ export const AVATAR_ITEMS = [
   { id: 'hair-buns', slot: 'hair', cost: 12 },
   { id: 'hair-braids', slot: 'hair', cost: 12 },
   { id: 'hair-none', slot: 'hair', cost: 0 },
+  { id: 'hair-fringe', slot: 'hair', cost: 8 },
+  { id: 'hair-wavy', slot: 'hair', cost: 10 },
+  { id: 'hair-pigtails', slot: 'hair', cost: 10 },
+  { id: 'hair-topknot', slot: 'hair', cost: 10 },
+  { id: 'hair-afro', slot: 'hair', cost: 12 },
+  { id: 'hair-mohawk', slot: 'hair', cost: 12 },
 
   { id: 'eyes-dot', slot: 'eyes', cost: 0 },
   { id: 'eyes-bright', slot: 'eyes', cost: 5 },
   { id: 'eyes-lash', slot: 'eyes', cost: 5 },
   { id: 'eyes-happy', slot: 'eyes', cost: 5 },
+  { id: 'eyes-wink', slot: 'eyes', cost: 5 },
+  { id: 'eyes-sleepy', slot: 'eyes', cost: 5 },
+  { id: 'eyes-star', slot: 'eyes', cost: 8 },
+  { id: 'eyes-heart', slot: 'eyes', cost: 8 },
   { id: 'mouth-smile', slot: 'mouth', cost: 0 },
   { id: 'mouth-grin', slot: 'mouth', cost: 4 },
   { id: 'mouth-o', slot: 'mouth', cost: 4 },
+  { id: 'mouth-teeth', slot: 'mouth', cost: 4 },
+  { id: 'mouth-tongue', slot: 'mouth', cost: 4 },
+  { id: 'mouth-cat', slot: 'mouth', cost: 5 },
+  { id: 'mouth-smirk', slot: 'mouth', cost: 4 },
   { id: 'extra-glasses', slot: 'extra', cost: 6 },
   { id: 'extra-round', slot: 'extra', cost: 6 },
   { id: 'extra-freckles', slot: 'extra', cost: 4 },
   { id: 'extra-rosy', slot: 'extra', cost: 4 },
+  { id: 'extra-sunglasses', slot: 'extra', cost: 8 },
+  { id: 'extra-hearts', slot: 'extra', cost: 8 },
+  { id: 'extra-stars', slot: 'extra', cost: 8 },
+
+  { id: 'makeup-blush', slot: 'makeup', cost: 4 },
+  { id: 'makeup-lips', slot: 'makeup', cost: 4 },
+  { id: 'makeup-shadow', slot: 'makeup', cost: 5 },
+  { id: 'makeup-glitter', slot: 'makeup', cost: 6 },
+  { id: 'makeup-hearts', slot: 'makeup', cost: 6 },
+  { id: 'makeup-star', slot: 'makeup', cost: 6 },
+  { id: 'makeup-rainbow', slot: 'makeup', cost: 8 },
+  { id: 'makeup-whiskers', slot: 'makeup', cost: 6 },
 
   { id: 'top-tee', slot: 'top', cost: 0 },
   { id: 'top-stripes', slot: 'top', cost: 6 },
@@ -212,12 +239,35 @@ export const AVATAR_ITEMS = [
   { id: 'top-dress', slot: 'top', cost: 12 },
   { id: 'top-concert', slot: 'top', cost: 14 },
   { id: 'top-xmas', slot: 'top', cost: 10, season: 'xmas' },
+  { id: 'top-rainbow', slot: 'top', cost: 8 },
+  { id: 'top-music', slot: 'top', cost: 8 },
+  { id: 'top-jersey', slot: 'top', cost: 10 },
+  { id: 'top-sweater', slot: 'top', cost: 10 },
+  { id: 'top-pyjamas', slot: 'top', cost: 10 },
+  { id: 'top-raincoat', slot: 'top', cost: 12 },
+  { id: 'top-jacket', slot: 'top', cost: 12 },
+  { id: 'top-tutu', slot: 'top', cost: 14 },
+
+  { id: 'acc-necklace', slot: 'acc', cost: 6 },
+  { id: 'acc-earrings', slot: 'acc', cost: 6 },
+  { id: 'acc-scarf', slot: 'acc', cost: 8 },
+  { id: 'acc-medal', slot: 'acc', cost: 8 },
+  { id: 'acc-neckphones', slot: 'acc', cost: 10 },
+  { id: 'acc-backpack', slot: 'acc', cost: 10 },
+  { id: 'acc-cape', slot: 'acc', cost: 14 },
 
   { id: 'hat-bow', slot: 'hat', cost: 6 },
   { id: 'hat-cap', slot: 'hat', cost: 8 },
   { id: 'hat-beanie', slot: 'hat', cost: 8 },
   { id: 'hat-crown', slot: 'hat', cost: 25 },
   { id: 'hat-santa', slot: 'hat', cost: 10, season: 'xmas' },
+  { id: 'hat-cat', slot: 'hat', cost: 8 },
+  { id: 'hat-bunny', slot: 'hat', cost: 8 },
+  { id: 'hat-flowers', slot: 'hat', cost: 10 },
+  { id: 'hat-tiara', slot: 'hat', cost: 12 },
+  { id: 'hat-headphones', slot: 'hat', cost: 12 },
+  { id: 'hat-party', slot: 'hat', cost: 8 },
+  { id: 'hat-wizard', slot: 'hat', cost: 15 },
 
   { id: 'move-wave', slot: 'move', cost: 0 },
   { id: 'move-jump', slot: 'move', cost: 8 },
@@ -225,6 +275,11 @@ export const AVATAR_ITEMS = [
   { id: 'move-spin', slot: 'move', cost: 10 },
   { id: 'move-dance', slot: 'move', cost: 12 },
   { id: 'move-violin', slot: 'move', cost: 15 },
+  { id: 'move-clap', slot: 'move', cost: 8 },
+  { id: 'move-hop', slot: 'move', cost: 8 },
+  { id: 'move-cheer', slot: 'move', cost: 10 },
+  { id: 'move-wiggle', slot: 'move', cost: 10 },
+  { id: 'move-conduct', slot: 'move', cost: 15 },
 ];
 
 export const AVATAR_X = [34, 366]; // how far along the floor it can be stood
@@ -235,7 +290,7 @@ export function freshAvatar() {
     x: 318,
     skin: 's2',
     hairColour: 'brown',
-    wear: { hair: 'hair-short', eyes: 'eyes-dot', mouth: 'mouth-smile', extra: null, top: 'top-tee', hat: null, move: 'move-wave' },
+    wear: { hair: 'hair-short', eyes: 'eyes-dot', mouth: 'mouth-smile', extra: null, makeup: null, top: 'top-tee', acc: null, hat: null, move: 'move-wave' },
   };
 }
 

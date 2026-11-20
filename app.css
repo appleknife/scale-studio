@@ -3985,6 +3985,14 @@ select,
   display: inline;
 }
 
+.av-baton {
+  display: none;
+}
+
+.av.is-conduct .av-baton {
+  display: inline;
+}
+
 .av-pos {
   cursor: grab;
   touch-action: pan-y;
@@ -8186,5 +8194,318 @@ select,
   }
   .pet .pet-look {
     transition: none;
+  }
+}
+
+/* ── More of the avatar's moves ──────────────────────────────────────────── */
+
+/* Clap: both hands meet in front, four times. */
+.av.is-clap .av-arm-l {
+  animation: av-clap-l 1.8s ease-in-out;
+}
+
+.av.is-clap .av-arm-r {
+  animation: av-clap-r 1.8s ease-in-out;
+}
+
+.av.is-clap .av-all {
+  animation: av-clap-bob 1.8s ease-in-out;
+}
+
+@keyframes av-clap-l {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  12%,
+  32%,
+  52%,
+  72% {
+    transform: rotate(-58deg);
+  }
+  22%,
+  42%,
+  62%,
+  82% {
+    transform: rotate(-30deg);
+  }
+}
+
+@keyframes av-clap-r {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  12%,
+  32%,
+  52%,
+  72% {
+    transform: rotate(58deg);
+  }
+  22%,
+  42%,
+  62%,
+  82% {
+    transform: rotate(30deg);
+  }
+}
+
+@keyframes av-clap-bob {
+  12%,
+  32%,
+  52%,
+  72% {
+    transform: translateY(-1.5px);
+  }
+}
+
+/* Bunny hops: three small springy hops on the spot. */
+.av.is-hop .av-all {
+  animation: av-hop 1.5s ease-in-out;
+}
+
+.av.is-hop .av-arm-l {
+  animation: av-hop-arm-l 1.5s ease-in-out;
+}
+
+.av.is-hop .av-arm-r {
+  animation: av-hop-arm-r 1.5s ease-in-out;
+}
+
+@keyframes av-hop {
+  0%,
+  33%,
+  66%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  5%,
+  38%,
+  71% {
+    transform: translateY(0) scale(1.06, 0.92);
+  }
+  18%,
+  51%,
+  84% {
+    transform: translateY(-11px) scale(0.97, 1.04);
+  }
+}
+
+@keyframes av-hop-arm-l {
+  18%,
+  51%,
+  84% {
+    transform: rotate(35deg);
+  }
+}
+
+@keyframes av-hop-arm-r {
+  18%,
+  51%,
+  84% {
+    transform: rotate(-35deg);
+  }
+}
+
+/* Cheer: both arms shoot up, with a jump, twice. */
+.av.is-cheer .av-arm-l {
+  animation: av-cheer-l 1.6s ease-in-out;
+}
+
+.av.is-cheer .av-arm-r {
+  animation: av-cheer-r 1.6s ease-in-out;
+}
+
+.av.is-cheer .av-all {
+  animation: av-cheer 1.6s ease-in-out;
+}
+
+@keyframes av-cheer-l {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  15%,
+  85% {
+    transform: rotate(118deg);
+  }
+  35%,
+  65% {
+    transform: rotate(128deg);
+  }
+  50% {
+    transform: rotate(110deg);
+  }
+}
+
+@keyframes av-cheer-r {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  15%,
+  85% {
+    transform: rotate(-118deg);
+  }
+  35%,
+  65% {
+    transform: rotate(-128deg);
+  }
+  50% {
+    transform: rotate(-110deg);
+  }
+}
+
+@keyframes av-cheer {
+  0%,
+  50%,
+  100% {
+    transform: translateY(0);
+  }
+  25%,
+  75% {
+    transform: translateY(-9px);
+  }
+}
+
+/* Wiggle: hips one way, arms the other. */
+.av.is-wiggle .av-upper {
+  animation: av-wiggle-top 2.2s ease-in-out;
+}
+
+.av.is-wiggle .av-all {
+  animation: av-wiggle 2.2s ease-in-out;
+}
+
+.av.is-wiggle .av-arm-l {
+  animation: av-wiggle-l 2.2s ease-in-out;
+}
+
+.av.is-wiggle .av-arm-r {
+  animation: av-wiggle-r 2.2s ease-in-out;
+}
+
+@keyframes av-wiggle {
+  12.5%,
+  37.5%,
+  62.5%,
+  87.5% {
+    transform: translateX(-2px);
+  }
+  25%,
+  50%,
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes av-wiggle-top {
+  12.5%,
+  37.5%,
+  62.5%,
+  87.5% {
+    transform: rotate(7deg);
+  }
+  25%,
+  50%,
+  75% {
+    transform: rotate(-7deg);
+  }
+}
+
+@keyframes av-wiggle-l {
+  10%,
+  90% {
+    transform: rotate(60deg);
+  }
+  30%,
+  70% {
+    transform: rotate(90deg);
+  }
+  50% {
+    transform: rotate(60deg);
+  }
+}
+
+@keyframes av-wiggle-r {
+  10%,
+  90% {
+    transform: rotate(-60deg);
+  }
+  30%,
+  70% {
+    transform: rotate(-90deg);
+  }
+  50% {
+    transform: rotate(-60deg);
+  }
+}
+
+/* Conduct: the right hand beats time with a baton — down, left, right, up —
+   twice through a bar of four, the left hand keeping the shape. */
+.av.is-conduct .av-arm-r {
+  animation: av-conduct-r 3.2s ease-in-out;
+}
+
+.av.is-conduct .av-arm-l {
+  animation: av-conduct-l 3.2s ease-in-out;
+}
+
+.av.is-conduct .av-upper {
+  animation: av-conduct-sway 3.2s ease-in-out;
+}
+
+@keyframes av-conduct-r {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  8% {
+    transform: rotate(-125deg);
+  }
+  16%,
+  56% {
+    transform: rotate(-75deg);
+  }
+  24%,
+  64% {
+    transform: rotate(-60deg);
+  }
+  32%,
+  72% {
+    transform: rotate(-105deg);
+  }
+  40%,
+  80% {
+    transform: rotate(-135deg);
+  }
+  48%,
+  88% {
+    transform: rotate(-120deg);
+  }
+}
+
+@keyframes av-conduct-l {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  10%,
+  90% {
+    transform: rotate(70deg);
+  }
+  50% {
+    transform: rotate(85deg);
+  }
+}
+
+@keyframes av-conduct-sway {
+  20%,
+  60% {
+    transform: rotate(-2deg);
+  }
+  40%,
+  80% {
+    transform: rotate(2deg);
   }
 }

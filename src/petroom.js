@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611201600';
-import { currentSeason } from './season.js?v=202611201600';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611201600';
+import * as Pet from './pet.js?v=202611201730';
+import { currentSeason } from './season.js?v=202611201730';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611201730';
 import {
   petMarkup,
   eggMarkup,
@@ -33,15 +33,15 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611201600';
-import { t, getLang } from './i18n.js?v=202611201600';
+} from './petart.js?v=202611201730';
+import { t, getLang } from './i18n.js?v=202611201730';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
 const PET_SCALE = 0.8; // the 100-unit pet box, in room units
 const AV_SCALE = 0.68; // the avatar's 100 × 130 box, in room units
 // How long each of the avatar's moves runs, in ms (the CSS animations' lengths).
-const MOVE_MS = { wave: 1900, jump: 1300, bow: 1700, spin: 1300, dance: 2600, violin: 3400 };
+const MOVE_MS = { wave: 1900, jump: 1300, bow: 1700, spin: 1300, dance: 2600, violin: 3400, clap: 1800, hop: 1500, cheer: 1600, wiggle: 2200, conduct: 3200 };
 const FISH_SCALE = 0.62;
 const BOWL = { x: 126, y: 262 }; // the food bowl, for the land pets
 const BED = { x: 296, y: 266 };
@@ -1617,7 +1617,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   const ME_GROUPS = [
     ['hair', ['hair']],
     ['face', ['eyes', 'mouth', 'extra']],
+    ['makeup', ['makeup']],
     ['top', ['top']],
+    ['acc', ['acc']],
     ['hat', ['hat']],
     ['move', ['move']],
   ];
