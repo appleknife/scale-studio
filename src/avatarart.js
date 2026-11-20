@@ -546,6 +546,6 @@ export function avatarItemIcon(avatar, item) {
 }
 
 /** The whole figure, standing still, for the "Me" tab. */
-export function avatarPortrait(avatar, cls = '') {
-  return `<svg class="av-portrait" viewBox="0 -10 100 140" aria-hidden="true">${avatarMarkup(avatar, { cls })}</svg>`;
+export function avatarPortrait(avatar, cls = '', wear = {}) {
+  return `<svg class="av-portrait" viewBox="0 -10 100 140" aria-hidden="true">${avatarMarkup(avatar, { cls, wear })}</svg>`;
 }

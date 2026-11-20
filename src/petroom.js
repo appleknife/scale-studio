@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611201730';
-import { currentSeason } from './season.js?v=202611201730';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611201730';
+import * as Pet from './pet.js?v=202611201800';
+import { currentSeason } from './season.js?v=202611201800';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611201800';
 import {
   petMarkup,
   eggMarkup,
@@ -33,8 +33,8 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611201730';
-import { t, getLang } from './i18n.js?v=202611201730';
+} from './petart.js?v=202611201800';
+import { t, getLang } from './i18n.js?v=202611201800';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -257,14 +257,29 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   // ── The avatar in the room ─────────────────────────────────────────────
 
   /** Puts the student's figure in the room (or takes it out), behind the pet. */
+  /**
+   * Something picked in the "Me" shop but not bought is tried on: the figure in
+   * the panel and the one in the room wear it until it is bought, put back, or
+   * another thing is picked. (A move is tried by doing it.)
+   */
+  const tryingOn = () => {
+    if (pending?.kind !== 'avatar' || Pet.avatarOwns(pet, pending.id)) return null;
+    return Pet.AVATAR_ITEMS.find((i) => i.id === pending.id) || null;
+  };
+  const tryWear = () => {
+    const item = tryingOn();
+    return item && item.slot !== 'move' ? { [item.slot]: item.id } : {};
+  };
+
   function drawAvatar() {
     layers.av?.remove();
     layers.av = null;
+    stopAvatarWalk();
     if (!pet.avatar.in || !pet.pet || choosing) return;
     layers.av = node(
       'g',
       { class: 'av-pos', role: 'button', tabindex: '0', 'aria-label': t('av.aria') },
-      avatarMarkup(pet.avatar),
+      avatarMarkup(pet.avatar, { wear: tryWear() }),
     );
     placeAvatar();
     // before the pet, so the pet walks in front of it — if the pet is in this
@@ -274,6 +289,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     layers.av.addEventListener('pointerdown', (event) => {
       if (busy) return;
       event.stopPropagation(); // not the furniture underneath
+      stopAvatarWalk();
       beginDrag(event, { kind: 'avatar', el: layers.av, from: { x: pet.avatar.x } });
     });
     layers.av.addEventListener('keydown', (e) => {
@@ -286,8 +302,109 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   function placeAvatar(x = pet.avatar.x) {
     if (!layers.av) return;
-    // the box's feet are at (50, 126)
-    layers.av.setAttribute('transform', `translate(${(x - 50 * AV_SCALE).toFixed(1)} ${(FLOOR_Y + 3 - 126 * AV_SCALE).toFixed(1)}) scale(${AV_SCALE})`);
+    // the box's feet are at (50, 126); facing left, the figure is mirrored about them
+    const y = (FLOOR_Y + 3 - 126 * AV_SCALE).toFixed(1);
+    layers.av.setAttribute(
+      'transform',
+      avFacing === -1
+        ? `translate(${(x + 50 * AV_SCALE).toFixed(1)} ${y}) scale(${-AV_SCALE} ${AV_SCALE})`
+        : `translate(${(x - 50 * AV_SCALE).toFixed(1)} ${y}) scale(${AV_SCALE})`,
+    );
+  }
+
+  // ── The avatar about the room ─────────────────────────────────────────
+  //
+  // Left alone, the student's figure potters about: strolls along the floor
+  // with a little bob, turns to look at the pet, hops for no reason, and now and
+  // then shows off its move. Picking it up (or anything happening to it) stops
+  // the stroll where it is.
+
+  let avFacing = 1;
+  let avRaf = 0;
+  let avWalking = false;
+  const AV_SPEED = 46; // room units a second: an easy stroll
+
+  function stopAvatarWalk() {
+    cancelAnimationFrame(avRaf);
+    avRaf = 0;
+    if (avWalking) {
+      avWalking = false;
+      layers.av?.querySelector('.av')?.classList.remove('is-walk');
+      Pet.setAvatar(pet, { x: pet.avatar.x });
+      save();
+    }
+  }
+
+  function avatarWalkTo(to, then) {
+    if (!layers.av) return;
+    const from = pet.avatar.x;
+    const dist = Math.abs(to - from);
+    if (dist < 4) return then?.();
+    avFacing = to > from ? 1 : -1;
+    const fig = layers.av.querySelector('.av');
+    fig?.classList.add('is-walk');
+    avWalking = true;
+    const start = performance.now();
+    const ms = (dist / AV_SPEED) * 1000;
+    const step = (now) => {
+      if (!layers.av || drag?.kind === 'avatar') return;
+      const k = Math.min(1, (now - start) / ms);
+      // ease in and out, so it sets off and stops like someone walking
+      const e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      pet.avatar.x = from + (to - from) * e;
+      placeAvatar();
+      if (k < 1) {
+        avRaf = requestAnimationFrame(step);
+        return;
+      }
+      avRaf = 0;
+      fig?.classList.remove('is-walk');
+      avWalking = false;
+      Pet.setAvatar(pet, { x: pet.avatar.x });
+      save();
+      then?.();
+    };
+    avRaf = requestAnimationFrame(step);
+  }
+
+  /** A little hop on the spot. */
+  function avatarSkip() {
+    const fig = layers.av?.querySelector('.av');
+    if (!fig) return;
+    fig.classList.remove('is-skip');
+    void fig.getBoundingClientRect();
+    fig.classList.add('is-skip');
+    later(() => fig.classList.remove('is-skip'), 650);
+  }
+
+  function avatarWander() {
+    if (!pet.pet) return;
+    const free = layers.av && !avWalking && drag?.kind !== 'avatar' && !choosing && !document.hidden;
+    const moving = layers.av?.querySelector('.av')?.className.baseVal.match(/is-(wave|jump|bow|spin|dance|violin|clap|hop|cheer|wiggle|conduct)\b/);
+    if (free && !moving) {
+      const roll = Math.random();
+      const [lo, hi] = Pet.AVATAR_X;
+      if (roll < 0.5) {
+        // a stroll somewhere else on the floor, sometimes with a hop at the end
+        let to = pet.avatar.x + (Math.random() < 0.5 ? -1 : 1) * rand(40, 150);
+        if (to < lo || to > hi) to = pet.avatar.x - (to - pet.avatar.x);
+        to = Math.max(lo, Math.min(hi, to));
+        avatarWalkTo(to, () => Math.random() < 0.3 && avatarSkip());
+      } else if (roll < 0.68) {
+        avatarSkip();
+        if (Math.random() < 0.4) later(avatarSkip, 520);
+      } else if (roll < 0.84 && !isFish()) {
+        // turns to look at the pet
+        const want = pos.x > pet.avatar.x ? 1 : -1;
+        if (want !== avFacing) {
+          avFacing = want;
+          placeAvatar();
+        }
+      } else if (roll < 0.92) {
+        doMove();
+      }
+    }
+    later(avatarWander, rand(3800, 8000));
   }
 
   /** Runs a move on a drawn figure: the class goes on, and comes off when it is over. */
@@ -1643,7 +1760,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
           ? t(item.slot === 'move' ? 'av.myMove' : 'av.on')
           : t(item.slot === 'move' ? 'av.use' : 'av.wear')
         : `♪ ${item.cost}${can ? '' : `<span class="tray-need">${t('pet.need', { n: item.cost - pet.notes })}</span>`}`;
-      return `<button class="tray-item av-item${on ? ' is-out' : ''}${picked ? ' is-picked' : ''}${item.season && !owned ? ' is-seasonal' : ''}" type="button" data-av="${item.id}" ${can ? '' : 'disabled'} aria-pressed="${on || picked}">
+      // anything can be tried on, even what is still being saved up for
+      return `<button class="tray-item av-item${on ? ' is-out' : ''}${picked ? ' is-picked' : ''}${can ? '' : ' is-short'}${item.season && !owned ? ' is-seasonal' : ''}" type="button" data-av="${item.id}" aria-pressed="${on || picked}">
         ${avatarItemIcon(a, item)}
         <span class="tray-name">${t(`av.item.${item.id}`)}</span>
         <span class="tray-cost">${label}</span></button>`;
@@ -1654,7 +1772,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     }).join('');
     return `
       <div class="me-top">
-        <div class="me-figure">${avatarPortrait(a)}</div>
+        <div class="me-figure${tryingOn() ? ' is-trying' : ''}">${avatarPortrait(a, '', tryWear())}</div>
         <div class="me-side">
           <label class="me-switch"><input type="checkbox" data-me-in ${a.in ? 'checked' : ''}/>
             <span><b>${t('av.inRoom')}</b><span class="me-sub">${t('av.inRoom.sub', { name: esc(pet.pet.name) })}</span></span></label>
@@ -1707,6 +1825,21 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         <button class="quiet-btn small" type="button" data-act="cancel-buy">${t('pet.confirm.putBack')}</button>
       </span></div>`;
     }
+    if (kind === 'avatar' && cost > pet.notes) {
+      return `<div class="pet-confirm is-preview" role="group">
+      <span>${t(pending.id.startsWith('move-') ? 'av.confirm.moveShort' : 'av.confirm.short', { name: esc(name), cost, n: cost - pet.notes })}</span>
+      <span class="pet-confirm-btns">
+        <button class="quiet-btn small" type="button" data-act="cancel-buy">${t('pet.confirm.putBack')}</button>
+      </span></div>`;
+    }
+    if (kind === 'avatar') {
+      return `<div class="pet-confirm is-preview" role="group">
+      <span>${t(pending.id.startsWith('move-') ? 'av.confirm.move' : 'av.confirm.try', { name: esc(name), cost, left: pet.notes - cost })}</span>
+      <span class="pet-confirm-btns">
+        <button class="primary-btn small" type="button" data-act="confirm-buy">${t('pet.confirm.buy')}</button>
+        <button class="quiet-btn small" type="button" data-act="cancel-buy">${t('pet.confirm.putBack')}</button>
+      </span></div>`;
+    }
     if (kind === 'item') {
       return `<div class="pet-confirm is-preview" role="group">
       <span>${t('pet.confirm.tryItem', { name: esc(name), cost, left: pet.notes - cost })}</span>
@@ -1727,7 +1860,14 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     const b = event.target.closest('button');
     if (!b) return;
     const lookBefore = previewItem()?.id;
+    const tryBefore = tryingOn()?.id;
     onPanelClick(b);
+    if (tryingOn()?.id !== tryBefore && running && tryingOn()?.slot !== 'move') {
+      const x = pet.avatar.x;
+      drawAvatar();
+      pet.avatar.x = x;
+      placeAvatar();
+    }
     if (previewItem()?.id !== lookBefore && running) paintFurniture();
   });
 
@@ -1805,6 +1945,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         pending = pending?.kind === 'avatar' && pending.id === b.dataset.av ? null : { kind: 'avatar', id: b.dataset.av };
         paintPanel();
         showConfirm();
+        // a move is tried by doing it, in the panel and in the room
+        if (pending && b.dataset.av.startsWith('move-')) {
+          runMove(els.panel.querySelector('.me-figure .av'), b.dataset.av);
+          runMove(layers.av?.querySelector('.av'), b.dataset.av);
+        }
       }
     } else if (b.dataset.snack) {
       // tapping the picked one again lets it go
@@ -1965,6 +2110,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       lastTouch = Date.now();
       blinkLoop();
       later(wander, 1800);
+      later(avatarWander, 3500);
       later(watchSky, 30000);
       const grew = Pet.unseenGrowth(pet);
       // A plan that was kept is said once, and it outranks an ordinary welcome.
