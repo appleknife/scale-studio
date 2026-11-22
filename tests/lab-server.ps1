@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $rootFull = [System.IO.Path]::GetFullPath($Root)
+$rootPrefix = $rootFull.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$Port/")
 $listener.Start()
@@ -41,7 +42,7 @@ while ($true) {
     else {
       $rel = $req.Url.LocalPath.TrimStart('/')
       $full = [System.IO.Path]::GetFullPath((Join-Path $rootFull $rel))
-      if (-not $full.StartsWith($rootFull)) { $res.StatusCode = 403 }
+      if (-not $full.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) { $res.StatusCode = 403 }
       elseif (Test-Path -LiteralPath $full -PathType Leaf) {
         $bytes = [System.IO.File]::ReadAllBytes($full)
         $ext = [System.IO.Path]::GetExtension($full).ToLowerInvariant()

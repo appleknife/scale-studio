@@ -17,6 +17,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $rootFull = [System.IO.Path]::GetFullPath($Root)
+$rootPrefix = $rootFull.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
 
 $mime = @{
   '.html' = 'text/html; charset=utf-8'
@@ -60,7 +61,7 @@ while ($true) {
     $relative = $path.TrimStart('/')
     $full = [System.IO.Path]::GetFullPath((Join-Path $rootFull $relative))
 
-    if (-not $full.StartsWith($rootFull)) {
+    if (-not $full.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
       $body = [System.Text.Encoding]::UTF8.GetBytes('403')
       $ct = 'text/plain'
       $status = 'HTTP/1.1 403 Forbidden'
