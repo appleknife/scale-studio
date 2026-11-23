@@ -16,8 +16,8 @@
 // anything else changing: the
 // player only asks the voice to `play({ midi, at, duration, gain, legato })`.
 
-import { makeHallIR } from './recorder.js?v=202611231645';
-import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611231645';
+import { makeHallIR } from './recorder.js?v=202611231715';
+import { sampleVoice, loadBank, emptyBank } from './sampler.js?v=202611231715';
 
 /** How long each tempo unit lasts, counted in quarter notes. */
 const UNIT_QUARTERS = { w: 4, h: 2, qd: 1.5, q: 1, e: 0.5 };
@@ -92,9 +92,44 @@ function levelForGain(gain) {
   return best;
 }
 
+/**
+ * How much louder or softer a note at this pitch is played, so the example
+ * sounds about as loud at the bottom of the G string as at the top of the E.
+ * Measured on the recorded takes through a small-speaker filter (a phone or
+ * tablet gives little below ~500 Hz): levelled for plain RMS, the G-string and
+ * low D-string notes still came out 2–4 dB under the E-string ones — and ears
+ * favour the high notes besides. +2 dB up to G4, easing to −1.5 dB from E5 up.
+ */
+export function registerTrim(midi) {
+  const db = midi <= 67 ? 2 : midi >= 76 ? -1.5 : 2 - (3.5 * (midi - 67)) / 9;
+  return 10 ** (db / 20);
+}
+
+/**
+ * The example is for hearing the notes, so whole passages should not swing from
+ * whisper to shout: a passage printed p played its notes ~12 dB under one printed
+ * f, and the volume had to be chased from one passage to the next. The printed
+ * dynamic is kept as a *colour* — a p passage is still darker and a little softer,
+ * an f one brighter — but its overall level is brought most of the way back to
+ * mf. Inside a passage nothing changes: a
+ * hairpin still swells from its marking to the next one, and an accent still
+ * stands out.
+ */
+// In decibels, by the marking the passage opens with. Worked out on the
+// recorded takes through a small-speaker filter: a p passage's darker tone takes
+// away just the frequencies a phone plays best, so it needs more lift than the
+// gain ratio alone suggests. With these, a whole passage sits within about
+// 2–3 dB of mf whatever its marking (it was 15 dB from quietest to loudest).
+const PASSAGE_TRIM_DB = { pp: 8, p: 6, mp: 3, mf: 0, f: -2, ff: -3.5 };
+
+function passageTrim(dynamic) {
+  return 10 ** ((PASSAGE_TRIM_DB[dynamic] ?? 0) / 20);
+}
+
 export function schedule(passage, { rate = 1, fromBar = 0 } = {}) {
   const spq = secondsPerQuarter(passage.tempo) / rate;
   const base = DYNAMIC_GAIN[passage.dynamic] ?? DYNAMIC_GAIN.mf;
+  const trim = passageTrim(passage.dynamic);
   const swell = passage.swell || null;
   const notes = [];
   let previous = null;
@@ -148,6 +183,8 @@ export function schedule(passage, { rate = 1, fromBar = 0 } = {}) {
       if (event.mark === 'staccato') duration *= 0.45;
 
       const levelGain = DYNAMIC_GAIN[level] ?? base;
+      // the evening-out (above): the whole passage towards mf, and the register
+      const even = trim * registerTrim(event.midi);
       notes.push({
         time,
         duration,
@@ -158,6 +195,9 @@ export function schedule(passage, { rate = 1, fromBar = 0 } = {}) {
         // recorded take already carries its own level — 1 means "as recorded".
         level,
         ramp: levelGain > 0 ? gain / levelGain : 1,
+        // the evening-out, as its own final volume: the take and its level are
+        // chosen as printed, then the whole note is turned up or down by this
+        trim: even,
         legato,
         accent: event.mark === 'accent',
         staccato: event.mark === 'staccato',
@@ -378,6 +418,8 @@ export function createPlayer({ wet = 0.24, volume: start = 0.8 } = {}) {
         const next = plan.notes[i + 1];
         const when = {
           ...note,
+          // the synth reads `gain`; the sampled voice reads `trim` itself
+          gain: note.gain * (note.trim || 1),
           at: start + note.time,
           // How much room there is before the next note, and what it is: a short
           // take may ring on *under its own pitch*, but ringing on under a

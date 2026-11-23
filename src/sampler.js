@@ -322,7 +322,7 @@ export function noteShape(sample, { staccato, legato, duration, written, rate, b
  */
 export function sampleVoice(ctx, destination, bank) {
   return {
-    play({ midi, at, duration, written, gain, ramp = 1, level = 'mf', legato = false, accent = false, staccato = false, nextIn = Infinity, nextMidi = null }) {
+    play({ midi, at, duration, written, gain, ramp = 1, trim = 1, level = 'mf', legato = false, accent = false, staccato = false, nextIn = Infinity, nextMidi = null }) {
       const sample = pickSample(bank.index, midi, { staccato, accent, legato, level });
       if (!sample) return false;
       const buffer = bank.buffers.get(sample.id);
@@ -379,7 +379,8 @@ export function sampleVoice(ctx, destination, bank) {
       // level comes from LEVEL_TILT, which is the sampled voice's own ladder —
       // using `gain` here as well would count the dynamic twice.
       const level_ = (ramp == null ? 1 : ramp) * tilt.gain;
-      const peak = level_ * (sample.gain || 1) * BANK_GAIN;
+      // `trim` evens the example out across passages and registers (playback.js)
+      const peak = level_ * (sample.gain || 1) * BANK_GAIN * trim;
 
       // One pass is the whole note for everything except a held note that outlasts
       // its take. Those are stitched from several passes with crossfades (see
