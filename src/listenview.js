@@ -11,12 +11,12 @@
 // score is drawn by OpenSheetMusicDisplay (BSD-3, vendor/), loaded only when a
 // score is opened, so the rest of the app never pays for it.
 
-import { readScore, readScoreFile, listParts, parseXml, sectionOf } from './musicxml.js?v=202611231900';
-import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611231900';
-import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611231900';
-import { t } from './i18n.js?v=202611231900';
+import { readScore, readScoreFile, listParts, parseXml, sectionOf } from './musicxml.js?v=202611232000';
+import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611232000';
+import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611232000';
+import { t } from './i18n.js?v=202611232000';
 
-const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611231900';
+const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611232000';
 const MAX_SECONDS = 600; // ten minutes: enough for any audition piece
 const MIN_SECONDS = 5;
 const MIN_SECTION_SECONDS = 1.5; // a single bar is a fair thing to practise
@@ -155,7 +155,6 @@ export function createListenView(deps) {
                 <p>${t('listen.scoreText')}</p>
                 <button class="ghost-btn" type="button" data-act="pick">${t('listen.pickScore')}</button>
               </div>
-              ${libraryHtml()}
             </div>
             ${paperHtml()}`
       }
@@ -265,66 +264,14 @@ export function createListenView(deps) {
 
   /* ── The score ───────────────────────────────────────────────────────── */
 
-  /* ── The teacher's pieces ────────────────────────────────────────────── */
-
-  let pieces = []; // library/index.json: what the teacher has put in the app
-  let inbox = ''; // where a teacher drops a PDF or photos to have them read
   let paperNote = false; // a PDF or photo was chosen: say what happens to those
-
-  async function loadLibrary() {
-    try {
-      const res = await fetch('library/index.json', { cache: 'no-cache' });
-      if (!res.ok) return;
-      const index = await res.json();
-      const list = index.pieces;
-      inbox = typeof index.inbox === 'string' && /^https:\/\//.test(index.inbox) ? index.inbox : '';
-      pieces = Array.isArray(list) ? list.filter((p) => p && p.file && p.title) : [];
-      if (pieces.length && panel === 'start' && !source) paint();
-    } catch {
-      /* no library, or offline before it was ever fetched: the file picker still works */
-    }
-  }
-
-  function libraryHtml() {
-    if (!pieces.length) return '';
-    return `
-      <div class="listen-choice listen-library">
-        <h4>${t('listen.libTitle')}</h4>
-        <p>${t('listen.libText')}</p>
-        <ul class="listen-pieces">${pieces
-          .map(
-            (p, i) =>
-              `<li><button class="listen-piece" type="button" data-act="piece" data-piece="${i}">
-                 <span class="listen-piece-title">${esc(p.title)}</span>
-                 ${p.composer ? `<span class="listen-piece-by">${esc(p.composer)}</span>` : ''}
-                 ${p.scanned ? `<span class="listen-piece-tag">${t('listen.scannedTag')}</span>` : ''}
-               </button></li>`,
-          )
-          .join('')}</ul>
-      </div>`;
-  }
-
-  async function openPiece(piece) {
-    if (!piece) return;
-    status(t('listen.reading'));
-    try {
-      const res = await fetch(`library/${piece.file}`);
-      if (!res.ok) throw new Error('missing');
-      const blob = await res.blob();
-      await openFile(new File([blob], piece.file, { type: 'application/xml' }), piece);
-    } catch {
-      status(t('listen.libFail'));
-    }
-  }
 
   /** A PDF or a photo cannot be read on this device; say so, and say where it can. */
   function paperHtml() {
     if (!paperNote) return '';
     return `<div class="listen-scanned listen-paper" role="status">
         <p>${t('listen.paperNote')}</p>
-        <p>${t('listen.paperTeacher')}${
-          inbox ? ` <a href="${esc(inbox)}" target="_blank" rel="noopener">${t('listen.paperInbox')}</a>` : ''
-        }</p>
+        <p>${t('listen.paperTeacher')}</p>
       </div>`;
   }
 
@@ -976,7 +923,6 @@ export function createListenView(deps) {
     const act = btn.dataset.act;
     if (act === 'back') return deps.onBack();
     if (act === 'pick') return fileInput.click();
-    if (act === 'piece') return openPiece(pieces[Number(btn.dataset.piece)]);
     if (act === 'whole') return section ? setSection(null) : undefined;
     if (act === 'section') {
       if (section) return;
@@ -1032,7 +978,6 @@ export function createListenView(deps) {
     stopHearing();
   });
   fileInput.addEventListener('change', () => openFile(fileInput.files?.[0]));
-  loadLibrary();
   partSelect.addEventListener('change', () => choosePart(partSelect.value));
 
   let resizeTimer = 0;
