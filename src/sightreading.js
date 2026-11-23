@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611231715';
-import { STAFF_GEOM } from './staff.js?v=202611231715';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611231745';
+import { STAFF_GEOM } from './staff.js?v=202611231745';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -871,7 +871,9 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   const FIRST_POSITION_TOP = 83; // B5
   // (Planned a little over the aim: about a quarter of the climbs end a note or
   // two short of it, so these give roughly half of level V and six in ten of VI.)
-  const shiftChance = level >= 6 ? 0.75 : level >= 5 ? 0.66 : 0;
+  // Level IV's printed range reaches D6 too, and a shift can be asked for there
+  // — less often than at V, so about one passage in five.
+  const shiftChance = level >= 6 ? 0.75 : level >= 5 ? 0.66 : level >= 4 ? 0.32 : 0;
   const upThere = pool.map((n, i) => i).filter((i) => pool[i].midi > FIRST_POSITION_TOP && i > home);
   const highClimb = upThere.length > 0 && chance(rng, shiftChance);
   let reach = 7 + Math.floor(rng() * headroom);
