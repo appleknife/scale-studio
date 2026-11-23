@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611231815';
-import { getLang, t } from './i18n.js?v=202611231815';
+import { median } from './pitch.js?v=202611231900';
+import { getLang, t } from './i18n.js?v=202611231900';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -433,6 +433,20 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     }
     joined.push({ ...n });
   }
+  // When the pitch takes a moment to settle into a new note while the violin
+  // keeps sounding — the glide of a shift, a string crossing with the old string
+  // still ringing, a slurred change in an echoing room — the note is only *heard*
+  // once the pitch is clear, 50–110 ms after it was played (measured on
+  // simulated takes). It began somewhere in that unclear stretch, so for timing
+  // its start is taken as the middle of it. A real silence in between is a gap,
+  // not a transition, and keeps the heard start.
+  for (let k = 1; k < joined.length; k++) {
+    const a = joined[k - 1];
+    const b = joined[k];
+    const gap = b.t0 - a.t1;
+    b.onset = gap > 0.02 && gap < 0.25 && quietIn(a.t1, b.t0) < 0.06 ? (a.t1 + b.t0) / 2 : b.t0;
+  }
+  if (joined.length) joined[0].onset = joined[0].t0;
   // The top of the scale is where players stop to turn round: they hold it, and
   // often play it twice — once at the top of the way up, once at the start of the
   // way down — with a bow change or a lift between. Neither is a mistake, so a
@@ -461,6 +475,7 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     const diff = det.midi - target;
     const r = noteResults[e];
     r.detectedName = det.midi;
+    r.t0 = det.onset ?? det.t0; // when it started, as best it can be told
     if (diff === 0) {
       r.status = 'exact';
       r.cents = det.cents;
@@ -529,7 +544,7 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     if (pairs[k].e === pairs[k - 1].e + 1) {
       const a = notes[pairs[k - 1].d];
       const b = notes[pairs[k].d];
-      spans.push({ ioi: b.t0 - a.t0, gap: b.t0 - a.t1 });
+      spans.push({ e: pairs[k - 1].e, ioi: (b.onset ?? b.t0) - (a.onset ?? a.t0), gap: b.t0 - a.t1 });
     }
   }
   const iois = spans.map((x) => x.ioi);
@@ -537,6 +552,9 @@ export function analyzeTake(frames, expectedScale, options = {}) {
   const pauseAt = Math.max(0.3, medianIoi * 0.8);
   const timed = spans.filter((x) => x.gap <= pauseAt).map((x) => x.ioi);
   let steadiness;
+  // What was measured, note by note, so a result can show it: each written
+  // note's length against the typical one (1 = even), or left out (a pause).
+  let timing = [];
   if (timed.length >= 3) {
     // The typical note: the average of the middle half of the lengths. A single
     // held or rushed note cannot move it, and when the notes come in two sizes
@@ -547,6 +565,11 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     const middle = sorted.slice(q, sorted.length - q);
     const typicalNote = middle.reduce((a, b) => a + b, 0) / middle.length;
     const devs = timed.map((v) => Math.min(1, Math.max(0, Math.abs(v - typicalNote) - GRACE) / typicalNote));
+    timing = spans.map((x) => ({
+      e: x.e,
+      ratio: x.ioi / typicalNote,
+      off: x.gap > pauseAt ? 'pause' : Math.max(0, Math.abs(x.ioi - typicalNote) - GRACE) / typicalNote > 0.33 ? (x.ioi > typicalNote ? 'long' : 'short') : null,
+    }));
     const typical = devs.reduce((a, b) => a + b, 0) / devs.length;
     steadiness = 1 - Math.max(0, typical - 0.035) / 0.45;
     // A clear stumble (a note a third longer or shorter) costs on its own — up
@@ -611,6 +634,7 @@ export function analyzeTake(frames, expectedScale, options = {}) {
       gate,
     },
     detected: notes,
+    timing,
   };
   // Notes sounded twice (or more) where the scale has them once.
   result.repeats = findRepeats(notes, pairs, expectedMidi, topIndex, stopThreshold);

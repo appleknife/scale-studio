@@ -8588,3 +8588,47 @@ select,
     animation: none !important;
   }
 }
+
+/* Under Steadiness: each note's length as heard, against the typical one. */
+.timing-strip {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 48px;
+  margin: 10px 0 4px;
+  padding: 0 2px;
+}
+
+.timing-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  border-top: 1px dashed var(--muted);
+  opacity: 0.6;
+}
+
+.timing-bar {
+  flex: 1;
+  min-width: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.timing-bar.is-off {
+  background: var(--gold);
+  opacity: 1;
+}
+
+.timing-bar.is-pause {
+  background: var(--muted);
+  opacity: 0.35;
+}
+
+.timing-note {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin: 4px 0 0;
+}

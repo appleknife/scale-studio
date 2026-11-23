@@ -1,19 +1,19 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611231815';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611231815';
-import { createInk } from './ink.js?v=202611231815';
-import { createFollower } from './follow.js?v=202611231815';
-import { createPetRoom } from './petroom.js?v=202611231815';
-import { SPRINT_FULL } from './pet.js?v=202611231815';
-import { createBuddy } from './buddy.js?v=202611231815';
-import { createSprintView } from './sprintview.js?v=202611231815';
-import { createTrillView } from './trillview.js?v=202611231815';
-import { createListenView } from './listenview.js?v=202611231815';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611231900';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611231900';
+import { createInk } from './ink.js?v=202611231900';
+import { createFollower } from './follow.js?v=202611231900';
+import { createPetRoom } from './petroom.js?v=202611231900';
+import { SPRINT_FULL } from './pet.js?v=202611231900';
+import { createBuddy } from './buddy.js?v=202611231900';
+import { createSprintView } from './sprintview.js?v=202611231900';
+import { createTrillView } from './trillview.js?v=202611231900';
+import { createListenView } from './listenview.js?v=202611231900';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611231815';
+window.__scaleStudioVersion = '202611231900';
 import {
   PitchDetector,
   midiToFreq,
@@ -21,16 +21,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611231815';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611231815';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611231815';
-import { generatePassage } from './sightreading.js?v=202611231815';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611231815';
-import { renderScore } from './score.js?v=202611231815';
-import { summariseIntonation } from './intonation.js?v=202611231815';
-import * as Journal from './journal.js?v=202611231815';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611231815';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611231815';
+} from './pitch.js?v=202611231900';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611231900';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611231900';
+import { generatePassage } from './sightreading.js?v=202611231900';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611231900';
+import { renderScore } from './score.js?v=202611231900';
+import { summariseIntonation } from './intonation.js?v=202611231900';
+import * as Journal from './journal.js?v=202611231900';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611231900';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611231900';
 import {
   STRINGS,
   FIFTHS,
@@ -39,7 +39,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611231815';
+} from './tuner.js?v=202611231900';
 
 const LANG = initLang();
 
@@ -3380,6 +3380,39 @@ function disarmDelete() {
  * Tapping a part of a result (Notes, Intonation, Steadiness, Flow; or the sight-
  * reading rows) opens a sentence on what it measures. One open at a time.
  */
+/**
+ * Under Steadiness: what was measured, note by note — each note's length as a
+ * bar against the typical one, the ones heard long or short named. So a take
+ * that felt even but scored low shows exactly which notes the microphone heard
+ * differently (a shift, a crossing), and a teacher can tell a mishearing from a
+ * rushed note.
+ */
+function timingStrip(result) {
+  const timing = result.timing || [];
+  if (timing.length < 3) return `<p class="timing-note">${t('explain.timing.none')}</p>`;
+  const nameOf = (e) => result.notes[e]?.note?.name || '';
+  const bars = timing
+    .map((x) => {
+      const h = Math.max(0.35, Math.min(2, x.ratio));
+      const cls = x.off === 'pause' ? 'is-pause' : x.off ? 'is-off' : '';
+      return `<span class="timing-bar ${cls}" style="height:${(h * 22).toFixed(1)}px" title="${esc(nameOf(x.e))} ${x.ratio.toFixed(2)}×"></span>`;
+    })
+    .join('');
+  const list = (kind) =>
+    timing
+      .filter((x) => x.off === kind)
+      .map((x) => `${esc(nameOf(x.e))} (${x.ratio.toFixed(1)}×)`)
+      .join(', ');
+  const long = list('long');
+  const short = list('short');
+  const lines = [];
+  if (long) lines.push(t('explain.timing.long', { list: long }));
+  if (short) lines.push(t('explain.timing.short', { list: short }));
+  if (!lines.length) lines.push(t('explain.timing.even'));
+  return `<div class="timing-strip" aria-hidden="true"><span class="timing-line"></span>${bars}</div>
+    <p class="timing-note"><b>${t('explain.timing.title')}</b> ${lines.join(' · ')}</p>`;
+}
+
 function explainPart(event) {
   const btn = event.target.closest('[data-explain] > button');
   if (!btn) return;
@@ -5005,7 +5038,7 @@ function renderResult(result) {
             <span class="metric-name">${label} <span class="explain-i" aria-hidden="true">ⓘ</span></span>
           </button>
           <div class="metric-bar"><span style="width:0%;background:${scoreColour(value * 100)}"></span></div>
-          <p class="explain-text" hidden>${t(`explain.${key}`)}</p>
+          <div class="explain-text" hidden><p>${t(`explain.${key}`)}</p>${key === 'steadiness' ? timingStrip(result) : ''}</div>
         </div>`,
     )
     .join('');
