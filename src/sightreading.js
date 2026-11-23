@@ -8,8 +8,8 @@
 // Everything is seeded, so a passage can be reproduced: the same level and seed
 // always give the same eight bars. Durations are counted in sixteenth notes.
 
-import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611231630';
-import { STAFF_GEOM } from './staff.js?v=202611231630';
+import { MAJOR_KEYS, keySignature, makeNote } from './music.js?v=202611231645';
+import { STAFF_GEOM } from './staff.js?v=202611231645';
 
 /* ── Seeded randomness ─────────────────────────────────────────────────── */
 
@@ -860,8 +860,35 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // the climax never aimed higher than a sixth above home, so level VI's F6 —
   // the note in the Manual's own range picture, three ledger lines up — was
   // decoration. The teacher asked for it to turn up now and then, not often.
-  const highClimb = level >= 5 && chance(rng, 0.18);
-  const reach = highClimb ? top - home : 7 + Math.floor(rng() * headroom);
+  //
+  // And levels V and VI are where a student has to shift. First position ends at
+  // B5 (fourth finger on the E string), so a passage that never goes above it
+  // never asks for third position — and at 18% of passages, a student could
+  // read five in a row without one. Now about half of level V's passages climb
+  // past B5, and six in ten of level VI's, to a note chosen among the ones up
+  // there — the lower ones more often, so the very top of the range stays the
+  // rarer event it should be — and the second phrase stays up there a while.
+  const FIRST_POSITION_TOP = 83; // B5
+  // (Planned a little over the aim: about a quarter of the climbs end a note or
+  // two short of it, so these give roughly half of level V and six in ten of VI.)
+  const shiftChance = level >= 6 ? 0.75 : level >= 5 ? 0.66 : 0;
+  const upThere = pool.map((n, i) => i).filter((i) => pool[i].midi > FIRST_POSITION_TOP && i > home);
+  const highClimb = upThere.length > 0 && chance(rng, shiftChance);
+  let reach = 7 + Math.floor(rng() * headroom);
+  if (highClimb) {
+    // weights 1, 0.75, 0.56, … from the lowest note above first position up
+    const weights = upThere.map((_, k) => 0.75 ** k);
+    let r = rng() * weights.reduce((a, b) => a + b, 0);
+    let at = upThere[upThere.length - 1];
+    for (let k = 0; k < upThere.length; k++) {
+      r -= weights[k];
+      if (r <= 0) {
+        at = upThere[k];
+        break;
+      }
+    }
+    reach = at - home;
+  }
   const peak = Math.min(top, home + reach);
   const lowest = Math.max(0, home - 3 - (level >= 5 ? Math.floor(rng() * 3) : 0));
 
@@ -886,7 +913,14 @@ export function generatePassage({ level = 5, seed = null } = {}) {
   // touches the top note once and falls straight back, which reads as a mistake
   // rather than as the high point of a phrase.
   const climbZone = Math.max(lift, peak - home);
-  const zones = [0, highClimb ? climbZone : lift, -Math.min(lift, 2), 0];
+  // On a climb to a shift, the first phrase already sits a little higher (so the
+  // jump up is one the level allows), the second lives just under the peak (so
+  // the hand stays up there for a while instead of touching one note), and the
+  // third comes part-way down before the answer goes home: a real stretch in
+  // third position, and a shift down out of it.
+  const zones = highClimb
+    ? [Math.min(lift, 3), Math.max(lift, climbZone - 1), lift, 0]
+    : [0, lift, -Math.min(lift, 2), 0];
 
   let prev = home;
   let lastStep = 0;
