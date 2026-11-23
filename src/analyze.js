@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611231615';
-import { getLang, t } from './i18n.js?v=202611231615';
+import { median } from './pitch.js?v=202611231630';
+import { getLang, t } from './i18n.js?v=202611231630';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -457,21 +457,25 @@ export function analyzeTake(frames, expectedScale, options = {}) {
   //
   // How even the notes are: each note's length (start to the next start) set
   // against the typical one. Calibrated on simulated takes at 2 to 7 notes a
-  // second, so a given mistake costs about the same at any speed: even playing,
-  // or the small wobble everyone has, keeps ~100; one note held half again as
-  // long ~89, twice as long ~80, two of those ~58; rushing the way down by a
-  // quarter ~82; a scale that drifts a third faster ~87; long-short pairs ~62.
+  // second with realistic timing noise — a bowed, slurred note's start can only
+  // be placed to within about ±20 ms (people themselves disagree by ~40 ms on
+  // where a bowed note begins, and onset research allows 50 ms for such sounds)
+  // — so that a given player scores about the same at any speed. A very good
+  // player (4% wobble, lingering a touch at the shifts) keeps ~94–100, a good
+  // student ~96; one note held half again as long ~94, twice as long ~84, two
+  // of those ~65; rushing the way down by a quarter ~91; long-short pairs ~80;
+  // ±25% all over the place ~65–80.
   //
   // Three things are left out. The note before the top one — how long the top
   // is held is the player's choice, like a fermata. A note followed by a real
-  // silence — that is a pause, and Flow scores it. And a frame's worth of time
-  // (12 ms) from every difference, because a start can only be heard to within
-  // about that: without it, fast and perfectly even scales lost points.
+  // silence — that is a pause, and Flow scores it. And 30 ms from every
+  // difference: the measuring's own uncertainty, not the player's.
   //
-  // (It used to drop the worst tenth of the notes instead, which let one clearly
-  // held or rushed note go unnoticed altogether — it was neither a pause for
-  // Flow nor counted here — and with too few notes to measure, it said 100.)
-  const GRACE = 0.012;
+  // (Before: it dropped the worst tenth of the notes, which let one clearly held
+  // note go unnoticed, and said 100 when it could not measure. Then, briefly, it
+  // allowed only 12 ms of measuring noise — fair to a synthetic take, too tough
+  // on a real violin in a real room.)
+  const GRACE = 0.03;
   const spans = [];
   for (let k = 1; k < pairs.length; k++) {
     if (pairs[k - 1].e === topIndex) continue;
@@ -497,13 +501,13 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     const typicalNote = middle.reduce((a, b) => a + b, 0) / middle.length;
     const devs = timed.map((v) => Math.min(1, Math.max(0, Math.abs(v - typicalNote) - GRACE) / typicalNote));
     const typical = devs.reduce((a, b) => a + b, 0) / devs.length;
-    steadiness = 1 - Math.max(0, typical - 0.03) / 0.4;
-    // A clear stumble (a note over a quarter longer or shorter) costs on its own —
-    // up to a point: when every other note is off, that is unevenness, which the
+    steadiness = 1 - Math.max(0, typical - 0.035) / 0.45;
+    // A clear stumble (a note a third longer or shorter) costs on its own — up
+    // to a point: when every other note is off, that is unevenness, which the
     // line above already measures, not a run of separate stumbles.
     let stumbles = 0;
-    for (const d of devs) if (d > 0.28) stumbles += 0.035 + 0.04 * Math.min(1, (d - 0.28) / 0.72);
-    steadiness = clamp(steadiness - Math.min(0.25, stumbles));
+    for (const d of devs) if (d > 0.33) stumbles += 0.02 + 0.04 * Math.min(1, (d - 0.33) / 0.67);
+    steadiness = clamp(steadiness - Math.min(0.2, stumbles));
   } else {
     // too few notes in a row to judge: neither praised nor blamed
     steadiness = notes.length ? 0.8 : 0;
