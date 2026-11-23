@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611220819';
-import { getLang, t } from './i18n.js?v=202611220819';
+import { median } from './pitch.js?v=202611231615';
+import { getLang, t } from './i18n.js?v=202611231615';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -454,23 +454,59 @@ export function analyzeTake(frames, expectedScale, options = {}) {
 
 
   // --- Steadiness ---------------------------------------------------------
-  const iois = [];
+  //
+  // How even the notes are: each note's length (start to the next start) set
+  // against the typical one. Calibrated on simulated takes at 2 to 7 notes a
+  // second, so a given mistake costs about the same at any speed: even playing,
+  // or the small wobble everyone has, keeps ~100; one note held half again as
+  // long ~89, twice as long ~80, two of those ~58; rushing the way down by a
+  // quarter ~82; a scale that drifts a third faster ~87; long-short pairs ~62.
+  //
+  // Three things are left out. The note before the top one — how long the top
+  // is held is the player's choice, like a fermata. A note followed by a real
+  // silence — that is a pause, and Flow scores it. And a frame's worth of time
+  // (12 ms) from every difference, because a start can only be heard to within
+  // about that: without it, fast and perfectly even scales lost points.
+  //
+  // (It used to drop the worst tenth of the notes instead, which let one clearly
+  // held or rushed note go unnoticed altogether — it was neither a pause for
+  // Flow nor counted here — and with too few notes to measure, it said 100.)
+  const GRACE = 0.012;
+  const spans = [];
   for (let k = 1; k < pairs.length; k++) {
-    // How long the top note was held is the player's choice, like a fermata, and
-    // says nothing about the pulse — so the gap that leaves it is not measured.
     if (pairs[k - 1].e === topIndex) continue;
     if (pairs[k].e === pairs[k - 1].e + 1) {
-      iois.push(notes[pairs[k].d].t0 - notes[pairs[k - 1].d].t0);
+      const a = notes[pairs[k - 1].d];
+      const b = notes[pairs[k].d];
+      spans.push({ ioi: b.t0 - a.t0, gap: b.t0 - a.t1 });
     }
   }
+  const iois = spans.map((x) => x.ioi);
   const medianIoi = iois.length ? median(iois) : 0;
-  let steadiness = 1;
-  if (iois.length >= 4) {
-    const devs = iois.map((v) => Math.abs(v - medianIoi) / medianIoi).sort((a, b) => a - b);
-    // Ignore the longest 10%: those are the pauses, scored separately below.
-    const kept = devs.slice(0, Math.max(1, Math.ceil(devs.length * 0.9)));
-    const meanDev = kept.reduce((a, b) => a + b, 0) / kept.length;
-    steadiness = clamp(1 - (meanDev - 0.07) / 0.4);
+  const pauseAt = Math.max(0.3, medianIoi * 0.8);
+  const timed = spans.filter((x) => x.gap <= pauseAt).map((x) => x.ioi);
+  let steadiness;
+  if (timed.length >= 3) {
+    // The typical note: the average of the middle half of the lengths. A single
+    // held or rushed note cannot move it, and when the notes come in two sizes
+    // (long-short, long-short) it sits between them, where the median would
+    // land on one size and call every note of the other size badly off.
+    const sorted = [...timed].sort((a, b) => a - b);
+    const q = Math.floor(sorted.length / 4);
+    const middle = sorted.slice(q, sorted.length - q);
+    const typicalNote = middle.reduce((a, b) => a + b, 0) / middle.length;
+    const devs = timed.map((v) => Math.min(1, Math.max(0, Math.abs(v - typicalNote) - GRACE) / typicalNote));
+    const typical = devs.reduce((a, b) => a + b, 0) / devs.length;
+    steadiness = 1 - Math.max(0, typical - 0.03) / 0.4;
+    // A clear stumble (a note over a quarter longer or shorter) costs on its own —
+    // up to a point: when every other note is off, that is unevenness, which the
+    // line above already measures, not a run of separate stumbles.
+    let stumbles = 0;
+    for (const d of devs) if (d > 0.28) stumbles += 0.035 + 0.04 * Math.min(1, (d - 0.28) / 0.72);
+    steadiness = clamp(steadiness - Math.min(0.25, stumbles));
+  } else {
+    // too few notes in a row to judge: neither praised nor blamed
+    steadiness = notes.length ? 0.8 : 0;
   }
 
   // --- Continuity ---------------------------------------------------------

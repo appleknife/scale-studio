@@ -10,7 +10,7 @@
 // Both work on the app's ~30 ms pitch frames. The pitch inside a note is detrended
 // before anything is counted: a slow slide is intonation, not vibrato.
 
-import { STRINGS, TEMPO, stringById } from './trill.js?v=202611220819';
+import { STRINGS, TEMPO, stringById } from './trill.js?v=202611231615';
 
 const median = (xs) => {
   if (!xs.length) return null;
