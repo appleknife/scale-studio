@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611231745';
-import { getLang, t } from './i18n.js?v=202611231745';
+import { median } from './pitch.js?v=202611231815';
+import { getLang, t } from './i18n.js?v=202611231815';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -386,13 +386,60 @@ export function analyzeTake(frames, expectedScale, options = {}) {
 
   const segmented = segmentNotes(frames, o);
   const gate = segmented.gate;
+
+  // How loud the take plays, and what counts as having gone quiet: under a fifth
+  // of that (about 14 dB down), or under the noise gate.
+  const playing = [];
+  for (const n of segmented.notes) for (const f of frames) if (f.t >= n.t0 && f.t <= n.t1) playing.push(f.rms);
+  const playLevel = playing.length ? median(playing) : gate;
+  const quietBelow = Math.max(gate, playLevel * 0.2);
+  /** The longest run of quiet in (from, to), in seconds. */
+  const quietIn = (from, to) => {
+    let best = 0;
+    let runFrom = null;
+    let last = from;
+    for (const f of frames) {
+      if (f.t <= from) continue;
+      if (f.t >= to) break;
+      if (f.rms < quietBelow) {
+        if (runFrom == null) runFrom = last;
+      } else if (runFrom != null) {
+        best = Math.max(best, f.t - runFrom);
+        runFrom = null;
+      }
+      last = f.t;
+    }
+    if (runFrom != null) best = Math.max(best, to - runFrom);
+    return best;
+  };
+
+  // A note whose pitch went unclear for a moment while it kept sounding (a bow
+  // change, an echo, a ringing open string) comes out of the segmenter as two
+  // pieces of the same note. A scale never repeats a note back to back except at
+  // the top (folded below), so two pieces with no real silence between them are
+  // put back together — otherwise the second piece counts as an extra note, and
+  // if it is the one matched, the note seems to start late.
+  const joined = [];
+  for (const n of segmented.notes) {
+    const prev = joined[joined.length - 1];
+    if (prev && prev.midi === n.midi && n.t0 - prev.t1 < 0.6 && quietIn(prev.t1, n.t0) < 0.12) {
+      const frames_ = prev.frames + n.frames;
+      prev.pitch = (prev.pitch * prev.frames + n.pitch * n.frames) / frames_;
+      prev.cents = (prev.pitch - prev.midi) * 100;
+      prev.frames = frames_;
+      prev.t1 = n.t1;
+      prev.duration = prev.t1 - prev.t0;
+      continue;
+    }
+    joined.push({ ...n });
+  }
   // The top of the scale is where players stop to turn round: they hold it, and
   // often play it twice — once at the top of the way up, once at the start of the
   // way down — with a bow change or a lift between. Neither is a mistake, so a
   // repeated top note is folded into one long one before anything is scored.
   const topIndex = Math.min(expected.length - 1, (expectedScale.octaves || 2) * 7);
   const topMidi = expectedMidi[topIndex];
-  const notes = foldTopRepeat(segmented.notes, topMidi);
+  const notes = foldTopRepeat(joined, topMidi);
   const { pairs, extras } = align(notes.map((n) => n.midi), expectedMidi);
   const octaveShift = detectOctaveShift(notes, expectedMidi);
 
@@ -514,14 +561,27 @@ export function analyzeTake(frames, expectedScale, options = {}) {
   }
 
   // --- Continuity ---------------------------------------------------------
+  //
+  // A stop is the sound going away, not the pitch going unclear. A note "ends"
+  // in the segmenter after two frames without a clear pitch, and a violin that
+  // never stopped can lose its pitch for a third of a second — a bow change, a
+  // string crossing, the glide of a shift, an open string ringing under the
+  // note, a room's echo — which used to be counted as a stop (and, the next
+  // note's start being misplaced with it, cost steadiness too). So a gap only
+  // counts when the playing really fell quiet in it: the longest stretch of
+  // quiet frames (see `quietIn` above) is what is measured, not the gap's length.
   const stopThreshold = Math.max(0.3, medianIoi * 0.8);
   let stops = 0;
   let longStops = 0;
   for (let k = 1; k < notes.length; k++) {
     const gap = notes[k].t0 - notes[k - 1].t1;
-    if (gap > stopThreshold) {
+    if (gap <= stopThreshold) continue;
+    // A room's echo carries on for a moment after a real stop, so the quiet
+    // inside it is shorter than the gap: most of the threshold is enough.
+    const quiet = quietIn(notes[k - 1].t1, notes[k].t0);
+    if (quiet >= stopThreshold * 0.6) {
       stops++;
-      if (gap > 1.0) longStops++;
+      if (quiet > 0.8) longStops++;
     }
   }
   const continuity = clamp(1 - 0.16 * stops - 0.1 * longStops);
