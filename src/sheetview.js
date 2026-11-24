@@ -14,19 +14,44 @@
 // MusicXML, and `tempoaudio.js` for the stretch. The mechanics are the same;
 // none of that app's code or art is copied.
 
-import * as Lib from './sheetlib.js?v=202611240300';
-import { renderStretched } from './tempoaudio.js?v=202611240300';
-import { loadOsmd } from './listenview.js?v=202611240300';
-import { t } from './i18n.js?v=202611240300';
-import { readScoreFile } from './musicxml.js?v=202611240300';
+import * as Lib from './sheetlib.js?v=202611240400';
+import { renderStretched } from './tempoaudio.js?v=202611240400';
+import { loadOsmd } from './listenview.js?v=202611240400';
+import { t } from './i18n.js?v=202611240400';
+import { readScoreFile } from './musicxml.js?v=202611240400';
 
 const PDF_VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
-const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240300';
-const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611240300';
+const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240400';
+const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611240400';
 const PDF_ASSETS = PDF_VENDOR;
 const MAX_DPR = 2;
 const INK = '#1f4fa8';
 const HIGHLIGHT = 'rgba(238, 196, 46, 0.38)';
+
+// One stroke icon set for the reader, so the bar reads as one family instead of
+// a mix of emoji and type glyphs. 24-unit grid, drawn in currentColor.
+const svg = (d, extra = '') =>
+  `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"${extra}>${d}</svg>`;
+const ICON = {
+  back: svg('<path d="M15 5l-7 7 7 7"/>'),
+  prev: svg('<path d="M14.5 6l-6 6 6 6"/>'),
+  next: svg('<path d="M9.5 6l6 6-6 6"/>'),
+  bookmark: svg('<path d="M7 4h10v16l-5-3.6L7 20z"/>'),
+  pen: svg('<path d="M4 20l4.2-1 10.6-10.6a2 2 0 0 0 0-2.8l-.4-.4a2 2 0 0 0-2.8 0L5 15.8z"/><path d="M13.5 6.5l4 4"/>'),
+  sliders: svg('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
+  note: svg('<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>'),
+  minus: svg('<path d="M6 12h12"/>'),
+  plus: svg('<path d="M12 6v12M6 12h12"/>'),
+  play: svg('<path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/>'),
+  pause: svg('<path d="M8 5h3v14H8zM13 5h3v14h-3z" fill="currentColor" stroke="none"/>'),
+  restart: svg('<path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4 4.5v4h4"/>'),
+  trash: svg('<path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/>'),
+  highlight: svg('<path d="M6 20h12"/><path d="M8.5 15.5l7.8-7.8a1.6 1.6 0 0 0 0-2.3l-.7-.7a1.6 1.6 0 0 0-2.3 0l-7.8 7.8L5 16z"/>'),
+  eraser: svg('<path d="M8.5 19l-4-4a1.5 1.5 0 0 1 0-2.1l8.4-8.4a1.5 1.5 0 0 1 2.1 0l4 4a1.5 1.5 0 0 1 0 2.1L12 19z"/><path d="M8.5 19H20M9 9l6 6"/>'),
+  undo: svg('<path d="M9 7L4.5 11.5 9 16"/><path d="M5 11.5h9a5 5 0 0 1 0 10h-2"/>'),
+  close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+  music: svg('<path d="M9 17.5V6l10-2v11.5"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>', ' stroke-width="1.5"'),
+};
 
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -46,6 +71,17 @@ function loadPdfjs() {
       throw err;
     });
   return pdfjsPromise;
+}
+
+/** Free a PDF and its worker. The loading task owns them in this pdf.js. */
+function dropPdf(pdf) {
+  try {
+    const owner = pdf && pdf.loadingTask && typeof pdf.loadingTask.destroy === 'function' ? pdf.loadingTask : pdf;
+    const done = owner && typeof owner.destroy === 'function' ? owner.destroy() : null;
+    if (done && done.catch) done.catch(() => {});
+  } catch {
+    /* already gone */
+  }
 }
 
 export function createSheetView(deps) {
@@ -117,10 +153,17 @@ export function createSheetView(deps) {
       const hay = `${s.title} ${s.composer} ${(s.tags || []).join(' ')}`.toLowerCase();
       return hay.includes(query.toLowerCase());
     });
+    root.classList.toggle('sheet-is-empty', !sheets.length);
     if (!sheets.length) {
       shelfEl.innerHTML = `
         <div class="sheet-empty">
-          <p class="sheet-empty-mark" aria-hidden="true">𝄞</p>
+          <svg class="sheet-empty-art" viewBox="0 0 120 96" aria-hidden="true">
+            <rect x="30" y="8" width="60" height="76" rx="3" class="art-page" />
+            ${[22, 30, 38, 46].map((y) => `<path d="M38 ${y}h44M38 ${y + 2.5}h44M38 ${y + 5}h44" class="art-staff" />`).join('')}
+            <circle cx="50" cy="31" r="2.6" class="art-note" /><path d="M52.4 31V21" class="art-stem" />
+            <circle cx="66" cy="47" r="2.6" class="art-note" /><path d="M68.4 47V37" class="art-stem" />
+            <path d="M22 86h76" class="art-ledge" /><path d="M60 86v8" class="art-ledge" />
+          </svg>
           <h3>${t('sheet.empty.title')}</h3>
           <p class="subtle">${t('sheet.empty.lead')}</p>
           <button class="primary-btn" type="button" data-act="import">${t('sheet.import')}</button>
@@ -128,31 +171,120 @@ export function createSheetView(deps) {
     } else if (!shown.length) {
       shelfEl.innerHTML = `<p class="sheet-empty-line subtle">${t('sheet.noMatch')}</p>`;
     } else {
-      shelfEl.innerHTML = `<div class="sheet-grid">${shown
-        .map(
-          (s) => `
-        <article class="sheet-card" data-id="${esc(s.id)}">
-          <button class="sheet-open" type="button" data-act="open" data-id="${esc(s.id)}">
-            <span class="sheet-card-kind" aria-hidden="true">${kindMark(s.kind)}</span>
-            <span class="sheet-card-title">${esc(s.title)}</span>
-            <span class="sheet-card-sub">${esc(s.composer || t('sheet.untitledComposer'))}</span>
-            <span class="sheet-card-meta">${t('sheet.cardMeta', { n: s.pageCount || 1 })}</span>
-          </button>
-          <button class="sheet-card-del ghost-btn" type="button" data-act="delete" data-id="${esc(s.id)}"
-            aria-label="${t('sheet.delete')}">✕</button>
-        </article>`,
-        )
-        .join('')}</div>`;
+      shelfEl.innerHTML = `<div class="sheet-grid">${shown.map(cardHtml).join('')}</div>`;
+      queueThumbs(shown);
     }
-    Lib.storageEstimate().then(({ used, quota }) => {
-      spaceEl.textContent = quota ? t('sheet.space', { used: Lib.megabytes(used), quota: Lib.megabytes(quota) }) : '';
+    Lib.storageEstimate().then(({ used }) => {
+      spaceEl.textContent = used ? t('sheet.space', { used: Lib.megabytes(used) }) : '';
     });
   }
 
+  function cardMeta(s) {
+    const n = s.pageCount || 1;
+    if (s.lastOpenedAt && n > 1 && (s.lastPage || 1) > 1) return t('sheet.cardAt', { n: s.lastPage, total: n });
+    return n === 1 ? t('sheet.cardMeta1') : t('sheet.cardMeta', { n });
+  }
+
+  function coverHtml(s) {
+    if (s.thumb) return `<img class="sheet-cover-img" src="${esc(s.thumb)}" alt="" draggable="false" />`;
+    // No picture yet (or MusicXML, which has none until it is engraved): a
+    // drawn page with the title, so the shelf still reads as music.
+    return `
+      <span class="sheet-cover-blank" aria-hidden="true">
+        <span class="sheet-cover-title">${esc(s.title)}</span>
+        ${'<i></i>'.repeat(5)}
+      </span>`;
+  }
+
+  function cardHtml(s) {
+    return `
+        <article class="sheet-card" data-id="${esc(s.id)}">
+          <button class="sheet-open" type="button" data-act="open" data-id="${esc(s.id)}">
+            <span class="sheet-cover" data-cover="${esc(s.id)}">
+              ${coverHtml(s)}
+              <span class="sheet-card-kind">${kindMark(s.kind)}</span>
+            </span>
+            <span class="sheet-card-text">
+              <span class="sheet-card-title">${esc(s.title)}</span>
+              <span class="sheet-card-sub">${esc(s.composer || t('sheet.untitledComposer'))}</span>
+              <span class="sheet-card-meta">${cardMeta(s)}</span>
+            </span>
+          </button>
+          <button class="sheet-card-del" type="button" data-act="delete" data-id="${esc(s.id)}"
+            aria-label="${t('sheet.delete')}" title="${t('sheet.delete')}">${ICON.trash}</button>
+        </article>`;
+  }
+
+  /* Covers are drawn once, small, and kept on the record, so the shelf opens fast. */
+  let thumbQueue = Promise.resolve();
+  const thumbTried = new Set();
+
+  function queueThumbs(list) {
+    for (const s of list) {
+      if (s.thumb || s.kind === 'musicxml' || thumbTried.has(s.id)) continue;
+      thumbTried.add(s.id);
+      thumbQueue = thumbQueue.then(() => makeThumb(s.id)).catch(() => {});
+    }
+  }
+
+  async function makeThumb(id) {
+    const rec = await Lib.getSheet(id);
+    if (!rec || rec.thumb) return;
+    const W = 300;
+    const canvas = document.createElement('canvas');
+    if (rec.kind === 'pdf') {
+      const pdfjs = await loadPdfjs();
+      const file = await Lib.getFile(rec.id);
+      if (!file) return;
+      const pdf = await pdfjs.getDocument({
+        data: new Uint8Array(await file.arrayBuffer()),
+        cMapUrl: PDF_ASSETS + 'cmaps/',
+        cMapPacked: true,
+        standardFontDataUrl: PDF_ASSETS + 'standard_fonts/',
+        wasmUrl: PDF_ASSETS + 'wasm/',
+      }).promise;
+      try {
+        const first = await pdf.getPage(1);
+        const base = first.getViewport({ scale: 1 });
+        const viewport = first.getViewport({ scale: W / base.width });
+        canvas.width = Math.round(viewport.width);
+        canvas.height = Math.round(viewport.height);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await first.render({ canvas, viewport }).promise;
+      } finally {
+        dropPdf(pdf);
+      }
+    } else {
+      const blob = await Lib.getFile(rec.kind === 'images' ? Lib.pageKey(rec.id, 1) : rec.id);
+      if (!blob) return;
+      const bmp = await createImageBitmap(blob);
+      canvas.width = W;
+      canvas.height = Math.round((bmp.height / Math.max(1, bmp.width)) * W);
+      canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      bmp.close?.();
+    }
+    const thumb = canvas.toDataURL('image/jpeg', 0.82);
+    // Read again before writing: the reader may have saved the record meanwhile.
+    const latest = (await Lib.getSheet(id)) || rec;
+    latest.thumb = thumb;
+    await Lib.saveSheet(latest);
+    if (sheet && sheet.id === id) sheet.thumb = thumb;
+    const slot = shelfEl.querySelector(`[data-cover="${CSS.escape(id)}"]`);
+    if (slot) {
+      const img = document.createElement('img');
+      img.className = 'sheet-cover-img is-new';
+      img.alt = '';
+      img.draggable = false;
+      img.src = thumb;
+      slot.querySelector('.sheet-cover-blank, .sheet-cover-img')?.replaceWith(img);
+    }
+  }
+
   function kindMark(kind) {
-    if (kind === 'musicxml') return '♬';
-    if (kind === 'images') return '▤';
-    if (kind === 'image') return '▤';
+    if (kind === 'musicxml') return 'XML';
+    if (kind === 'images' || kind === 'image') return t('sheet.kindPhoto');
     return 'PDF';
   }
 
@@ -169,7 +301,7 @@ export function createSheetView(deps) {
       wasmUrl: PDF_ASSETS + 'wasm/',
     }).promise;
     const n = doc.numPages || 1;
-    doc.destroy();
+    dropPdf(doc);
     return n;
   }
 
@@ -262,7 +394,6 @@ export function createSheetView(deps) {
   let renderTask = null;
   let paintedPage = 0;
   let cropTimer = 0;
-  const imageUrls = new Set();
   let saveTimer = 0;
   let inkTimer = 0;
   let stageW = 0;
@@ -273,38 +404,43 @@ export function createSheetView(deps) {
 
   readerEl.innerHTML = `
     <div class="reader-bar">
-      <button class="reader-btn" type="button" data-act="back" aria-label="${t('sheet.close')}">←</button>
+      <button class="reader-btn" type="button" data-act="back" aria-label="${t('sheet.close')}" title="${t('sheet.close')}">${ICON.back}</button>
       <div class="reader-title-wrap">
         <h3 class="reader-title" data-el="title"></h3>
         <span class="reader-meta" data-el="meta"></span>
       </div>
       <div class="reader-bar-tools">
-        <button class="reader-btn" type="button" data-act="bookmark" aria-label="${t('sheet.bookmark')}" title="${t('sheet.bookmark')}">🔖</button>
-        <button class="reader-btn" type="button" data-act="ink" aria-label="${t('sheet.tools')}" title="${t('sheet.tools')}">✎</button>
-        <button class="reader-btn" type="button" data-act="settings" aria-label="${t('sheet.settings')}" title="${t('sheet.settings')}">⚙</button>
-        <button class="reader-btn" type="button" data-act="audio" aria-label="${t('sheet.audio')}" title="${t('sheet.audio')}">♫</button>
+        <button class="reader-btn" type="button" data-act="bookmark" data-chrome="bookmarks" aria-label="${t('sheet.bookmark')}" title="${t('sheet.bookmark')}">${ICON.bookmark}</button>
+        <button class="reader-btn" type="button" data-act="ink" data-chrome="ink" aria-label="${t('sheet.tools')}" title="${t('sheet.tools')}">${ICON.pen}</button>
+        <button class="reader-btn" type="button" data-act="settings" data-chrome="settings" aria-label="${t('sheet.settings')}" title="${t('sheet.settings')}">${ICON.sliders}</button>
+        <button class="reader-btn reader-btn-audio" type="button" data-act="audio" data-chrome="audio" aria-label="${t('sheet.audio')}" title="${t('sheet.audio')}">${ICON.note}<i class="reader-live" aria-hidden="true"></i></button>
       </div>
     </div>
     <div class="reader-stage" data-el="stage" tabindex="0">
       <div class="reader-pages" data-el="pages"></div>
+      <div class="reader-spinner" aria-hidden="true"></div>
       <p class="reader-hint" data-el="hint" hidden></p>
     </div>
     <div class="reader-foot">
-      <button class="reader-btn" type="button" data-act="prev" aria-label="${t('sheet.prev')}">‹</button>
-      <input class="reader-slider" data-el="slider" type="range" min="1" max="1" value="1" aria-label="${t('sheet.page')}" />
+      <button class="reader-btn" type="button" data-act="prev" aria-label="${t('sheet.prev')}" title="${t('sheet.prev')}">${ICON.prev}</button>
+      <input class="reader-slider reader-range" data-el="slider" type="range" min="1" max="1" value="1" aria-label="${t('sheet.page')}" />
       <span class="reader-pageno" data-el="pageno"></span>
-      <button class="reader-btn" type="button" data-act="next" aria-label="${t('sheet.next')}">›</button>
-      <button class="reader-btn" type="button" data-act="zoomOut" aria-label="${t('sheet.zoomOut')}">−</button>
-      <button class="reader-btn" type="button" data-act="zoomIn" aria-label="${t('sheet.zoomIn')}">+</button>
+      <button class="reader-btn" type="button" data-act="next" aria-label="${t('sheet.next')}" title="${t('sheet.next')}">${ICON.next}</button>
+      <span class="reader-foot-gap" aria-hidden="true"></span>
+      <div class="reader-zoom" role="group">
+        <button class="reader-btn" type="button" data-act="zoomOut" aria-label="${t('sheet.zoomOut')}" title="${t('sheet.zoomOut')}">${ICON.minus}</button>
+        <button class="reader-btn" type="button" data-act="zoomIn" aria-label="${t('sheet.zoomIn')}" title="${t('sheet.zoomIn')}">${ICON.plus}</button>
+      </div>
     </div>
     <div class="reader-sheet reader-inkbar" data-el="inkbar" hidden>
-      <div class="reader-row">
-        <button class="reader-pill is-on" type="button" data-tool="pen">${t('sheet.pen')}</button>
-        <button class="reader-pill" type="button" data-tool="highlight">${t('sheet.highlight')}</button>
-        <button class="reader-pill" type="button" data-tool="erase">${t('sheet.eraser')}</button>
-        <button class="reader-pill" type="button" data-act="undo">${t('sheet.undo')}</button>
-        <button class="reader-pill" type="button" data-act="clearInk">${t('sheet.clearInk')}</button>
-        <button class="reader-pill" type="button" data-act="inkOff">${t('sheet.done')}</button>
+      <div class="reader-tools">
+        <button class="reader-tool is-on" type="button" data-tool="pen">${ICON.pen}<span>${t('sheet.pen')}</span></button>
+        <button class="reader-tool" type="button" data-tool="highlight">${ICON.highlight}<span>${t('sheet.highlight')}</span></button>
+        <button class="reader-tool" type="button" data-tool="erase">${ICON.eraser}<span>${t('sheet.eraser')}</span></button>
+        <span class="reader-tools-rule" aria-hidden="true"></span>
+        <button class="reader-tool" type="button" data-act="undo">${ICON.undo}<span>${t('sheet.undo')}</span></button>
+        <button class="reader-tool" type="button" data-act="clearInk">${ICON.trash}<span>${t('sheet.clearInk')}</span></button>
+        <button class="reader-done" type="button" data-act="inkOff">${t('sheet.done')}</button>
       </div>
       <p class="subtle reader-note">${t('sheet.inkNote')}</p>
     </div>
@@ -412,11 +548,7 @@ export function createSheetView(deps) {
     semitones = 0;
     loopOn = false;
     if (doc) {
-      try {
-        doc.destroy();
-      } catch {
-        /* already gone */
-      }
+      dropPdf(doc);
       doc = null;
     }
     osmd = null;
@@ -425,11 +557,13 @@ export function createSheetView(deps) {
     audioTracks = [];
     tool = null;
     paintedPage = 0;
+    dropUrls([...refs.pages.children]);
     refs.pages.innerHTML = '';
-    imageUrls.forEach((url) => URL.revokeObjectURL(url));
-    imageUrls.clear();
     refs.panel.hidden = true;
+    refs.panel.dataset.panel = '';
     refs.inkbar.hidden = true;
+    readerEl.classList.remove('is-immersive');
+    syncChrome();
   }
 
   async function measure() {
@@ -443,10 +577,23 @@ export function createSheetView(deps) {
     return Math.max(0.05, fit * zoom);
   }
 
+  // Which way the last turn went, so the new page slides in from that side.
+  let turnDir = 0;
+
+  const boxUrls = (box) => box._urls || [];
+  const dropUrls = (boxes) => boxes.forEach((box) => boxUrls(box).forEach((url) => URL.revokeObjectURL(url)));
+
+  /**
+   * Draw the pages showing. The old page stays on screen until the new one is
+   * drawn and then they swap, so a turn never flashes a blank stand. MusicXML is
+   * the exception: OSMD measures itself, so it has to be drawn in place.
+   */
   async function paint() {
     if (!sheet) return;
     const ticket = ++renderTicket;
     const keepScroll = paintedPage === page ? refs.stage.scrollTop : 0;
+    const dir = turnDir;
+    turnDir = 0;
     try {
       renderTask?.cancel();
     } catch {
@@ -456,28 +603,44 @@ export function createSheetView(deps) {
     const pages = pagesShowing();
     refs.pageno.textContent = Lib.pageLabel(page, sheet.pageCount || 1);
     refs.slider.value = String(page);
+    refs.slider.style.setProperty('--fill', `${sheet.pageCount > 1 ? ((page - 1) / (sheet.pageCount - 1)) * 100 : 0}%`);
     refs.pages.dataset.layout = layout;
     refs.stage.classList.toggle('is-zoomed', zoom > 1.02);
-    refs.pages.innerHTML = '';
-    imageUrls.forEach((url) => URL.revokeObjectURL(url));
-    imageUrls.clear();
-    for (const n of pages) refs.pages.appendChild(pageBox(n));
     if (tool) setHint(t('sheet.inkHint'));
 
-    for (const n of pages) {
-      const box = refs.pages.querySelector(`[data-page="${n}"]`);
-      if (!box) continue;
+    const old = [...refs.pages.children];
+    const boxes = pages.map((n) => pageBox(n));
+    const inPlace = sheet.kind === 'musicxml' || !old.length;
+    if (inPlace) {
+      dropUrls(old);
+      refs.pages.replaceChildren(...boxes);
+    }
+    const slow = setTimeout(() => refs.stage.classList.add('is-loading'), inPlace ? 0 : 220);
+
+    for (const box of boxes) {
       try {
-        await paintPage(n, box, ticket);
+        await paintPage(Number(box.dataset.page), box, ticket);
       } catch (err) {
-        if (err && err.name === 'RenderingCancelledException') return;
+        if (err && err.name === 'RenderingCancelledException') break;
         if (ticket === renderTicket) {
           const media = box.querySelector('.page-media');
           if (media) media.innerHTML = `<p class="page-fail">${t('sheet.pageFailed')}</p>`;
         }
       }
-      if (ticket !== renderTicket) return;
+      if (ticket !== renderTicket) break;
     }
+    clearTimeout(slow);
+    if (ticket !== renderTicket) {
+      if (!inPlace) dropUrls(boxes);
+      return;
+    }
+    refs.stage.classList.remove('is-loading');
+    if (!inPlace) {
+      dropUrls(old);
+      refs.pages.replaceChildren(...boxes);
+    }
+    if (dir) boxes.forEach((box) => box.classList.add(dir > 0 ? 'turn-next' : 'turn-prev'));
+    if (tool) boxes.forEach((box) => box.querySelector('.page-ink')?.classList.add('is-active'));
     paintedPage = page;
     refs.stage.scrollTop = keepScroll;
     scheduleSave();
@@ -513,7 +676,7 @@ export function createSheetView(deps) {
       const key = sheet.kind === 'images' ? Lib.pageKey(sheet.id, n) : sheet.id;
       const file = await Lib.getFile(key);
       const url = URL.createObjectURL(file);
-      imageUrls.add(url);
+      (box._urls ||= []).push(url);
       media.innerHTML = `<img class="page-image" src="${url}" alt="" draggable="false" />`;
       const img = media.querySelector('img');
       await new Promise((resolve) => {
@@ -537,7 +700,10 @@ export function createSheetView(deps) {
     frame.style.width = `${cssW}px`;
     frame.style.height = `${cssH}px`;
     frame.style.transform = `translate(${-crop.left * 100}%, ${-crop.top * 100}%)`;
-    box.style.filter = Lib.toneFilter(sheet.settings?.tone, sheet.settings?.brightness);
+    // The tone goes on the page, not the box, so night mode does not invert the
+    // box's shadow into a grey glow; the box behind takes the toned paper colour.
+    frame.style.filter = Lib.toneFilter(sheet.settings?.tone, sheet.settings?.brightness);
+    box.dataset.tone = sheet.settings?.tone || 'paper';
 
     const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
     ink.width = Math.round(cssW * dpr);
@@ -725,12 +891,24 @@ export function createSheetView(deps) {
     saveInkSoon();
   }
 
+  /** The bar buttons show which sheet is up, and the note glows while a track plays. */
+  function syncChrome() {
+    const open = refs.panel.hidden ? '' : refs.panel.dataset.panel;
+    readerEl.querySelectorAll('[data-chrome]').forEach((btn) => {
+      const name = btn.dataset.chrome;
+      const on = name === 'ink' ? !refs.inkbar.hidden : open === name;
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-pressed', String(on));
+    });
+  }
+
   function setTool(next) {
     tool = next;
     refs.inkbar.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('is-on', b.dataset.tool === tool));
     refs.stage.classList.toggle('is-inking', Boolean(tool));
     refs.pages.querySelectorAll('.page-ink').forEach((c) => c.classList.toggle('is-active', Boolean(tool)));
     setHint(tool ? t('sheet.inkHint') : '');
+    syncChrome();
   }
 
   /* ── Turning and zoom ────────────────────────────────────────────────── */
@@ -738,6 +916,7 @@ export function createSheetView(deps) {
   function goTo(next) {
     const target = Lib.turnPage(next, sheet?.pageCount || 1, 0);
     if (target === page) return;
+    turnDir = target > page ? 1 : -1;
     page = target;
     paint();
   }
@@ -758,8 +937,17 @@ export function createSheetView(deps) {
     const size = layout === 'spread' ? 2 : 1;
     const next = Lib.turnPage(page, sheet?.pageCount || 1, delta * size);
     if (next !== page) {
+      turnDir = delta;
       page = next;
       paint();
+    } else {
+      // At either cover: a small nudge says there is no further to go.
+      const box = refs.pages.firstElementChild;
+      if (box) {
+        box.classList.remove('bump-next', 'bump-prev');
+        void box.offsetWidth;
+        box.classList.add(delta > 0 ? 'bump-next' : 'bump-prev');
+      }
     }
   }
 
@@ -779,84 +967,109 @@ export function createSheetView(deps) {
   function closePanel() {
     refs.panel.hidden = true;
     refs.panel.dataset.panel = '';
+    syncChrome();
   }
 
   function togglePanel(name) {
     if (panelIs(name)) return closePanel();
     refs.panel.hidden = false;
     refs.panel.dataset.panel = name;
+    // One sheet at a time: the pen bar and a panel would stack over the page.
+    if (!refs.inkbar.hidden) {
+      refs.inkbar.hidden = true;
+      setTool(null);
+    }
+    syncChrome();
     if (name === 'settings') renderSettings();
     else if (name === 'bookmarks') renderBookmarks();
     else if (name === 'audio') renderAudio();
   }
 
-  function renderSettings() {
-    const s = sheet.settings;
-    refs.panel.innerHTML = `
-      <div class="reader-row">
-        <h4>${t('sheet.settings')}</h4>
-        <button class="reader-pill" type="button" data-act="closePanel">${t('sheet.done')}</button>
-      </div>
-      <div class="reader-row">
-        <span class="reader-label">${t('sheet.tone')}</span>
-        <div class="segmented small" role="group">
-          ${Lib.TONES.map(
-            (tone) =>
-              `<button type="button" data-tone="${tone}" aria-selected="${s.tone === tone}">${t('sheet.tone.' + tone)}</button>`,
-          ).join('')}
-        </div>
-      </div>
-      <label class="reader-row">
-        <span class="reader-label">${t('sheet.brightness')}</span>
-        <input type="range" data-set="brightness" min="0.55" max="1.5" step="0.05" value="${s.brightness}" />
-      </label>
-      <div class="reader-row">
-        <span class="reader-label">${t('sheet.fit')}</span>
-        <div class="segmented small" role="group">
-          <button type="button" data-fit="page" aria-selected="${s.fit === 'page'}">${t('sheet.fit.page')}</button>
-          <button type="button" data-fit="width" aria-selected="${s.fit === 'width'}">${t('sheet.fit.width')}</button>
-        </div>
-      </div>
-      <div class="reader-row">
-        <button class="reader-pill ${s.halfPage ? 'is-on' : ''}" type="button" data-toggle="halfPage">${t('sheet.halfPage')}</button>
-        <button class="reader-pill ${s.spread ? 'is-on' : ''}" type="button" data-toggle="spread">${t('sheet.spread')}</button>
-        <button class="reader-pill ${s.keepAwake !== false ? 'is-on' : ''}" type="button" data-toggle="keepAwake">${t('sheet.keepAwake')}</button>
-      </div>
-      ${sheet.kind === 'images' ? `<div class="reader-row"><button class="reader-pill" type="button" data-act="addPages">${t('sheet.addPages')}</button></div>` : ''}
-      <div class="reader-crop">
-        <h5>${t('sheet.crop')}</h5>
-        ${['l', 'r', 't', 'b'].map(
-          (edge) => `
-          <label class="reader-row">
-            <span class="reader-label">${t('sheet.crop.' + edge)}</span>
-            <input type="range" data-crop="${edge}" min="0" max="0.25" step="0.01" value="${s.crop?.[edge] || 0}" />
-          </label>`,
-        ).join('')}
-        <button class="reader-pill" type="button" data-act="cropReset">${t('sheet.crop.reset')}</button>
+  /** The top of a sliding panel: its name and a close button. */
+  function head(key) {
+    return `
+      <div class="sheet-panel-head">
+        <h4>${t(key)}</h4>
+        <button class="reader-icon-btn" type="button" data-act="closePanel" aria-label="${t('sheet.done')}" title="${t('sheet.done')}">${ICON.close}</button>
       </div>`;
   }
 
-  function renderBookmarks() {
-    const marks = sheet.bookmarks || [];
+  function renderSettings() {
+    const s = sheet.settings;
+    const crop = s.crop || {};
+    const cropped = ['l', 'r', 't', 'b'].some((e) => Number(crop[e]) > 0);
+    const seg = (attr, value, on, label) =>
+      `<button type="button" data-${attr}="${value}" aria-pressed="${on}" class="${on ? 'is-on' : ''}">${label}</button>`;
+    const sw = (key, on, label) => `
+        <button class="reader-switch" type="button" data-toggle="${key}" role="switch" aria-checked="${on}">
+          <span>${label}</span><i aria-hidden="true"></i>
+        </button>`;
     refs.panel.innerHTML = `
-      <div class="reader-row">
-        <h4>${t('sheet.bookmarks')}</h4>
-        <button class="reader-pill" type="button" data-act="bookmarkPage">${t('sheet.addBookmark')}</button>
-        <button class="reader-pill" type="button" data-act="closePanel">${t('sheet.done')}</button>
+${head('sheet.settings')}
+      <div class="sheet-panel-grid">
+        <span class="reader-label">${t('sheet.tone')}</span>
+        <div class="reader-seg reader-tones">
+          ${Lib.TONES.map((tone) => seg('tone', tone, s.tone === tone, `<i class="tone-chip tone-${tone}" aria-hidden="true"></i>${t('sheet.tone.' + tone)}`)).join('')}
+        </div>
+        <label class="reader-label" for="sheet-bright">${t('sheet.brightness')}</label>
+        <input id="sheet-bright" class="reader-range" type="range" data-set="brightness" min="0.55" max="1.5" step="0.05" value="${s.brightness}" />
+        <span class="reader-label">${t('sheet.fit')}</span>
+        <div class="reader-seg">
+          ${seg('fit', 'page', s.fit === 'page', t('sheet.fit.page'))}
+          ${seg('fit', 'width', s.fit === 'width', t('sheet.fit.width'))}
+        </div>
       </div>
+      <div class="reader-switches">
+        ${sw('halfPage', Boolean(s.halfPage), t('sheet.halfPage'))}
+        ${sw('spread', Boolean(s.spread), t('sheet.spread'))}
+        ${sw('keepAwake', s.keepAwake !== false, t('sheet.keepAwake'))}
+      </div>
+      ${sheet.kind === 'images' ? `<button class="reader-pill reader-wide" type="button" data-act="addPages">${ICON.plus}${t('sheet.addPages')}</button>` : ''}
+      <details class="reader-crop" ${cropped ? 'open' : ''}>
+        <summary>${t('sheet.crop')}${cropped ? ' ·' : ''}</summary>
+        <div class="sheet-panel-grid">
+          ${['l', 'r', 't', 'b']
+            .map(
+              (edge) => `
+            <label class="reader-label" for="sheet-crop-${edge}">${t('sheet.crop.' + edge)}</label>
+            <input id="sheet-crop-${edge}" class="reader-range" type="range" data-crop="${edge}" min="0" max="0.25" step="0.01" value="${crop[edge] || 0}" />`,
+            )
+            .join('')}
+        </div>
+        <button class="reader-pill" type="button" data-act="cropReset">${t('sheet.crop.reset')}</button>
+      </details>`;
+    paintRanges();
+  }
+
+  function renderBookmarks() {
+    const marks = [...(sheet.bookmarks || [])].sort((x, y) => x.page - y.page);
+    refs.panel.innerHTML = `
+${head('sheet.bookmarks')}
+      <button class="reader-pill reader-wide" type="button" data-act="bookmarkPage">${ICON.bookmark}${t('sheet.addBookmark')}</button>
       ${marks.length
         ? `<ul class="reader-list">${marks
             .map(
               (m) => `
-          <li>
+          <li class="${m.page === page ? 'is-current' : ''}">
             <button class="reader-list-go" type="button" data-mark="${m.page}" data-mark-id="${esc(m.id)}">
-              <strong>${esc(m.name || '')}</strong><span>${t('sheet.pageN', { n: m.page })}</span>
+              <span class="reader-list-page">${m.page}</span><strong>${esc(m.name || '')}</strong>
             </button>
-            <button class="reader-pill" type="button" data-unmark="${esc(m.id)}">${t('sheet.remove')}</button>
+            <button class="reader-icon-btn" type="button" data-unmark="${esc(m.id)}" aria-label="${t('sheet.remove')}" title="${t('sheet.remove')}">${ICON.trash}</button>
           </li>`,
             )
             .join('')}</ul>`
-        : `<p class="subtle">${t('sheet.noBookmarks')}</p>`}`;
+        : `<p class="reader-empty">${ICON.bookmark}<span>${t('sheet.noBookmarks')}</span></p>`}`;
+  }
+
+  /** Range inputs fill up to the thumb in the accent colour (WebKit has no ::-moz-range-progress). */
+  function paintRanges() {
+    refs.panel.querySelectorAll('.reader-range').forEach(fillRange);
+  }
+  function fillRange(el) {
+    const lo = Number(el.min) || 0;
+    const hi = Number(el.max) || 1;
+    const v = Number(el.value) || 0;
+    el.style.setProperty('--fill', `${hi > lo ? ((v - lo) / (hi - lo)) * 100 : 0}%`);
   }
 
   /* ── The practice track ──────────────────────────────────────────────── */
@@ -1109,7 +1322,13 @@ export function createSheetView(deps) {
       slider.max = String(buffer?.duration || 1);
       slider.value = String(position());
     }
-    if (playBtn) playBtn.textContent = playing ? t('sheet.audioPause') : t('sheet.audioPlay');
+    if (playBtn && playBtn.dataset.playing !== String(playing)) {
+      playBtn.dataset.playing = String(playing);
+      playBtn.innerHTML = playing ? ICON.pause : ICON.play;
+      playBtn.setAttribute('aria-label', playing ? t('sheet.audioPause') : t('sheet.audioPlay'));
+    }
+    if (slider) fillRange(slider);
+    readerEl.querySelector('.reader-btn-audio')?.classList.toggle('is-playing', playing || metro.on);
   }
 
   function saveTrackSettings() {
@@ -1126,66 +1345,71 @@ export function createSheetView(deps) {
     if (!sheet) return;
     if (!refs.panel.dataset.panel || refs.panel.hidden) return;
     if (refs.panel.dataset.panel !== 'audio') return;
-    const marks = loopA || loopB ? `A ${Lib.clock(loopA)} · B ${Lib.clock(loopB)}` : t('sheet.noLoop');
-    refs.panel.innerHTML = `
-      <div class="reader-row">
-        <h4>${t('sheet.audio')}</h4>
-        <button class="reader-pill" type="button" data-act="closePanel">${t('sheet.done')}</button>
-      </div>
-      <div class="reader-row">
-        <button class="primary-btn" type="button" data-act="pickAudio">${t('sheet.addAudio')}</button>
-        <label class="reader-check"><input type="checkbox" data-el="autoplay" ${sheet.autoplay ? 'checked' : ''} /> ${t('sheet.autoplay')}</label>
-      </div>
-      ${
-        audioTracks.length
-          ? `<ul class="reader-list">${audioTracks
-              .map(
-                (row) => `
-            <li class="${row.id === currentTrack?.id ? 'is-current' : ''}">
-              <button class="reader-list-go" type="button" data-track="${esc(row.id)}">
-                <strong>${esc(row.name)}</strong>
-              </button>
-              <button class="reader-pill" type="button" data-track-del="${esc(row.id)}">${t('sheet.remove')}</button>
-            </li>`,
-              )
-              .join('')}</ul>`
-          : `<p class="subtle">${t('sheet.noAudio')}</p>`
-      }
-      <div class="reader-player ${currentTrack ? '' : 'is-off'}">
-        <div class="reader-row">
-          <button class="primary-btn" type="button" data-act="trackPlay" ${currentTrack ? '' : 'disabled'}>${
-            playing ? t('sheet.audioPause') : t('sheet.audioPlay')
-          }</button>
-          <button class="reader-pill" type="button" data-act="trackStop" ${currentTrack ? '' : 'disabled'}>${t('sheet.audioRestart')}</button>
-          <span class="reader-time" data-el="track-time">${statusTime()}</span>
+    const hasLoop = loopB - loopA >= 0.2;
+    const marks = hasLoop ? `A ${Lib.clock(loopA)} – B ${Lib.clock(loopB)}` : t('sheet.noLoop');
+    const tracks = audioTracks.length
+      ? `<ul class="reader-list reader-tracks">${audioTracks
+          .map(
+            (row) => `
+          <li class="${row.id === currentTrack?.id ? 'is-current' : ''}">
+            <button class="reader-list-go" type="button" data-track="${esc(row.id)}">
+              <span class="reader-list-page">${ICON.note}</span><strong>${esc(row.name)}</strong>
+            </button>
+            <button class="reader-icon-btn" type="button" data-track-del="${esc(row.id)}" aria-label="${t('sheet.remove')}" title="${t('sheet.remove')}">${ICON.trash}</button>
+          </li>`,
+          )
+          .join('')}</ul>`
+      : `<p class="reader-empty">${ICON.music}<span>${t('sheet.noAudio')}</span></p>`;
+    const player = currentTrack
+      ? `
+      <div class="reader-player">
+        <div class="reader-transport">
+          <button class="reader-play" type="button" data-act="trackPlay" aria-label="${playing ? t('sheet.audioPause') : t('sheet.audioPlay')}">${playing ? ICON.pause : ICON.play}</button>
+          <div class="reader-scrub">
+            <input class="reader-seek reader-range" data-el="track-seek" type="range" min="0" max="${buffer?.duration || 1}" step="0.05" value="${position()}" aria-label="${t('sheet.audio')}" />
+            <div class="reader-scrub-row">
+              <span class="reader-time" data-el="track-time">${statusTime()}</span>
+              <button class="reader-icon-btn" type="button" data-act="trackStop" aria-label="${t('sheet.audioRestart')}" title="${t('sheet.audioRestart')}">${ICON.restart}</button>
+            </div>
+          </div>
         </div>
-        <input class="reader-seek" data-el="track-seek" type="range" min="0" max="${buffer?.duration || 1}" step="0.05" value="${position()}" ${currentTrack ? '' : 'disabled'} />
-        <label class="reader-row">
-          <span class="reader-label">${t('sheet.speed')} <b data-el="rate-label">${rate.toFixed(2)}×</b></span>
-          <input type="range" data-set="rate" min="0.5" max="1.5" step="0.05" value="${rate}" />
-        </label>
-        <label class="reader-row">
-          <span class="reader-label">${t('sheet.pitch')} <b data-el="pitch-label">${semitones > 0 ? '+' : ''}${semitones}</b></span>
-          <input type="range" data-set="pitch" min="-12" max="12" step="1" value="${semitones}" />
-        </label>
-        <label class="reader-row">
-          <span class="reader-label">${t('sheet.volume')}</span>
-          <input type="range" data-set="volume" min="0" max="1" step="0.02" value="${volume}" />
-        </label>
-        <div class="reader-row">
-          <button class="reader-pill" type="button" data-act="loopA">${t('sheet.setA')}</button>
-          <button class="reader-pill" type="button" data-act="loopB">${t('sheet.setB')}</button>
-          <button class="reader-pill ${loopOn ? 'is-on' : ''}" type="button" data-act="loopToggle">${t('sheet.loop')}</button>
-          <span class="subtle" data-el="loop">${marks}</span>
+        <div class="sheet-panel-grid">
+          <label class="reader-label" for="sheet-rate">${t('sheet.speed')}</label>
+          <div class="reader-valued"><input id="sheet-rate" class="reader-range" type="range" data-set="rate" min="0.5" max="1.5" step="0.05" value="${rate}" /><b data-el="rate-label">${rate.toFixed(2)}×</b></div>
+          <label class="reader-label" for="sheet-pitch">${t('sheet.pitch')}</label>
+          <div class="reader-valued"><input id="sheet-pitch" class="reader-range" type="range" data-set="pitch" min="-12" max="12" step="1" value="${semitones}" /><b data-el="pitch-label">${semitones > 0 ? '+' : ''}${semitones}</b></div>
+          <label class="reader-label" for="sheet-vol">${t('sheet.volume')}</label>
+          <div class="reader-valued"><input id="sheet-vol" class="reader-range" type="range" data-set="volume" min="0" max="1" step="0.02" value="${volume}" /><b>${Math.round(volume * 100)}</b></div>
+        </div>
+        <div class="reader-loop">
+          <div class="reader-seg">
+            <button type="button" data-act="loopA">${t('sheet.setA')}</button>
+            <button type="button" data-act="loopB">${t('sheet.setB')}</button>
+            <button type="button" data-act="loopToggle" aria-pressed="${loopOn}" class="${loopOn ? 'is-on' : ''}" ${hasLoop ? '' : 'disabled'}>${t('sheet.loop')}</button>
+          </div>
+          <span class="reader-time" data-el="loop">${marks}</span>
         </div>
         <p class="subtle reader-note">${t('sheet.audioNote')}</p>
+      </div>`
+      : '';
+    refs.panel.innerHTML = `
+${head('sheet.audio')}
+      ${tracks}
+      <div class="reader-track-actions">
+        <button class="reader-pill" type="button" data-act="pickAudio">${ICON.plus}${t('sheet.addAudio')}</button>
+        ${audioTracks.length ? `<label class="reader-check"><input type="checkbox" data-el="autoplay" ${sheet.autoplay ? 'checked' : ''} /> ${t('sheet.autoplay')}</label>` : ''}
       </div>
-      <div class="reader-row reader-metro">
-        <span class="reader-label">${t('sheet.metronome')}</span>
-        <button class="reader-pill ${metro.on ? 'is-on' : ''}" type="button" data-act="metro">${metro.on ? t('sheet.stop') : t('sheet.start')}</button>
-        <input type="range" data-set="bpm" min="40" max="208" step="2" value="${metro.bpm}" />
-        <b data-el="bpm-label">${metro.bpm}</b>
+      ${player}
+      <div class="reader-metro">
+        <button class="reader-metro-btn ${metro.on ? 'is-on' : ''}" type="button" data-act="metro" aria-pressed="${metro.on}">
+          <i class="reader-metro-dot" aria-hidden="true"></i>${t('sheet.metronome')}
+        </button>
+        <button class="reader-icon-btn" type="button" data-act="bpmDown" aria-label="−">${ICON.minus}</button>
+        <b class="reader-bpm" data-el="bpm-label">${metro.bpm}</b>
+        <button class="reader-icon-btn" type="button" data-act="bpmUp" aria-label="+">${ICON.plus}</button>
+        <input class="reader-range" type="range" data-set="bpm" min="40" max="208" step="2" value="${metro.bpm}" aria-label="${t('sheet.metronome')}" />
       </div>`;
+    paintRanges();
     drawTrackClock();
   }
 
@@ -1239,6 +1463,7 @@ export function createSheetView(deps) {
     clearTimeout(metro.timer);
     metro.timer = 0;
     if (refs.panel && !refs.panel.hidden) renderAudio();
+    else drawTrackClock();
   }
 
   /* ── Screen awake ────────────────────────────────────────────────────── */
@@ -1365,6 +1590,7 @@ export function createSheetView(deps) {
         if (!currentTrack && sheet?.audioId) await selectTrack(sheet.audioId);
         return togglePanel('audio');
       case 'ink':
+        if (refs.inkbar.hidden) closePanel();
         refs.inkbar.hidden = !refs.inkbar.hidden;
         return setTool(refs.inkbar.hidden ? null : 'pen');
       case 'inkOff':
@@ -1436,6 +1662,18 @@ export function createSheetView(deps) {
         if (loopOn) seek(loopA);
         renderAudio();
         return;
+      case 'bpmDown':
+      case 'bpmUp': {
+        metro.bpm = Lib.clamp(metro.bpm + (act === 'bpmUp' ? 2 : -2), 40, 208);
+        const label = refs.panel.querySelector('[data-el="bpm-label"]');
+        if (label) label.textContent = String(metro.bpm);
+        const range = refs.panel.querySelector('[data-set="bpm"]');
+        if (range) {
+          range.value = String(metro.bpm);
+          fillRange(range);
+        }
+        return;
+      }
       case 'metro':
         if (metro.on) {
           stopMetronome();
@@ -1450,13 +1688,18 @@ export function createSheetView(deps) {
 
   const onRootInput = (event) => {
     const el = event.target;
+    if (el.classList?.contains('reader-range')) fillRange(el);
+    if (el.dataset.set === 'volume') {
+      const b = el.parentElement?.querySelector('b');
+      if (b) b.textContent = String(Math.round(Number(el.value) * 100));
+    }
     if (el.dataset.set && sheet) {
       const kind = el.dataset.set;
       if (kind === 'brightness') {
         sheet.settings.brightness = Number(el.value);
         scheduleSave(500);
-        refs.pages.querySelectorAll('.page-box').forEach((box) => {
-          box.style.filter = Lib.toneFilter(sheet.settings.tone, sheet.settings.brightness);
+        refs.pages.querySelectorAll('.page-frame').forEach((frame) => {
+          frame.style.filter = Lib.toneFilter(sheet.settings.tone, sheet.settings.brightness);
         });
       } else if (kind === 'rate') {
         rate = Number(el.value);
@@ -1602,9 +1845,13 @@ export function createSheetView(deps) {
     const share = (event.clientX - box.left) / Math.max(1, box.width);
     if (share < 0.28) step(-1);
     else if (share > 0.72) step(1);
-    else {
+    else if (!refs.panel.hidden) closePanel();
+    else if (!refs.inkbar.hidden) {
       refs.inkbar.hidden = true;
-      closePanel();
+      setTool(null);
+    } else {
+      readerEl.classList.toggle('is-immersive');
+      measure().then(paint);
     }
   });
   refs.stage.addEventListener('pointercancel', (event) => {

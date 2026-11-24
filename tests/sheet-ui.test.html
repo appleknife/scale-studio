@@ -107,7 +107,7 @@
         await until(() => document.querySelector('[data-tone="night"]'));
         document.querySelector('[data-tone="night"]').click();
         await wait(250);
-        const filter = document.querySelector('.page-box').style.filter;
+        const filter = document.querySelector('.page-frame').style.filter;
         if (!filter.includes('invert')) problems.push('night tone did not reach the page');
         log.push('filter: ' + filter);
         document.querySelector('[data-act="closePanel"]').click();
