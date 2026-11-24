@@ -4,8 +4,8 @@
 // This module is deliberately free of DOM and audio code so it can be tested
 // in isolation (see tests/dsp.test.html).
 
-import { median } from './pitch.js?v=202611240600';
-import { getLang, t } from './i18n.js?v=202611240600';
+import { median } from './pitch.js?v=202611241900';
+import { getLang, t } from './i18n.js?v=202611241900';
 
 export const DEFAULTS = {
   minClarity: 0.5,
@@ -537,7 +537,7 @@ export function analyzeTake(frames, expectedScale, options = {}) {
   // note go unnoticed, and said 100 when it could not measure. Then, briefly, it
   // allowed only 12 ms of measuring noise — fair to a synthetic take, too tough
   // on a real violin in a real room.)
-  const GRACE = 0.03;
+  const GRACE = 0.04;
   const spans = [];
   for (let k = 1; k < pairs.length; k++) {
     if (pairs[k - 1].e === topIndex) continue;
@@ -564,20 +564,24 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     const q = Math.floor(sorted.length / 4);
     const middle = sorted.slice(q, sorted.length - q);
     const typicalNote = middle.reduce((a, b) => a + b, 0) / middle.length;
+    // Nov 2026, a touch more lenient after real takes felt harsh: 40 ms of
+    // measuring grace (was 30), 6% wobble free (was 3.5%), a gentler slope, and
+    // a stumble only at 40% off (was a third), costing a little less.
+    const STUMBLE = 0.4;
     const devs = timed.map((v) => Math.min(1, Math.max(0, Math.abs(v - typicalNote) - GRACE) / typicalNote));
     timing = spans.map((x) => ({
       e: x.e,
       ratio: x.ioi / typicalNote,
-      off: x.gap > pauseAt ? 'pause' : Math.max(0, Math.abs(x.ioi - typicalNote) - GRACE) / typicalNote > 0.33 ? (x.ioi > typicalNote ? 'long' : 'short') : null,
+      off: x.gap > pauseAt ? 'pause' : Math.max(0, Math.abs(x.ioi - typicalNote) - GRACE) / typicalNote > STUMBLE ? (x.ioi > typicalNote ? 'long' : 'short') : null,
     }));
     const typical = devs.reduce((a, b) => a + b, 0) / devs.length;
-    steadiness = 1 - Math.max(0, typical - 0.035) / 0.45;
+    steadiness = 1 - Math.max(0, typical - 0.06) / 0.55;
     // A clear stumble (a note a third longer or shorter) costs on its own — up
     // to a point: when every other note is off, that is unevenness, which the
     // line above already measures, not a run of separate stumbles.
     let stumbles = 0;
-    for (const d of devs) if (d > 0.33) stumbles += 0.02 + 0.04 * Math.min(1, (d - 0.33) / 0.67);
-    steadiness = clamp(steadiness - Math.min(0.2, stumbles));
+    for (const d of devs) if (d > STUMBLE) stumbles += 0.015 + 0.03 * Math.min(1, (d - STUMBLE) / (1 - STUMBLE));
+    steadiness = clamp(steadiness - Math.min(0.15, stumbles));
   } else {
     // too few notes in a row to judge: neither praised nor blamed
     steadiness = notes.length ? 0.8 : 0;
@@ -593,7 +597,9 @@ export function analyzeTake(frames, expectedScale, options = {}) {
   // note's start being misplaced with it, cost steadiness too). So a gap only
   // counts when the playing really fell quiet in it: the longest stretch of
   // quiet frames (see `quietIn` above) is what is measured, not the gap's length.
-  const stopThreshold = Math.max(0.3, medianIoi * 0.8);
+  // Nov 2026, more lenient: a breath between notes up to 0.4 s (or one note's
+  // length) is not a stop, and a stop costs a little less.
+  const stopThreshold = Math.max(0.4, medianIoi);
   let stops = 0;
   let longStops = 0;
   for (let k = 1; k < notes.length; k++) {
@@ -602,12 +608,12 @@ export function analyzeTake(frames, expectedScale, options = {}) {
     // A room's echo carries on for a moment after a real stop, so the quiet
     // inside it is shorter than the gap: most of the threshold is enough.
     const quiet = quietIn(notes[k - 1].t1, notes[k].t0);
-    if (quiet >= stopThreshold * 0.6) {
+    if (quiet >= stopThreshold * 0.7) {
       stops++;
-      if (quiet > 0.8) longStops++;
+      if (quiet > 1.0) longStops++;
     }
   }
-  const continuity = clamp(1 - 0.16 * stops - 0.1 * longStops);
+  const continuity = clamp(1 - 0.12 * stops - 0.08 * longStops);
 
   const w = o.weights;
   const raw = w.accuracy * accuracy + w.intonation * intonation + w.steadiness * steadiness + w.continuity * continuity;
