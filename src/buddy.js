@@ -12,8 +12,8 @@
 // It never judges a score, never sulks, and stays out of the way: decorative to
 // a screen reader, and absent entirely for a student who has no pet or egg.
 
-import { loadPet, stageOf } from './pet.js?v=202611241900';
-import { petMarkup, eggMarkup, HEART } from './petart.js?v=202611241900';
+import { loadPet, stageOf } from './pet.js?v=202611241945';
+import { petMarkup, eggMarkup, HEART } from './petart.js?v=202611241945';
 
 const NS = 'http://www.w3.org/2000/svg';
 

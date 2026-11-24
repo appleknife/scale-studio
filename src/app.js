@@ -1,20 +1,20 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611241900';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611241900';
-import { createInk } from './ink.js?v=202611241900';
-import { createFollower } from './follow.js?v=202611241900';
-import { createPetRoom } from './petroom.js?v=202611241900';
-import { SPRINT_FULL } from './pet.js?v=202611241900';
-import { createBuddy } from './buddy.js?v=202611241900';
-import { createSprintView } from './sprintview.js?v=202611241900';
-import { createTrillView } from './trillview.js?v=202611241900';
-import { createListenView } from './listenview.js?v=202611241900';
-import { createSheetView } from './sheetview.js?v=202611241900';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611241945';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611241945';
+import { createInk } from './ink.js?v=202611241945';
+import { createFollower } from './follow.js?v=202611241945';
+import { createPetRoom } from './petroom.js?v=202611241945';
+import { SPRINT_FULL } from './pet.js?v=202611241945';
+import { createBuddy } from './buddy.js?v=202611241945';
+import { createSprintView } from './sprintview.js?v=202611241945';
+import { createTrillView } from './trillview.js?v=202611241945';
+import { createListenView } from './listenview.js?v=202611241945';
+import { createSheetView } from './sheetview.js?v=202611241945';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611241900';
+window.__scaleStudioVersion = '202611241945';
 import {
   PitchDetector,
   midiToFreq,
@@ -22,16 +22,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611241900';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611241900';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611241900';
-import { generatePassage } from './sightreading.js?v=202611241900';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611241900';
-import { renderScore } from './score.js?v=202611241900';
-import { summariseIntonation } from './intonation.js?v=202611241900';
-import * as Journal from './journal.js?v=202611241900';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611241900';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611241900';
+} from './pitch.js?v=202611241945';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611241945';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611241945';
+import { generatePassage } from './sightreading.js?v=202611241945';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611241945';
+import { renderScore } from './score.js?v=202611241945';
+import { summariseIntonation } from './intonation.js?v=202611241945';
+import * as Journal from './journal.js?v=202611241945';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611241945';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611241945';
 import {
   STRINGS,
   FIFTHS,
@@ -40,7 +40,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611241900';
+} from './tuner.js?v=202611241945';
 
 const LANG = initLang();
 
@@ -1817,12 +1817,39 @@ function stopAssistAudio() {
  * microphone is open), and with no pitch of its own. A beep at 880 Hz is an A,
  * and the take is listening for notes.
  */
+// The clicks pass through a soft clipper on the way to the player's volume:
+// pushed this hard, a noise burst's few tallest spikes would otherwise clip and
+// crackle. The curve rounds those off and leaves the body, so the click comes
+// out about 10 dB louder (twice as loud to the ear) yet still peaks just under
+// full scale at full volume. (A compressor was tried and only made it quieter:
+// its attack is slower than a click.)
+let clickBus = null;
+function clickBusFor(ctx) {
+  if (clickBus && clickBus.ctx === ctx) return clickBus.node;
+  const curve = new Float32Array(2048);
+  for (let i = 0; i < curve.length; i++) {
+    const x = (i / (curve.length - 1)) * 2 - 1;
+    curve[i] = Math.tanh(x * 3) / Math.tanh(3);
+  }
+  const pre = ctx.createGain();
+  pre.gain.value = 1 / 3;
+  const shaper = ctx.createWaveShaper();
+  shaper.curve = curve;
+  const post = ctx.createGain();
+  post.gain.value = 1.9;
+  pre.connect(shaper).connect(post).connect(player.output);
+  clickBus = { ctx, node: pre };
+  return pre;
+}
+
 function clickAt(ctx, when, strength = 0.6) {
   const strong = strength >= 1;
-  const length = Math.floor(ctx.sampleRate * 0.05);
+  // Nov 2026, louder again: a longer tail (20 ms, was 12) for more body and
+  // more gain into the soft clipper above.
+  const length = Math.floor(ctx.sampleRate * 0.07);
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
   const data = buffer.getChannelData(0);
-  const fall = ctx.sampleRate * 0.012;
+  const fall = ctx.sampleRate * 0.02;
   for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / fall);
   const src = ctx.createBufferSource();
   src.buffer = buffer;
@@ -1831,8 +1858,8 @@ function clickAt(ctx, when, strength = 0.6) {
   filter.frequency.value = strong ? 2400 : 1800;
   filter.Q.value = 0.7;
   const gain = ctx.createGain();
-  gain.gain.value = strong ? 4 : 3;
-  src.connect(filter).connect(gain).connect(player.output);
+  gain.gain.value = strong ? 7 : 5.5;
+  src.connect(filter).connect(gain).connect(clickBusFor(ctx));
   src.start(when);
   assistClicks.push(src);
   // A long session should not accumulate stopped nodes in this list.
