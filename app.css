@@ -10325,3 +10325,118 @@ select,
     max-width: min(100%, 1100px);
   }
 }
+
+/* ready ring, page strip, edit step */
+.scan-shutter {
+  position: relative;
+}
+.scan-ring {
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  background: conic-gradient(#bfe8c9 calc(var(--p, 0) * 1turn), rgba(255, 255, 255, 0.16) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 0);
+  pointer-events: none;
+}
+.scan-ring.is-fire {
+  box-shadow: 0 0 0 4px rgba(191, 232, 201, 0.35);
+}
+.scan-hint[data-kind='found'] {
+  color: #cfe8ff;
+}
+.scan-hint[data-kind='hold'],
+.scan-hint[data-kind='fire'] {
+  color: #bfe8c9;
+}
+.scan-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 10px;
+  background: #1b1917;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.scan-thumb {
+  flex: none;
+  width: 58px;
+  height: 76px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  background: #000;
+  cursor: pointer;
+}
+.scan-thumb.is-current {
+  border-color: #8ec9ff;
+  box-shadow: 0 0 0 2px rgba(142, 201, 255, 0.35);
+}
+.scan-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+  display: block;
+}
+.scan.is-editing .scan-stage,
+.scan.is-editing .scan-bar,
+.scan.is-editing .scan-tools,
+.scan.is-editing .scan-strip {
+  visibility: hidden;
+}
+.scan-edit {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  background: #121110;
+}
+.scan-edit-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  width: 100%;
+  max-width: min(100%, 1100px);
+  overflow: hidden;
+}
+.scan-edit-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.scan-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: #1b1917;
+  flex: none;
+}
+.scan-edit-title {
+  flex: 1;
+  font-size: 13.5px;
+  text-align: center;
+}
+.scan-edit-tools {
+  flex: none;
+  padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+  background: #1b1917;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.scan-apply {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+.scan-apply svg {
+  width: 18px;
+  height: 18px;
+}

@@ -107,10 +107,10 @@
           }
         }
         const found = S.autoQuad(frame, W, H);
-        ok('page found', found);
+        ok('page found', found && found.score > 0.42);
         if (found) {
-          near('found area', S.quadArea(found), 0.36, 0.12);
-          const c = S.quadCenter(found);
+          near('found area', S.quadArea(found.quad), 0.36, 0.12);
+          const c = S.quadCenter(found.quad);
           near('found center x', c[0], 0.5, 0.12);
           near('found center y', c[1], 0.5, 0.12);
         }

@@ -305,36 +305,98 @@ export function applyFilter(data, w, h, mode) {
  * the bright sheet against a darker desk, and the strongest outer edges — and
  * the more page-shaped one wins. Coordinates come back in 0–1 units.
  */
-export function autoQuad(data, w, h) {
-  const gray = greyOf(data, w, h);
-  const cut = otsu(gray);
-  const bright = new Uint8Array(w * h);
-  let brightCount = 0;
-  for (let p = 0; p < gray.length; p += 1) {
-    if (gray[p] > cut) {
-      bright[p] = 1;
-      brightCount += 1;
+/** Gradient magnitude map, used to weigh an edge as a real page border. */
+export function gradients(gray, w, h) {
+  const mag = new Float32Array(w * h);
+  let mean = 0;
+  for (let y = 1; y < h - 1; y += 1) {
+    for (let x = 1; x < w - 1; x += 1) {
+      const gx = gray[y * w + x + 1] - gray[y * w + x - 1];
+      const gy = gray[(y + 1) * w + x] - gray[(y - 1) * w + x];
+      const m = Math.hypot(gx, gy);
+      mag[y * w + x] = m;
+      mean += m;
     }
   }
+  return { mag, mean: mean / Math.max(1, (w - 2) * (h - 2)) };
+}
+
+function magAt(mag, w, h, x, y) {
+  const cx = Math.min(w - 1, Math.max(0, Math.round(x)));
+  const cy = Math.min(h - 1, Math.max(0, Math.round(y)));
+  return mag[cy * w + cx];
+}
+
+/**
+ * How much a quad looks like a page: edges it can be seen along, opposite
+ * sides that agree, a shape that fills its own box, and a place near the
+ * middle. 0–1; a real page at a normal distance sits well above 0.4.
+ */
+export function quadQuality(q, mag, meanMag, w, h) {
+  if (!q || q.length !== 4) return 0;
+  const area = quadArea(q);
+  if (area < 0.1 || area > 0.96) return 0;
+  const sides = [];
+  let edge = 0;
+  let samples = 0;
+  for (let i = 0; i < 4; i += 1) {
+    const [x1, y1] = q[i];
+    const [x2, y2] = q[(i + 1) % 4];
+    sides.push(Math.hypot(x2 - x1, y2 - y1));
+    for (let k = 1; k < 20; k += 1) {
+      const f = k / 20;
+      edge += magAt(mag, w, h, (x1 + (x2 - x1) * f) * w, (y1 + (y2 - y1) * f) * h);
+      samples += 1;
+    }
+  }
+  const support = Math.min(1, edge / samples / Math.max(4, meanMag * 1.8));
+  if (!support) return 0;
+  const xs = q.map((p) => p[0]);
+  const ys = q.map((p) => p[1]);
+  const box = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+  const fill = box > 0 ? Math.min(1, area / box) : 0;
+  const opposite = (Math.abs(sides[0] - sides[2]) + Math.abs(sides[1] - sides[3])) / Math.max(...sides);
+  let square = 0;
+  for (let i = 0; i < 4; i += 1) {
+    const [ax, ay] = q[i];
+    const [bx, by] = q[(i + 1) % 4];
+    const [cx, cy] = q[(i + 3) % 4];
+    const l1 = Math.hypot(bx - ax, by - ay) || 1;
+    const l2 = Math.hypot(cx - ax, cy - ay) || 1;
+    square += Math.abs(((bx - ax) * (cx - ax) + (by - ay) * (cy - ay)) / (l1 * l2));
+  }
+  square = 1 - square / 4;
+  const center = quadCenter(q);
+  const centered = 1 - Math.min(1, Math.hypot(center[0] - 0.5, center[1] - 0.5) * 2.2);
+  return Math.max(0, Math.min(1, support * 0.42 + square * 0.26 + fill * 0.18 + centered * 0.1 + (1 - opposite) * 0.04));
+}
+
+/**
+ * Guess the page's four corners from a small frame. Bright regions and strong
+ * edges are both tried, and every candidate is weighed by quadQuality, so a
+ * patch of light or a single strong line does not win on its own.
+ */
+export function autoQuad(data, w, h) {
+  const gray = greyOf(data, w, h);
+  const { mag, mean } = gradients(gray, w, h);
+  const cut = otsu(gray);
+  const bright = new Uint8Array(w * h);
+  for (let p = 0; p < gray.length; p += 1) bright[p] = gray[p] > cut ? 1 : 0;
   const candidates = [];
   const paper = brightQuad(bright, w, h);
   if (paper) candidates.push(paper);
-  const edges = edgeQuad(gray, w, h);
+  const edges = edgeQuad(mag, w, h);
   if (edges) candidates.push(edges);
   let best = null;
-  let bestScore = 0;
+  let bestScore = 0.42;
   for (const q of candidates) {
-    const area = quadArea(q);
-    if (area < 0.12 || area > 0.97) continue;
-    const center = quadCenter(q);
-    const centered = 1 - Math.min(1, Math.hypot(center[0] - 0.5, center[1] - 0.5) * 2.5);
-    const score = area * 0.6 + centered * 0.4;
+    const score = quadQuality(q, mag, mean, w, h);
     if (score > bestScore) {
       bestScore = score;
       best = q;
     }
   }
-  return best;
+  return best ? { quad: best, score: bestScore } : null;
 }
 
 function quadFromExtremes(points) {
@@ -415,21 +477,14 @@ function brightQuad(bright, w, h) {
   return best;
 }
 
-function edgeQuad(gray, w, h) {
+function edgeQuad(mag, w, h) {
   const pts = [];
-  let total = 0;
-  for (let y = 1; y < h - 1; y += 2) {
-    for (let x = 1; x < w - 1; x += 2) {
-      const gx = gray[y * w + x + 1] - gray[y * w + x - 1];
-      const gy = gray[(y + 1) * w + x] - gray[(y - 1) * w + x];
-      const m = Math.abs(gx) + Math.abs(gy);
-      total += m;
-      if (m > 48) pts.push([x / w, y / h]);
+  for (let y = 2; y < h - 2; y += 2) {
+    for (let x = 2; x < w - 2; x += 2) {
+      if (mag[y * w + x] > 42) pts.push([x / w, y / h]);
     }
   }
   if (pts.length < 24) return null;
-  const mean = total / ((w * h) / 4);
-  if (mean < 4) return null;
   return quadFromExtremes(pts);
 }
 

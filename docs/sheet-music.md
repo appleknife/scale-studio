@@ -33,11 +33,13 @@ piece; clearing the site's data does.
 
 ## Scanning a page
 
-**Scan** on the shelf (or *Scan pages* under an image piece) opens the camera,
-finds the sheet, and warps it flat. Drag a corner to correct it; the shutter is
-manual, or automatic once the corners have been still for a moment. Five page
-treatments: original, document colour, clean (flattened light), grey, black and
-white. Pages stack, can be removed, and are saved as one piece when finished.
+**Scan** on the shelf (or *Scan pages* under an image piece) opens the camera and
+finds the sheet. A ring around the shutter fills while it holds; at the top it
+takes the picture. **Shooting and correcting are separate:** the frame is kept as
+taken, then a thumbnail opens an editor where the corners are dragged onto the
+page and the look is chosen — Clean (flattened light) by default, then document
+colour, original, grey, black and white. Pages stack and are saved as one piece
+when finished.
 
 Studied in Scanner Pro 9.0.5 (`ScannerPro.app`, Mach-O + `ScannerPro/…` Swift
 paths), and what was reproduced:

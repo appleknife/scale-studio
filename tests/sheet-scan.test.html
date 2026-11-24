@@ -43,14 +43,36 @@
         if (document.querySelector('[data-el="scan"]').hidden) problems.push('the scan screen is hidden');
         if (!document.querySelector('[data-act="shoot"]')) problems.push('no shutter');
 
+        if (!document.querySelector('[data-el="ring"]')) problems.push('no ready ring');
+        document.querySelector('[data-act="auto"]').click();
+        if (document.querySelector('[data-act="auto"]').getAttribute('aria-pressed') !== 'false') problems.push('auto did not turn off');
+        log.push('auto toggles');
+
         api.setQuad([[0.12, 0.12], [0.88, 0.12], [0.88, 0.88], [0.12, 0.88]]);
-        await api.shoot();
+        const overlay = document.querySelector('[data-el="overlay"]');
+        const box = overlay.getBoundingClientRect();
+        const at = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, pointerId: 3, pointerType: 'touch', bubbles: true };
+        overlay.dispatchEvent(new PointerEvent('pointerdown', at));
+        overlay.dispatchEvent(new PointerEvent('pointerup', at));
+        await until(() => api.pages === 1);
         if (api.pages !== 1) problems.push('pages after shoot: ' + api.pages);
         log.push('pages: ' + api.pages);
 
-        // Filter choice, then a second page and undo it.
-        document.querySelector('[data-filter="bw"]').click();
-        if (!document.querySelector('[data-filter="bw"]').classList.contains('is-on')) problems.push('filter did not select');
+        // Nothing is warped yet: the page waits for the edit step.
+        if (!document.querySelector('[data-page="0"]')) problems.push('no page thumbnail');
+        document.querySelector('[data-page="0"]').click();
+        await until(() => !document.querySelector('[data-el="edit"]').hidden);
+        const selected = document.querySelector('.scan-filter.is-on[data-editfilter]')?.dataset.editfilter;
+        if (selected !== 'clean') problems.push('default look is ' + selected);
+        log.push('editor opened on ' + selected);
+        document.querySelector('[data-editfilter="bw"]').click();
+        api.setQuad([[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]], 'edit');
+        await wait(120);
+        document.querySelector('[data-act="editApply"]').click();
+        await until(() => document.querySelector('[data-el="edit"]').hidden);
+        log.push('edited and applied');
+
+        // A second page, removed again from the strip's undo.
         await api.shoot();
         if (api.pages !== 2) problems.push('second page missing: ' + api.pages);
         document.querySelector('[data-act="undo"]').click();

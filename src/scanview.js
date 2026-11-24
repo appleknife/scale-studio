@@ -1,17 +1,19 @@
-// scanview.js — the scan screen: camera, corners, filter, pages.
+// scanview.js — the scan screen: camera, corners, pages, and the edit step.
 //
-// This is the part of Scanner Pro that matters for a sheet-music stand: point
-// the camera at the page, let the quad settle (or drag the corners), take it,
-// flatten it, choose how it should look. Multi-page, because a part is pages.
+// Shooting and correcting are separate on purpose. A frame is taken as it is,
+// with the corners the camera found; the page is straightened and toned later,
+// on a still picture, where a corner can be placed precisely and a look can be
+// compared without the camera moving underneath. That is also how the original
+// works: auto-capture at the camera, crop and colour mode on the page after.
 //
-// The learned parts of the original (finger removal, curved-line flattening,
-// document-type guessing) are not reproduced; what is here is the camera, the
-// quad, the warp and the tone.
+// The learned parts of Scanner Pro (finger removal, curved-page flattening,
+// document-type guessing) are not reproduced; the camera, the quad, the warp
+// and the tone are.
 
-import { t } from './i18n.js?v=202611240700';
+import { t } from './i18n.js?v=202611240900';
 import {
-  autoQuad,
   applyFilter,
+  autoQuad,
   grabFrame,
   orderQuad,
   outputSize,
@@ -19,20 +21,23 @@ import {
   quadDistance,
   quadToPixels,
   smoothQuad,
-  steadyEnough,
   warpPixels,
-} from './scan.js?v=202611240700';
+} from './scan.js?v=202611240900';
 
 const ICON = {
   close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
   torch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l1 5-2 3v10h-4V11L8 8z"/><path d="M9.5 15h5"/></svg>',
   auto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5h3M20 8V5h-3M4 16v3h3M20 16v3h-3"/><rect x="8.5" y="8.5" width="7" height="7" rx="1"/></svg>',
   shutter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="7.4"/><circle cx="12" cy="12" r="4.6" fill="currentColor" stroke="none"/></svg>',
   undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7L4.5 11.5 9 16"/><path d="M5 11.5h9a5 5 0 0 1 0 10h-2"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+  pages: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3.5" width="10" height="17" rx="1.5"/><path d="M9.5 8h5M9.5 11.5h5M9.5 15h3"/></svg>',
+  wand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18l9.5-9.5"/><path d="M16.5 4v3M15 5.5h3M19.5 10v2M18.5 11h2"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>',
 };
 
-const FILTERS = ['photo', 'color', 'clean', 'grey', 'bw'];
+const FILTERS = ['clean', 'color', 'photo', 'grey', 'bw'];
 const PREVIEW = {
   photo: 'none',
   color: 'contrast(1.08) saturate(1.05)',
@@ -40,6 +45,8 @@ const PREVIEW = {
   grey: 'grayscale(1) contrast(1.15)',
   bw: 'grayscale(1) contrast(2.1) brightness(1.05)',
 };
+const FIRE_AT = 1;
+const COOLDOWN = 1200;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -48,18 +55,22 @@ export function createScanner(deps) {
   let stream = null;
   let track = null;
   let running = false;
-  let quad = null; // normalised, ordered
+  let mode = 'camera'; // camera | edit
+  let quad = null;
   let suggested = null;
   let history = [];
+  let hold = 0; // 0..1 towards firing
   let lastFire = 0;
   let detectTimer = 0;
   let raf = 0;
   let auto = true;
-  let filter = 'color';
+  let filter = 'clean'; // default look for new pages
   let torch = false;
   let torchOk = false;
   let busy = false;
-  const pages = []; // JPEG data URLs
+  let misses = 0;
+  let editing = -1;
+  const pages = []; // {raw, quad, filter}
 
   root.innerHTML = `
     <div class="scan" data-el="scan" hidden>
@@ -71,20 +82,45 @@ export function createScanner(deps) {
       </div>
       <div class="scan-bar">
         <button class="scan-btn" type="button" data-act="close" aria-label="${t('scan.close')}" title="${t('scan.close')}">${ICON.close}</button>
-        <span class="scan-title">${t('scan.title')}</span>
+        <span class="scan-title" data-el="title">${t('scan.title')}</span>
         <button class="scan-btn" type="button" data-act="torch" aria-label="${t('scan.torch')}" title="${t('scan.torch')}" hidden>${ICON.torch}</button>
         <button class="scan-btn is-on" type="button" data-act="auto" aria-pressed="true" aria-label="${t('scan.auto')}" title="${t('scan.auto')}">${ICON.auto}</button>
       </div>
-      <div class="scan-tools">
+      <div class="scan-tools" data-el="tools">
         <div class="scan-filters" role="group" aria-label="${t('scan.filter')}">
           ${FILTERS.map((f) => `<button class="scan-filter ${f === filter ? 'is-on' : ''}" type="button" data-filter="${f}">${t('scan.filter.' + f)}</button>`).join('')}
         </div>
         <div class="scan-shoot">
           <button class="scan-thumbs" type="button" data-act="undo" aria-label="${t('scan.undo')}" hidden>${ICON.undo}<b data-el="count"></b></button>
-          <button class="scan-shutter" type="button" data-act="shoot" aria-label="${t('scan.shoot')}">${ICON.shutter}</button>
+          <button class="scan-shutter" type="button" data-act="shoot" aria-label="${t('scan.shoot')}">
+            <span class="scan-ring" data-el="ring" aria-hidden="true"></span>
+            ${ICON.shutter}
+          </button>
           <button class="scan-thumbs scan-done" type="button" data-act="done" aria-label="${t('scan.done')}" hidden>${ICON.check}<b data-el="count2"></b></button>
         </div>
         <p class="scan-note" data-el="note">${t('scan.corners')}</p>
+      </div>
+      <div class="scan-strip" data-el="strip" hidden></div>
+
+      <div class="scan-edit" data-el="edit" hidden>
+        <div class="scan-edit-stage" data-el="editStage">
+          <img class="scan-edit-img" data-el="editImg" alt="" />
+          <canvas class="scan-overlay" data-el="editOverlay"></canvas>
+        </div>
+        <div class="scan-edit-bar">
+          <button class="scan-btn" type="button" data-act="editBack" aria-label="${t('scan.back')}" title="${t('scan.back')}">${ICON.back}</button>
+          <span class="scan-edit-title" data-el="editTitle"></span>
+          <button class="scan-btn" type="button" data-act="editDelete" aria-label="${t('scan.delete')}" title="${t('scan.delete')}">${ICON.trash}</button>
+          <button class="scan-thumbs" type="button" data-act="editPrev" aria-label="${t('scan.prev')}">${ICON.back}</button>
+          <button class="scan-thumbs" type="button" data-act="editNext" aria-label="${t('scan.next')}">${ICON.back.replace('M15 5l-7 7 7 7', 'M9 5l7 7-7 7')}</button>
+        </div>
+        <div class="scan-edit-tools">
+          <div class="scan-filters" role="group" aria-label="${t('scan.filter')}">
+            ${FILTERS.map((f) => `<button class="scan-filter" type="button" data-editfilter="${f}">${t('scan.filter.' + f)}</button>`).join('')}
+          </div>
+          <button class="primary-btn scan-apply" type="button" data-act="editApply">${ICON.check}${t('scan.apply')}</button>
+          <p class="scan-note">${t('scan.editNote')}</p>
+        </div>
       </div>
     </div>`;
 
@@ -98,73 +134,101 @@ export function createScanner(deps) {
     note: root.querySelector('[data-el="note"]'),
     count: root.querySelector('[data-el="count"]'),
     count2: root.querySelector('[data-el="count2"]'),
+    ring: root.querySelector('[data-el="ring"]'),
+    strip: root.querySelector('[data-el="strip"]'),
+    edit: root.querySelector('[data-el="edit"]'),
+    editStage: root.querySelector('[data-el="editStage"]'),
+    editImg: root.querySelector('[data-el="editImg"]'),
+    editOverlay: root.querySelector('[data-el="editOverlay"]'),
+    editTitle: root.querySelector('[data-el="editTitle"]'),
   };
   const torchBtn = root.querySelector('[data-act="torch"]');
-  const undoBtn = root.querySelector('[data-act="undo"]');
-  const doneBtn = root.querySelector('[data-act="done"]');
+  const autoBtn = root.querySelector('[data-act="auto"]');
 
-  function hatchQuad(w, h) {
+  function hatchQuad() {
     const inset = 0.08;
-    return [
-      [inset, inset],
-      [1 - inset, inset],
-      [1 - inset, 1 - inset],
-      [inset, 1 - inset],
-    ];
+    return [[inset, inset], [1 - inset, inset], [1 - inset, 1 - inset], [inset, 1 - inset]];
+  }
+
+  function drawQuadOn(canvas, q, color, fill, handles) {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (!w || !h || !q) return;
+    const ctx = canvas.getContext('2d');
+    if (!fill) ctx.clearRect(0, 0, w, h);
+    else {
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.beginPath();
+      q.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h)));
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.beginPath();
+    q.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h)));
+    ctx.closePath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.setLineDash(handles ? [] : [7, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (handles) {
+      for (const [x, y] of q) {
+        ctx.beginPath();
+        ctx.arc(x * w, y * h, 9, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.strokeStyle = '#1f4fa8';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    }
   }
 
   function drawOverlay() {
     const canvas = el.overlay;
-    const w = canvas.width;
-    const h = canvas.height;
-    if (!w || !h) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, w, h);
-    const drawQuad = (q, color, fill, handles) => {
-      if (!q) return;
-      ctx.beginPath();
-      q.forEach(([x, y], i) => (i ? ctx.lineTo(x * w, y * h) : ctx.moveTo(x * w, y * h)));
-      ctx.closePath();
-      if (fill) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-        ctx.fill();
-      }
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.setLineDash(fill ? [7, 5] : []);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      if (handles) {
-        for (const [x, y] of q) {
-          ctx.beginPath();
-          ctx.arc(x * w, y * h, 9, 0, Math.PI * 2);
-          ctx.fillStyle = '#fff';
-          ctx.fill();
-          ctx.strokeStyle = '#1f4fa8';
-          ctx.lineWidth = 3;
-          ctx.stroke();
-        }
-      }
-    };
-    if (suggested && quadDistance(suggested, quad) > 0.03) drawQuad(suggested, 'rgba(255,255,255,0.75)', true, false);
-    drawQuad(quad, '#8ec9ff', true, true);
+    if (!canvas.width) return;
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    if (suggested && (!quad || quadDistance(suggested, quad) > 0.03)) drawQuadOn(canvas, suggested, 'rgba(255,255,255,0.6)', true, false);
+    if (quad) drawQuadOn(canvas, quad, hold > 0.45 ? '#bfe8c9' : '#8ec9ff', true, true);
+  }
+
+  function sizeOverlay(canvas, host) {
+    const box = host.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(box.width));
+    canvas.height = Math.max(1, Math.round(box.height));
   }
 
   function resizeOverlay() {
-    const box = el.stage.getBoundingClientRect();
-    el.overlay.width = Math.max(1, Math.round(box.width));
-    el.overlay.height = Math.max(1, Math.round(box.height));
+    sizeOverlay(el.overlay, el.stage);
+    drawOverlay();
+    resizeEdit();
+  }
+
+  function setQuad(next, target = 'camera') {
+    const q = orderQuad(next).map(([x, y]) => [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))]);
+    if (target === 'edit' && editing >= 0) {
+      pages[editing].quad = q;
+      drawEdit();
+      return;
+    }
+    quad = q;
     drawOverlay();
   }
 
-  function setQuad(next) {
-    quad = orderQuad(next).map(([x, y]) => [Math.max(0, Math.min(1, x)), Math.max(0, Math.min(1, y))]);
-    drawOverlay();
+  function setHint(text, kind = '') {
+    el.hint.textContent = text || '';
+    el.hint.dataset.kind = kind;
+    el.hint.hidden = !text;
+  }
+
+  function paintRing() {
+    el.ring.style.setProperty('--p', hold.toFixed(3));
+    el.ring.classList.toggle('is-armed', hold > 0.05);
   }
 
   function detectFrame() {
-    if (!running || el.video.readyState < 2) return;
-    const max = 220;
+    if (!running || mode !== 'camera' || el.video.readyState < 2) return;
+    const max = 260;
     const vw = el.video.videoWidth || 640;
     const vh = el.video.videoHeight || 480;
     const long = Math.max(vw, vh);
@@ -175,25 +239,45 @@ export function createScanner(deps) {
     small.height = h;
     const ctx = small.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(el.video, 0, 0, w, h);
-    const data = ctx.getImageData(0, 0, w, h).data;
-    const found = autoQuad(data, w, h);
+    const found = autoQuad(ctx.getImageData(0, 0, w, h).data, w, h);
+
     if (!found) {
       suggested = null;
-      if (auto) history = [];
+      history = [];
+      hold = Math.max(0, hold - 0.2);
+      if (auto) quad = null;
+      setHint(auto ? t('scan.seek') : '');
+      paintRing();
       drawOverlay();
       return;
     }
-    suggested = smoothQuad(suggested, found, 0.4);
-    if (auto) {
-      quad = quad ? smoothQuad(quad, suggested, 0.16) : suggested.map((p) => [...p]);
-      history.push({ quad: quad.map((p) => [...p]), at: performance.now() });
-      if (history.length > 7) history.shift();
-      el.hint.textContent = steadyEnough(history) ? t('scan.hold') : t('scan.seek');
-      el.hint.hidden = !el.hint.textContent;
-      if (steadyEnough(history) && performance.now() - lastFire > 1500 && !busy) {
+
+    misses = 0;
+    suggested = smoothQuad(suggested, found.quad, 0.45);
+    if (!auto) {
+      setHint(t('scan.found'), 'found');
+      drawOverlay();
+      return;
+    }
+
+    const previous = quad;
+    quad = previous ? smoothQuad(previous, suggested, 0.2) : suggested.map((p) => [...p]);
+    const stable = !previous || quadDistance(previous, quad) < 0.014;
+    history.push({ quad: quad.map((p) => [...p]), at: performance.now(), score: found.score });
+    if (history.length > 8) history.shift();
+    hold = Math.max(0, Math.min(FIRE_AT, hold + (stable ? 0.23 : -0.18)));
+    paintRing();
+    if (hold >= FIRE_AT) {
+      setHint(t('scan.hold'), 'fire');
+      el.ring.classList.add('is-fire');
+      if (performance.now() - lastFire > COOLDOWN && !busy) {
         lastFire = performance.now();
+        hold = 0;
+        setTimeout(() => el.ring.classList.remove('is-fire'), 500);
         shoot();
       }
+    } else {
+      setHint(hold > 0.1 ? t('scan.hold') : t('scan.found'), hold > 0.1 ? 'hold' : 'found');
     }
     drawOverlay();
   }
@@ -205,7 +289,7 @@ export function createScanner(deps) {
         audio: false,
         video: { facingMode: { ideal: 'environment' }, width: { ideal: 2560 }, height: { ideal: 1440 } },
       });
-    } catch (err) {
+    } catch {
       el.fail.hidden = false;
       el.fail.innerHTML = `<p>${t('scan.noCamera')}</p><button class="reader-pill" type="button" data-act="close">${t('scan.close')}</button>`;
       return;
@@ -218,7 +302,6 @@ export function createScanner(deps) {
     el.stage.style.aspectRatio = `${vw} / ${vh}`;
     running = true;
     resizeOverlay();
-    quad = hatchQuad(el.overlay.width, el.overlay.height);
     const caps = track?.getCapabilities?.() || {};
     torchOk = Boolean(caps.torch);
     torchBtn.hidden = !torchOk;
@@ -230,10 +313,11 @@ export function createScanner(deps) {
         setTimeout(() => {
           detectTimer = 0;
           detectFrame();
-        }, 130);
+        }, 120);
       }
     };
     loop();
+    setHint(t('scan.seek'));
   }
 
   function stop() {
@@ -252,71 +336,178 @@ export function createScanner(deps) {
     el.video.srcObject = null;
   }
 
-  function updatePages() {
+  function renderStrip() {
     const n = pages.length;
-    undoBtn.hidden = !n;
-    doneBtn.hidden = !n;
+    root.querySelector('[data-act="undo"]').hidden = !n;
+    root.querySelector('[data-act="done"]').hidden = !n;
     el.count.textContent = String(n);
     el.count2.textContent = String(n);
+    el.strip.hidden = !n;
+    el.strip.innerHTML = pages
+      .map(
+        (p, i) => `<button class="scan-thumb ${i === editing ? 'is-current' : ''}" type="button" data-page="${i}" aria-label="${t('scan.pageN', { n: i + 1 })}"><img src="${p.thumb || p.raw}" alt="" /></button>`,
+      )
+      .join('');
     el.scan.classList.toggle('has-pages', n > 0);
   }
 
-  async function shoot() {
-    if (busy || !running) return;
-    busy = true;
-    el.scan.classList.add('is-busy');
-    try {
-      const frame = grabFrame(el.video, 2200);
-      const sw = frame.width;
-      const sh = frame.height;
-      const q = quadToPixels(quad || hatchQuad(1, 1), sw, sh);
-      const [ow, oh] = outputSize(q);
-      const src = frame.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, sw, sh).data;
-      const warped = warpPixels(src, sw, sh, q, ow, oh);
-      if (!warped) throw new Error('warp');
-      const filtered = applyFilter(warped, ow, oh, filter);
+  /** Render one page through its quad and filter at a working size. */
+  function renderPage(page, maxEdge) {
+    const img = new Image();
+    img.src = page.raw;
+    return img.decode().then(() => {
+      const sw = img.naturalWidth;
+      const sh = img.naturalHeight;
+      const q = quadToPixels(page.quad || hatchQuad(), sw, sh);
+      const [ow, oh] = outputSize(q, maxEdge);
+      const srcCanvas = document.createElement('canvas');
+      srcCanvas.width = sw;
+      srcCanvas.height = sh;
+      const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
+      sctx.drawImage(img, 0, 0);
+      const warped = warpPixels(sctx.getImageData(0, 0, sw, sh).data, sw, sh, q, ow, oh);
       const out = document.createElement('canvas');
       out.width = ow;
       out.height = oh;
-      out.getContext('2d').putImageData(new ImageData(filtered, ow, oh), 0, 0);
-      pages.push(out.toDataURL('image/jpeg', 0.92));
-      updatePages();
+      out.getContext('2d').putImageData(new ImageData(applyFilter(warped, ow, oh, page.filter), ow, oh), 0, 0);
+      return out;
+    });
+  }
+
+  async function makeThumb(index) {
+    const page = pages[index];
+    if (!page) return;
+    try {
+      const canvas = await renderPage(page, 260);
+      page.thumb = canvas.toDataURL('image/jpeg', 0.7);
+      if (mode === 'camera') renderStrip();
+    } catch {
+      /* a thumb is not worth blocking on */
+    }
+  }
+
+  async function shoot() {
+    if (busy || !running || mode !== 'camera') return;
+    busy = true;
+    el.scan.classList.add('is-busy');
+    try {
+      const frame = grabFrame(el.video, 2400);
+      const page = { raw: frame.toDataURL('image/jpeg', 0.94), quad: (quad || hatchQuad()).map((p) => [...p]), filter, thumb: '' };
+      pages.push(page);
+      renderStrip();
+      makeThumb(pages.length - 1);
       history = [];
       if (navigator.vibrate) navigator.vibrate(25);
-      el.hint.textContent = t('scan.taken');
-      el.hint.hidden = false;
+      setHint(t('scan.taken'), 'found');
       setTimeout(() => {
-        if (!busy) el.hint.hidden = true;
-      }, 1200);
+        if (mode === 'camera' && !busy) setHint(auto ? t('scan.seek') : '');
+      }, 1100);
     } catch {
       el.fail.hidden = false;
       el.fail.innerHTML = `<p>${t('scan.failed')}</p>`;
     }
     busy = false;
     el.scan.classList.remove('is-busy');
-    if (quad && auto) history = [];
+  }
+
+  function openEdit(index) {
+    if (!pages[index]) return;
+    editing = index;
+    mode = 'edit';
+    el.scan.classList.add('is-editing');
+    el.edit.hidden = false;
+    const page = pages[index];
+    el.editImg.src = page.raw;
+    el.editImg.style.filter = PREVIEW[page.filter] || 'none';
+    el.editTitle.textContent = t('scan.pageN', { n: index + 1 });
+    if (!page.quad) page.quad = hatchQuad();
+    el.edit.querySelectorAll('[data-editfilter]').forEach((b) => b.classList.toggle('is-on', b.dataset.editfilter === page.filter));
+    el.editImg.decode().then(() => {
+      el.editStage.style.aspectRatio = `${el.editImg.naturalWidth} / ${el.editImg.naturalHeight}`;
+      resizeEdit();
+      const fit = el.edit.querySelector('[data-act="editPrev"]');
+      fit.hidden = index === 0;
+      el.edit.querySelector('[data-act="editNext"]').hidden = index === pages.length - 1;
+    });
+    history = [];
+  }
+
+  function resizeEdit() {
+    if (el.edit.hidden) return;
+    sizeOverlay(el.editOverlay, el.editStage);
+    drawEdit();
+  }
+
+  function drawEdit() {
+    const page = pages[editing];
+    if (!page) return;
+    el.editOverlay.getContext('2d').clearRect(0, 0, el.editOverlay.width, el.editOverlay.height);
+    drawQuadOn(el.editOverlay, page.quad, '#8ec9ff', true, true);
+  }
+
+  function applyEdit() {
+    if (editing < 0) return;
+    const page = pages[editing];
+    page.filter = el.edit.querySelector('.scan-filter.is-on')?.dataset.editfilter || 'clean';
+    makeThumb(editing);
+    const next = editing + 1;
+    if (next < pages.length) openEdit(next);
+    else closeEdit();
+  }
+
+  function closeEdit() {
+    mode = 'camera';
+    editing = -1;
+    el.edit.hidden = true;
+    el.scan.classList.remove('is-editing');
+    hold = 0;
+    paintRing();
+    renderStrip();
+    setHint(auto ? t('scan.seek') : '');
+    const box = el.stage.getBoundingClientRect();
+    if (box.width) sizeOverlay(el.overlay, el.stage);
+    drawOverlay();
+  }
+
+  function deleteEditing() {
+    if (editing < 0) return;
+    pages.splice(editing, 1);
+    if (!pages.length) {
+      closeEdit();
+      return;
+    }
+    openEdit(Math.min(editing, pages.length - 1));
   }
 
   async function finish() {
     if (!pages.length) return close();
-    const files = await Promise.all(
-      pages.map(async (url, i) => {
-        const blob = await (await fetch(url)).blob();
-        return new File([blob], `scan-${String(i + 1).padStart(2, '0')}.jpg`, { type: 'image/jpeg' });
-      }),
-    );
+    const files = [];
+    for (let i = 0; i < pages.length; i += 1) {
+      try {
+        const canvas = await renderPage(pages[i], 2200);
+        const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.92));
+        files.push(new File([blob], `scan-${String(i + 1).padStart(2, '0')}.jpg`, { type: 'image/jpeg' }));
+      } catch {
+        /* skip a bad page rather than lose the rest */
+      }
+    }
     const stamp = new Date();
     const title = `Scan ${stamp.toLocaleDateString()} ${stamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     stop();
     el.scan.hidden = true;
+    pages.length = 0;
+    renderStrip();
     deps.onSave?.(files, title);
   }
 
   function close() {
     stop();
     el.scan.hidden = true;
+    el.edit.hidden = true;
     pages.length = 0;
-    updatePages();
+    mode = 'camera';
+    editing = -1;
+    renderStrip();
     deps.onClose?.();
   }
 
@@ -331,16 +522,16 @@ export function createScanner(deps) {
     }
   }
 
-  /* Corner dragging: four generous handles over the overlay. */
+  /* Corner dragging, on whichever canvas is in front. */
   let drag = null;
-  function near(event) {
-    const box = el.overlay.getBoundingClientRect();
+  function near(event, canvas, q) {
+    const box = canvas.getBoundingClientRect();
     const x = (event.clientX - box.left) / box.width;
     const y = (event.clientY - box.top) / box.height;
-    if (!quad) return -1;
+    if (!q) return -1;
     let best = -1;
-    let bestD = 0.08;
-    quad.forEach((p, i) => {
+    let bestD = 0.09;
+    q.forEach((p, i) => {
       const d = Math.hypot(p[0] - x, p[1] - y);
       if (d < bestD) {
         best = i;
@@ -350,37 +541,68 @@ export function createScanner(deps) {
     return best;
   }
 
+  function wireDrag(canvas, getter, setter) {
+    canvas.addEventListener('pointerdown', (event) => {
+      const q = getter();
+      const i = near(event, canvas, q);
+      if (i < 0) return;
+      event.preventDefault();
+      drag = i;
+      if (mode === 'camera') {
+        auto = false;
+        autoBtn.classList.remove('is-on');
+        autoBtn.setAttribute('aria-pressed', 'false');
+        hold = 0;
+        paintRing();
+      }
+      canvas.setPointerCapture?.(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (drag == null) return;
+      const box = canvas.getBoundingClientRect();
+      const q = getter().map((p) => [...p]);
+      q[drag] = [Math.max(0, Math.min(1, (event.clientX - box.left) / box.width)), Math.max(0, Math.min(1, (event.clientY - box.top) / box.height))];
+      setter(orderQuad(q));
+    });
+    const end = () => {
+      drag = null;
+      history = [];
+    };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+  }
+
+  wireDrag(el.overlay, () => quad || hatchQuad(), (q) => setQuad(q, 'camera'));
+  wireDrag(el.editOverlay, () => pages[editing]?.quad || hatchQuad(), (q) => setQuad(q, 'edit'));
+
+  // With auto off, a tap on the page is the shutter.
+  let tapAt = null;
   el.overlay.addEventListener('pointerdown', (event) => {
-    const i = near(event);
-    if (i < 0) return;
-    event.preventDefault();
-    drag = i;
-    auto = false;
-    el.scan.querySelector('[data-act="auto"]').classList.remove('is-on');
-    el.overlay.setPointerCapture?.(event.pointerId);
+    tapAt = { x: event.clientX, y: event.clientY };
   });
-  el.overlay.addEventListener('pointermove', (event) => {
-    if (drag == null) return;
-    const box = el.overlay.getBoundingClientRect();
-    const next = quad.map((p) => [...p]);
-    next[drag] = [Math.max(0, Math.min(1, (event.clientX - box.left) / box.width)), Math.max(0, Math.min(1, (event.clientY - box.top) / box.height))];
-    quad = orderQuad(next);
-    drawOverlay();
+  el.overlay.addEventListener('pointerup', (event) => {
+    if (!tapAt) return;
+    const moved = Math.hypot(event.clientX - tapAt.x, event.clientY - tapAt.y);
+    tapAt = null;
+    if (moved < 8 && !auto && mode === 'camera' && quad) shoot();
   });
-  const endDrag = () => {
-    drag = null;
-    history = [];
-  };
-  el.overlay.addEventListener('pointerup', endDrag);
-  el.overlay.addEventListener('pointercancel', endDrag);
 
   root.addEventListener('click', (event) => {
-    const btn = event.target.closest('[data-act], [data-filter]');
+    const btn = event.target.closest('[data-act], [data-filter], [data-editfilter], [data-page]');
     if (!btn || el.scan.hidden) return;
+    if (btn.dataset.page) return openEdit(Number(btn.dataset.page));
     if (btn.dataset.filter) {
       filter = btn.dataset.filter;
       root.querySelectorAll('[data-filter]').forEach((b) => b.classList.toggle('is-on', b === btn));
       el.video.style.filter = PREVIEW[filter] || 'none';
+      return;
+    }
+    if (btn.dataset.editfilter) {
+      const page = pages[editing];
+      if (!page) return;
+      page.filter = btn.dataset.editfilter;
+      el.editImg.style.filter = PREVIEW[page.filter] || 'none';
+      el.edit.querySelectorAll('[data-editfilter]').forEach((b) => b.classList.toggle('is-on', b === btn));
       return;
     }
     switch (btn.dataset.act) {
@@ -390,18 +612,34 @@ export function createScanner(deps) {
         return shoot();
       case 'done':
         return finish();
+      case 'review':
+        return pages.length ? openEdit(0) : null;
       case 'undo':
         pages.pop();
-        updatePages();
+        renderStrip();
         return;
       case 'torch':
         return toggleTorch();
       case 'auto':
         auto = !auto;
-        btn.classList.toggle('is-on', auto);
-        btn.setAttribute('aria-pressed', String(auto));
+        autoBtn.classList.toggle('is-on', auto);
+        autoBtn.setAttribute('aria-pressed', String(auto));
+        hold = 0;
         history = [];
-        el.hint.hidden = true;
+        paintRing();
+        setHint(auto ? t('scan.seek') : '');
+        return;
+      case 'editBack':
+        return closeEdit();
+      case 'editApply':
+        return applyEdit();
+      case 'editDelete':
+        return deleteEditing();
+      case 'editPrev':
+        if (editing > 0) openEdit(editing - 1);
+        return;
+      case 'editNext':
+        if (editing < pages.length - 1) openEdit(editing + 1);
         return;
       default:
     }
@@ -411,26 +649,29 @@ export function createScanner(deps) {
     if (!el.scan.hidden) resizeOverlay();
   });
 
+  renderStrip();
 
   const api = {
     async open() {
       el.scan.hidden = false;
       el.video.style.filter = PREVIEW[filter] || 'none';
-      updatePages();
+      renderStrip();
       await start();
-      if (running && !quad) quad = hatchQuad(1, 1);
     },
     close,
     stop,
-    // Test hooks; harmless in the app.
     get pages() {
       return pages.length;
     },
     setQuad,
     shoot,
     finish,
+    openEdit,
     get running() {
       return running;
+    },
+    get mode() {
+      return mode;
     },
   };
   window.__scanner = api;
