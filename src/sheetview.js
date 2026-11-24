@@ -14,15 +14,17 @@
 // MusicXML, and `tempoaudio.js` for the stretch. The mechanics are the same;
 // none of that app's code or art is copied.
 
-import * as Lib from './sheetlib.js?v=202611240400';
-import { renderStretched } from './tempoaudio.js?v=202611240400';
-import { loadOsmd } from './listenview.js?v=202611240400';
-import { t } from './i18n.js?v=202611240400';
-import { readScoreFile } from './musicxml.js?v=202611240400';
+import * as Lib from './sheetlib.js?v=202611240600';
+import { renderStretched } from './tempoaudio.js?v=202611240600';
+import { loadOsmd } from './listenview.js?v=202611240600';
+import { t } from './i18n.js?v=202611240600';
+import { readScoreFile } from './musicxml.js?v=202611240600';
+import * as Dropbox from './dropbox.js?v=202611240500';
+import * as Keys from './sheetkeys.js?v=202611240500';
 
 const PDF_VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
-const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240400';
-const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611240400';
+const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240600';
+const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611240600';
 const PDF_ASSETS = PDF_VENDOR;
 const MAX_DPR = 2;
 const INK = '#1f4fa8';
@@ -51,6 +53,11 @@ const ICON = {
   undo: svg('<path d="M9 7L4.5 11.5 9 16"/><path d="M5 11.5h9a5 5 0 0 1 0 10h-2"/>'),
   close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   music: svg('<path d="M9 17.5V6l10-2v11.5"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>', ' stroke-width="1.5"'),
+  cloud: svg('<path d="M7 18h9.5a3.5 3.5 0 0 0 .4-7A5.5 5.5 0 0 0 6.4 9.3 4.2 4.2 0 0 0 7 18z"/>'),
+  folder: svg('<path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/>'),
+  file: svg('<path d="M6 3.5h8l4 4V20.5H6z"/><path d="M14 3.5v4h4"/>'),
+  upload: svg('<path d="M12 16V5M7.5 9.5L12 5l4.5 4.5"/><path d="M4.5 19h15"/>'),
+  key: svg('<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 12h.01M11 12h.01M15 12h.01"/>'),
 };
 
 const esc = (s) =>
@@ -94,6 +101,9 @@ export function createSheetView(deps) {
   let inkPages = {};
   let audioTracks = [];
   let readerOpen = false;
+  let keyMap = Keys.loadMap();
+  let learning = null;
+  let cloudReady = false;
 
   root.innerHTML = `
     <button class="back-btn" type="button" data-act="back"><span aria-hidden="true">←</span> ${t('sheet.back')}</button>
@@ -102,7 +112,10 @@ export function createSheetView(deps) {
         <h2>${t('sheet.title')}</h2>
         <p class="subtle sheet-lead">${t('sheet.lead')}</p>
       </div>
-      <button class="primary-btn sheet-import" type="button" data-act="import">${t('sheet.import')}</button>
+      <div class="sheet-head-actions">
+        <button class="sheet-cloud-btn" type="button" data-act="cloud">${ICON.cloud}${t('sheet.cloud')}</button>
+        <button class="primary-btn sheet-import" type="button" data-act="import">${t('sheet.import')}</button>
+      </div>
     </div>
     <div class="sheet-tools">
       <input class="sheet-search" type="search" placeholder="${t('sheet.search')}" aria-label="${t('sheet.search')}" />
@@ -114,6 +127,7 @@ export function createSheetView(deps) {
       accept=".pdf,application/pdf,.musicxml,.xml,.mxl,application/vnd.recordare.musicxml+xml,image/*" />
     <input class="sheet-audio-file" type="file" multiple hidden accept="audio/*" />
     <div class="reader" data-el="reader" hidden></div>
+    <div class="cloud" data-el="cloud" hidden></div>
     <div class="sheet-toast" data-el="toast" hidden></div>`;
 
   const shelfEl = root.querySelector('[data-el="shelf"]');
@@ -380,6 +394,241 @@ export function createSheetView(deps) {
     if (first) openSheet(first);
   }
 
+  /* ── Dropbox ─────────────────────────────────────────────────────────── */
+
+  const cloudEl = root.querySelector('[data-el="cloud"]');
+  let cloudPath = '';
+  let cloudBusy = false;
+  let cloudTicket = 0;
+  let cloudAutoOpen = false;
+
+  function cloudClose() {
+    cloudEl.hidden = true;
+    cloudEl.innerHTML = '';
+  }
+
+  function cloudBox(titleKey, body) {
+    cloudEl.innerHTML = `
+      <div class="cloud-box" role="dialog" aria-modal="true" aria-labelledby="cloudTitle">
+        <div class="cloud-head">
+          <span class="cloud-mark" aria-hidden="true">${ICON.cloud}</span>
+          <h3 id="cloudTitle">${t(titleKey)}</h3>
+          <button class="reader-icon-btn" type="button" data-act="cloudClose" aria-label="${t('sheet.done')}" title="${t('sheet.done')}">${ICON.close}</button>
+        </div>
+        ${body}
+      </div>`;
+    cloudEl.hidden = false;
+  }
+
+  function cloudNote(text) {
+    return `<p class="cloud-note subtle">${text}</p>`;
+  }
+
+  async function cloudOpen() {
+    if (!Dropbox.saved()?.appKey) return cloudSetup();
+    if (!Dropbox.isConnected()) return cloudSignIn();
+    return cloudBrowse(cloudPath);
+  }
+
+  function cloudSetup() {
+    const redirect = Dropbox.redirectUri();
+    cloudBox(
+      'sheet.cloudSetup',
+      `
+      <p class="cloud-lead">${t('sheet.cloudSetupLead')}</p>
+      <ol class="cloud-steps">
+        <li>${t('sheet.cloudStepApp')}</li>
+        <li>${t('sheet.cloudStepScopes')}</li>
+        <li>${t('sheet.cloudStepRedirect', { url: `<code class="cloud-url">${esc(redirect)}</code>` })}</li>
+      </ol>
+      <div class="cloud-row">
+        <a class="reader-pill" href="${Dropbox.CONSOLE_URL}" target="_blank" rel="noopener noreferrer">${t('sheet.cloudConsole')}</a>
+        <button class="reader-pill" type="button" data-act="cloudCopy">${t('sheet.cloudCopy')}</button>
+      </div>
+      <label class="cloud-field">
+        <span>${t('sheet.cloudKey')}</span>
+        <input data-el="appkey" autocomplete="off" spellcheck="false" placeholder="xxxxxxxxxxxxxxx" value="${esc(Dropbox.saved()?.appKey || '')}" />
+      </label>
+      <div class="cloud-row">
+        <button class="primary-btn" type="button" data-act="cloudSaveKey">${t('sheet.cloudSaveKey')}</button>
+      </div>
+      ${cloudNote(t('sheet.cloudNote'))}`,
+    );
+    cloudEl.querySelector('[data-el="appkey"]')?.focus();
+  }
+
+  function cloudSignIn() {
+    cloudBox(
+      'sheet.cloud',
+      `
+      <p class="cloud-lead">${t('sheet.cloudSignInLead')}</p>
+      ${cloudNote(t('sheet.cloudSignInNote'))}
+      <div class="cloud-row">
+        <button class="primary-btn" type="button" data-act="cloudConnect">${t('sheet.cloudConnect')}</button>
+        <button class="reader-pill" type="button" data-act="cloudForgetKey">${t('sheet.cloudChangeKey')}</button>
+      </div>`,
+    );
+  }
+
+  async function cloudBrowse(path) {
+    const ticket = ++cloudTicket;
+    cloudPath = path || '';
+    cloudBox(
+      'sheet.cloud',
+      `${cloudBusy ? `<p class="cloud-note subtle">${t('sheet.cloudLoading')}</p>` : ''}
+      <div class="cloud-crumbs">
+        <button class="reader-icon-btn" type="button" data-act="cloudUp" ${cloudPath ? '' : 'disabled'} aria-label="${t('sheet.cloudUp')}">${ICON.back}</button>
+        <code>/Dropbox${esc(cloudPath)}</code>
+        <button class="reader-icon-btn" type="button" data-act="cloudSignOut" aria-label="${t('sheet.cloudSignOut')}" title="${t('sheet.cloudSignOut')}">${ICON.close}</button>
+      </div>
+      <div class="cloud-list" data-el="cloudList">${cloudBusy ? '' : `<p class="cloud-note subtle">${t('sheet.cloudLoading')}</p>`}</div>
+      ${cloudNote(sheet ? t('sheet.cloudAudioOpen') : t('sheet.cloudPickPiece'))}`,
+    );
+    cloudBusy = true;
+    try {
+      const entries = await Dropbox.listFolder(cloudPath);
+      if (ticket !== cloudTicket) return;
+      cloudBusy = false;
+      const list = cloudEl.querySelector('[data-el="cloudList"]');
+      if (!list) return;
+      list.innerHTML = entries.length
+        ? entries
+            .map((entry) => {
+              const folder = entry['.tag'] === 'folder';
+              const audio = !folder && Dropbox.isAudioName(entry.name);
+              return `
+            <div class="cloud-item">
+              <button class="cloud-item-go" type="button" data-act="${folder ? 'cloudDir' : audio ? 'cloudAudio' : 'cloudGet'}"
+                data-path="${esc(Dropbox.joinPath(cloudPath, entry.name))}" data-name="${esc(entry.name)}">
+                <span class="cloud-item-icon ${folder ? 'is-folder' : audio ? 'is-audio' : ''}">${folder ? ICON.folder : audio ? ICON.note : ICON.file}</span>
+                <span class="cloud-item-name">${esc(entry.name)}</span>
+                <span class="cloud-item-size">${folder ? '' : esc(sizeLabel(entry.size))}</span>
+                ${folder ? '' : `<span class="cloud-item-act">${audio ? t('sheet.cloudUseTrack') : t('sheet.cloudImport')}</span>`}
+              </button>
+            </div>`;
+            })
+            .join('')
+        : `<p class="cloud-note subtle">${t('sheet.cloudEmpty')}</p>`;
+      if (cloudPath && !cloudEl.querySelector('[data-act="cloudUp"]:not([disabled])')) cloudSignIn();
+    } catch (err) {
+      cloudBusy = false;
+      const list = cloudEl.querySelector('[data-el="cloudList"]');
+      if (list) list.innerHTML = `<p class="cloud-note is-error">${esc(cloudError(err))}</p>`;
+      return;
+    }
+    cloudBusy = false;
+  }
+
+  function sizeLabel(bytes) {
+    const n = Number(bytes) || 0;
+    if (!n) return '';
+    if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function cloudError(err) {
+    const code = err && err.code;
+    if (code === 'signed-out') return t('sheet.cloudExpired');
+    if (code === 'expired') return t('sheet.cloudExpired');
+    if (code === 'network') return t('sheet.cloudNetwork');
+    if (code === 'path') return t('sheet.cloudNotFound');
+    return t('sheet.cloudFailed');
+  }
+
+  async function cloudImport(path, name, audio) {
+    cloudBusy = true;
+    const list = cloudEl.querySelector('[data-el="cloudList"]');
+    if (list) list.innerHTML = `<p class="cloud-note subtle">${t('sheet.cloudDownloading', { name })}</p>`;
+    try {
+      const blob = await Dropbox.download(path);
+      const file = new File([blob], name, { type: blob.type || '' });
+      if (audio) {
+        if (!sheet) {
+          toast(t('sheet.cloudNeedPiece'));
+        } else {
+          await importAudio(file);
+          toast(t('sheet.audioAdded'));
+          cloudClose();
+        }
+        cloudBusy = false;
+        return;
+      }
+      cloudBusy = false;
+      cloudClose();
+      await importFiles([file]);
+    } catch (err) {
+      cloudBusy = false;
+      if (list) list.innerHTML = `<p class="cloud-note is-error">${esc(cloudError(err))}</p>`;
+    }
+  }
+
+  async function copyRedirect() {
+    const url = Dropbox.redirectUri();
+    try {
+      await navigator.clipboard.writeText(url);
+      toast(t('sheet.cloudCopied'));
+    } catch {
+      toast(url);
+    }
+  }
+
+  async function cloudConnect() {
+    const appKey = String(Dropbox.saved()?.appKey || '').trim();
+    if (!appKey) return cloudSetup();
+    const verifier = Dropbox.randomVerifier();
+    const state = Dropbox.randomVerifier(24);
+    const challenge = await Dropbox.challengeFor(verifier);
+    try {
+      sessionStorage.setItem('scaleStudio.dropboxPkce', JSON.stringify({ verifier, state, at: Date.now() }));
+    } catch {
+      /* private mode — the state check just falls back */
+    }
+    location.assign(Dropbox.authUrl({ appKey, redirect: Dropbox.redirectUri(), challenge, state }));
+  }
+
+  /** Back from Dropbox: check the state, exchange the code, clean the address. */
+  async function cloudCallback() {
+    const cb = Dropbox.parseCallback(location.search);
+    if (!cb.code && !cb.error) return false;
+    let pending = null;
+    try {
+      pending = JSON.parse(sessionStorage.getItem('scaleStudio.dropboxPkce') || 'null');
+      sessionStorage.removeItem('scaleStudio.dropboxPkce');
+    } catch {
+      pending = null;
+    }
+    const clean = () => {
+      const url = new URL(location.href);
+      url.search = '';
+      history.replaceState(null, '', url);
+    };
+    if (cb.error) {
+      clean();
+      toast(cb.description || t('sheet.cloudDenied'));
+      return true;
+    }
+    if (!pending || (cb.state && pending.state !== cb.state) || !Dropbox.saved()?.appKey) {
+      clean();
+      toast(t('sheet.cloudState'));
+      return true;
+    }
+    try {
+      await Dropbox.exchange({
+        code: cb.code,
+        verifier: pending.verifier,
+        appKey: Dropbox.saved().appKey,
+        redirect: Dropbox.redirectUri(),
+      });
+      clean();
+      toast(t('sheet.cloudConnected'));
+      cloudAutoOpen = true;
+    } catch {
+      clean();
+      toast(t('sheet.cloudToken'));
+    }
+    return true;
+  }
+
   /* ── The reader ──────────────────────────────────────────────────────── */
 
   let doc = null;
@@ -426,6 +675,7 @@ export function createSheetView(deps) {
       <input class="reader-slider reader-range" data-el="slider" type="range" min="1" max="1" value="1" aria-label="${t('sheet.page')}" />
       <span class="reader-pageno" data-el="pageno"></span>
       <button class="reader-btn" type="button" data-act="next" aria-label="${t('sheet.next')}" title="${t('sheet.next')}">${ICON.next}</button>
+      <span class="reader-key" data-el="lastkey" hidden></span>
       <span class="reader-foot-gap" aria-hidden="true"></span>
       <div class="reader-zoom" role="group">
         <button class="reader-btn" type="button" data-act="zoomOut" aria-label="${t('sheet.zoomOut')}" title="${t('sheet.zoomOut')}">${ICON.minus}</button>
@@ -454,6 +704,7 @@ export function createSheetView(deps) {
     hint: readerEl.querySelector('[data-el="hint"]'),
     slider: readerEl.querySelector('[data-el="slider"]'),
     pageno: readerEl.querySelector('[data-el="pageno"]'),
+    lastkey: readerEl.querySelector('[data-el="lastkey"]'),
     inkbar: readerEl.querySelector('[data-el="inkbar"]'),
     panel: readerEl.querySelector('[data-el="panel"]'),
   });
@@ -1037,8 +1288,36 @@ ${head('sheet.settings')}
             .join('')}
         </div>
         <button class="reader-pill" type="button" data-act="cropReset">${t('sheet.crop.reset')}</button>
-      </details>`;
+      </details>
+      <details class="reader-keys" ${learning ? 'open' : ''}>
+        <summary>${ICON.key}${t('sheet.turner')}</summary>
+        <p class="subtle reader-note">${t('sheet.turnerNote')}</p>
+        ${Keys.ACTIONS.map(
+          (action) => `
+          <div class="reader-keyrow" data-keyrow="${action}">
+            <span>${t('sheet.turn.' + action)}</span>
+            <span class="reader-keychips">${(keyMap[action] || []).map((k) => `<kbd>${esc(Keys.keyLabel(k))}</kbd>`).join('')}</span>
+            <button class="reader-pill ${learning === action ? 'is-on' : ''}" type="button" data-act="learn" data-action="${action}">
+              ${learning === action ? t('sheet.pressKey') : t('sheet.change')}
+            </button>
+          </div>`,
+        ).join('')}
+        <div class="reader-row">
+          <button class="reader-pill" type="button" data-act="keysReset">${t('sheet.turnerReset')}</button>
+          <span class="reader-key-live" data-el="learned">${t('sheet.turnerLast')} <b>—</b></span>
+        </div>
+      </details>
+`;
     paintRanges();
+  }
+
+  async function addBookmark() {
+    if (!sheet) return;
+    const name = window.prompt(t('sheet.bookmarkName'), t('sheet.pageN', { n: page }));
+    if (name === null) return;
+    sheet.bookmarks = [...(sheet.bookmarks || []), { id: `p${page}-${Lib.uid()}`, page, name: name.trim() || t('sheet.pageN', { n: page }) }];
+    await Lib.saveSheet(sheet).catch(() => {});
+    renderBookmarks();
   }
 
   function renderBookmarks() {
@@ -1559,6 +1838,38 @@ ${head('sheet.audio')}
         if (readerOpen) showShelf();
         else deps.onBack?.();
         return;
+      case 'cloud':
+        return cloudOpen();
+      case 'cloudClose':
+        return cloudClose();
+      case 'cloudCopy':
+        return copyRedirect();
+      case 'cloudSaveKey': {
+        const key = cloudEl.querySelector('[data-el="appkey"]')?.value.trim();
+        if (!key) return;
+        Dropbox.saveAppKey(key);
+        toast(t('sheet.cloudKeySaved'));
+        return cloudSignIn();
+      }
+      case 'cloudConnect':
+        return cloudConnect();
+      case 'cloudForgetKey':
+        Dropbox.forget();
+        return cloudSetup();
+      case 'cloudSignOut':
+        Dropbox.forget();
+        return cloudSignIn();
+      case 'cloudUp':
+        return cloudBrowse(Dropbox.parentPath(cloudPath));
+      case 'cloudDir':
+        return cloudBrowse(btn.dataset.path);
+      case 'cloudGet':
+        return cloudImport(btn.dataset.path, btn.dataset.name, false);
+      case 'cloudAudio':
+        return cloudImport(btn.dataset.path, btn.dataset.name, true);
+      case 'learn':
+        learning = btn.dataset.action;
+        return renderSettings();
       case 'import':
         fileEl.click();
         return;
@@ -1608,15 +1919,11 @@ ${head('sheet.audio')}
         return;
       case 'closePanel':
         return closePanel();
-      case 'bookmarkPage': {
-        if (!sheet) return;
-        const name = window.prompt(t('sheet.bookmarkName'), t('sheet.pageN', { n: page }));
-        if (name === null) return;
-        sheet.bookmarks = [...(sheet.bookmarks || []), { id: `p${page}-${Lib.uid()}`, page, name: name.trim() || t('sheet.pageN', { n: page }) }];
-        await Lib.saveSheet(sheet).catch(() => {});
-        renderBookmarks();
-        return;
-      }
+      case 'keysReset':
+        keyMap = Keys.resetMap();
+        return renderSettings();
+      case 'bookmarkPage':
+        return addBookmark();
       case 'cropReset':
         sheet.settings.crop = { l: 0, r: 0, t: 0, b: 0 };
         await Lib.saveSheet(sheet).catch(() => {});
@@ -1870,22 +2177,74 @@ ${head('sheet.audio')}
     { passive: false },
   );
 
-  refs.stage.addEventListener('keydown', (event) => {
-    if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+  let keyTimer = 0;
+  function flashKey(label) {
+    if (!refs.lastkey) return;
+    refs.panel.querySelector('[data-el="learned"] b')?.replaceChildren(document.createTextNode(label));
+    refs.lastkey.textContent = label;
+    refs.lastkey.hidden = false;
+    clearTimeout(keyTimer);
+    keyTimer = setTimeout(() => {
+      refs.lastkey.hidden = true;
+    }, 1600);
+  }
+
+  const KEY_ACTION = {
+    prev: () => step(-1),
+    next: () => step(1),
+    first: () => goTo(1),
+    last: () => goTo(sheet?.pageCount || 1),
+    bookmark: () => addBookmark(),
+    audio: () => {
+      ensureAudio();
+      togglePanel('audio');
+    },
+  };
+
+  /**
+   * Pedals, keyboards and remotes all arrive here. The listener is on the
+   * document, not the page, so a pedal press works wherever the focus sits —
+   * and it is captured, so a button's own Space handling does not eat it.
+   */
+  function onKey(event) {
+    if (!readerOpen) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const key = Keys.normalKey(event);
+    if (learning) {
       event.preventDefault();
-      step(1);
-    } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
-      event.preventDefault();
-      step(-1);
-    } else if (event.key === 'Escape') {
+      if (key !== 'Escape') {
+        keyMap = Keys.assign(keyMap, learning, key);
+        Keys.saveMap(keyMap);
+      }
+      learning = null;
+      renderSettings();
+      flashKey(Keys.keyLabel(key));
+      return;
+    }
+    if (key === 'Escape') {
       if (!refs.panel.hidden) closePanel();
       else if (tool) {
         refs.inkbar.hidden = true;
         setTool(null);
       } else showShelf();
-    } else if (event.key === '+' || event.key === '=') setZoom(zoom * 1.2);
-    else if (event.key === '-') setZoom(zoom / 1.2);
-  });
+      return;
+    }
+    if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      return setZoom(zoom * 1.2);
+    }
+    if (event.key === '-') {
+      event.preventDefault();
+      return setZoom(zoom / 1.2);
+    }
+    const action = Keys.actionFor(key, keyMap);
+    if (!action) return;
+    event.preventDefault();
+    flashKey(Keys.keyLabel(key));
+    (KEY_ACTION[action] || (() => {}))();
+  }
+  document.addEventListener('keydown', onKey, true);
+
 
   const onResize = () => {
     if (readerOpen) {
@@ -1902,10 +2261,23 @@ ${head('sheet.audio')}
   // app must not sit inside the page's animated, padded shell.
   document.body.appendChild(readerEl);
 
+  cloudEl.addEventListener('click', (event) => {
+    if (event.target === cloudEl) cloudClose();
+  });
+
   /* ── What the app calls ──────────────────────────────────────────────── */
 
   return {
     open() {
+      if (!cloudReady) {
+        cloudReady = true;
+        cloudCallback().then((handled) => {
+          if (handled && cloudAutoOpen) cloudOpen();
+        });
+      } else if (cloudAutoOpen) {
+        cloudAutoOpen = false;
+        cloudOpen();
+      }
       showShelf();
       deps.onViewChange?.();
     },

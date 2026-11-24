@@ -31,6 +31,40 @@ piece; clearing the site's data does.
   loop, and a click track. Speed (0.5–1.5×) keeps the pitch and pitch (±12
   semitones, semitone steps) keeps the speed. Tracks can start with the page.
 
+## Dropbox
+
+**Cloud** on the shelf browses Dropbox and downloads a piece or an audio track
+into the local shelf. Files are copied to the device; the app still works with
+Dropbox closed afterwards.
+
+The page is static, so the sign-in uses Dropbox's own recommendation for that
+case: OAuth with PKCE, read-only scopes (`files.metadata.read`,
+`files.content.read`), no client secret. One Dropbox app has to exist, and its
+key is public and typed into the app once:
+
+1. Open the [App Console](https://www.dropbox.com/developers/apps), create an app,
+   choose **Scoped access** and **Full Dropbox**.
+2. On **Permissions**, tick `files.metadata.read` and `files.content.read`, then
+   Submit. In **Settings**, turn on **Allow public clients**.
+3. Copy the address the setup panel shows into **Redirect URIs** (it is this page
+   without a query — `http://localhost:8777/` while testing, the published
+   address in use otherwise), then paste the app key into the app.
+
+The refresh token stays in that browser; **Sign out** removes it. While Dropbox
+is reviewing the app, up to 500 accounts can connect — enough for a studio.
+
+## Bluetooth page turners
+
+Pair the pedal with the tablet **as a keyboard** and it works: the app listens at
+the document for key presses, wherever the focus is. AirTurn, PageFlip and most
+footswitches send PageUp/PageDown or the arrows out of the box; B and N are also
+mapped, and any key can be reassigned under **Page settings → Page turner** by
+pressing the pedal switch when asked.
+
+AirTurn's "direct mode" is a BLE GATT link, which a web page cannot open — pair
+in the normal OS keyboard way instead (that is what the pedal's keyboard mode
+is). The reader flashes the key it heard next to the page number, which makes a
+mis-paired pedal obvious in one press.
 ## What this borrows from MobileSheets, and what it does not
 
 Studied: MobileSheets Pro 3.9.45 (Build 650), package

@@ -20,6 +20,12 @@ export const TONES = ['paper', 'sepia', 'night'];
 export const MIN_ZOOM = 0.6;
 export const MAX_ZOOM = 5;
 
+export function base64url(bytes) {
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 export const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, Number.isFinite(n) ? n : lo));
 
 export function uid() {

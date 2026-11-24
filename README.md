@@ -288,6 +288,10 @@ and pitch (independently) and an A-B loop.
 Nothing is uploaded and the section adds no scores of its own. A PDF the teacher bought stays
 theirs; the shelf is local and the only copy is theirs.
 
+**Dropbox** brings a piece or a backing track in without a computer, and a paired
+**Bluetooth page turner** turns pages as a keyboard would (any switch can be
+reassigned, so AirTurn/PageFlip work in their keyboard mode).
+
 The reading mechanics — night mode, half-page turns, per-page ink, speed and
 pitch as separate controls — were studied in MobileSheets Pro and rebuilt on
 web parts: pdf.js for the page, Web Audio plus a granular stretch for the track.

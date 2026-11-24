@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dropbox and pedals</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 20px; background: #faf7f1; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // The parts of the Dropbox bridge and the pedal map that can be weighed
+      // without the network or a pedal: PKCE, the authorization URL, callback
+      // parsing, listing order, safe headers, and key assignment.
+      import * as D from '../src/dropbox.js';
+      import { base64url } from '../src/sheetlib.js';
+      import * as K from '../src/sheetkeys.js';
+
+      const problems = [];
+      const log = [];
+      const is = (name, got, want) => {
+        if (got !== want) problems.push(`${name}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+      };
+      const ok = (name, value) => is(name, Boolean(value), true);
+      const near = (name, got, want, within) => {
+        if (!(Math.abs(got - want) <= within)) problems.push(`${name}: ${got} vs ${want}`);
+      };
+
+      try {
+        const v1 = D.randomVerifier();
+        const v2 = D.randomVerifier(43);
+        is('verifier length', v1.length, 64);
+        is('verifier short length', v2.length, 43);
+        ok('verifier characters', /^[A-Za-z0-9\-._~]+$/.test(v1));
+        ok('verifiers differ', v1 !== v2);
+
+        const challenge = await D.challengeFor(v1);
+        const expected = base64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v1))));
+        is('challenge matches SHA-256', challenge, expected);
+        ok('challenge is url-safe', /^[A-Za-z0-9\-_]+$/.test(challenge));
+        ok('challenge has no padding', !challenge.includes('='));
+
+        const url = new URL(
+          D.authUrl({ appKey: 'abc123', redirect: 'https://example.test/app/', challenge, state: 'st8' }),
+        );
+        is('authorize host', url.origin + url.pathname, 'https://www.dropbox.com/oauth2/authorize');
+        is('client id', url.searchParams.get('client_id'), 'abc123');
+        is('response type', url.searchParams.get('response_type'), 'code');
+        is('challenge method', url.searchParams.get('code_challenge_method'), 'S256');
+        is('challenge passthrough', url.searchParams.get('code_challenge'), challenge);
+        is('offline token', url.searchParams.get('token_access_type'), 'offline');
+        is('state passthrough', url.searchParams.get('state'), 'st8');
+        is('redirect passthrough', url.searchParams.get('redirect_uri'), 'https://example.test/app/');
+        is('scopes', url.searchParams.get('scope'), 'files.metadata.read files.content.read');
+
+        const cb = D.parseCallback('?code=xyz&state=st8');
+        is('callback code', cb.code, 'xyz');
+        is('callback state', cb.state, 'st8');
+        const denied = D.parseCallback('?error=access_denied&error_description=Nope');
+        is('callback error', denied.error, 'access_denied');
+        is('callback description', denied.description, 'Nope');
+
+        const listing = D.musicEntries([
+          { '.tag': 'file', name: 'Bach.pdf', size: 2048 },
+          { '.tag': 'folder', name: 'Scans' },
+          { '.tag': 'file', name: 'notes.txt' },
+          { '.tag': 'file', name: 'backing.mp3', size: 999 },
+          { '.tag': 'file', name: 'Tune.MUSICXML' },
+          { '.tag': 'deleted', name: 'old.pdf' },
+          { '.tag': 'folder', name: 'audio' },
+        ]);
+        is('listing count', listing.length, 5);
+        is('folders first', listing[0].name, 'audio');
+        is('folders sorted', listing[1].name, 'Scans');
+        is('file order', listing.slice(2).map((e) => e.name).join(','), 'Bach.pdf,backing.mp3,Tune.MUSICXML');
+        ok('audio detected', D.isAudioName('x.M4A'));
+        ok('pdf is not audio', !D.isAudioName('x.pdf'));
+
+        is('join root', D.joinPath('', 'a.pdf'), '/a.pdf');
+        is('join nested', D.joinPath('/Music', 'a.pdf'), '/Music/a.pdf');
+        is('join trims', D.joinPath('/Music/', '/a.pdf'), '/Music/a.pdf');
+        is('parent', D.parentPath('/Music/Scans/a.pdf'), '/Music/Scans');
+        is('parent root', D.parentPath('/a.pdf'), '');
+
+        const header = D.asciiJson({ path: '/Ünïcode/谱.pdf' });
+        ok('header is ascii', /^[\x20-\x7e]+$/.test(header));
+        is('header escapes', JSON.parse(header).path, '/Ünïcode/谱.pdf');
+
+        // Pedal keys: defaults, reassignment clears the old owner, reset.
+        const defaults = K.loadMap();
+        is('default next includes PageDown', defaults.next.includes('PageDown'), true);
+        is('default prev includes ArrowLeft', defaults.prev.includes('ArrowLeft'), true);
+        const moved = K.assign(defaults, 'prev', 'B');
+        is('B moved off next', moved.next.includes('B'), false);
+        is('B now prev', moved.prev.includes('B'), true);
+        is('next still turns', K.actionFor('PageDown', defaults), 'next');
+        is('sheet has no action', K.actionFor('Q', defaults), '');
+        const spacer = K.normalKey({ key: ' ', code: 'Space' });
+        is('space normalised', spacer, 'Space');
+        is('code letter', K.normalKey({ key: 'b', code: 'KeyB' }), 'B');
+        is('page key kept', K.normalKey({ key: 'PageDown', code: 'PageDown' }), 'PageDown');
+
+        localStorage.setItem('scaleStudio.sheetKeys', JSON.stringify({ next: ['Z'] }));
+        const stored = K.loadMap();
+        is('stored override wins', stored.next.join(''), 'Z');
+        is('missing action falls back', stored.prev.includes('ArrowLeft'), true);
+        const reset = K.resetMap();
+        is('reset restores defaults', reset.next.includes('PageDown'), true);
+
+        near('base64url length', base64url(new Uint8Array([1, 2, 3])).length, 4, 0);
+        log.push('all checks ran');
+      } catch (err) {
+        problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
+      }
+
+      document.getElementById('report').textContent = problems.length ? problems.join('\n') : 'ok\n' + log.join('\n');
+      fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'dropbox', problems, log: log.join('\n') }, null, 2) });
+    </script>
+  </body>
+</html>
