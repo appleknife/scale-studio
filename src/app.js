@@ -10,6 +10,7 @@ import { createBuddy } from './buddy.js?v=202611232000';
 import { createSprintView } from './sprintview.js?v=202611232000';
 import { createTrillView } from './trillview.js?v=202611232000';
 import { createListenView } from './listenview.js?v=202611232000';
+import { createSheetView } from './sheetview.js?v=202611232000';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
@@ -62,10 +63,12 @@ const el = {
     sprint: $('view-sprint'),
     trill: $('view-trill'),
     listen: $('view-listen'),
+    sheets: $('view-sheets'),
   },
   openSprintBtn: $('openSprintBtn'),
   openTrillBtn: $('openTrillBtn'),
   openListenBtn: $('openListenBtn'),
+  openSheetsBtn: $('openSheetsBtn'),
   openPetBtn: $('openPetBtn'),
   petBack: $('petBack'),
   menuPetArt: $('menuPetArt'),
@@ -296,6 +299,7 @@ let petRoom = null;
 let sprintView = null;
 let trillView = null;
 let listenView = null;
+let sheetView = null;
 /** The small pets that listen beside the music (see createBuddy, below). */
 let listenBuddy = null;
 let sightBuddy = null;
@@ -411,6 +415,7 @@ function showView(name) {
   if (name !== 'sprint' && sprintView) sprintView.stop();
   if (name !== 'trill' && trillView) trillView.stop();
   if (name !== 'listen' && listenView) listenView.stop();
+  if (name !== 'sheets' && sheetView) sheetView.stop();
   if (name !== 'sight') {
     stopSightReplay();
     stopHearing();
@@ -2524,6 +2529,21 @@ el.openListenBtn.addEventListener('click', () => {
   showView('listen');
 });
 window.__listenView = listenView;
+
+// Sheet music: a local shelf of the student's own PDFs, photos and MusicXML
+// files, with a page reader, pen and an optional practice track. Nothing is
+// uploaded; MobileSheets was studied for the mechanics, not copied.
+sheetView = createSheetView({
+  root: el.views.sheets,
+  profileId: () => petProfileId(),
+  audio: () => ({ ctx: player.context, out: player.output }),
+  onBack: () => goHome(),
+  onViewChange: () => renderGrid(),
+});
+el.openSheetsBtn.addEventListener('click', () => {
+  sheetView.open();
+  showView('sheets');
+});
 
 // The pet, small, beside the music: it listens while you play. One on the
 // scale card, one by the sight-reading controls, one on the result page.
@@ -5491,6 +5511,10 @@ renderWho();
 
 if (params.has('help') && el.helpDialog.showModal) el.helpDialog.showModal();
 if (params.has('pet')) openPet();
+if (params.has('sheets')) {
+  sheetView.open();
+  showView('sheets');
+}
 el.openPetBtn.addEventListener('click', openPet);
 el.petBack.addEventListener('click', goHome);
 paintMenuPet();

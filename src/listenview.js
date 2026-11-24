@@ -16,7 +16,7 @@ import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=2
 import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611232000';
 import { t } from './i18n.js?v=202611232000';
 
-const OSMD_SRC = './vendor/opensheetmusicdisplay.min.js?v=202611232000';
+const OSMD_SRC = new URL('../vendor/opensheetmusicdisplay.min.js?v=202611232000', import.meta.url).href;
 const MAX_SECONDS = 600; // ten minutes: enough for any audition piece
 const MIN_SECONDS = 5;
 const MIN_SECTION_SECONDS = 1.5; // a single bar is a fair thing to practise
@@ -41,7 +41,7 @@ const pctOf = (x) => Math.round(x * 100);
 const signed = (c) => `${c > 0 ? '+' : c < 0 ? '−' : ''}${Math.abs(Math.round(c))}`;
 
 let osmdLoading = null;
-function loadOsmd() {
+export function loadOsmd() {
   if (window.opensheetmusicdisplay) return Promise.resolve(window.opensheetmusicdisplay);
   if (osmdLoading) return osmdLoading;
   osmdLoading = new Promise((resolve, reject) => {

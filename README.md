@@ -276,6 +276,23 @@ Two things there are less obvious than they look:
   own page of marks. It is the only feature in the app that is pure pointer
   handling, so nothing else exercises it.
 
+## Sheet music
+
+The menu's **Sheet music** shelf keeps the student's own music: PDFs, photos and
+MusicXML, on the device, in IndexedDB. Turn pages with a tap, a swipe or the
+arrows; zoom, fit, crop the margins, and switch the page to sepia or night for a
+dark stand. A pen and highlighter write on the page and stay there, bookmarks
+hold the place, and an audio track can run underneath with its own volume, speed
+and pitch (independently) and an A-B loop.
+
+Nothing is uploaded and the section adds no scores of its own. A PDF the teacher bought stays
+theirs; the shelf is local and the only copy is theirs.
+
+The reading mechanics — night mode, half-page turns, per-page ink, speed and
+pitch as separate controls — were studied in MobileSheets Pro and rebuilt on
+web parts: pdf.js for the page, Web Audio plus a granular stretch for the track.
+docs/sheet-music.md has the comparison, the files and the limits. pdf.js is
+fetched only when a PDF is opened, then kept offline like the recorded violin.
 ## How it listens
 
 * **Pitch detection:** YIN (cumulative mean normalized difference) over a 2048-sample

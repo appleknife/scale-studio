@@ -1,0 +1,66 @@
+# Sheet music
+
+The app keeps a local shelf of the music a student brings: a PDF from a
+teacher, photos of a part, a MusicXML file. **Nothing is uploaded and no scores
+ship with the app**, so the repository carries code only and every piece belongs
+to whoever put it on that device.
+
+No score ships at all: the shelf starts empty and holds only what the student
+adds. The repository carries code.
+
+The shelf is IndexedDB. Leaving the section or closing the tab does not lose a
+piece; clearing the site's data does.
+
+## Using it
+
+* **Add music** takes PDFs, images and MusicXML. A file named `Gavotte - Gossec.pdf`
+  becomes the title *Gavotte* by *Gossec*.
+* Tap a page's right or left third to turn — or swipe, or the arrows, or a
+  keyboard's arrow and Page keys. The settings panel can make that a half-page
+  turn, which is the gesture for a phone on a stand.
+* Zoom with pinch or `Ctrl`+wheel, or the zoom buttons. Fit is a setting, not a
+  one-off: *whole page* or *width*.
+* **Page tone** offers paper, sepia and night; night inverts and softens the
+  page, which is the difference between a bright page and a usable one in a dark
+  room. Brightness and the four crop edges sit beside it.
+* **Bookmarks** hold a page and a name; the last page read opens next time.
+* The pen, highlighter and box eraser write **on the page**, saved per page. A
+  stroke is kept in page-relative coordinates, so zooming, cropping and the next
+  visit put it back where it was.
+* **Practice track** attaches audio to the piece: play, seek, volume, an A–B
+  loop, and a click track. Speed (0.5–1.5×) keeps the pitch and pitch (±12
+  semitones, semitone steps) keeps the speed. Tracks can start with the page.
+
+## What this borrows from MobileSheets, and what it does not
+
+Studied: MobileSheets Pro 3.9.45 (Build 650), package
+`com.zubersoft.mobilesheetsfree`. No code or art was copied; the notes below are
+what the app's own classes and strings do.
+
+| MobileSheets | Here |
+| --- | --- |
+| Native PDF engine `librddoc.so` (Radaee PDF SDK) behind `PdfRenderLibrary.jniRenderBitmap`, night mode as a render flag | Mozilla pdf.js renders the page to a canvas; tone is a CSS filter |
+| `MsgAudioPlayer`/`PlayerWrapper` with `setTempo`/`setPitchShift` over `libMsAudioPlayer.so` (Superpowered), A–B `loopBetween`, fades, balance, mono | Web Audio `AudioBufferSourceNode` plus a granular stretch in `src/tempoaudio.js`; A–B loop, fades from the gain |
+| Camera scan with auto-crop (Genius Scan SDK), PDF from photos, image correction | Pick photos or a PDF; browser image decode; crop edges in the reader |
+| Import from device, SAF, Dropbox, Drive, OneDrive, Nextcloud; batch import | Pick from the device; any cloud the device's file picker exposes |
+| Tap zones, swipe, half-page, two pages, pedal/MIDI turns, auto-scroll | Tap zones, swipe, half-page, two pages, arrows; pedal and MIDI are not wired |
+| Ink and highlighter with layers, stamps and text, written into the PDF on export | One ink layer per page, pen/highlighter/eraser, kept in the database |
+| PDF passwords, PDF links and bookmarks | PDF bookmarks are not read; page bookmarks are |
+
+## Files
+
+* `src/sheetlib.js` — the shelf: records, files, ink and track storage, and the
+  arithmetic a page needs (fit, crop, page limits, semitone ratio).
+* `src/sheetview.js` — the shelf screen and the reader.
+* `src/tempoaudio.js` — the stretch behind speed and pitch.
+* `vendor/pdfjs/` — pdf.js (Apache-2.0, licence alongside), pinned to
+  `pdfjs-dist@6.5.438`, legacy build. Fetched only when a PDF is opened and
+  cached on the device like the recorded violin.
+
+## Limits worth saying out loud
+
+Speed and pitch are granular, not studio quality: at the extremes the bowing
+smears. Pitch-preserving playback of an audio element (`preservesPitch`) is not
+used because it cannot change key at a fixed tempo. Password-protected PDFs open
+if pdf.js can read them, and say so if not. A scanned PDF is an image to this
+app — the note-following in *Listen* still wants MusicXML.

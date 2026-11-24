@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sheet reader</title>`r`n    <link rel="stylesheet" href="../app.css" />
+    <style>
+      body { font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; margin: 0; background: #faf7f1; }
+      #host { min-height: 100vh; }
+      pre { margin: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="host"></div>
+    <pre id="report" style="position:fixed;bottom:0;right:0;max-width:45vw;background:#fffdfa;z-index:99">running…</pre>
+    <script type="module">
+      // The reader, driven the way a thumb drives it: import a small PDF of our
+      // own, open it, turn the light down, write on it, bookmark it, close and
+      // delete. The PDF below is hand-written, so nothing copyrighted is needed.
+      import { createSheetView } from '../src/sheetview.js';
+      import * as Lib from '../src/sheetlib.js';
+
+      const problems = [];
+      window.addEventListener('error', (e) => problems.push('window error: ' + e.message));
+      window.addEventListener('unhandledrejection', (e) => problems.push('rejection: ' + (e.reason && e.reason.message || e.reason)));
+      const log = [];
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const until = async (fn, ms = 6000) => {
+        const end = Date.now() + ms;
+        while (Date.now() < end) {
+          const v = fn();
+          if (v) return v;
+          await wait(50);
+        }
+        throw new Error('timed out');
+      };
+
+      const PDF_B64 = 'JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCAyMDAgMzAwXS9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNCAwIFI+Pj4+L0NvbnRlbnRzIDUgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9Gb250L1N1YnR5cGUvVHlwZTEvQmFzZUZvbnQvSGVsdmV0aWNhPj4KZW5kb2JqCjUgMCBvYmoKPDwvTGVuZ3RoIDQyPj4Kc3RyZWFtCkJUIC9GMSAxOCBUZiAyMCAyNTAgVGQgKFNoZWV0IE11c2ljKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNSAwMDAwMCBuIAowMDAwMDAwMDYwIDAwMDAwIG4gCjAwMDAwMDAxMTEgMDAwMDAgbiAKMDAwMDAwMDIyMyAwMDAwMCBuIAowMDAwMDAwMjg2IDAwMDAwIG4gCnRyYWlsZXIKPDwvU2l6ZSA2L1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKMzc2CiUlRU9GCg==';
+      const PDF_BYTES = Uint8Array.from(atob(PDF_B64), (c) => c.charCodeAt(0));
+
+      const pdfFile = () => new File([PDF_BYTES], 'Study - Me.pdf', { type: 'application/pdf' });
+
+      function wavFile(seconds = 3, hz = 440, rate = 8000) {
+        const n = Math.round(seconds * rate);
+        const buf = new ArrayBuffer(44 + n * 2);
+        const view = new DataView(buf);
+        const str = (at, text) => [...text].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
+        str(0, 'RIFF');
+        view.setUint32(4, 36 + n * 2, true);
+        str(8, 'WAVEfmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, rate, true);
+        view.setUint32(28, rate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        str(36, 'data');
+        view.setUint32(40, n * 2, true);
+        for (let i = 0; i < n; i += 1) {
+          view.setInt16(44 + i * 2, Math.round(Math.sin((2 * Math.PI * hz * i) / rate) * 12000), true);
+        }
+        return new File([buf], 'backing - Me.wav', { type: 'audio/wav' });
+      }
+      window.confirm = () => true;
+      window.prompt = () => 'Bar 1';
+
+      const root = document.getElementById('host');
+      const view = createSheetView({
+        root,
+        profileId: () => 'ui-tester',
+        onBack: () => {},
+      });
+
+      try {
+        view.open();
+        await until(() => document.querySelector('.sheet-empty'));
+        log.push('empty shelf shown');
+
+        const input = document.querySelector('.sheet-file');
+        const list = new DataTransfer();
+        list.items.add(pdfFile());
+        input.files = list.files;
+        input.dispatchEvent(new Event('change'));
+
+        const card = await until(() => document.querySelector('.sheet-card'));
+        if (!/Study/.test(card.textContent)) problems.push('title from the file name is missing');
+        if (!/Me/.test(card.textContent)) problems.push('composer from the file name is missing');
+        log.push('card: ' + card.textContent.replace(/\s+/g, ' ').trim());
+
+        card.querySelector('[data-act="open"]').click();
+        await wait(1500);
+        log.push('after open: readerHidden=' + document.querySelector('.reader')?.hidden + ' fail=' + (document.querySelector('.page-fail')?.textContent || 'none') + ' meta=' + (document.querySelector('.reader-meta')?.textContent || ''));
+        const pageBox = await until(() => document.querySelector('.page-box'));
+        const canvas = await until(() => {
+          const c = pageBox.querySelector('canvas.page-image');
+          return c && c.width > 10 ? c : null;
+        });
+        log.push('page canvas ' + canvas.width + 'x' + canvas.height);
+        if (!(canvas.width > 10)) problems.push('the page did not render');
+
+        const pageno = document.querySelector('[data-el="pageno"]').textContent;
+        if (pageno !== '1 / 1') problems.push('page label is ' + pageno);
+
+        // Night tone.
+        document.querySelector('[data-act="settings"]').click();
+        await until(() => document.querySelector('[data-tone="night"]'));
+        document.querySelector('[data-tone="night"]').click();
+        await wait(250);
+        const filter = document.querySelector('.page-box').style.filter;
+        if (!filter.includes('invert')) problems.push('night tone did not reach the page');
+        log.push('filter: ' + filter);
+        document.querySelector('[data-act="closePanel"]').click();
+
+        // A bookmark.
+        document.querySelector('[data-act="bookmark"]').click();
+        await until(() => document.querySelector('[data-act="bookmarkPage"]'));
+        document.querySelector('[data-act="bookmarkPage"]').click();
+        await until(() => document.querySelector('[data-unmark]'));
+        const sheetId = document.querySelector('.sheet-card')?.dataset.id || null;
+        log.push('bookmark added');
+        document.querySelector('[data-act="closePanel"]').click();
+
+        // Ink: a stroke across the page.
+        document.querySelector('[data-act="ink"]').click();
+        await wait(300);
+        log.push('ink actives=' + document.querySelectorAll('.page-ink.is-active').length + ' barHidden=' + document.querySelector('[data-el="inkbar"]').hidden + ' rect=' + JSON.stringify(document.querySelector('.page-ink')?.getBoundingClientRect()) + ' style=' + document.querySelector('.page-ink')?.style.width);
+        const ink = await until(() => {
+          const c = document.querySelector('.page-ink.is-active');
+          return c && c.getBoundingClientRect().width > 20 ? c : null;
+        });
+        const rect = ink.getBoundingClientRect();
+        const at = (fx, fy) => ({ clientX: rect.left + rect.width * fx, clientY: rect.top + rect.height * fy, pointerId: 1, bubbles: true });
+        ink.dispatchEvent(new PointerEvent('pointerdown', at(0.2, 0.2)));
+        ink.dispatchEvent(new PointerEvent('pointermove', at(0.4, 0.35)));
+        ink.dispatchEvent(new PointerEvent('pointermove', at(0.6, 0.5)));
+        ink.dispatchEvent(new PointerEvent('pointerup', at(0.6, 0.5)));
+        await wait(600);
+
+        const meta = await Lib.listSheets('ui-tester');
+        const id = meta[0]?.id;
+        if (!id) problems.push('the sheet was not stored');
+        const marks = id ? await Lib.getInk(id) : {};
+        const strokes = Object.values(marks).flatMap((p) => p.strokes || []);
+        if (strokes.length !== 1) problems.push('inked strokes stored: ' + strokes.length);
+        else if (strokes[0].pts.length < 2) problems.push('the stroke has one point');
+        const bookmarks = meta[0]?.bookmarks || [];
+        if (bookmarks.length !== 1) problems.push('bookmarks stored: ' + bookmarks.length);
+        log.push('ink points: ' + strokes[0]?.pts.length);
+
+        // Ink undo.
+        document.querySelector('[data-act="inkOff"]').click();
+        document.querySelector('[data-act="ink"]').click();
+        await wait(300);
+        log.push('ink actives=' + document.querySelectorAll('.page-ink.is-active').length + ' barHidden=' + document.querySelector('[data-el="inkbar"]').hidden + ' rect=' + JSON.stringify(document.querySelector('.page-ink')?.getBoundingClientRect()) + ' style=' + document.querySelector('.page-ink')?.style.width);
+        document.querySelector('[data-act="undo"]').click();
+        await wait(500);
+        const after = Object.values(await Lib.getInk(id)).flatMap((p) => p.strokes || []);
+        if (after.length !== 0) problems.push('undo left ' + after.length + ' strokes');
+        log.push('undo cleared the stroke');
+
+        // A practice track: add one, play it, and take the speed down.
+        document.querySelector('[data-act="audio"]').click();
+        await until(() => document.querySelector('[data-act="pickAudio"]'));
+        const audioInput = document.querySelector('.sheet-audio-file');
+        const alist = new DataTransfer();
+        alist.items.add(wavFile());
+        audioInput.files = alist.files;
+        audioInput.dispatchEvent(new Event('change'));
+        const track = await until(() => document.querySelector('[data-track]'));
+        track.click();
+        await wait(500);
+        const playBtn = document.querySelector('[data-act="trackPlay"]');
+        playBtn.click();
+        await wait(500);
+        log.push('playText=' + document.querySelector('[data-act="trackPlay"]').textContent + ' clock=' + document.querySelector('[data-el="track-time"]').textContent + ' disabled=' + document.querySelector('[data-el="track-seek"]').disabled);
+        log.push('err=' + window.__sheetErr + ' dur=' + window.__sheetBuf + ' plays=' + window.__sheetPlay + ' ctx=' + window.__sheetState + ' pos=' + window.__sheetPos + ' start=' + JSON.stringify(window.__sheetStart) + ' end=' + window.__sheetEnd);
+        const seek = document.querySelector('[data-el="track-seek"]');
+        const heard = Number(seek.value);
+        if (!(heard > 0)) problems.push('the track did not advance');
+        log.push('track at ' + heard.toFixed(2) + 's');
+        const speed = document.querySelector('[data-set="rate"]');
+        speed.value = '0.5';
+        speed.dispatchEvent(new Event('input', { bubbles: true }));
+        const pitch = document.querySelector('[data-set="pitch"]');
+        pitch.value = '2';
+        pitch.dispatchEvent(new Event('input', { bubbles: true }));
+        await wait(1600);
+        if (document.querySelector('[data-el="rate-label"]').textContent !== '0.50×') problems.push('speed label did not follow');
+        if (document.querySelector('[data-el="pitch-label"]').textContent !== '+2') problems.push('pitch label did not follow');
+        const rows = await Lib.getAudio(id);
+        if (!rows[0] || rows[0].rate !== 0.5 || rows[0].semitones !== 2) problems.push('track settings were not stored: ' + JSON.stringify(rows[0]));
+        log.push('speed and pitch stored');
+        document.querySelector('[data-act="trackStop"]').click();
+        document.querySelector('[data-act="closePanel"]').click();
+        await wait(200);
+        // Closing keeps the place; deleting clears everything.
+        document.querySelector('[data-act="back"]').click();
+        await until(() => !document.querySelector('.reader') || document.querySelector('.reader').hidden);
+        await until(() => document.querySelector('.sheet-card'));
+        document.querySelector('.sheet-card [data-act="delete"]').click();
+        await until(() => document.querySelector('.sheet-empty'));
+        const left = await Lib.listSheets('ui-tester');
+        if (left.length) problems.push('delete left the sheet behind');
+        if (await Lib.getFile(id)) problems.push('delete left the file behind');
+        log.push('deleted cleanly');
+
+        // A MusicXML piece draws through OSMD. Two bars of our own, so the test
+        // needs no score file from anywhere.
+        const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1"><part-list><score-part id="P1"><part-name>Violin</part-name></score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>1</divisions><key><fifths>1</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes><note><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note></measure><measure number="2"><note><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration><type>whole</type></note></measure></part></score-partwise>`;
+        log.push('fetching musicxml');
+        const second = new DataTransfer();
+        second.items.add(new File([xml], 'Bourree - Bach.musicxml', { type: 'application/vnd.recordare.musicxml+xml' }));
+        document.querySelector('.sheet-file').files = second.files;
+        document.querySelector('.sheet-file').dispatchEvent(new Event('change'));
+        await until(() => document.querySelectorAll('.sheet-card').length === 1);
+        log.push('cards=' + document.querySelectorAll('.sheet-card').length + ' readerOpen=' + !document.querySelector('.reader').hidden);
+        document.querySelector('.sheet-card [data-act="open"]').click();
+        await wait(6000);
+        log.push('media=' + (document.querySelector('.page-media')?.innerHTML || '').slice(0, 240));
+        const svgDrawn = await until(() => document.querySelector('.page-music svg'), 22000);
+        log.push('musicmedia=' + (document.querySelector('.page-media')?.innerHTML || '').slice(0, 200));
+        if (!svgDrawn.querySelector('path, text, g')) problems.push('the MusicXML drew nothing');
+        log.push('musicxml drawn');
+        document.querySelector('[data-act="back"]').click();
+        await until(() => document.querySelector('.sheet-card'));
+        document.querySelector('.sheet-card [data-act="delete"]').click();
+        await until(() => document.querySelector('.sheet-empty'));
+        log.push('musicxml deleted');
+      } catch (err) {
+        problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
+      }
+
+      document.getElementById('report').textContent = problems.length ? problems.join('\n') : 'ok\n' + log.join('\n');
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'sheet-ui', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

@@ -132,6 +132,12 @@
                 Play a piece and hear what the app noticed — tuning, vibrato, pulse. Bring a MusicXML score and it checks every bar.
               </span>
             </button>
+            <button class="menu-tile" id="openSheetsBtn" type="button">
+              <span class="menu-title">Sheet music <span class="menu-new">New</span></span>
+              <span class="menu-sub">
+                Your own PDFs, photos and scores on the stand. Turn pages, mark them, and play along to a track.
+              </span>
+            </button>
             <button class="menu-tile" id="openLogBtn" type="button">
               <span class="menu-title">Practice log</span>
               <span class="menu-sub" id="logBannerText">
@@ -164,6 +170,9 @@
 
         <!-- ── Listen, beta (drawn by src/listenview.js) ──────────────────── -->
         <section class="view" id="view-listen" hidden></section>
+
+        <!-- ── Sheet music (drawn by src/sheetview.js) ───────────────────── -->
+        <section class="view" id="view-sheets" hidden></section>
 
         <!-- ── Pet room ────────────────────────────────────────────────── -->
         <section class="view" id="view-pet" hidden>
