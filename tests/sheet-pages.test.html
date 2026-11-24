@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Page turning</title>
+    <link rel="stylesheet" href="../app.css" />
+    <style>
+      body { margin: 0; }
+      pre { position: fixed; bottom: 0; right: 0; max-width: 45vw; background: #fffdfa; z-index: 99; margin: 8px; }
+    </style>
+  </head>
+  <body>
+    <div id="host"></div>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // Turning a multi-page piece: the buttons, a tap on each side, and the
+      // arrow keys. A one-page fixture never exercised any of this.
+      import { createSheetView } from '../src/sheetview.js';
+      import * as Lib from '../src/sheetlib.js';
+
+      const PDF = 'JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFIgNCAwIFIgNSAwIFJdL0NvdW50IDM+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCAyMDAgMzAwXS9SZXNvdXJjZXM8PC9Gb250PDwvRjEgOSAwIFI+Pj4+L0NvbnRlbnRzIDYgMCBSPj4KZW5kb2JqCjQgMCBvYmoKPDwvVHlwZS9QYWdlL1BhcmVudCAyIDAgUi9NZWRpYUJveFswIDAgMjAwIDMwMF0vUmVzb3VyY2VzPDwvRm9udDw8L0YxIDkgMCBSPj4+Pi9Db250ZW50cyA3IDAgUj4+CmVuZG9iago1IDAgb2JqCjw8L1R5cGUvUGFnZS9QYXJlbnQgMiAwIFIvTWVkaWFCb3hbMCAwIDIwMCAzMDBdL1Jlc291cmNlczw8L0ZvbnQ8PC9GMSA5IDAgUj4+Pj4vQ29udGVudHMgOCAwIFI+PgplbmRvYmoKNiAwIG9iago8PC9MZW5ndGggMzc+PgpzdHJlYW0KQlQgL0YxIDE4IFRmIDIwIDI1MCBUZCAoUGFnZSAxKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCjcgMCBvYmoKPDwvTGVuZ3RoIDM3Pj4Kc3RyZWFtCkJUIC9GMSAxOCBUZiAyMCAyNTAgVGQgKFBhZ2UgMikgVGogRVQKZW5kc3RyZWFtCmVuZG9iago4IDAgb2JqCjw8L0xlbmd0aCAzNz4+CnN0cmVhbQpCVCAvRjEgMTggVGYgMjAgMjUwIFRkIChQYWdlIDMpIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKOSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PgplbmRvYmoKeHJlZgowIDEwCjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxNSAwMDAwMCBuIAowMDAwMDAwMDYwIDAwMDAwIG4gCjAwMDAwMDAxMjMgMDAwMDAgbiAKMDAwMDAwMDIzNSAwMDAwMCBuIAowMDAwMDAwMzQ3IDAwMDAwIG4gCjAwMDAwMDA0NTkgMDAwMDAgbiAKMDAwMDAwMDU0NCAwMDAwMCBuIAowMDAwMDAwNjI5IDAwMDAwIG4gCjAwMDAwMDA3MTQgMDAwMDAgbiAKdHJhaWxlcgo8PC9TaXplIDEwL1Jvb3QgMSAwIFI+PgpzdGFydHhyZWYKNzc3CiUlRU9GCg==';
+      const bytes = Uint8Array.from(atob(PDF), (c) => c.charCodeAt(0));
+      const problems = [];
+      const log = [];
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      const until = async (fn, ms = 6000) => {
+        const end = Date.now() + ms;
+        while (Date.now() < end) {
+          const v = fn();
+          if (v) return v;
+          await wait(50);
+        }
+        throw new Error('timed out');
+      };
+      window.confirm = () => true;
+
+      const root = document.getElementById('host');
+      const view = createSheetView({ root, profileId: () => 'pages-tester', onBack: () => {} });
+      const label = () => document.querySelector('[data-el="pageno"]')?.textContent;
+
+      try {
+        view.open();
+        await until(() => document.querySelector('.sheet-empty'));
+        const input = document.querySelector('.sheet-file');
+        const list = new DataTransfer();
+        list.items.add(new File([bytes], 'Three pages - Me.pdf', { type: 'application/pdf' }));
+        input.files = list.files;
+        input.dispatchEvent(new Event('change'));
+
+        await until(() => document.querySelector('.page-image'));
+        const slider = await until(() => document.querySelector('[data-el="slider"]'));
+        log.push('count=' + slider.max + ' label=' + label());
+        if (slider.max !== '3') problems.push('page count is ' + slider.max + ', not 3');
+        if (label() !== '1 / 3') problems.push('label starts at ' + label());
+
+        // The foot's own buttons.
+        document.querySelector('[data-act="next"]').click();
+        await until(() => label() === '2 / 3');
+        log.push('button -> ' + label());
+        document.querySelector('[data-act="prev"]').click();
+        await until(() => label() === '1 / 3');
+
+        // A tap on the right third of the page, as a finger delivers it.
+        const stage = document.querySelector('[data-el="stage"]');
+        const box = stage.getBoundingClientRect();
+        const tap = (share) => {
+          const x = box.left + box.width * share;
+          const y = box.top + box.height / 2;
+          stage.dispatchEvent(new PointerEvent('pointerdown', { clientX: x, clientY: y, pointerId: 7, pointerType: 'touch', bubbles: true }));
+          stage.dispatchEvent(new PointerEvent('pointerup', { clientX: x, clientY: y, pointerId: 7, pointerType: 'touch', bubbles: true }));
+        };
+        tap(0.9);
+        await until(() => label() === '2 / 3');
+        log.push('tap right -> ' + label());
+        tap(0.1);
+        await until(() => label() === '1 / 3');
+        log.push('tap left -> ' + label());
+
+        // And the keyboard, with the stage focused.
+        stage.focus();
+        stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        await until(() => label() === '2 / 3');
+        log.push('arrow -> ' + label());
+
+        // A swipe (a long drag) also turns, and so does the slider.
+        if (label() === '2 / 3') {
+          slider.value = '3';
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          await until(() => label() === '3 / 3');
+          log.push('slider -> ' + label());
+          if (label() === '3 / 3') {
+            tap(0.9);
+            await wait(300);
+            if (label() !== '3 / 3') problems.push('turned past the last page');
+          }
+        }
+
+        document.querySelector('[data-act="back"]').click();
+        await until(() => document.querySelector('.sheet-card'));
+        document.querySelector('.sheet-card [data-act="delete"]').click();
+        await until(() => document.querySelector('.sheet-empty'));
+        // Photos picked together are one piece, in order.
+        const blobs = [];
+        for (let i = 0; i < 3; i += 1) {
+          const canvas = document.createElement('canvas');
+          canvas.width = 200; canvas.height = 300;
+          const c = canvas.getContext('2d');
+          c.fillStyle = '#fff'; c.fillRect(0, 0, 200, 300);
+          c.fillStyle = '#000'; c.font = '20px sans-serif'; c.fillText('Photo ' + (i + 1), 20, 60);
+          blobs.push(await new Promise((r) => canvas.toBlob(r, 'image/png')));
+        }
+        const shots = new DataTransfer();
+        blobs.forEach((b, i) => shots.items.add(new File([b], 'scan' + (i + 1) + '.png', { type: 'image/png' })));
+        document.querySelector('.sheet-file').files = shots.files;
+        document.querySelector('.sheet-file').dispatchEvent(new Event('change'));
+        await until(() => document.querySelectorAll('.sheet-card').length === 1);
+        const meta = document.querySelector('.sheet-card');
+        log.push('photo card: ' + meta.textContent.replace(/\s+/g, ' ').trim());
+        if (!/3 pages/.test(meta.textContent)) problems.push('three photos did not make three pages');
+        meta.querySelector('[data-act="open"]').click();
+        await until(() => document.querySelector('.page-image'));
+        if (label() !== '1 / 3') problems.push('photos start at ' + label());
+        const footBox = document.querySelector('.reader-foot').getBoundingClientRect();
+        if (footBox.bottom > innerHeight + 2) problems.push('the foot bar is below the screen');
+        tap(0.9);
+        await until(() => label() === '2 / 3');
+        log.push('photo tap -> ' + label());
+        document.querySelector('[data-act="back"]').click();
+        await until(() => document.querySelector('.sheet-card'));
+        document.querySelector('.sheet-card [data-act="delete"]').click();
+        await until(() => document.querySelector('.sheet-empty'));
+      } catch (err) {
+        problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
+      }
+
+      const meta = await Lib.listSheets('pages-tester');
+      for (const row of meta) await Lib.deleteSheet(row.id);
+
+      document.getElementById('report').textContent = problems.length ? problems.join('\n') : 'ok\n' + log.join('\n');
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'sheet-pages', problems, log: log.join('\n') }, null, 2),
+      });
+    </script>
+  </body>
+</html>

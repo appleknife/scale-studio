@@ -220,9 +220,13 @@ export function saveSheet(sheet) {
   return run(STORE_SHEETS, 'readwrite', (store) => store.put(sheet)).then(() => sheet);
 }
 
+export const pageKey = (id, n) => `${id}/p${n}`;
+
 export async function deleteSheet(id) {
+  const sheet = await getSheet(id).catch(() => null);
   const tracks = await getAudio(id).catch(() => []);
-  const keys = [...tracks.map((row) => `${id}/${row.id}`), id];
+  const pages = sheet && sheet.kind === 'images' ? Array.from({ length: sheet.pageCount || 0 }, (_, i) => pageKey(id, i + 1)) : [];
+  const keys = [...tracks.map((row) => `${id}/${row.id}`), ...pages, id];
   await Promise.all([
     run(STORE_SHEETS, 'readwrite', (store) => store.delete(id)),
     run(STORE_INK, 'readwrite', (store) => store.delete(id)),

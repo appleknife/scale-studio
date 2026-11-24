@@ -297,6 +297,7 @@ export const S = {
   'sheet.audioFailed': ['That audio file could not be read.', '无法读取这个音频文件。'],
   'sheet.autoplay': ['Play when opened', '打开时自动播放'],
   'sheet.addAudio': ['Add a track', '添加伴奏'],
+  'sheet.addPages': ['Add pages', '添加页面'],
   'sheet.noAudio': ['No track on this piece yet.', '这首乐曲还没有伴奏。'],
   'sheet.audioPlay': ['Play', '播放'],
   'sheet.audioPause': ['Pause', '暂停'],

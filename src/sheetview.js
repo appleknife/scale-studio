@@ -14,14 +14,14 @@
 // MusicXML, and `tempoaudio.js` for the stretch. The mechanics are the same;
 // none of that app's code or art is copied.
 
-import * as Lib from './sheetlib.js?v=202611232000';
-import { renderStretched } from './tempoaudio.js?v=202611232000';
-import { loadOsmd } from './listenview.js?v=202611232000';
-import { t } from './i18n.js?v=202611232000';
+import * as Lib from './sheetlib.js?v=202611240200';
+import { renderStretched } from './tempoaudio.js?v=202611240200';
+import { loadOsmd } from './listenview.js?v=202611240200';
+import { t } from './i18n.js?v=202611240200';
 
 const PDF_VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
-const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611232000';
-const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611232000';
+const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240200';
+const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611240200';
 const PDF_ASSETS = PDF_VENDOR;
 const MAX_DPR = 2;
 const INK = '#1f4fa8';
@@ -53,6 +53,7 @@ export function createSheetView(deps) {
   let sheets = [];
   let query = '';
   let sheet = null;
+  let addTarget = null;
   let inkPages = {};
   let audioTracks = [];
   let readerOpen = false;
@@ -149,6 +150,7 @@ export function createSheetView(deps) {
 
   function kindMark(kind) {
     if (kind === 'musicxml') return '♬';
+    if (kind === 'images') return '▤';
     if (kind === 'image') return '▤';
     return 'PDF';
   }
@@ -170,20 +172,58 @@ export function createSheetView(deps) {
     return n;
   }
 
+  async function appendImages(target, images) {
+    if (!target || !images.length) return;
+    const start = target.pageCount || 0;
+    try {
+      for (let i = 0; i < images.length; i += 1) await Lib.saveFile(Lib.pageKey(target.id, start + i + 1), images[i]);
+      target.pageCount = start + images.length;
+      await Lib.saveSheet(target);
+      if (sheet && sheet.id === target.id) {
+        await measure();
+        await paint();
+        renderSettings();
+      } else {
+        await renderShelf();
+      }
+    } catch {
+      toast(t('sheet.importFailed', { n: images.length }));
+    }
+  }
+
   async function importFiles(list) {
-    const files = [...list];
+    const picked = [...list];
     let first = null;
     let failed = 0;
-    for (const file of files) {
-      const kind = Lib.fileKind(file);
-      if (!kind) {
-        if (Lib.audioKind(file) && sheet) {
-          await importAudio(file);
-          continue;
-        }
-        failed += 1;
-        continue;
+
+    // Audio picked with a piece open belongs to that piece.
+    for (const f of picked) {
+      if (!Lib.fileKind(f) && Lib.audioKind(f) && sheet) await importAudio(f);
+    }
+
+    // Photos picked together are one part, in the order given: pages of a
+    // piece, not one piece per photo.
+    const images = picked.filter((f) => Lib.fileKind(f) === 'image');
+    if (images.length) {
+      try {
+        const { title, composer } = Lib.splitName(images[0].name);
+        const made = Lib.emptySheet(profile(), {
+          title,
+          composer,
+          kind: 'images',
+          pageCount: images.length,
+        });
+        for (let i = 0; i < images.length; i += 1) await Lib.saveFile(Lib.pageKey(made.id, i + 1), images[i]);
+        await Lib.saveSheet(made);
+        first = made.id;
+      } catch {
+        failed += images.length;
       }
+    }
+
+    for (const file of picked) {
+      const kind = Lib.fileKind(file);
+      if (kind !== 'pdf' && kind !== 'musicxml') continue;
       try {
         const { title, composer } = Lib.splitName(file.name);
         const made = Lib.emptySheet(profile(), { title, composer, kind });
@@ -199,10 +239,10 @@ export function createSheetView(deps) {
         failed += 1;
       }
     }
+
     await renderShelf();
     if (failed) toast(t('sheet.importFailed', { n: failed }));
     if (first) openSheet(first);
-    else if (files.some(Lib.audioKind) && readerOpen) renderAudio();
   }
 
   /* ── The reader ──────────────────────────────────────────────────────── */
@@ -302,6 +342,7 @@ export function createSheetView(deps) {
 
   async function openSheet(id) {
     const found = await Lib.getSheet(id);
+    addTarget = null;
     if (!found) return;
     await closeReader();
     sheet = found;
@@ -389,6 +430,7 @@ export function createSheetView(deps) {
   }
 
   async function measure() {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
     stageW = refs.stage.clientWidth;
     stageH = refs.stage.clientHeight;
   }
@@ -463,8 +505,9 @@ export function createSheetView(deps) {
       const base = pdfPage.getViewport({ scale: 1 });
       viewW = base.width;
       viewH = base.height;
-    } else if (sheet.kind === 'image') {
-      const file = await Lib.getFile(sheet.id);
+    } else if (sheet.kind === 'image' || sheet.kind === 'images') {
+      const key = sheet.kind === 'images' ? Lib.pageKey(sheet.id, n) : sheet.id;
+      const file = await Lib.getFile(key);
       const url = URL.createObjectURL(file);
       imageUrls.add(url);
       media.innerHTML = `<img class="page-image" src="${url}" alt="" draggable="false" />`;
@@ -775,6 +818,7 @@ export function createSheetView(deps) {
         <button class="reader-pill ${s.spread ? 'is-on' : ''}" type="button" data-toggle="spread">${t('sheet.spread')}</button>
         <button class="reader-pill ${s.keepAwake !== false ? 'is-on' : ''}" type="button" data-toggle="keepAwake">${t('sheet.keepAwake')}</button>
       </div>
+      ${sheet.kind === 'images' ? `<div class="reader-row"><button class="reader-pill" type="button" data-act="addPages">${t('sheet.addPages')}</button></div>` : ''}
       <div class="reader-crop">
         <h5>${t('sheet.crop')}</h5>
         ${['l', 'r', 't', 'b'].map(
@@ -1343,6 +1387,10 @@ export function createSheetView(deps) {
         await Lib.saveSheet(sheet).catch(() => {});
         renderSettings();
         return paint();
+      case 'addPages':
+        addTarget = sheet;
+        fileEl.click();
+        return;
       case 'pickAudio':
         audioFileEl.click();
         return;
@@ -1459,7 +1507,12 @@ export function createSheetView(deps) {
   });
 
   fileEl.addEventListener('change', () => {
-    if (fileEl.files?.length) importFiles(fileEl.files);
+    if (addTarget && fileEl.files?.length) {
+      const images = [...fileEl.files].filter((f) => Lib.fileKind(f) === 'image');
+      const target = addTarget;
+      addTarget = null;
+      appendImages(target, images);
+    } else if (fileEl.files?.length) importFiles(fileEl.files);
     fileEl.value = '';
   });
   audioFileEl.addEventListener('change', () => {

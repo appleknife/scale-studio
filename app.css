@@ -8631,6 +8631,8 @@ select,
   font-size: 13.5px;
   color: var(--ink-soft);
   margin: 4px 0 0;
+}
+
 /* ── Sheet music ─────────────────────────────────────────────────────── */
 
 .sheet-head {
@@ -8819,6 +8821,8 @@ select,
 .reader-stage {
   position: relative;
   flex: 1;
+  min-height: 0;
+  min-width: 0;
   overflow: auto;
   overscroll-behavior: contain;
   padding: 12px;
