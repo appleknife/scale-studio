@@ -19,8 +19,9 @@ import { renderStretched } from './tempoaudio.js?v=202611240600';
 import { loadOsmd } from './listenview.js?v=202611240600';
 import { t } from './i18n.js?v=202611240600';
 import { readScoreFile } from './musicxml.js?v=202611240600';
-import * as Dropbox from './dropbox.js?v=202611240500';
-import * as Keys from './sheetkeys.js?v=202611240500';
+import { createScanner } from './scanview.js?v=202611240700';
+import * as Dropbox from './dropbox.js?v=202611240700';
+import * as Keys from './sheetkeys.js?v=202611240700';
 
 const PDF_VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
 const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240600';
@@ -54,6 +55,7 @@ const ICON = {
   close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   music: svg('<path d="M9 17.5V6l10-2v11.5"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>', ' stroke-width="1.5"'),
   cloud: svg('<path d="M7 18h9.5a3.5 3.5 0 0 0 .4-7A5.5 5.5 0 0 0 6.4 9.3 4.2 4.2 0 0 0 7 18z"/>'),
+  scan: svg('<path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H8l1.4-2h5.2L16 6h1.5A2.5 2.5 0 0 1 20 8.5v9A2.5 2.5 0 0 1 17.5 20h-11A2.5 2.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.6"/>'),
   folder: svg('<path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z"/>'),
   file: svg('<path d="M6 3.5h8l4 4V20.5H6z"/><path d="M14 3.5v4h4"/>'),
   upload: svg('<path d="M12 16V5M7.5 9.5L12 5l4.5 4.5"/><path d="M4.5 19h15"/>'),
@@ -113,6 +115,7 @@ export function createSheetView(deps) {
         <p class="subtle sheet-lead">${t('sheet.lead')}</p>
       </div>
       <div class="sheet-head-actions">
+        <button class="sheet-cloud-btn" type="button" data-act="scan">${ICON.scan}${t('sheet.scan')}</button>
         <button class="sheet-cloud-btn" type="button" data-act="cloud">${ICON.cloud}${t('sheet.cloud')}</button>
         <button class="primary-btn sheet-import" type="button" data-act="import">${t('sheet.import')}</button>
       </div>
@@ -335,6 +338,24 @@ export function createSheetView(deps) {
       }
     } catch {
       toast(t('sheet.importFailed', { n: images.length }));
+    }
+  }
+
+  async function saveScan(files, title) {
+    if (!files.length) return;
+    try {
+      if (readerOpen && sheet && sheet.kind === 'images') {
+        await appendImages(sheet, files);
+        toast(t('scan.taken'));
+        return;
+      }
+      const made = Lib.emptySheet(profile(), { title, composer: '', kind: 'images', pageCount: files.length });
+      for (let i = 0; i < files.length; i += 1) await Lib.saveFile(Lib.pageKey(made.id, i + 1), files[i]);
+      await Lib.saveSheet(made);
+      await renderShelf();
+      openSheet(made.id);
+    } catch {
+      toast(t('scan.failed'));
     }
   }
 
@@ -1275,7 +1296,7 @@ ${head('sheet.settings')}
         ${sw('spread', Boolean(s.spread), t('sheet.spread'))}
         ${sw('keepAwake', s.keepAwake !== false, t('sheet.keepAwake'))}
       </div>
-      ${sheet.kind === 'images' ? `<button class="reader-pill reader-wide" type="button" data-act="addPages">${ICON.plus}${t('sheet.addPages')}</button>` : ''}
+      ${sheet.kind === 'images' ? `<div class="reader-row"><button class="reader-pill" type="button" data-act="addPages">${ICON.plus}${t('sheet.addPages')}</button><button class="reader-pill" type="button" data-act="scan">${ICON.scan}${t('sheet.scanPages')}</button></div>` : ''}
       <details class="reader-crop" ${cropped ? 'open' : ''}>
         <summary>${t('sheet.crop')}${cropped ? ' ·' : ''}</summary>
         <div class="sheet-panel-grid">
@@ -1870,6 +1891,8 @@ ${head('sheet.audio')}
       case 'learn':
         learning = btn.dataset.action;
         return renderSettings();
+      case 'scan':
+        return scanner.open();
       case 'import':
         fileEl.click();
         return;
@@ -2261,6 +2284,17 @@ ${head('sheet.audio')}
   // app must not sit inside the page's animated, padded shell.
   document.body.appendChild(readerEl);
 
+  const scanHost = document.createElement('div');
+  document.body.appendChild(scanHost);
+  const scanner = createScanner({
+    root: scanHost,
+    onSave: saveScan,
+    onClose: () => {
+      if (readerOpen) refs.stage.focus({ preventScroll: true });
+      else renderShelf();
+    },
+  });
+
   cloudEl.addEventListener('click', (event) => {
     if (event.target === cloudEl) cloudClose();
   });
@@ -2282,6 +2316,7 @@ ${head('sheet.audio')}
       deps.onViewChange?.();
     },
     stop() {
+      scanner.close();
       if (readerOpen) closeReader();
       readerEl.hidden = true;
       readerOpen = false;

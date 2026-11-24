@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Scan arithmetic</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 20px; background: #faf7f1; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // The geometry and tone behind the camera: corner order, steadiness,
+      // homography, warp, threshold, filters, and a synthetic page for the
+      // detector. The camera itself is exercised by sheet-scan.test.html.
+      import * as S from '../src/scan.js';
+
+      const problems = [];
+      const log = [];
+      const is = (name, got, want) => {
+        if (got !== want) problems.push(`${name}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+      };
+      const ok = (name, v) => is(name, Boolean(v), true);
+      const near = (name, got, want, within) => {
+        if (!(Math.abs(got - want) <= within)) problems.push(`${name}: ${got} vs ${want} ± ${within}`);
+      };
+
+      try {
+        const shuffled = [[90, 90], [10, 10], [90, 10], [10, 90]];
+        const q = S.orderQuad(shuffled);
+        is('order tl', q[0].join(','), '10,10');
+        is('order tr', q[1].join(','), '90,10');
+        is('order br', q[2].join(','), '90,90');
+        is('order bl', q[3].join(','), '10,90');
+        near('area', S.quadArea(q), 6400, 0.001);
+        near('center', S.quadCenter(q)[0], 50, 0.001);
+        near('distance', S.quadDistance(q, q), 0, 0.001);
+
+        const smoothed = S.smoothQuad(q, q.map(([x, y]) => [x + 20, y + 20]), 0.5);
+        near('smooth midway', smoothed[0][0], 20, 0.001);
+
+        const still = Array.from({ length: 7 }, () => ({ quad: [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]] }));
+        ok('steady history fires', S.steadyEnough(still));
+        const jittered = still.map((h, i) => ({ quad: h.quad.map(([x, y]) => [x + (i === 6 ? 0.05 : 0), y]) }));
+        ok('jitter holds fire', !S.steadyEnough(jittered));
+        ok('small page holds fire', !S.steadyEnough(still, 0.95));
+
+        const size = S.outputSize(q, 100);
+        near('output keeps ratio', size[0] / size[1], 1, 0.02);
+        ok('output capped', Math.max(...size) <= 100);
+
+        // Homography and warp: a 100² source, four flat colour blocks, warped
+        // from its inner square; each output corner should carry its block.
+        const w = 100;
+        const h = 100;
+        const src = new Uint8ClampedArray(w * h * 4);
+        for (let y = 0; y < h; y += 1) {
+          for (let x = 0; x < w; x += 1) {
+            const at = (y * w + x) * 4;
+            const left = x < 50;
+            const top = y < 50;
+            src[at] = left ? (top ? 255 : 0) : top ? 0 : 255;
+            src[at + 1] = left && !top ? 255 : 0;
+            src[at + 2] = !left && top ? 255 : 0;
+            src[at + 3] = 255;
+          }
+        }
+        const quad = [[10, 10], [89, 10], [89, 89], [10, 89]];
+        const out = S.warpPixels(src, w, h, quad, 40, 40);
+        ok('warp returns pixels', out);
+        const px = (x, y) => [...out.slice((y * 40 + x) * 4, (y * 40 + x) * 4 + 3)];
+        ok('warp tl is red', px(2, 2)[0] > 200);
+        ok('warp tr is blue', px(37, 2)[2] > 200);
+        ok('warp bl is green', px(2, 37)[1] > 200);
+        ok('warp br is red', px(37, 37)[0] > 200 && px(37, 37)[2] < 50);
+
+        const grey = new Uint8ClampedArray(200);
+        for (let i = 0; i < 200; i += 1) grey[i] = i < 100 ? 20 : 230;
+        near('otsu between modes', S.otsu(grey), 20, 1);
+        const greyData = new Uint8ClampedArray(200 * 4);
+        for (let i = 0; i < 200; i += 1) {
+          greyData[i * 4] = greyData[i * 4 + 1] = greyData[i * 4 + 2] = grey[i];
+          greyData[i * 4 + 3] = 255;
+        }
+        is('grey copy', S.greyOf(greyData, 20, 10)[0], 20);
+
+        for (const mode of ['photo', 'color', 'clean', 'grey', 'bw']) {
+          const outF = S.applyFilter(greyData, 20, 10, mode);
+          is(mode + ' keeps size', outF.length, greyData.length);
+          ok(mode + ' in range', outF.every((v) => v >= 0 && v <= 255));
+        }
+        const bw = S.applyFilter(greyData, 20, 10, 'bw');
+        is('bw is two tones', new Set([...bw.filter((_, i) => i % 4 === 0)]).size <= 2, true);
+
+        // A white page on a dark desk: the detector should find it, roughly.
+        const W = 200;
+        const H = 150;
+        const frame = new Uint8ClampedArray(W * H * 4);
+        for (let y = 0; y < H; y += 1) {
+          for (let x = 0; x < W; x += 1) {
+            const at = (y * W + x) * 4;
+            const paper = x > 40 && x < 160 && y > 30 && y < 120;
+            const v = paper ? 235 : 42;
+            frame[at] = frame[at + 1] = frame[at + 2] = v;
+            frame[at + 3] = 255;
+          }
+        }
+        const found = S.autoQuad(frame, W, H);
+        ok('page found', found);
+        if (found) {
+          near('found area', S.quadArea(found), 0.36, 0.12);
+          const c = S.quadCenter(found);
+          near('found center x', c[0], 0.5, 0.12);
+          near('found center y', c[1], 0.5, 0.12);
+        }
+        log.push('all checks ran');
+      } catch (err) {
+        problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
+      }
+
+      document.getElementById('report').textContent = problems.length ? problems.join('\n') : 'ok\n' + log.join('\n');
+      fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'scan', problems, log: log.join('\n') }, null, 2) });
+    </script>
+  </body>
+</html>

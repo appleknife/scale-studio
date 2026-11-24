@@ -31,6 +31,33 @@ piece; clearing the site's data does.
   loop, and a click track. Speed (0.5–1.5×) keeps the pitch and pitch (±12
   semitones, semitone steps) keeps the speed. Tracks can start with the page.
 
+## Scanning a page
+
+**Scan** on the shelf (or *Scan pages* under an image piece) opens the camera,
+finds the sheet, and warps it flat. Drag a corner to correct it; the shutter is
+manual, or automatic once the corners have been still for a moment. Five page
+treatments: original, document colour, clean (flattened light), grey, black and
+white. Pages stack, can be removed, and are saved as one piece when finished.
+
+Studied in Scanner Pro 9.0.5 (`ScannerPro.app`, Mach-O + `ScannerPro/…` Swift
+paths), and what was reproduced:
+
+| Scanner Pro | Here |
+| --- | --- |
+| `DocumentBordersDetector`, `HoughBordersDetector`, `AdaptiveQuadDetector`, `StillImageQuadDetector`, with `OneEuroQuadrilateralFilter` / `ExtendedKalmanFilter` steadying the quad | Otsu bright-region and Sobel-edge candidates in `src/scan.js`, a smoothed average over frames |
+| `SPAutoCaptureManager`, `ShutterState`, "Hold still to take picture" | stillness test over seven samples, shutter fires after a cool-down |
+| `SPAutoCaptureManagerConfig`, `CapturePerspectiveAnalyzer`, manual mode "tap anywhere to adjust corners" | corner handles and an auto on/off switch |
+| `SPQuadWrapStepOperation` (homography) | `homography()` + bilinear `warpPixels()` |
+| `ShadowRemovalFilter`, `ColorDocumentFilter`, `BlackWhiteFilter`, `DenoiseFilter`, `UnsharpMaskFilter`, `ColorModeClassifier` "Smart Filters" | colour balance, shadow-flattening "clean", grey and adaptive B&W in `applyFilter()` |
+| `OneVsTwoPageClassifier`, `SPCaptureBookBorderView` (book mode) | one page per frame; no spread split |
+| `FingersSegmentationModule` + `InpaintingFilter` (LaMa/GPU) | not ported — a thumb in the corner stays |
+| `DocumentPlanarizer` + quality/applicability analysers (curved pages) | not ported — a curved page stays curved within the rectangle |
+| MLKit / Apple Vision / Tesseract OCR, `SPOCRProcessingService` | not in the scan screen; *Listen* still takes MusicXML |
+| `spdoc` package, multi-page counter, retake, reorder, PDF/JPEG/TXT export, password | image piece pages, remove-last, saved as JPEG pages; PDFs are made outside the app |
+
+The screen is `src/scanview.js`; the arithmetic is `src/scan.js` and is covered
+by `tests/scan.test.html` (`tests/sheet-scan.test.html` drives the camera with
+Chrome's fake device).
 ## Dropbox
 
 **Cloud** on the shelf browses Dropbox and downloads a piece or an audio track

@@ -292,6 +292,9 @@ theirs; the shelf is local and the only copy is theirs.
 **Bluetooth page turner** turns pages as a keyboard would (any switch can be
 reassigned, so AirTurn/PageFlip work in their keyboard mode).
 
+**Scan** opens the camera, finds the page, warps it flat and saves it as pages
+of a piece — with corner drag, an auto shutter, and page tones.
+
 The reading mechanics — night mode, half-page turns, per-page ink, speed and
 pitch as separate controls — were studied in MobileSheets Pro and rebuilt on
 web parts: pdf.js for the page, Web Audio plus a granular stretch for the track.
