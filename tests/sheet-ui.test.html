@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Sheet reader</title>`r`n    <link rel="stylesheet" href="../app.css" />
+    <title>Sheet reader</title>
+    <link rel="stylesheet" href="../app.css" />
     <style>
       body { font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; margin: 0; background: #faf7f1; }
       #host { min-height: 100vh; }
@@ -173,7 +174,6 @@
         playBtn.click();
         await wait(500);
         log.push('playText=' + document.querySelector('[data-act="trackPlay"]').textContent + ' clock=' + document.querySelector('[data-el="track-time"]').textContent + ' disabled=' + document.querySelector('[data-el="track-seek"]').disabled);
-        log.push('err=' + window.__sheetErr + ' dur=' + window.__sheetBuf + ' plays=' + window.__sheetPlay + ' ctx=' + window.__sheetState + ' pos=' + window.__sheetPos + ' start=' + JSON.stringify(window.__sheetStart) + ' end=' + window.__sheetEnd);
         const seek = document.querySelector('[data-el="track-seek"]');
         const heard = Number(seek.value);
         if (!(heard > 0)) problems.push('the track did not advance');

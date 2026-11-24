@@ -14,14 +14,15 @@
 // MusicXML, and `tempoaudio.js` for the stretch. The mechanics are the same;
 // none of that app's code or art is copied.
 
-import * as Lib from './sheetlib.js?v=202611240200';
-import { renderStretched } from './tempoaudio.js?v=202611240200';
-import { loadOsmd } from './listenview.js?v=202611240200';
-import { t } from './i18n.js?v=202611240200';
+import * as Lib from './sheetlib.js?v=202611240300';
+import { renderStretched } from './tempoaudio.js?v=202611240300';
+import { loadOsmd } from './listenview.js?v=202611240300';
+import { t } from './i18n.js?v=202611240300';
+import { readScoreFile } from './musicxml.js?v=202611240300';
 
 const PDF_VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
-const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240200';
-const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611240200';
+const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240300';
+const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611240300';
 const PDF_ASSETS = PDF_VENDOR;
 const MAX_DPR = 2;
 const INK = '#1f4fa8';
@@ -97,10 +98,10 @@ export function createSheetView(deps) {
     }, 3200);
   }
 
-  function showShelf() {
+  async function showShelf() {
     readerEl.hidden = true;
     readerOpen = false;
-    closeReader();
+    await closeReader();
     renderShelf();
     deps.onViewChange?.();
   }
@@ -198,7 +199,9 @@ export function createSheetView(deps) {
 
     // Audio picked with a piece open belongs to that piece.
     for (const f of picked) {
-      if (!Lib.fileKind(f) && Lib.audioKind(f) && sheet) await importAudio(f);
+      if (Lib.fileKind(f)) continue;
+      if (Lib.audioKind(f) && sheet) await importAudio(f);
+      else failed += 1;
     }
 
     // Photos picked together are one part, in the order given: pages of a
@@ -454,6 +457,7 @@ export function createSheetView(deps) {
     refs.pageno.textContent = Lib.pageLabel(page, sheet.pageCount || 1);
     refs.slider.value = String(page);
     refs.pages.dataset.layout = layout;
+    refs.stage.classList.toggle('is-zoomed', zoom > 1.02);
     refs.pages.innerHTML = '';
     imageUrls.forEach((url) => URL.revokeObjectURL(url));
     imageUrls.clear();
@@ -567,7 +571,7 @@ export function createSheetView(deps) {
           drawComposer: true,
           drawPartNames: false,
         });
-        await osmd.load(await (await Lib.getFile(sheet.id)).text());
+        await osmd.load(await readScoreFile(await Lib.getFile(sheet.id)));
         osmd.render();
         const svg = media.querySelector('svg');
         if (svg) {
@@ -972,10 +976,16 @@ export function createSheetView(deps) {
     const at = keep ? position() : 0;
     const wasPlaying = playing;
     if (wasPlaying) stopSource();
+    const before = buffer?.duration || stash.duration;
     const rendered = await Promise.resolve().then(() => renderStretched(ac, stash, rate, semitones));
     if (job !== stretchJob || !sheet) return;
+    // Positions are seconds of the stretched track: at half speed the same bar
+    // is twice as far in, so the spot and the A–B loop move with the speed.
+    const k = rendered.duration / Math.max(0.001, before);
     buffer = rendered;
-    startOffset = Lib.clamp(at, 0, rendered.duration);
+    startOffset = Lib.clamp(at * k, 0, rendered.duration);
+    loopA *= k;
+    loopB *= k;
     if (wasPlaying) startSource();
     drawTrackClock();
   }
@@ -987,7 +997,6 @@ export function createSheetView(deps) {
     node.buffer = buffer;
     node.connect(master);
     node.onended = () => {
-      window.__sheetEnd = ac.currentTime;
       if (source !== node) return;
       playing = false;
       source = null;
@@ -996,7 +1005,6 @@ export function createSheetView(deps) {
       renderAudio();
     };
     node.start(0, Lib.clamp(startOffset, 0, buffer.duration));
-    window.__sheetStart = { at: ac.currentTime, off: startOffset, dur: buffer.duration };
     source = node;
     startedAt = ac.currentTime;
     playing = true;
@@ -1020,24 +1028,22 @@ export function createSheetView(deps) {
   async function playTrack(id, fromStart) {
     if (!sheet) return;
     try {
-    window.__sheetErr = '';
-    window.__sheetBuf = 0;
-    window.__sheetBuf = buffer ? buffer.duration : -1;
-    window.__sheetPlay = (window.__sheetPlay || 0) + 1;
-    await ensureAudio();
-    if (ac.state === 'suspended') ac.resume().catch(() => {});
-    if (!currentTrack || currentTrack.id !== id) {
-      await reloadTracks();
-      await selectTrack(id);
-    } else if (!buffer && stash) {
-      buffer = stash;
+      await ensureAudio();
+      if (ac.state === 'suspended') ac.resume().catch(() => {});
+      if (!currentTrack || currentTrack.id !== id) {
+        await reloadTracks();
+        await selectTrack(id);
+      } else if (!buffer && stash) {
+        buffer = stash;
+      }
+      if (!buffer) return;
+      if (fromStart) startOffset = 0;
+      startSource();
+      renderAudio();
+      drawTrackClock();
+    } catch (err) {
+      console.error(err);
     }
-    if (!buffer) return;
-    if (fromStart) startOffset = 0;
-    startSource();
-    renderAudio();
-    drawTrackClock();
-    } catch (err) { window.__sheetErr = String(err && err.message || err); console.error(err); }
   }
 
   function pauseTrack() {
@@ -1095,13 +1101,14 @@ export function createSheetView(deps) {
   }
 
   function drawTrackClock() {
-    window.__sheetPos = position();
-    window.__sheetState = ac ? ac.state + ':' + ac.currentTime.toFixed(2) + ':' + (source ? 'src' : 'nosrc') : 'noctx';
     const clockEl = refs.panel.querySelector('[data-el="track-time"]');
     const slider = refs.panel.querySelector('[data-el="track-seek"]');
     const playBtn = refs.panel.querySelector('[data-act="trackPlay"]');
     if (clockEl) clockEl.textContent = statusTime();
-    if (slider) slider.value = String(position());
+    if (slider) {
+      slider.max = String(buffer?.duration || 1);
+      slider.value = String(position());
+    }
     if (playBtn) playBtn.textContent = playing ? t('sheet.audioPause') : t('sheet.audioPlay');
   }
 
@@ -1186,9 +1193,9 @@ export function createSheetView(deps) {
 
   const metro = { on: false, bpm: 88, beats: 4, timer: 0, next: 0, count: 0, gain: null };
 
-  function metroClick(accent) {
+  function metroClick(accent, when) {
     if (!ac || !metro.gain) return;
-    const at = ac.currentTime;
+    const at = Math.max(ac.currentTime, when);
     const osc = ac.createOscillator();
     const env = ac.createGain();
     osc.frequency.value = accent ? 1568 : 1046;
@@ -1205,8 +1212,7 @@ export function createSheetView(deps) {
     const ahead = 0.12;
     while (metro.next < ac.currentTime + ahead) {
       const accent = metro.count % metro.beats === 0;
-      const delay = Math.max(0, metro.next - ac.currentTime);
-      setTimeout(() => metroClick(accent), delay * 1000);
+      metroClick(accent, metro.next);
       metro.count += 1;
       metro.next += 60 / metro.bpm;
     }
@@ -1273,7 +1279,9 @@ export function createSheetView(deps) {
     }
     if (btn.dataset.fit && sheet) {
       fitMode = btn.dataset.fit;
+      zoom = 1;
       sheet.settings.fit = fitMode;
+      sheet.settings.zoom = 1;
       await Lib.saveSheet(sheet).catch(() => {});
       renderSettings();
       return paint();
@@ -1309,6 +1317,7 @@ export function createSheetView(deps) {
         await Lib.saveSheet(sheet).catch(() => {});
       }
       saveAudioWithFiles(stripBlob());
+      Lib.deleteAudioBlob(sheet.id, btn.dataset.trackDel).catch(() => {});
       renderAudio();
       return;
     }
@@ -1525,15 +1534,38 @@ export function createSheetView(deps) {
   let pinchFrom = null;
   const pointers = new Map();
 
+  // A pinch shows its size with a CSS scale while the fingers move and draws
+  // the page once when they lift: re-rendering a PDF on every move flickers.
+  let pinchZoom = 0;
+  let pinched = false; // a pinch is never also a tap or a swipe
+
+  function endPinch() {
+    if (!pinchFrom) return;
+    pinchFrom = null;
+    refs.pages.style.transform = '';
+    refs.pages.style.transformOrigin = '';
+    if (pinchZoom) setZoom(pinchZoom);
+    pinchZoom = 0;
+  }
+
   refs.stage.addEventListener('pointerdown', (event) => {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 1) pinched = false;
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
-      pinchFrom = { d: Math.hypot(a.x - b.x, a.y - b.y), zoom };
+      const rect = refs.pages.getBoundingClientRect();
+      pinchFrom = {
+        d: Math.hypot(a.x - b.x, a.y - b.y),
+        zoom,
+        ox: (a.x + b.x) / 2 - rect.left,
+        oy: (a.y + b.y) / 2 - rect.top,
+      };
+      pinched = true;
+      stageStart = null;
       return;
     }
     if (event.target.closest('.page-ink.is-active')) return;
-    stageStart = { x: event.clientX, y: event.clientY, scroll: refs.stage.scrollTop };
+    stageStart = { x: event.clientX, y: event.clientY, scroll: refs.stage.scrollTop, left: refs.stage.scrollLeft };
     if (zoom > 1.02) refs.stage.setPointerCapture?.(event.pointerId);
   });
 
@@ -1543,22 +1575,27 @@ export function createSheetView(deps) {
     if (pinchFrom && pointers.size >= 2) {
       const [a, b] = [...pointers.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      setZoom(pinchFrom.zoom * (d / Math.max(1, pinchFrom.d)));
+      pinchZoom = Lib.clampZoom(pinchFrom.zoom * (d / Math.max(1, pinchFrom.d)));
+      refs.pages.style.transformOrigin = `${pinchFrom.ox}px ${pinchFrom.oy}px`;
+      refs.pages.style.transform = `scale(${pinchZoom / pinchFrom.zoom})`;
       return;
     }
     if (!stageStart || zoom <= 1.02) return;
+    // Zoomed in: the finger drags the page both ways.
     refs.stage.scrollTop = stageStart.scroll - (event.clientY - stageStart.y);
+    refs.stage.scrollLeft = stageStart.left - (event.clientX - stageStart.x);
   });
 
   refs.stage.addEventListener('pointerup', (event) => {
     pointers.delete(event.pointerId);
-    if (pointers.size < 2) pinchFrom = null;
-    if (!stageStart) return;
+    if (pointers.size < 2) endPinch();
+    if (pinched || !stageStart) return;
     const dx = event.clientX - stageStart.x;
     const dy = event.clientY - stageStart.y;
     const quiet = Math.abs(dx) < 9 && Math.abs(dy) < 9;
     stageStart = null;
-    if (Math.abs(dx) > 46 && Math.abs(dx) > Math.abs(dy) * 1.4) return step(dx < 0 ? 1 : -1);
+    // A swipe turns the page; zoomed in, the same drag was moving the page.
+    if (zoom <= 1.02 && Math.abs(dx) > 46 && Math.abs(dx) > Math.abs(dy) * 1.4) return step(dx < 0 ? 1 : -1);
     if (!quiet) return;
     if (tool) return;
     const box = refs.stage.getBoundingClientRect();
@@ -1570,16 +1607,16 @@ export function createSheetView(deps) {
       closePanel();
     }
   });
-  refs.stage.addEventListener('pointercancel', () => {
-    pointers.clear();
+  refs.stage.addEventListener('pointercancel', (event) => {
+    pointers.delete(event.pointerId);
     stageStart = null;
-    pinchFrom = null;
+    if (pointers.size < 2) endPinch();
   });
 
   refs.stage.addEventListener(
     'wheel',
     (event) => {
-      if (!event.ctrlKey && zoom <= 1.02) return;
+      if (!event.ctrlKey) return;
       event.preventDefault();
       setZoom(zoom * (event.deltaY < 0 ? 1.08 : 0.93));
     },

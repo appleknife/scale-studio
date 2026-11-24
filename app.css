@@ -8834,9 +8834,23 @@ select,
 .reader-pages {
   display: flex;
   align-items: flex-start;
-  justify-content: center;
+  /* Not justify-content: center — a page wider than the stage would spill off
+     the left edge, where no scroll can reach it. Auto margins centre a page that
+     fits and let a zoomed one start at the left. */
+  justify-content: flex-start;
+  width: max-content;
+  min-width: 100%;
   gap: 10px;
   min-height: 100%;
+}
+.reader-pages > .page-box:first-child {
+  margin-left: auto;
+}
+.reader-pages > .page-box:last-child {
+  margin-right: auto;
+}
+.reader-stage.is-zoomed .page-box {
+  touch-action: none; /* zoomed: the reader drags the page both ways itself */
 }
 .page-box {
   position: relative;

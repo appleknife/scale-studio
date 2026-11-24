@@ -40,7 +40,7 @@ export function fileKind(file) {
   const type = String(file && file.type || '');
   const name = String(file && file.name || '').toLowerCase();
   if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
-  if (/\.(musicxml|mxl)$/.test(name) || type.includes('musicxml')) return 'musicxml';
+  if (/\.(musicxml|mxl|xml)$/.test(name) || type.includes('musicxml')) return 'musicxml';
   if (type.startsWith('image/') || /\.(png|jpe?g|webp|gif|avif)$/.test(name)) return 'image';
   return null;
 }
@@ -265,6 +265,10 @@ export function getAudioBlob(sheetId, trackId) {
 
 export function saveAudioBlob(sheetId, trackId, blob) {
   return run(STORE_FILES, 'readwrite', (store) => store.put(blob, `${sheetId}/${trackId}`));
+}
+
+export function deleteAudioBlob(sheetId, trackId) {
+  return run(STORE_FILES, 'readwrite', (store) => store.delete(`${sheetId}/${trackId}`));
 }
 
 export async function storageEstimate() {
