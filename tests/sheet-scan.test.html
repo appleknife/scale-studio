@@ -65,6 +65,11 @@
         const selected = document.querySelector('.scan-filter.is-on[data-editfilter]')?.dataset.editfilter;
         if (selected !== 'clean') problems.push('default look is ' + selected);
         log.push('editor opened on ' + selected);
+        if (!document.querySelector('[data-act="editStraighten"]')) problems.push('no straighten switch');
+        const preview = document.querySelector('[data-el="editPreview"]');
+        await until(() => preview.width > 40);
+        if (preview.width < 40) problems.push('no edit preview');
+        log.push('straighten switch: ' + document.querySelector('[data-act="editStraighten"]').getAttribute('aria-checked') + ', preview ' + preview.width + 'x' + preview.height);
         document.querySelector('[data-editfilter="bw"]').click();
         api.setQuad([[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]], 'edit');
         await wait(120);

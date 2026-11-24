@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Dewarp</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 20px; background: #faf7f1; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script type="module">
+      // A page of bowed staves, then the straightener on it. The measure is the
+      // same before and after: how far each line wanders from its own middle.
+      import * as D from '../src/dewarp.js';
+
+      const problems = [];
+      const log = [];
+      const ok = (name, v) => {
+        if (!v) problems.push(name);
+      };
+      const near = (name, got, want, within) => {
+        if (!(Math.abs(got - want) <= within)) problems.push(name + ': ' + got + ' vs ' + want);
+      };
+
+      function page(w, h, bow, lines) {
+        const data = new Uint8ClampedArray(w * h * 4);
+        for (let i = 0; i < w * h; i += 1) {
+          data[i * 4] = data[i * 4 + 1] = data[i * 4 + 2] = 245;
+          data[i * 4 + 3] = 255;
+        }
+        for (const base of lines) {
+          for (let x = 0; x < w; x += 1) {
+            const y = Math.round(base + bow * Math.sin((Math.PI * x) / w));
+            for (let t = 0; t < 2; t += 1) {
+              const at = ((y + t) * w + x) * 4;
+              if (at < data.length) data[at] = data[at + 1] = data[at + 2] = 30;
+            }
+          }
+        }
+        return data;
+      }
+
+      const wander = (data, w, h, base) => {
+        let first = -1;
+        let last = -1;
+        let top = h;
+        let bottom = 0;
+        for (let x = 0; x < w; x += 4) {
+          for (let y = Math.max(0, base - 30); y < Math.min(h, base + 30); y += 1) {
+            if (data[(y * w + x) * 4] < 90) {
+              if (first < 0) first = x;
+              last = x;
+              top = Math.min(top, y);
+              bottom = Math.max(bottom, y);
+              break;
+            }
+          }
+        }
+        return last - first > w * 0.4 ? bottom - top : 0;
+      };
+
+      try {
+        const W = 600;
+        const H = 800;
+        const staff = [120, 132, 144, 156, 168, 300, 312, 324, 336, 348];
+        const bowed = page(W, H, 10, staff);
+        const lines = D.findLines(D.straighten ? (() => {
+          const g = new Uint8ClampedArray(W * H);
+          for (let i = 0; i < W * H; i += 1) g[i] = bowed[i * 4];
+          return g;
+        })() : null, W, H);
+        log.push('lines found: ' + lines.length);
+        ok('ten lines found', lines.length >= 8);
+        const conf = D.straightenConfidence(lines, W);
+        near('confidence high', conf, 1, 0.35);
+        ok('confidence clears bar', conf >= 0.45);
+
+        const before = wander(bowed, W, H, 132);
+        const res = D.straighten(bowed, W, H);
+        ok('straighten applied', res.applied);
+        const after = wander(res.data, W, H, 132);
+        log.push('bow before ' + before + 'px, after ' + after + 'px');
+        ok('bow reduced', after < before * 0.6);
+
+        const blank = new Uint8ClampedArray(W * H * 4).fill(255);
+        const none = D.straighten(blank, W, H);
+        ok('blank page left alone', !none.applied);
+
+        // A single line is not enough to build a field from.
+        ok('one line not applied', !D.straighten(page(W, H, 8, [300]), W, H).applied);
+      } catch (err) {
+        problems.push('exception: ' + err.message + ' @ ' + (err.stack || '').split('\n')[1]);
+      }
+
+      document.getElementById('report').textContent = problems.length ? problems.join('\n') : 'ok\n' + log.join('\n');
+      fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'dewarp', problems, log: log.join('\n') }, null, 2) });
+    </script>
+  </body>
+</html>

@@ -10440,3 +10440,19 @@ select,
   width: 18px;
   height: 18px;
 }
+
+/* The straighten switch borrows the settings switch, on the dark scan sheet. */
+.scan-straight {
+  color: #f2ece2;
+  border-bottom: 0;
+  padding: 9px 2px;
+}
+.scan-straight i {
+  background: rgba(255, 255, 255, 0.24);
+}
+.scan-straight[aria-checked='true'] i {
+  background: #8ec9ff;
+}
+.scan-straight:disabled {
+  opacity: 0.45;
+}

@@ -10,7 +10,7 @@
 // document-type guessing) are not reproduced; the camera, the quad, the warp
 // and the tone are.
 
-import { t } from './i18n.js?v=202611240900';
+import { t } from './i18n.js?v=202611241000';
 import {
   applyFilter,
   autoQuad,
@@ -22,7 +22,8 @@ import {
   quadToPixels,
   smoothQuad,
   warpPixels,
-} from './scan.js?v=202611240900';
+} from './scan.js?v=202611241000';
+import { straighten } from './dewarp.js?v=202611241000';
 
 const ICON = {
   close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -104,7 +105,7 @@ export function createScanner(deps) {
 
       <div class="scan-edit" data-el="edit" hidden>
         <div class="scan-edit-stage" data-el="editStage">
-          <img class="scan-edit-img" data-el="editImg" alt="" />
+          <canvas class="scan-edit-img" data-el="editPreview"></canvas>
           <canvas class="scan-overlay" data-el="editOverlay"></canvas>
         </div>
         <div class="scan-edit-bar">
@@ -118,6 +119,7 @@ export function createScanner(deps) {
           <div class="scan-filters" role="group" aria-label="${t('scan.filter')}">
             ${FILTERS.map((f) => `<button class="scan-filter" type="button" data-editfilter="${f}">${t('scan.filter.' + f)}</button>`).join('')}
           </div>
+          <button class="reader-switch scan-straight" type="button" data-act="editStraighten" role="switch" aria-checked="true"><span>${t('scan.straighten')}</span><i aria-hidden="true"></i></button>
           <button class="primary-btn scan-apply" type="button" data-act="editApply">${ICON.check}${t('scan.apply')}</button>
           <p class="scan-note">${t('scan.editNote')}</p>
         </div>
@@ -138,7 +140,7 @@ export function createScanner(deps) {
     strip: root.querySelector('[data-el="strip"]'),
     edit: root.querySelector('[data-el="edit"]'),
     editStage: root.querySelector('[data-el="editStage"]'),
-    editImg: root.querySelector('[data-el="editImg"]'),
+    editPreview: root.querySelector('[data-el="editPreview"]'),
     editOverlay: root.querySelector('[data-el="editOverlay"]'),
     editTitle: root.querySelector('[data-el="editTitle"]'),
   };
@@ -366,10 +368,17 @@ export function createScanner(deps) {
       const sctx = srcCanvas.getContext('2d', { willReadFrequently: true });
       sctx.drawImage(img, 0, 0);
       const warped = warpPixels(sctx.getImageData(0, 0, sw, sh).data, sw, sh, q, ow, oh);
+      let pixels = warped;
+      if (page.straighten !== false) {
+        const res = straighten(warped, ow, oh);
+        page.straightenOk = res.confidence >= 0.45;
+        if (res.applied) pixels = res.data;
+        else page.straighten = false;
+      }
       const out = document.createElement('canvas');
       out.width = ow;
       out.height = oh;
-      out.getContext('2d').putImageData(new ImageData(applyFilter(warped, ow, oh, page.filter), ow, oh), 0, 0);
+      out.getContext('2d').putImageData(new ImageData(applyFilter(pixels, ow, oh, page.filter), ow, oh), 0, 0);
       return out;
     });
   }
@@ -392,7 +401,7 @@ export function createScanner(deps) {
     el.scan.classList.add('is-busy');
     try {
       const frame = grabFrame(el.video, 2400);
-      const page = { raw: frame.toDataURL('image/jpeg', 0.94), quad: (quad || hatchQuad()).map((p) => [...p]), filter, thumb: '' };
+      const page = { raw: frame.toDataURL('image/jpeg', 0.94), quad: (quad || hatchQuad()).map((p) => [...p]), filter, straighten: true, thumb: '' };
       pages.push(page);
       renderStrip();
       makeThumb(pages.length - 1);
@@ -410,6 +419,43 @@ export function createScanner(deps) {
     el.scan.classList.remove('is-busy');
   }
 
+  let previewJob = 0;
+  let previewTimer = 0;
+
+  function paintStraightenButton(page) {
+    const btn = el.edit.querySelector('[data-act="editStraighten"]');
+    if (!btn) return;
+    const available = page.straightenOk !== false;
+    btn.setAttribute('aria-checked', String(Boolean(page.straighten) && available));
+    btn.classList.toggle('is-on', Boolean(page.straighten) && available);
+    btn.disabled = !available;
+    btn.title = available ? t('scan.straightenNote') : t('scan.straightenNone');
+  }
+
+  /** Draw the page as the current corners, look and straighten would save it. */
+  function refreshEdit(delay = 90) {
+    const job = ++previewJob;
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+      const page = pages[editing];
+      if (!page) return;
+      try {
+        const canvas = await renderPage(page, 900);
+        if (job !== previewJob) return;
+        el.editPreview.width = canvas.width;
+        el.editPreview.height = canvas.height;
+        el.editPreview.getContext('2d').drawImage(canvas, 0, 0);
+        el.editStage.style.aspectRatio = `${canvas.width} / ${canvas.height}`;
+        sizeOverlay(el.editOverlay, el.editStage);
+        drawEdit();
+        paintStraightenButton(page);
+        el.edit.querySelectorAll('[data-editfilter]').forEach((b) => b.classList.toggle('is-on', b.dataset.editfilter === page.filter));
+      } catch {
+        /* keep the last preview */
+      }
+    }, delay);
+  }
+
   function openEdit(index) {
     if (!pages[index]) return;
     editing = index;
@@ -417,18 +463,15 @@ export function createScanner(deps) {
     el.scan.classList.add('is-editing');
     el.edit.hidden = false;
     const page = pages[index];
-    el.editImg.src = page.raw;
-    el.editImg.style.filter = PREVIEW[page.filter] || 'none';
-    el.editTitle.textContent = t('scan.pageN', { n: index + 1 });
+    page.straightenOk = page.straightenOk !== false;
+    if (page.straighten === undefined) page.straighten = true;
     if (!page.quad) page.quad = hatchQuad();
+    el.editTitle.textContent = t('scan.pageN', { n: index + 1 });
     el.edit.querySelectorAll('[data-editfilter]').forEach((b) => b.classList.toggle('is-on', b.dataset.editfilter === page.filter));
-    el.editImg.decode().then(() => {
-      el.editStage.style.aspectRatio = `${el.editImg.naturalWidth} / ${el.editImg.naturalHeight}`;
-      resizeEdit();
-      const fit = el.edit.querySelector('[data-act="editPrev"]');
-      fit.hidden = index === 0;
-      el.edit.querySelector('[data-act="editNext"]').hidden = index === pages.length - 1;
-    });
+    paintStraightenButton(page);
+    el.edit.querySelector('[data-act="editPrev"]').hidden = index === 0;
+    el.edit.querySelector('[data-act="editNext"]').hidden = index === pages.length - 1;
+    refreshEdit(0);
     history = [];
   }
 
@@ -601,7 +644,8 @@ export function createScanner(deps) {
       const page = pages[editing];
       if (!page) return;
       page.filter = btn.dataset.editfilter;
-      el.editImg.style.filter = PREVIEW[page.filter] || 'none';
+      paintStraightenButton(page);
+      refreshEdit();
       el.edit.querySelectorAll('[data-editfilter]').forEach((b) => b.classList.toggle('is-on', b === btn));
       return;
     }

@@ -267,7 +267,7 @@ export function applyFilter(data, w, h, mode) {
     for (let p = 0; p < gray.length; p += 1) {
       // Against the local paper rather than a global cut, so a shadowed corner
       // does not turn into a black block.
-      const v = gray[p] < Math.min(cut, paper[p] * 0.86) ? 24 : 248;
+      const v = gray[p] <= Math.min(cut, paper[p] * 0.86) ? 24 : 248;
       const at = p * 4;
       out[at] = v;
       out[at + 1] = v;

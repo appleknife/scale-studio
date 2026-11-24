@@ -53,7 +53,8 @@ paths), and what was reproduced:
 | `ShadowRemovalFilter`, `ColorDocumentFilter`, `BlackWhiteFilter`, `DenoiseFilter`, `UnsharpMaskFilter`, `ColorModeClassifier` "Smart Filters" | colour balance, shadow-flattening "clean", grey and adaptive B&W in `applyFilter()` |
 | `OneVsTwoPageClassifier`, `SPCaptureBookBorderView` (book mode) | one page per frame; no spread split |
 | `FingersSegmentationModule` + `InpaintingFilter` (LaMa/GPU) | not ported — a thumb in the corner stays |
-| `DocumentPlanarizer` + quality/applicability analysers (curved pages) | not ported — a curved page stays curved within the rectangle |
+| `DocumentPlanarizer` sits on Leptonica `dewarpa` (text-line disparity); applicability/quality analysers decide when to run | `src/dewarp.js` tracks long staff or text lines, builds a vertical disparity field and straightens; a per-page switch, off when no long lines are found |
+| `FlounderArtifactClassificator` (16 KB Core ML model) guards the planarizer | not ported; line count and bow are the only guards |
 | MLKit / Apple Vision / Tesseract OCR, `SPOCRProcessingService` | not in the scan screen; *Listen* still takes MusicXML |
 | `spdoc` package, multi-page counter, retake, reorder, PDF/JPEG/TXT export, password | image piece pages, remove-last, saved as JPEG pages; PDFs are made outside the app |
 
@@ -127,3 +128,7 @@ smears. Pitch-preserving playback of an audio element (`preservesPitch`) is not
 used because it cannot change key at a fixed tempo. Password-protected PDFs open
 if pdf.js can read them, and say so if not. A scanned PDF is an image to this
 app — the note-following in *Listen* still wants MusicXML.
+
+Straightening corrects vertical bowing only, and only where long lines are
+visible; a page squeezed sideways by a gutter keeps that squeeze. Finger removal
+and OCR are still out of reach here.

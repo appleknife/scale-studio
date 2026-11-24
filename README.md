@@ -294,6 +294,7 @@ reassigned, so AirTurn/PageFlip work in their keyboard mode).
 
 **Scan** opens the camera and finds the page; a ring shows when it will fire.
 Pages are cropped and toned afterwards, opened from their thumbnails, and saved
+A page can also be straightened — bowed staff lines are pushed back level.
 as one piece.
 
 The reading mechanics — night mode, half-page turns, per-page ink, speed and

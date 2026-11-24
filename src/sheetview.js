@@ -19,9 +19,9 @@ import { renderStretched } from './tempoaudio.js?v=202611240600';
 import { loadOsmd } from './listenview.js?v=202611240600';
 import { t } from './i18n.js?v=202611240600';
 import { readScoreFile } from './musicxml.js?v=202611240600';
-import { createScanner } from './scanview.js?v=202611240900';
-import * as Dropbox from './dropbox.js?v=202611240900';
-import * as Keys from './sheetkeys.js?v=202611240900';
+import { createScanner } from './scanview.js?v=202611241000';
+import * as Dropbox from './dropbox.js?v=202611241000';
+import * as Keys from './sheetkeys.js?v=202611241000';
 
 const PDF_VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
 const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611240600';
