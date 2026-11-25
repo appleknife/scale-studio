@@ -10599,3 +10599,124 @@ select,
 .scan-straight:disabled {
   opacity: 0.45;
 }
+
+/* ── Up on the furniture, and hide and seek ──────────────────────────── */
+
+/* Behind something low (the beanbag, the toy box, the plant) it ducks down:
+   squashed about its own feet, ears up. */
+.pet-hit.is-crouch {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scale(1.06, 0.58);
+}
+
+/* A peek: out round the side of its hiding place, a look, and back. */
+.pet-hit.is-peek {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pet-peek 1.6s ease-in-out;
+}
+.pet-hit.is-crouch.is-peek {
+  animation-name: pet-peek-low;
+}
+@keyframes pet-peek {
+  0%, 100% { transform: translateX(0); }
+  28%, 64% { transform: translateX(var(--peek, 24px)); }
+}
+@keyframes pet-peek-low {
+  0%, 100% { transform: translateX(0) scale(1.06, 0.58); }
+  28%, 64% { transform: translateX(var(--peek, 24px)) scale(1, 0.8); }
+}
+
+/* Eyes closed: the room goes dark and counts down. */
+.seek-veil {
+  animation: seek-veil-in 0.35s ease-out both;
+}
+.seek-veil rect {
+  opacity: 0.985; /* no peeking: it must not be seen going */
+}
+.seek-veil.is-lifting {
+  animation: seek-veil-out 0.7s ease-in forwards;
+}
+@keyframes seek-veil-in {
+  from { opacity: 0; }
+}
+@keyframes seek-veil-out {
+  0%, 45% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.seek-eyes {
+  font-size: 44px;
+}
+.seek-count {
+  font: 800 64px var(--sans);
+  fill: #ffe27a;
+  transform-box: fill-box;
+  transform-origin: 50% 60%;
+}
+.seek-count.is-tick {
+  animation: seek-tick 0.8s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes seek-tick {
+  0% { transform: scale(0.3); opacity: 0; }
+  40% { opacity: 1; }
+  100% { transform: scale(1); }
+}
+.seek-sub {
+  font: 600 15px var(--sans);
+  fill: #e9e3ff;
+}
+
+/* "Not here!" floating up from a wrong guess. */
+.fx-tag {
+  font: 800 13px var(--sans);
+  fill: #6a4cc7;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3.5px;
+  stroke-linejoin: round;
+  animation: fx-tag-up 1.4s ease-out forwards;
+}
+@keyframes fx-tag-up {
+  0% { opacity: 0; transform: translateY(6px); }
+  18% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-22px); }
+}
+
+.pet-play-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  padding: 7px 13px;
+  border: 2px solid #f0d8c4;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  font: 700 13.5px/1 var(--sans);
+  box-shadow: 0 6px 14px -8px rgba(60, 40, 20, 0.5);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease;
+}
+.pet-play-btn:hover {
+  background: #fff;
+}
+.pet-play-btn:active {
+  transform: scale(0.95);
+}
+.pet-play-btn.is-seeking {
+  background: #6a4cc7;
+  border-color: #6a4cc7;
+  color: #fff;
+}
+.pet-play-btn[hidden] {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-hit.is-peek,
+  .seek-count.is-tick,
+  .fx-tag {
+    animation: none;
+  }
+}

@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611251800';
-import { currentSeason } from './season.js?v=202611251800';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611251800';
+import * as Pet from './pet.js?v=202611251900';
+import { currentSeason } from './season.js?v=202611251900';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611251900';
 import {
   petMarkup,
   eggMarkup,
@@ -33,8 +33,8 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611251800';
-import { t, getLang } from './i18n.js?v=202611251800';
+} from './petart.js?v=202611251900';
+import { t, getLang } from './i18n.js?v=202611251900';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -46,6 +46,27 @@ const FISH_SCALE = 0.62;
 const BOWL = { x: 126, y: 262 }; // the food bowl, for the land pets
 const BED = { x: 296, y: 266 };
 const SLEEP_AFTER = 55000; // a quiet spell long enough for a nap
+
+// Tops a pet can sit on, in the drawing's own units (before the piece is
+// dragged anywhere): the left and right ends of the surface, and its height.
+const PERCH = {
+  bookshelf: { x0: 220, x1: 258, y: 134 },
+  piano: { x0: 150, x1: 206, y: 148 },
+  toybox: { x0: 330, x1: 370, y: 263 },
+  beanbag: { x0: 46, x1: 74, y: 253 },
+};
+// Places to hide in hide and seek: where the pet's feet go (just behind the
+// piece, so it is drawn behind it), whether it has to crouch to fit, and how
+// far it leans out when it peeks. The piano's legs leave its feet showing and
+// the beanbag its ears — a hint, the way a real hider gives themselves away.
+// (The plant was tried: its pot is too thin to hide anything.)
+const HIDE = {
+  bookshelf: { x: 239, y: 220, crouch: false, peek: 26 },
+  piano: { x: 178, y: 219, crouch: false, peek: 36 },
+  beanbag: { x: 60, y: 282, crouch: true, peek: 30 },
+  toybox: { x: 350, y: 289, crouch: true, peek: 28 },
+  bed: { x: 296, y: 258, crouch: true, peek: 40 },
+};
 
 const SOUNDS = {
   dog: ['pet.say.dog1', 'pet.say.dog2'],
@@ -115,6 +136,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   let held = false; // the pet is in the student's hand
   let drag = null; // a press that may become a drag: { kind, id, el, start, from, moved }
   let skyStep = -1; // which five minutes the window was last painted for
+  let perch = null; // the furniture the pet is sitting on top of, if any
+  let seek = null; // a game of hide and seek: { spot, tries, misses }
 
   // The time the room goes by: the clock, or `?hour=21` to see the evening at noon.
   /** What to call an animal: a chick that has grown up is a hen. */
@@ -192,6 +215,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       layers.room.innerHTML = roomArt();
       if (previewItem()) queueMicrotask(paintFurniture);
       skyStep = Math.floor(timeNow() * 12);
+      // The piece it was sitting on has been put away: down it comes.
+      if (perch && !pet.placed.includes(perch)) {
+        perch = null;
+        if (!held) dropPet();
+      }
       // A ball may have been bought or put away while the scenery was replaced.
       const wantsBall = pet.pet && !choosing && pet.placed.includes('ball') && !isFish();
       if (wantsBall && !layers.ball) {
@@ -231,6 +259,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       layers.stage.append(layers.petPos);
       // A press on the pet is a pat if it is let go, and a lift if it is carried.
       layers.pet.addEventListener('pointerdown', (event) => {
+        if (seek) {
+          event.stopPropagation();
+          if (seek.hidden) reveal('found');
+          return;
+        }
         if (busy) return;
         if (isFish()) {
           patPet();
@@ -245,7 +278,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         }
       });
       if (isFish()) pos = { x: 200, y: 164 };
-      else if (pos.y !== FLOOR_Y) pos = { x: 210, y: FLOOR_Y };
+      else if (perch && pet.placed.includes(perch)) pos = { x: pos.x, y: perchTop(perch).y };
+      else if (pos.y !== FLOOR_Y) {
+        perch = null;
+        pos = { x: 210, y: FLOOR_Y };
+      }
       placePet();
       setMode(mode === 'sleep' ? 'sleep' : 'idle');
       setHungry(hungry);
@@ -472,7 +509,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     }
     if (layers.shade) {
       // on the floor under the pet, smaller the higher it is held
-      const ground = Math.max(pos.y, FLOOR_Y);
+      const ground = perch ? perchTop(perch).y : Math.max(pos.y, FLOOR_Y);
       const lift = Math.min(1, Math.max(0, (ground - pos.y) / 160));
       const k = s / PET_SCALE;
       layers.shade.setAttribute('transform', `translate(${pos.x.toFixed(1)} ${(ground + 1).toFixed(1)}) scale(${(k * (1 - lift * 0.55)).toFixed(3)})`);
@@ -665,8 +702,21 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   els.svg.addEventListener('pointerdown', (event) => {
     if (drag) return;
     const el = event.target.closest ? event.target.closest('.room-item') : null;
+    // Hiding: a tap on a piece of furniture is a guess, never a drag.
+    if (seek) {
+      if (seek.hidden && el) guess(el);
+      return;
+    }
     if (!el || !Pet.ITEM_RANGE[el.dataset.item]) return;
-    beginDrag(event, { kind: 'item', id: el.dataset.item, el, from: Pet.itemAt(pet, el.dataset.item) });
+    beginDrag(event, { kind: 'item', id: el.dataset.item, el, from: Pet.itemAt(pet, el.dataset.item), petFrom: { ...pos } });
+  });
+
+  els.play?.addEventListener('click', () => {
+    if (seek) {
+      if (seek.hidden) reveal('giveup');
+      return;
+    }
+    startSeek();
   });
 
   // The pet watches a finger (or the mouse) moving about the room.
@@ -702,6 +752,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     } else if (drag.kind === 'item') {
       const to = Pet.moveItem(pet, drag.id, drag.from.x + dx, drag.from.y + dy);
       drag.el.setAttribute('transform', `translate(${to.x} ${to.y})`);
+      // a pet sitting on top rides along
+      if (perch === drag.id && !held) {
+        pos = { x: drag.petFrom.x + (to.x - drag.from.x), y: perchTop(perch).y };
+        placePet();
+      }
       // its light goes with the lamp
       if (drag.id === 'lamp') layers.room.querySelector('.lamp-glow.is-lit')?.parentNode.setAttribute('transform', `translate(${to.x} ${to.y})`);
     } else {
@@ -947,6 +1002,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   /** Picked up: whatever it was doing stops, and it dangles, delighted. */
   function liftPet() {
     held = true;
+    perch = null;
     cancelAnimationFrame(raf);
     setMode('happy');
     layers.pet?.classList.add('is-held');
@@ -960,7 +1016,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     save();
     paintFoot();
     const from = pos.y;
-    const fall = FLOOR_Y - from;
+    // Let go above a bookshelf, the piano, the toy box or the beanbag, it lands
+    // on top and stays there; anywhere else it drops to the floor.
+    const onto = isFish() ? null : perchUnder(pos.x, pos.y);
+    const fall = (onto ? perchTop(onto).y : FLOOR_Y) - from;
     const ms = 110 + 24 * Math.sqrt(Math.max(0, fall));
     const start = performance.now();
     const land = () => {
@@ -973,6 +1032,14 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         later(() => squash.classList.remove('is-landing'), 430);
       }
       hop();
+      if (onto) {
+        perch = onto;
+        placePet();
+        hearts(2);
+        say(t('pet.say.perch'), 1800);
+        later(() => mode === 'happy' && !held && setMode('idle'), 1400);
+        return;
+      }
       const bed = bedAt();
       if (pet.placed.includes('bed') && Math.abs(pos.x - bed.x) < 34) {
         say(t('pet.say.cosy'), 1800);
@@ -1013,10 +1080,289 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     later(watchSky, 30000);
   }
 
+  // ── Up on the furniture ───────────────────────────────────────────────
+
+  /** The top of a piece of furniture, where it stands now. */
+  function perchTop(id) {
+    const p = PERCH[id];
+    const o = Pet.itemAt(pet, id);
+    return { x0: p.x0 + o.x, x1: p.x1 + o.x, y: p.y + o.y };
+  }
+
+  /** The furniture out in the room that can be sat on. */
+  const perches = () => Object.keys(PERCH).filter((id) => pet.placed.includes(id));
+
+  /** What a pet let go at (x, y) would land on: the first top below it, if any. */
+  function perchUnder(x, y) {
+    let best = null;
+    for (const id of perches()) {
+      const top = perchTop(id);
+      if (x < top.x0 - 4 || x > top.x1 + 4 || y > top.y + 10) continue;
+      if (!best || top.y < perchTop(best).y) best = id;
+    }
+    return best;
+  }
+
+  /** A jump in an arc, with a squash at each end — up onto something, or down. */
+  function jumpTo(x, y, then = null) {
+    if (held) return;
+    cancelAnimationFrame(raf);
+    const from = { ...pos };
+    perch = null;
+    facing = x >= from.x ? 1 : -1;
+    // high enough to clear the edge of a top it is jumping onto
+    const rise = 26 + Math.abs(from.y - y) * 0.32;
+    const ms = 420 + Math.min(260, Math.abs(from.y - y) * 1.6);
+    const start = performance.now();
+    hop();
+    setMode('happy');
+    const step = (now) => {
+      if (!running || held) return;
+      const f = Math.min(1, (now - start) / ms);
+      const arc = 4 * f * (1 - f); // 0 → 1 → 0
+      pos = {
+        x: from.x + (x - from.x) * f,
+        y: from.y + (y - from.y) * f - arc * rise,
+      };
+      placePet();
+      if (f < 1) raf = requestAnimationFrame(step);
+      else {
+        pos = { x, y };
+        placePet();
+        const squash = layers.pet?.querySelector('.pet-scale');
+        if (squash) {
+          squash.classList.remove('is-landing');
+          void squash.getBoundingClientRect();
+          squash.classList.add('is-landing');
+          later(() => squash.classList.remove('is-landing'), 430);
+        }
+        setMode('idle');
+        then?.();
+      }
+    };
+    raf = requestAnimationFrame(step);
+  }
+
+  /** Climbs up onto a piece of furniture by itself: walks over, then a big jump. */
+  function climb(id) {
+    const top = perchTop(id);
+    const mid = (top.x0 + top.x1) / 2;
+    const side = pos.x < mid ? top.x0 - 18 : top.x1 + 18;
+    walkTo(Math.min(372, Math.max(28, side)), FLOOR_Y, () => {
+      if (busy || held || seek) return;
+      jumpTo(mid, top.y, () => {
+        perch = id;
+        placePet();
+        say(t('pet.say.perch'), 1700);
+      });
+    }, 80);
+  }
+
+  // ── Hide and seek ─────────────────────────────────────────────────────
+  //
+  // The room goes dark while it counts to three (eyes closed!), the pet slips
+  // behind a piece of furniture, and the student taps where they think it is. A
+  // wrong guess wobbles that piece; after two, the right one rustles. The pet
+  // peeks out now and then, and gives up hiding after half a minute.
+
+  const hideSpots = () => Object.keys(HIDE).filter((id) => pet.placed.includes(id));
+  let lastSpot = null;
+
+  function paintPlay() {
+    const b = els.play;
+    if (!b) return;
+    const can = Boolean(pet.pet && pet.pet.name && !isFish() && !choosing && running);
+    b.hidden = !can;
+    b.textContent = seek ? t('pet.seek.giveup') : t('pet.seek.btn');
+    b.classList.toggle('is-seeking', Boolean(seek));
+  }
+
+  function startSeek() {
+    if (!pet.pet || isFish() || busy || held || choosing || seek) return;
+    const spots = hideSpots();
+    if (!spots.length) {
+      say(t('pet.seek.nowhere'), 3600);
+      return;
+    }
+    lastTouch = Date.now();
+    cancelAnimationFrame(raf);
+    perch = null;
+    if (mode === 'sleep') setMode('idle');
+    const choices = spots.length > 1 ? spots.filter((id) => id !== lastSpot) : spots;
+    const spot = pick(choices);
+    lastSpot = spot;
+    busy = true;
+    seek = { spot, tries: 0, misses: 0, hidden: false };
+    paintPlay();
+    say(t('pet.seek.ready'), 1300);
+
+    // Eyes closed: the room goes dark, and counts.
+    const veil = node('g', { class: 'seek-veil' });
+    veil.innerHTML = `<rect x="0" y="0" width="400" height="300" fill="#1c1636"/>
+      <text class="seek-eyes" x="200" y="120" text-anchor="middle">🙈</text>
+      <text class="seek-count" x="200" y="196" text-anchor="middle"></text>
+      <text class="seek-sub" x="200" y="226" text-anchor="middle">${esc(t('pet.seek.counting'))}</text>`;
+    later(() => {
+      if (!seek) return;
+      layers.fx.append(veil);
+      seek.veil = veil;
+    }, 900);
+    const count = (n) => {
+      const el = veil.querySelector('.seek-count');
+      el.textContent = String(n);
+      el.classList.remove('is-tick');
+      void el.getBoundingClientRect();
+      el.classList.add('is-tick');
+      tone(n === 1 ? 784 : 587, 0, 0.25, { type: 'sine', vol: 0.12 });
+    };
+    later(() => seek && count(3), 1000);
+    later(() => seek && hidePet(spot), 1300);
+    later(() => seek && count(2), 1850);
+    later(() => seek && count(1), 2700);
+    later(() => {
+      if (!seek) return;
+      veil.querySelector('.seek-eyes').textContent = '👀';
+      veil.querySelector('.seek-count').textContent = '';
+      veil.querySelector('.seek-sub').textContent = t('pet.seek.find', { name: pet.pet.name });
+      veil.classList.add('is-lifting');
+      tone(988, 0, 0.35, { type: 'sine', vol: 0.12 });
+      later(() => {
+        veil.remove();
+        if (!seek) return;
+        seek.hidden = true;
+        seek.since = Date.now();
+        // the first hint waits a moment: a fair start
+        later(peekLoop, rand(3500, 5500));
+      }, 700);
+    }, 3550);
+  }
+
+  /** Behind the piece: drawn before it in the picture, so the furniture covers it. */
+  function hidePet(id) {
+    const h = HIDE[id];
+    const o = Pet.itemAt(pet, id);
+    pos = { x: h.x + o.x, y: h.y + o.y };
+    facing = pick([1, -1]);
+    setMode('idle');
+    if (els.bubble) els.bubble.hidden = true;
+    placePet();
+    const itemEl = layers.room.querySelector(`.room-item[data-item="${id}"]`);
+    if (!itemEl) return;
+    // no shadow on the floor in front of the hiding place: it would give it away
+    if (layers.shade) layers.shade.style.display = 'none';
+    layers.room.insertBefore(layers.petPos, itemEl);
+    layers.pet.classList.toggle('is-crouch', h.crouch);
+  }
+
+  function unhidePet() {
+    if (!layers.petPos) return;
+    layers.pet.classList.remove('is-crouch', 'is-peek');
+    if (layers.shade) layers.shade.style.display = '';
+    layers.stage.append(layers.petPos);
+  }
+
+  /** Hints while it hides: a peek round the side, a rustle, a giggle. */
+  function peekLoop() {
+    if (!seek || !seek.hidden) return;
+    if (Date.now() - seek.since > 30000) {
+      reveal('timeout');
+      return;
+    }
+    const h = HIDE[seek.spot];
+    const roll = Math.random();
+    if (roll < 0.45) {
+      const s = PET_SCALE * (STAGE_SCALE[Pet.stageOf(pet.pet)] || 1);
+      const g = layers.pet;
+      g.style.setProperty('--peek', `${((h.peek / s) * pick([1, -1]) * facing).toFixed(1)}px`);
+      g.classList.remove('is-peek');
+      void g.getBoundingClientRect();
+      g.classList.add('is-peek');
+      later(() => g.classList.remove('is-peek'), 1700);
+    } else if (roll < 0.75) {
+      const el = layers.room.querySelector(`.room-item[data-item="${seek.spot}"]`);
+      if (el) boing(el, 'is-sway', 1200);
+    } else {
+      tone(1320, 0, 0.08, { type: 'sine', vol: 0.06 });
+      tone(1568, 0.1, 0.08, { type: 'sine', vol: 0.06 });
+      tone(1320, 0.2, 0.1, { type: 'sine', vol: 0.06 });
+    }
+    later(peekLoop, rand(3600, 6000));
+  }
+
+  /** A little word floating up from something tapped. */
+  function tag(text, x, y, cls = '') {
+    const g = node('text', { class: `fx-tag ${cls}`, x: x.toFixed(1), y: y.toFixed(1), 'text-anchor': 'middle' });
+    g.textContent = text;
+    layers.fx.append(g);
+    later(() => g.remove(), 1400);
+  }
+
+  function guess(el) {
+    if (!seek || !seek.hidden) return;
+    lastTouch = Date.now();
+    seek.tries += 1;
+    if (el.dataset.item === seek.spot) {
+      reveal('found');
+      return;
+    }
+    seek.misses += 1;
+    const box = itemBox(el);
+    boing(el, 'is-sway', 900);
+    tag(t('pet.seek.notHere'), box.cx, box.y + 6);
+    // Two wrong guesses: the right piece gives itself away.
+    if (seek.misses >= 2) {
+      const right = layers.room.querySelector(`.room-item[data-item="${seek.spot}"]`);
+      if (right) later(() => boing(right, 'is-sway', 1200), 650);
+    }
+  }
+
+  /** Out it comes — found, or tired of waiting, or the student gave up. */
+  function reveal(how) {
+    if (!seek) return;
+    const tries = seek.tries;
+    const spot = seek.spot;
+    endSeek();
+    const box = (() => {
+      const el = layers.room.querySelector(`.room-item[data-item="${spot}"]`);
+      return el ? itemBox(el) : { cx: pos.x, y: pos.y - 40 };
+    })();
+    // in front of the piece, and a little to one side
+    const outX = Math.min(360, Math.max(40, box.cx + (box.cx > 200 ? -34 : 34)));
+    jumpTo(outX, FLOOR_Y, () => {
+      setMode('happy');
+      hearts(how === 'found' ? 4 : 2);
+      if (how === 'found') sparkles(pos.x, pos.y - 36, 10);
+      say(
+        how === 'found'
+          ? tries <= 1
+            ? t('pet.seek.first')
+            : t('pet.seek.found', { n: tries })
+          : t('pet.seek.here'),
+        2600,
+      );
+      later(() => mode === 'happy' && !held && setMode('idle'), 1800);
+    });
+  }
+
+  function endSeek() {
+    if (!seek) return;
+    seek.veil?.remove();
+    seek = null;
+    busy = false;
+    unhidePet();
+    paintPlay();
+  }
+
   // ── Behaviour ──────────────────────────────────────────────────────────
 
   function walkTo(x, y = pos.y, then = null, speed = 70) {
     if (held) return;
+    if (perch && !isFish()) {
+      // down first, on the side it is heading for, then on its way
+      const down = Math.min(372, Math.max(28, pos.x + (x >= pos.x ? 26 : -26)));
+      jumpTo(down, FLOOR_Y, () => walkTo(x, y, then, speed));
+      return;
+    }
     cancelAnimationFrame(raf);
     const from = { ...pos };
     const dist = Math.hypot(x - from.x, y - from.y);
@@ -1062,6 +1408,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       setHungry(pining);
       if (roll < 0.55) {
         if (isFish()) walkTo(rand(166, 234), rand(142, 190), null, 34);
+        // Up on something, it mostly enjoys the view; now and then it hops down.
+        else if (perch && roll > 0.2) lookAt(rand(30, 370), rand(150, 280), 1200);
         else walkTo(rand(70, 340), FLOOR_Y, null, 62);
       } else if (roll < 0.7 && pining) {
         say(`${t('pet.wish')} ${foodIcon(Pet.snackFor(pet.pet.species, 'treat').look)}`, 2600);
@@ -1073,6 +1421,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         later(() => lookAt(pos.x + 120, pos.y - 70, 900), 1000);
       } else if (roll < 0.88) {
         stretch();
+      } else if (roll < 0.9 && !perch && !isFish() && perches().length) {
+        climb(pick(perches()));
       } else if (roll < 0.92) {
         if (pet.pet.variant === 'rare') {
           // A rare one shimmers now and then, just a little.
@@ -1471,6 +1821,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       }
     }
     paintFoot();
+    paintPlay();
   }
 
   /** The line under the room: how notes are earned, and — until it has been tried — that things can be moved. */
@@ -2109,6 +2460,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     }
     held = false;
     drag = null;
+    perch = null;
+    paintPlay();
     if (pet.pet) {
       lastTouch = Date.now();
       blinkLoop();
@@ -2147,6 +2500,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   }
 
   function stop() {
+    if (seek) endSeek();
     running = false;
     busy = false;
     timers.forEach(clearTimeout);
@@ -2157,6 +2511,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     stopAvatarWalk();
     queuedReaction = false;
     if (els.bubble) els.bubble.hidden = true;
+    if (els.play) els.play.hidden = true;
   }
 
   /**
