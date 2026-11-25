@@ -1,20 +1,20 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251645';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251645';
-import { createInk } from './ink.js?v=202611251645';
-import { createFollower } from './follow.js?v=202611251645';
-import { createPetRoom } from './petroom.js?v=202611251645';
-import { SPRINT_FULL } from './pet.js?v=202611251645';
-import { createBuddy } from './buddy.js?v=202611251645';
-import { createSprintView } from './sprintview.js?v=202611251645';
-import { createTrillView } from './trillview.js?v=202611251645';
-import { createListenView } from './listenview.js?v=202611251645';
-import { createSheetView } from './sheetview.js?v=202611251645';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251700';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251700';
+import { createInk } from './ink.js?v=202611251700';
+import { createFollower } from './follow.js?v=202611251700';
+import { createPetRoom } from './petroom.js?v=202611251700';
+import { SPRINT_FULL } from './pet.js?v=202611251700';
+import { createBuddy } from './buddy.js?v=202611251700';
+import { createSprintView } from './sprintview.js?v=202611251700';
+import { createTrillView } from './trillview.js?v=202611251700';
+import { createListenView } from './listenview.js?v=202611251700';
+import { createSheetView } from './sheetview.js?v=202611251700';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611251645';
+window.__scaleStudioVersion = '202611251700';
 import {
   PitchDetector,
   midiToFreq,
@@ -22,16 +22,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611251645';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251645';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251645';
-import { generatePassage } from './sightreading.js?v=202611251645';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251645';
-import { renderScore } from './score.js?v=202611251645';
-import { summariseIntonation } from './intonation.js?v=202611251645';
-import * as Journal from './journal.js?v=202611251645';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251645';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251645';
+} from './pitch.js?v=202611251700';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251700';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251700';
+import { generatePassage } from './sightreading.js?v=202611251700';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251700';
+import { renderScore } from './score.js?v=202611251700';
+import { summariseIntonation } from './intonation.js?v=202611251700';
+import * as Journal from './journal.js?v=202611251700';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251700';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251700';
 import {
   STRINGS,
   FIFTHS,
@@ -40,7 +40,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611251645';
+} from './tuner.js?v=202611251700';
 
 const LANG = initLang();
 
@@ -1819,9 +1819,8 @@ function stopAssistAudio() {
  */
 // The clicks pass through a soft clipper on the way to the player's volume:
 // pushed this hard, a noise burst's few tallest spikes would otherwise clip and
-// crackle. The curve rounds those off and leaves the body, so the click comes
-// out about 10 dB louder (twice as loud to the ear) yet still peaks just under
-// full scale at full volume. (A compressor was tried and only made it quieter:
+// crackle. The curve rounds those off and leaves the body, so a click can be
+// fuller without crackling at full volume (see the gain in clickAt for how loud). (A compressor was tried and only made it quieter:
 // its attack is slower than a click.)
 let clickBus = null;
 function clickBusFor(ctx) {
@@ -1844,8 +1843,11 @@ function clickBusFor(ctx) {
 
 function clickAt(ctx, when, strength = 0.6) {
   const strong = strength >= 1;
-  // Nov 2026, louder again: a longer tail (20 ms, was 12) for more body and
-  // more gain into the soft clipper above.
+  // Nov 2026: a longer tail (20 ms, was 12) for more body, into the soft
+  // clipper above — about 5 dB over the old click. A day at +10 dB broke takes
+  // on an iPad halfway through: Safari's own input processing (which a page
+  // cannot switch off) heard the loud clicks from the speaker and turned the
+  // microphone down, the violin read as silence, and the take ended itself.
   const length = Math.floor(ctx.sampleRate * 0.07);
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
   const data = buffer.getChannelData(0);
@@ -1858,7 +1860,7 @@ function clickAt(ctx, when, strength = 0.6) {
   filter.frequency.value = strong ? 2400 : 1800;
   filter.Q.value = 0.7;
   const gain = ctx.createGain();
-  gain.gain.value = strong ? 7 : 5.5;
+  gain.gain.value = strong ? 3.2 : 2.5;
   src.connect(filter).connect(gain).connect(clickBusFor(ctx));
   src.start(when);
   assistClicks.push(src);
@@ -2061,8 +2063,11 @@ function ingestSightFrame(frame) {
   const neverStarted = take.assisted && take.onsets === 0 && elapsed > 6;
   // An assisted run is on a clock, so it knows whether the passage can be over:
   // before the last bar's time is up only a long silence ends it.
+  // On an iPad the microphone can also be turned down for a stretch by Safari's
+  // own processing while the clicks play, which reads as silence; so while the
+  // clicks are still running only a really long quiet (12 s, was 6) ends it.
   const early = take.assisted && take.endsAt > 0 && elapsed < take.endsAt;
-  const wait = early ? 6 : unfinished ? 4.5 : 2.2;
+  const wait = early ? 12 : unfinished ? 4.5 : 2.2;
   if ((take.frames.length > 40 && quiet > wait) || neverStarted) {
     finishSightTake();
   }
