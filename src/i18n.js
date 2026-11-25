@@ -1436,6 +1436,10 @@ export const S = {
     'No microphone was found. Check that one is plugged in and selected in your sound settings.',
     '找不到麦克风。检查一下有没有接上、系统声音设置里有没有选对。',
   ],
+  'mic.dead': [
+    "The iPad isn't giving the app any sound from the microphone — not even the room. That's an iPadOS audio glitch, not your playing. Swipe Safari (or the Scale Studio icon) fully closed and open it again; if it still happens, restart the iPad.",
+    '平板完全没有把麦克风的声音交给应用——连房间里的声音都没有。这是 iPadOS 的音频故障，不是你拉得有问题。把 Safari（或 Scale Studio 图标）从后台完全划掉再打开；如果还是这样，就重启平板。',
+  ],
   'mic.busy': [
     'Another app is using the microphone. Close it and try again.',
     '另一个程序正在用麦克风。先关掉它，再试一次。',

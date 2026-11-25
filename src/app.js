@@ -1,20 +1,20 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251730';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251730';
-import { createInk } from './ink.js?v=202611251730';
-import { createFollower } from './follow.js?v=202611251730';
-import { createPetRoom } from './petroom.js?v=202611251730';
-import { SPRINT_FULL } from './pet.js?v=202611251730';
-import { createBuddy } from './buddy.js?v=202611251730';
-import { createSprintView } from './sprintview.js?v=202611251730';
-import { createTrillView } from './trillview.js?v=202611251730';
-import { createListenView } from './listenview.js?v=202611251730';
-import { createSheetView } from './sheetview.js?v=202611251730';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251800';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251800';
+import { createInk } from './ink.js?v=202611251800';
+import { createFollower } from './follow.js?v=202611251800';
+import { createPetRoom } from './petroom.js?v=202611251800';
+import { SPRINT_FULL } from './pet.js?v=202611251800';
+import { createBuddy } from './buddy.js?v=202611251800';
+import { createSprintView } from './sprintview.js?v=202611251800';
+import { createTrillView } from './trillview.js?v=202611251800';
+import { createListenView } from './listenview.js?v=202611251800';
+import { createSheetView } from './sheetview.js?v=202611251800';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611251730';
+window.__scaleStudioVersion = '202611251800';
 import {
   PitchDetector,
   midiToFreq,
@@ -22,16 +22,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611251730';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251730';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251730';
-import { generatePassage } from './sightreading.js?v=202611251730';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251730';
-import { renderScore } from './score.js?v=202611251730';
-import { summariseIntonation } from './intonation.js?v=202611251730';
-import * as Journal from './journal.js?v=202611251730';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251730';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251730';
+} from './pitch.js?v=202611251800';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251800';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251800';
+import { generatePassage } from './sightreading.js?v=202611251800';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251800';
+import { renderScore } from './score.js?v=202611251800';
+import { summariseIntonation } from './intonation.js?v=202611251800';
+import * as Journal from './journal.js?v=202611251800';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251800';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251800';
 import {
   STRINGS,
   FIFTHS,
@@ -40,7 +40,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611251730';
+} from './tuner.js?v=202611251800';
 
 const LANG = initLang();
 
@@ -1145,6 +1145,9 @@ function onTuneFrame(frame) {
   // 0.55 bar throws away — which is what "it does not pick up my G" looks like.
   if (!frame.freq || frame.clarity < 0.45 || frame.rms < hearLevel(state.mic?.floor, frame.clarity)) {
     tune.silentFor += 1;
+    // Once a second, check the microphone is giving anything at all; a dead
+    // one gets the way out instead of a dial waiting for ever.
+    if (tune.silentFor % 30 === 0 && micLooksDead()) el.tuneStatus.textContent = t('mic.dead');
     if (tune.silentFor > 20 && tune.cents != null) {
       tune.cents = null;
       paintNeedle();
@@ -2174,7 +2177,7 @@ function renderSightResult(result) {
   if (!result.heard || result.heard < 3) {
     el.sightPct.textContent = '–';
     el.sightGrade.textContent = t('result.nothing.title');
-    el.sightLine.textContent = t('result.nothing.body');
+    el.sightLine.textContent = micLooksDead() ? t('mic.dead') : t('result.nothing.body');
     el.sightParts.innerHTML = '';
     paintIntonationLine(el.sightIntonationSum, []);
     el.sightTips.innerHTML = '';
@@ -4197,9 +4200,13 @@ function paintInkTools({ tool, canUndo }) {
  * 4096 there are fourteen periods to agree on, and the reading settles.
  */
 /** iOS routes playback by audio session; older browsers have no such API. */
+// Only when it changes. Every switch makes iPadOS rebuild its audio session,
+// and on iPadOS 26 enough churn can crash the system's audio service, after
+// which a page gets no microphone until Safari is quit (WebKit bug 319706).
 function setAudioSession(type) {
   if ('audioSession' in navigator) {
     try {
+      if (navigator.audioSession.type === type) return;
       navigator.audioSession.type = type;
     } catch {
       /* older Safari — nothing to set */
@@ -4330,6 +4337,12 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
     // Room noise, learned as the page runs — see nextFloor() in pitch.js.
     floor: 0.0012,
     stalled: false,
+    // The loudest frame since it opened, and when it opened. A working
+    // microphone always hears *something* — room noise is never exact silence —
+    // so one that has delivered nothing at all for seconds is dead, not quiet:
+    // see micLooksDead().
+    loudest: 0,
+    openedAt: performance.now(),
     /**
      * Keep the screen on while the microphone is. A tablet on a music stand is
      * not being touched, so it dims and locks on its usual timer — and locking
@@ -4463,6 +4476,7 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
       }
     }
     const { freq, clarity, rms } = detector.detect(frame);
+    if (rms > mic.loudest) mic.loudest = rms;
     // Pitched frames are the violin, and must never teach the room's level.
     mic.floor = nextFloor(mic.floor, rms, freq > 0 && clarity >= 0.5);
     if (rms === 0) {
@@ -4589,7 +4603,23 @@ document.addEventListener('visibilitychange', () => {
   });
 });
 
+/**
+ * True when the microphone is open but the iPad (or anything else) is handing
+ * the page no sound at all: not a single frame above −100 dB in five seconds,
+ * or a track the system has muted or ended. That is the system's audio, not the
+ * player: on iPadOS 26 a crashed audio service leaves a page in exactly this
+ * state until Safari is quit (WebKit bug 319706) while Voice Memos still works.
+ */
+function micLooksDead(mic = state.mic) {
+  if (!mic) return false;
+  const track = mic.stream?.getAudioTracks?.()[0];
+  if (track && (track.readyState === 'ended' || track.muted)) return true;
+  return performance.now() - mic.openedAt > 5000 && mic.loudest < 1e-5;
+}
+
 function micErrorMessage(err) {
+  // iPadOS 26's own words when its audio service has fallen over.
+  if (/AVAudioSessionCaptureDevice|Failed to start the audio device/i.test(err?.message || '')) return t('mic.dead');
   switch (err?.name) {
     case 'Superseded':
       return '';
@@ -5056,7 +5086,7 @@ function renderResult(result) {
 
   if (result.stats.heard < 3) {
     el.resultGrade.textContent = t('result.nothing.title');
-    el.resultLine.textContent = t('result.nothing.body');
+    el.resultLine.textContent = micLooksDead() ? t('mic.dead') : t('result.nothing.body');
     el.resultSub.textContent = '';
     el.scoreNumber.textContent = '–';
     el.ringValue.style.strokeDashoffset = RING_CIRCUMFERENCE;
