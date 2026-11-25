@@ -1,20 +1,20 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251715';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251715';
-import { createInk } from './ink.js?v=202611251715';
-import { createFollower } from './follow.js?v=202611251715';
-import { createPetRoom } from './petroom.js?v=202611251715';
-import { SPRINT_FULL } from './pet.js?v=202611251715';
-import { createBuddy } from './buddy.js?v=202611251715';
-import { createSprintView } from './sprintview.js?v=202611251715';
-import { createTrillView } from './trillview.js?v=202611251715';
-import { createListenView } from './listenview.js?v=202611251715';
-import { createSheetView } from './sheetview.js?v=202611251715';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251730';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251730';
+import { createInk } from './ink.js?v=202611251730';
+import { createFollower } from './follow.js?v=202611251730';
+import { createPetRoom } from './petroom.js?v=202611251730';
+import { SPRINT_FULL } from './pet.js?v=202611251730';
+import { createBuddy } from './buddy.js?v=202611251730';
+import { createSprintView } from './sprintview.js?v=202611251730';
+import { createTrillView } from './trillview.js?v=202611251730';
+import { createListenView } from './listenview.js?v=202611251730';
+import { createSheetView } from './sheetview.js?v=202611251730';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611251715';
+window.__scaleStudioVersion = '202611251730';
 import {
   PitchDetector,
   midiToFreq,
@@ -22,16 +22,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611251715';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251715';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251715';
-import { generatePassage } from './sightreading.js?v=202611251715';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251715';
-import { renderScore } from './score.js?v=202611251715';
-import { summariseIntonation } from './intonation.js?v=202611251715';
-import * as Journal from './journal.js?v=202611251715';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251715';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251715';
+} from './pitch.js?v=202611251730';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251730';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251730';
+import { generatePassage } from './sightreading.js?v=202611251730';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251730';
+import { renderScore } from './score.js?v=202611251730';
+import { summariseIntonation } from './intonation.js?v=202611251730';
+import * as Journal from './journal.js?v=202611251730';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251730';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251730';
 import {
   STRINGS,
   FIFTHS,
@@ -40,7 +40,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611251715';
+} from './tuner.js?v=202611251730';
 
 const LANG = initLang();
 
@@ -1794,6 +1794,8 @@ function startAssistedRun() {
  * ends, or when the student leaves the screen.
  */
 let assistClicks = [];
+/** Set by ?debug: sees every microphone frame (see the probe near the end). */
+let micProbe = null;
 
 function stopAssistAudio() {
   for (const node of assistClicks) {
@@ -4641,6 +4643,7 @@ async function openMicFor(mode) {
 }
 
 function routeFrame(frame, from) {
+  if (micProbe) micProbe.frame(frame, from);
   // Only the microphone the app is using may speak. Anything else is one that
   // was opened and lost track of: it closes, rather than feeding a second
   // clock into whatever is listening.
@@ -5666,6 +5669,70 @@ if (params.has('sightwalk')) {
   // and a walk that silently never happens cannot fail a test.
   setTimeout(walk, 0);
 }
+// ?debug — a panel that says what the microphone is actually delivering, for a
+// device the app cannot be debugged on from here (an iPad): whether frames
+// arrive, whether they are from the microphone in use, how loud, what pitch,
+// the context's state, and any error the page threw. One screenshot of it
+// says where the chain breaks.
+if (params.has('debug')) {
+  const box = document.createElement('pre');
+  box.className = 'mic-probe';
+  box.style.cssText =
+    'position:fixed;left:8px;bottom:8px;z-index:9999;margin:0;padding:10px 12px;max-width:min(94vw,460px);' +
+    'font:12px/1.45 ui-monospace,Menlo,monospace;color:#e9ffe9;background:rgba(10,14,12,.92);' +
+    'border-radius:10px;white-space:pre-wrap;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.4)';
+  document.body.appendChild(box);
+  const errors = [];
+  const note = (msg) => {
+    errors.push(String(msg).slice(0, 160));
+    if (errors.length > 4) errors.shift();
+  };
+  window.addEventListener('error', (e) => note(`error: ${e.message} @${(e.filename || '').split('/').pop()}:${e.lineno}`));
+  window.addEventListener('unhandledrejection', (e) => note(`rejection: ${e.reason && (e.reason.message || e.reason)}`));
+  let n = 0;
+  let stray = 0;
+  let loud = 0;
+  let pitched = 0;
+  let last = null;
+  let perSec = 0;
+  let strayPerSec = 0;
+  micProbe = {
+    frame(frame, from) {
+      if (from && from !== state.mic) {
+        stray += 1;
+        return;
+      }
+      n += 1;
+      last = frame;
+      loud = Math.max(loud, frame.rms || 0);
+      if (frame.freq > 0 && frame.clarity > 0.5) pitched += 1;
+    },
+  };
+  const db = (v) => (v > 0 ? (20 * Math.log10(v)).toFixed(1) + ' dB' : '-inf');
+  setInterval(() => {
+    perSec = n;
+    strayPerSec = stray;
+    const mic = state.mic;
+    const lines = [
+      `version ${window.__scaleStudioVersion}  view ${document.querySelector('.view:not([hidden])')?.id || '?'}  mode ${state.micMode || '-'}`,
+      mic
+        ? `mic ctx ${mic.ctx?.state} @${mic.sampleRate} Hz  stalled ${mic.stalled}  track ${mic.stream?.getAudioTracks()[0]?.readyState} muted ${mic.stream?.getAudioTracks()[0]?.muted}`
+        : 'mic: none open',
+      `frames/s ${perSec}  from a stray mic ${strayPerSec}  pitched ${pitched}`,
+      `loudest ${db(loud)}  last ${last ? db(last.rms) : '-'}  ${last && last.freq ? last.freq.toFixed(1) + ' Hz clarity ' + last.clarity.toFixed(2) : 'no pitch'}`,
+      mic ? `floor ${db(mic.floor)}  needs ${db(hearLevel(mic.floor, 0.9))} (clear) / ${db(hearLevel(mic.floor, 0))}` : '',
+      `audio session ${navigator.audioSession ? navigator.audioSession.type + ' / ' + (navigator.audioSession.state || '') : 'n/a'}`,
+      `tune listening ${Boolean(state.tune?.listening)}  sight ${sight.phase}`,
+      ...(errors.length ? ['— errors —', ...errors] : ['no errors']),
+    ];
+    box.textContent = lines.filter(Boolean).join('\n');
+    n = 0;
+    stray = 0;
+    loud = 0;
+    pitched = 0;
+  }, 1000);
+}
+
 if (params.has('sight')) {
   // ?sight=5&seed=4471 reproduces one passage exactly — handy for a class
   openSight(Number(params.get('sight')) || 5, params.has('seed') ? Number(params.get('seed')) : null);
