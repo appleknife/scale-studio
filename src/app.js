@@ -1,20 +1,20 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251630';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251630';
-import { createInk } from './ink.js?v=202611251630';
-import { createFollower } from './follow.js?v=202611251630';
-import { createPetRoom } from './petroom.js?v=202611251630';
-import { SPRINT_FULL } from './pet.js?v=202611251630';
-import { createBuddy } from './buddy.js?v=202611251630';
-import { createSprintView } from './sprintview.js?v=202611251630';
-import { createTrillView } from './trillview.js?v=202611251630';
-import { createListenView } from './listenview.js?v=202611251630';
-import { createSheetView } from './sheetview.js?v=202611251630';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251645';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251645';
+import { createInk } from './ink.js?v=202611251645';
+import { createFollower } from './follow.js?v=202611251645';
+import { createPetRoom } from './petroom.js?v=202611251645';
+import { SPRINT_FULL } from './pet.js?v=202611251645';
+import { createBuddy } from './buddy.js?v=202611251645';
+import { createSprintView } from './sprintview.js?v=202611251645';
+import { createTrillView } from './trillview.js?v=202611251645';
+import { createListenView } from './listenview.js?v=202611251645';
+import { createSheetView } from './sheetview.js?v=202611251645';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611251630';
+window.__scaleStudioVersion = '202611251645';
 import {
   PitchDetector,
   midiToFreq,
@@ -22,16 +22,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611251630';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251630';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251630';
-import { generatePassage } from './sightreading.js?v=202611251630';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251630';
-import { renderScore } from './score.js?v=202611251630';
-import { summariseIntonation } from './intonation.js?v=202611251630';
-import * as Journal from './journal.js?v=202611251630';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251630';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251630';
+} from './pitch.js?v=202611251645';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251645';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251645';
+import { generatePassage } from './sightreading.js?v=202611251645';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251645';
+import { renderScore } from './score.js?v=202611251645';
+import { summariseIntonation } from './intonation.js?v=202611251645';
+import * as Journal from './journal.js?v=202611251645';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251645';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251645';
 import {
   STRINGS,
   FIFTHS,
@@ -40,7 +40,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611251630';
+} from './tuner.js?v=202611251645';
 
 const LANG = initLang();
 

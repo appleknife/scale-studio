@@ -68,7 +68,7 @@ export function semitoneLabel(cents) {
 }
 
 /** The mark for a note that came out as a different pitch altogether. */
-function wrongNoteMark(x, cents, centre, half, yFor) {
+function wrongNoteMark(x, cents, centre, half, yFor, delay = 0) {
   const up = cents > 0;
   const r = WRONG_R;
   const badgeY = yFor(cents) + (up ? -1 : 1) * 2; // just past the end of the axis
@@ -79,13 +79,22 @@ function wrongNoteMark(x, cents, centre, half, yFor) {
   const arrow = `M ${fmt(x - 3.8)} ${fmt(baseY)} L ${fmt(x)} ${fmt(tipY)} L ${fmt(x + 3.8)} ${fmt(baseY)}`;
   const textY = up ? badgeY + 6.2 : badgeY + 0.6;
   return (
-    `<g class="intonation-wrong" data-semitones="${Math.round(cents / 100)}">` +
+    // Everything animates from CSS (app.css, "wrong note"): the mark pops in,
+    // two rings ripple out of the badge for ever, the glow breathes, and a spark
+    // runs up the stem towards the badge. --d staggers the marks left to right.
+    `<g class="intonation-wrong" data-semitones="${Math.round(cents / 100)}" style="--d:${fmt(delay)}s">` +
     `<rect class="intonation-wrong-col" x="${fmt(x - 8)}" y="${fmt(centre - half - 3)}" width="16" height="${fmt(half * 2 + 6)}" rx="8"/>` +
     `<line class="intonation-wrong-stem" x1="${fmt(x)}" y1="${fmt(centre)}" x2="${fmt(x)}" y2="${fmt(badgeY)}"/>` +
+    `<line class="intonation-wrong-spark" x1="${fmt(x)}" y1="${fmt(centre)}" x2="${fmt(x)}" y2="${fmt(badgeY)}"/>` +
+    `<circle class="intonation-wrong-ripple" cx="${fmt(x)}" cy="${fmt(badgeY)}" r="${r}"/>` +
+    `<circle class="intonation-wrong-ripple is-late" cx="${fmt(x)}" cy="${fmt(badgeY)}" r="${r}"/>` +
     `<circle class="intonation-wrong-glow" cx="${fmt(x)}" cy="${fmt(badgeY)}" r="${fmt(r + 4)}"/>` +
+    `<g class="intonation-wrong-pop">` +
     `<circle class="intonation-wrong-badge" cx="${fmt(x)}" cy="${fmt(badgeY)}" r="${r}"/>` +
+    `<circle class="intonation-wrong-shine" cx="${fmt(x)}" cy="${fmt(badgeY)}" r="${fmt(r - 1.6)}"/>` +
     `<path class="intonation-wrong-arrow" d="${arrow}"/>` +
     `<text class="intonation-wrong-num" x="${fmt(x)}" y="${fmt(textY)}" text-anchor="middle">${semitoneLabel(cents)}</text>` +
+    `</g>` +
     `</g>`
   );
 }
@@ -155,7 +164,8 @@ export function intonationLane({ marks = [], centre, half = 22, left, right }) {
     // the lane, a thick stem to the edge, and a glowing badge with an arrow and
     // how many half steps away it was.
     if (Math.abs(mark.cents) >= SPAN) {
-      part.push(wrongNoteMark(x, mark.cents, centre, half, yFor));
+      const across = right > left ? (x - left) / (right - left) : 0;
+      part.push(wrongNoteMark(x, mark.cents, centre, half, yFor, 0.15 + across * 0.5));
       continue;
     }
     const y = yFor(mark.cents);
