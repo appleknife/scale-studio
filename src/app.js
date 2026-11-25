@@ -1,20 +1,20 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251700';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251700';
-import { createInk } from './ink.js?v=202611251700';
-import { createFollower } from './follow.js?v=202611251700';
-import { createPetRoom } from './petroom.js?v=202611251700';
-import { SPRINT_FULL } from './pet.js?v=202611251700';
-import { createBuddy } from './buddy.js?v=202611251700';
-import { createSprintView } from './sprintview.js?v=202611251700';
-import { createTrillView } from './trillview.js?v=202611251700';
-import { createListenView } from './listenview.js?v=202611251700';
-import { createSheetView } from './sheetview.js?v=202611251700';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251715';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251715';
+import { createInk } from './ink.js?v=202611251715';
+import { createFollower } from './follow.js?v=202611251715';
+import { createPetRoom } from './petroom.js?v=202611251715';
+import { SPRINT_FULL } from './pet.js?v=202611251715';
+import { createBuddy } from './buddy.js?v=202611251715';
+import { createSprintView } from './sprintview.js?v=202611251715';
+import { createTrillView } from './trillview.js?v=202611251715';
+import { createListenView } from './listenview.js?v=202611251715';
+import { createSheetView } from './sheetview.js?v=202611251715';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611251700';
+window.__scaleStudioVersion = '202611251715';
 import {
   PitchDetector,
   midiToFreq,
@@ -22,16 +22,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611251700';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251700';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251700';
-import { generatePassage } from './sightreading.js?v=202611251700';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251700';
-import { renderScore } from './score.js?v=202611251700';
-import { summariseIntonation } from './intonation.js?v=202611251700';
-import * as Journal from './journal.js?v=202611251700';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251700';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251700';
+} from './pitch.js?v=202611251715';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251715';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251715';
+import { generatePassage } from './sightreading.js?v=202611251715';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251715';
+import { renderScore } from './score.js?v=202611251715';
+import { summariseIntonation } from './intonation.js?v=202611251715';
+import * as Journal from './journal.js?v=202611251715';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251715';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251715';
 import {
   STRINGS,
   FIFTHS,
@@ -40,7 +40,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611251700';
+} from './tuner.js?v=202611251715';
 
 const LANG = initLang();
 
@@ -1750,7 +1750,7 @@ function startAssistedRun() {
 
   const start = ctx.currentTime + 0.15;
   for (let i = 0; i < plan.clicks; i++) {
-    clickAt(ctx, start + i * plan.interval, i === 0 ? 1 : 0.6);
+    clickAt(ctx, start + i * plan.interval, i === 0 ? 1 : 0.6, true);
   }
   // The numbers follow the clicks: one per beat, counting down.
   for (let i = 0; i < plan.clicks; i++) {
@@ -1841,17 +1841,20 @@ function clickBusFor(ctx) {
   return pre;
 }
 
-function clickAt(ctx, when, strength = 0.6) {
+function clickAt(ctx, when, strength = 0.6, loud = false) {
   const strong = strength >= 1;
-  // Nov 2026: a longer tail (20 ms, was 12) for more body, into the soft
-  // clipper above — about 5 dB over the old click. A day at +10 dB broke takes
-  // on an iPad halfway through: Safari's own input processing (which a page
-  // cannot switch off) heard the loud clicks from the speaker and turned the
-  // microphone down, the violin read as silence, and the take ended itself.
-  const length = Math.floor(ctx.sampleRate * 0.07);
+  // Two levels. The count-in is loud — a longer tail (20 ms) and more gain
+  // through the soft clipper above, about 10 dB over the play-along click —
+  // because nothing is being listened to yet. The clicks *under* the playing
+  // stay at the level they had for weeks: on an iPad, Safari's own input
+  // processing (which a page cannot switch off) hears loud clicks from the
+  // speaker and turns the microphone down so far that the violin reads as
+  // silence — in Nov 2026 a day of loud play-along clicks ended takes two bars
+  // in with "nothing to score".
+  const length = Math.floor(ctx.sampleRate * (loud ? 0.07 : 0.05));
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
   const data = buffer.getChannelData(0);
-  const fall = ctx.sampleRate * 0.02;
+  const fall = ctx.sampleRate * (loud ? 0.02 : 0.012);
   for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / fall);
   const src = ctx.createBufferSource();
   src.buffer = buffer;
@@ -1860,8 +1863,13 @@ function clickAt(ctx, when, strength = 0.6) {
   filter.frequency.value = strong ? 2400 : 1800;
   filter.Q.value = 0.7;
   const gain = ctx.createGain();
-  gain.gain.value = strong ? 3.2 : 2.5;
-  src.connect(filter).connect(gain).connect(clickBusFor(ctx));
+  if (loud) {
+    gain.gain.value = strong ? 7 : 5.5;
+    src.connect(filter).connect(gain).connect(clickBusFor(ctx));
+  } else {
+    gain.gain.value = strong ? 4 : 3;
+    src.connect(filter).connect(gain).connect(player.output);
+  }
   src.start(when);
   assistClicks.push(src);
   // A long session should not accumulate stopped nodes in this list.
@@ -2060,7 +2068,23 @@ function ingestSightFrame(frame) {
   // there running the click track to the end of the passage, which reads as a
   // frozen app. A student who *has* played is never cut off by this — it only
   // fires while nothing has sounded.
-  const neverStarted = take.assisted && take.onsets === 0 && elapsed > 6;
+  // But first, if nothing has been heard three seconds into an assisted run,
+  // the clicks go quiet (the moving line carries on): on an iPad the clicks
+  // from the speaker can be what is drowning the violin out, and with them
+  // gone the microphone comes back. The six seconds then start again.
+  if (take.assisted && take.onsets === 0 && elapsed > 3 && take.clicksCut == null) {
+    take.clicksCut = elapsed;
+    for (const node of assistClicks) {
+      try {
+        node.stop();
+      } catch {
+        /* already played */
+      }
+    }
+    assistClicks = [];
+    el.sightStatus.textContent = t('sight.clicksCut');
+  }
+  const neverStarted = take.assisted && take.onsets === 0 && elapsed > (take.clicksCut ?? 0) + 6;
   // An assisted run is on a clock, so it knows whether the passage can be over:
   // before the last bar's time is up only a long silence ends it.
   // On an iPad the microphone can also be turned down for a stretch by Safari's

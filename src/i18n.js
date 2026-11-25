@@ -1268,6 +1268,7 @@ export const S = {
     '准备好了就开始，应用会在你第一个音时开始。',
   ],
   'sight.playing': ['Listening…', '正在聆听…'],
+  'sight.clicksCut': ['Clicks off so the microphone can hear you — keep playing.', '节拍声先关掉，好让麦克风听见你——继续拉。'],
   'sight.partNotes': ['Notes right', '音对了'],
   'sight.partTuned': ['In tune', '音准'],
   'sight.partPulse': ['Steady pulse', '节拍稳定'],
