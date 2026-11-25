@@ -126,12 +126,18 @@
         const count = (re) => (lane.markup.match(new RegExp(re, 'g')) || []).length;
         log.push(
           `lane: ${lane.markup.length} chars · stems ${count('intonation-stem')} · dots ${count('intonation-dot')} · ` +
-            `rings ${count('intonation-missed')} · chevrons ${count('intonation-over')} · bottom ${lane.bottom}`,
+            `rings ${count('intonation-missed')} · wrong notes ${count('class="intonation-wrong"')} · bottom ${lane.bottom}`,
         );
-        if (count('intonation-stem') !== 4) problems.push(`${count('intonation-stem')} stems for four heard notes`);
-        if (count('intonation-dot') !== 4) problems.push(`${count('intonation-dot')} dots for four heard notes`);
+        // 70 cents off is a different note: it gets the wrong-note badge, not a stem.
+        if (count('intonation-stem') !== 3) problems.push(`${count('intonation-stem')} stems for three notes near their pitch`);
+        if (count('intonation-dot') !== 3) problems.push(`${count('intonation-dot')} dots for three notes near their pitch`);
         if (count('intonation-missed') !== 1) problems.push(`${count('intonation-missed')} rings for one missed note`);
-        if (!/intonation-over/.test(lane.markup)) problems.push('an off-the-scale reading has no chevron');
+        if (count('class="intonation-wrong"') !== 1) problems.push('a wrong note has no wrong-note mark');
+        {
+          const wrong = intonationLane({ marks: [{ x: 50, cents: 210 }, { x: 90, cents: -95 }], centre: 60, half: 20, left: 0, right: 120 }).markup;
+          if (!wrong.includes('data-semitones="2"') || !wrong.includes('>+2<')) problems.push('a note two half steps high is not labelled +2');
+          if (!wrong.includes('data-semitones="-1"') || !wrong.includes('>−1<')) problems.push('a note a half step low is not labelled −1');
+        }
         // The lane reports how far down it reaches, so the next system can clear it.
         if (lane.bottom !== 80) problems.push(`the lane bottom is ${lane.bottom}, not 80`);
         // Each stem is drawn at its own note's x — the whole point of the lane.

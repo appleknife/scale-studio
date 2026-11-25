@@ -14,18 +14,18 @@
 // MusicXML, and `tempoaudio.js` for the stretch. The mechanics are the same;
 // none of that app's code or art is copied.
 
-import * as Lib from './sheetlib.js?v=202611241945';
-import { renderStretched } from './tempoaudio.js?v=202611241945';
-import { loadOsmd } from './listenview.js?v=202611241945';
-import { t } from './i18n.js?v=202611241945';
-import { readScoreFile } from './musicxml.js?v=202611241945';
+import * as Lib from './sheetlib.js?v=202611251630';
+import { renderStretched } from './tempoaudio.js?v=202611251630';
+import { loadOsmd } from './listenview.js?v=202611251630';
+import { t } from './i18n.js?v=202611251630';
+import { readScoreFile } from './musicxml.js?v=202611251630';
 import { createScanner } from './scanview.js?v=202611241000';
 import * as Dropbox from './dropbox.js?v=202611241000';
 import * as Keys from './sheetkeys.js?v=202611241000';
 
 const PDF_VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
-const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611241945';
-const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611241945';
+const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611251630';
+const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611251630';
 const PDF_ASSETS = PDF_VENDOR;
 const MAX_DPR = 2;
 const INK = '#1f4fa8';

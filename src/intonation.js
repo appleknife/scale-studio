@@ -57,6 +57,47 @@ export function summariseIntonation(notes = []) {
   };
 }
 
+/** The colour of a wrong note: stronger than the "off" band, so it reads as a different thing. */
+export const WRONG = '#d23a2f';
+
+/** How many half steps a wrong note was away, rounded, e.g. "+2" or "−1". */
+export function semitoneLabel(cents) {
+  const n = Math.round(cents / 100);
+  if (n === 0) return cents > 0 ? '+' : '−';
+  return `${n > 0 ? '+' : '−'}${Math.abs(n)}`;
+}
+
+/** The mark for a note that came out as a different pitch altogether. */
+function wrongNoteMark(x, cents, centre, half, yFor) {
+  const up = cents > 0;
+  const r = WRONG_R;
+  const badgeY = yFor(cents) + (up ? -1 : 1) * 2; // just past the end of the axis
+  // Arrow on the outside, the number of half steps on the inside.
+  const s = up ? -1 : 1;
+  const tipY = badgeY + s * 7;
+  const baseY = badgeY + s * 3.6;
+  const arrow = `M ${fmt(x - 3.8)} ${fmt(baseY)} L ${fmt(x)} ${fmt(tipY)} L ${fmt(x + 3.8)} ${fmt(baseY)}`;
+  const textY = up ? badgeY + 6.2 : badgeY + 0.6;
+  return (
+    `<g class="intonation-wrong" data-semitones="${Math.round(cents / 100)}">` +
+    `<rect class="intonation-wrong-col" x="${fmt(x - 8)}" y="${fmt(centre - half - 3)}" width="16" height="${fmt(half * 2 + 6)}" rx="8"/>` +
+    `<line class="intonation-wrong-stem" x1="${fmt(x)}" y1="${fmt(centre)}" x2="${fmt(x)}" y2="${fmt(badgeY)}"/>` +
+    `<circle class="intonation-wrong-glow" cx="${fmt(x)}" cy="${fmt(badgeY)}" r="${fmt(r + 4)}"/>` +
+    `<circle class="intonation-wrong-badge" cx="${fmt(x)}" cy="${fmt(badgeY)}" r="${r}"/>` +
+    `<path class="intonation-wrong-arrow" d="${arrow}"/>` +
+    `<text class="intonation-wrong-num" x="${fmt(x)}" y="${fmt(textY)}" text-anchor="middle">${semitoneLabel(cents)}</text>` +
+    `</g>`
+  );
+}
+
+/** The wrong-note badge's radius; the lane leaves this much more room. */
+export const WRONG_R = 11;
+
+/** Whether a lane holds a wrong note, so the score can leave room for its badge. */
+export function hasWrongNote(marks = []) {
+  return marks.some((m) => Number.isFinite(m.cents) && Math.abs(m.cents) >= SPAN);
+}
+
 /** Where a reading sits, vertically. Exported because a test can check it. */
 export function yForCents(cents, { centre, half = 22 } = {}) {
   // Up is sharp: a positive number of cents is drawn above the centre line.
@@ -70,6 +111,9 @@ export function yForCents(cents, { centre, half = 22 } = {}) {
  * note's own horizontal position — which is what makes the picture readable:
  * a stem sits under the note it is about, so "which notes were off" is a matter
  * of looking up rather than counting columns.
+ *
+ * A reading half a semitone or more off is a wrong note and gets its own
+ * glowing mark (see wrongNoteMark) instead of a stem.
  *
  * `cents` of `null` means the app did not hear that note; it is drawn as a hollow
  * ring on the centre line, which is visibly not the same as a note played
@@ -105,6 +149,15 @@ export function intonationLane({ marks = [], centre, half = 22, left, right }) {
       part.push(`<circle class="intonation-missed" cx="${fmt(x)}" cy="${fmt(centre)}" r="1.9"/>`);
       continue;
     }
+    // Half a semitone or more off is not "a little high": it is a different
+    // note. Clamped to the axis it used to look like a slightly sharp one, so it
+    // gets a mark of its own that cannot be mistaken — a tinted column through
+    // the lane, a thick stem to the edge, and a glowing badge with an arrow and
+    // how many half steps away it was.
+    if (Math.abs(mark.cents) >= SPAN) {
+      part.push(wrongNoteMark(x, mark.cents, centre, half, yFor));
+      continue;
+    }
     const y = yFor(mark.cents);
     const { colour } = bandFor(mark.cents);
     part.push(
@@ -112,15 +165,8 @@ export function intonationLane({ marks = [], centre, half = 22, left, right }) {
         `stroke="${colour}" stroke-width="2.6"/>`,
     );
     part.push(`<circle class="intonation-dot" cx="${fmt(x)}" cy="${fmt(y)}" r="2.2" fill="${colour}"/>`);
-    // A reading past the end of the axis gets a chevron rather than a stem that
-    // simply stops short and looks deliberate.
-    if (Math.abs(mark.cents) > SPAN) {
-      const dir = mark.cents > 0 ? -1 : 1;
-      const tip = y + dir * 3.4;
-      part.push(
-        `<path class="intonation-over" d="M ${fmt(x - 2.4)} ${fmt(tip)} L ${fmt(x)} ${fmt(tip + dir * 3)} L ${fmt(x + 2.4)} ${fmt(tip)}" stroke="${colour}"/>`,
-      );
-    }
   }
-  return { markup: part.join(''), bottom: centre + half };
+  // A badge below the lane reaches past it; say so, so the next system clears it.
+  const below = marks.some((m) => Number.isFinite(m.cents) && m.cents <= -SPAN);
+  return { markup: part.join(''), bottom: centre + half + (below ? WRONG_R + 2 : 0) };
 }

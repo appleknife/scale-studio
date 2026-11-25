@@ -6,11 +6,11 @@
 //
 // It borrows staff.js's geometry and ink so the two screens look like siblings.
 
-import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611241945';
-import { CLEF_PATH } from './clef.js?v=202611241945';
-import { intonationLane } from './intonation.js?v=202611241945';
+import { STAFF_GEOM, accidentalAt } from './staff.js?v=202611251630';
+import { CLEF_PATH } from './clef.js?v=202611251630';
+import { intonationLane, WRONG_R } from './intonation.js?v=202611251630';
 
-import { beatLength } from './sightreading.js?v=202611241945';
+import { beatLength } from './sightreading.js?v=202611251630';
 
 const { LINE_GAP, STEPS, E4, INK, MUTED, CLEF_BBOX, yForNote, indexOf, stemUp } = STAFF_GEOM;
 
@@ -1358,7 +1358,10 @@ function drawSystem(
   // its bottom so the spacing pass can leave room for it.
   let laneBottom = null;
   if (marks.length) {
-    const centre = Math.max(bottom + 26, lastDynY + 22);
+    // A wrong note's badge sits above the lane's top edge: room for it, so it
+    // never runs into the notes hanging below the staff.
+    const lift = marks.some((m) => Number.isFinite(m.cents) && m.cents >= 50) ? WRONG_R : 0;
+    const centre = Math.max(bottom + 26, lastDynY + 22) + lift;
     const lane = intonationLane({
       marks,
       centre,
