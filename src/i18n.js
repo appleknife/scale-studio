@@ -243,7 +243,7 @@ export const S = {
   'pet.say.fish2': ['*splash*', '（扑通）'],
   'pet.say.yum': ['Yum!', '好吃！'],
   'pet.say.favourite': ['My favourite!!', '我最爱吃这个！！'],
-  'listen.back': ['Home', '主页'],
+  'listen.back': ['Sheet music', '乐谱'],
   'sheet.back': ['Home', '首页'],
   'sheet.title': ['Sheet music', '乐谱'],
   'sheet.lead': ['Keep your own music here — a PDF from your teacher, photos of a part, a MusicXML file. Turn the page, mark it, and put a practice track under it.', '把你自己的乐谱放在这里——老师给的 PDF、拍的乐谱照片、MusicXML 文件。可以翻页、做记号，并在下面播放伴奏。'],
@@ -372,6 +372,11 @@ export const S = {
   'sheet.change': ['Change', '更改'],
   'sheet.turnerReset': ['Reset keys', '恢复默认键'],
   'sheet.scan': ['Scan', '扫描'],
+  'sheet.scanBeta': ['Experimental', '实验功能'],
+  'sheet.scanBetaNote': ["Experimental — the scanner doesn't work reliably yet. For now, take a photo with the camera and add it with Add music.", '实验功能——扫描还不太好用。目前请先用相机拍照，再用“添加乐谱”加进来。'],
+  'sheet.listen.title': ['Just play — Listen', '直接拉 —— 聆听'],
+  'sheet.listen.sub': ['Play anything and hear what the app noticed — tuning, vibrato, pulse. Open a MusicXML piece below and it checks every bar.', '随便拉一段，听听应用注意到了什么——音准、揉弦、节拍。打开下面的 MusicXML 曲子，它会逐小节检查。'],
+  'sheet.listen.score': ['Listen: play this and check every bar', '聆听：拉这首，逐小节检查'],
   'sheet.scanPages': ['Scan pages', '扫描页面'],
   'scan.title': ['Scan pages', '扫描页面'],
   'scan.close': ['Close the camera', '关闭相机'],
@@ -1996,6 +2001,9 @@ export const STATIC = {
 
   /* sheet music */
   'Sheet music': '乐谱',
+  'Sheet music & Listen': '乐谱与聆听',
+  'Your own PDFs, photos and scores on the stand — and Listen, which hears you play a piece and says what it noticed.':
+    '把自己的 PDF、照片和乐谱放上谱架——还有“聆听”：它听你拉一首曲子，告诉你它注意到了什么。',
   'Your own PDFs, photos and scores on the stand. Turn pages, mark them, and play along to a track.':
     '把你自己的乐谱放上谱架：PDF、照片、扫描件。可以翻页、做记号，并跟着伴奏练。',
   /* sight reading */

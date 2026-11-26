@@ -1,20 +1,20 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611251900';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611251900';
-import { createInk } from './ink.js?v=202611251900';
-import { createFollower } from './follow.js?v=202611251900';
-import { createPetRoom } from './petroom.js?v=202611251900';
-import { SPRINT_FULL } from './pet.js?v=202611251900';
-import { createBuddy } from './buddy.js?v=202611251900';
-import { createSprintView } from './sprintview.js?v=202611251900';
-import { createTrillView } from './trillview.js?v=202611251900';
-import { createListenView } from './listenview.js?v=202611251900';
-import { createSheetView } from './sheetview.js?v=202611251900';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611252330';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611252330';
+import { createInk } from './ink.js?v=202611252330';
+import { createFollower } from './follow.js?v=202611252330';
+import { createPetRoom } from './petroom.js?v=202611252330';
+import { SPRINT_FULL } from './pet.js?v=202611252330';
+import { createBuddy } from './buddy.js?v=202611252330';
+import { createSprintView } from './sprintview.js?v=202611252330';
+import { createTrillView } from './trillview.js?v=202611252330';
+import { createListenView } from './listenview.js?v=202611252330';
+import { createSheetView } from './sheetview.js?v=202611252330';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611251900';
+window.__scaleStudioVersion = '202611252330';
 import {
   PitchDetector,
   midiToFreq,
@@ -22,16 +22,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611251900';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611251900';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611251900';
-import { generatePassage } from './sightreading.js?v=202611251900';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611251900';
-import { renderScore } from './score.js?v=202611251900';
-import { summariseIntonation } from './intonation.js?v=202611251900';
-import * as Journal from './journal.js?v=202611251900';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611251900';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611251900';
+} from './pitch.js?v=202611252330';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611252330';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611252330';
+import { generatePassage } from './sightreading.js?v=202611252330';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611252330';
+import { renderScore } from './score.js?v=202611252330';
+import { summariseIntonation } from './intonation.js?v=202611252330';
+import * as Journal from './journal.js?v=202611252330';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611252330';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611252330';
 import {
   STRINGS,
   FIFTHS,
@@ -40,7 +40,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611251900';
+} from './tuner.js?v=202611252330';
 
 const LANG = initLang();
 
@@ -67,7 +67,6 @@ const el = {
   },
   openSprintBtn: $('openSprintBtn'),
   openTrillBtn: $('openTrillBtn'),
-  openListenBtn: $('openListenBtn'),
   openSheetsBtn: $('openSheetsBtn'),
   openPetBtn: $('openPetBtn'),
   petBack: $('petBack'),
@@ -2584,12 +2583,18 @@ listenView = createListenView({
   getMic: () => state.mic,
   micError: (err) => micErrorMessage(err),
   onFinish: () => noteTake('piece'),
-  onBack: () => goHome(),
+  // Listen lives inside Sheet music now: back goes to the shelf.
+  onBack: () => {
+    sheetView.open();
+    showView('sheets');
+  },
 });
-el.openListenBtn.addEventListener('click', () => {
-  listenView.open();
+/** Listen, free or with a score from the shelf. */
+async function openListen(file = null) {
   showView('listen');
-});
+  if (file) await listenView.openWith(file);
+  else listenView.openFree();
+}
 window.__listenView = listenView;
 
 // Sheet music: a local shelf of the student's own PDFs, photos and MusicXML
@@ -2601,6 +2606,7 @@ sheetView = createSheetView({
   audio: () => ({ ctx: player.context, out: player.output }),
   onBack: () => goHome(),
   onViewChange: () => renderGrid(),
+  onListen: (file) => openListen(file),
 });
 el.openSheetsBtn.addEventListener('click', () => {
   sheetView.open();

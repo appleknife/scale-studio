@@ -11,12 +11,12 @@
 // score is drawn by OpenSheetMusicDisplay (BSD-3, vendor/), loaded only when a
 // score is opened, so the rest of the app never pays for it.
 
-import { readScore, readScoreFile, listParts, parseXml, sectionOf } from './musicxml.js?v=202611251900';
-import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611251900';
-import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611251900';
-import { t } from './i18n.js?v=202611251900';
+import { readScore, readScoreFile, listParts, parseXml, sectionOf } from './musicxml.js?v=202611252330';
+import { analyzeFree, analyzeScore, barStartTime, nameOf } from './listen.js?v=202611252330';
+import { recordStream, play as playRecording, canRecord } from './recorder.js?v=202611252330';
+import { t } from './i18n.js?v=202611252330';
 
-const OSMD_SRC = new URL('../vendor/opensheetmusicdisplay.min.js?v=202611251900', import.meta.url).href;
+const OSMD_SRC = new URL('../vendor/opensheetmusicdisplay.min.js?v=202611252330', import.meta.url).href;
 const MAX_SECONDS = 600; // ten minutes: enough for any audition piece
 const MIN_SECONDS = 5;
 const MIN_SECTION_SECONDS = 1.5; // a single bar is a fair thing to practise
@@ -273,6 +273,19 @@ export function createListenView(deps) {
         <p>${t('listen.paperNote')}</p>
         <p>${t('listen.paperTeacher')}</p>
       </div>`;
+  }
+
+  /** Back to free playing: no score, nothing practised. */
+  function dropScore() {
+    stopHearing();
+    section = null;
+    anchor = false;
+    tries.clear();
+    source = null;
+    osmd = null;
+    ticket += 1;
+    scoreEl.innerHTML = '';
+    scoreWrap.hidden = true;
   }
 
   async function openFile(file, piece = null) {
@@ -936,15 +949,7 @@ export function createListenView(deps) {
       return paint();
     }
     if (act === 'noscore') {
-      stopHearing();
-      section = null;
-      anchor = false;
-      tries.clear();
-      source = null;
-      osmd = null;
-      ticket += 1;
-      scoreEl.innerHTML = '';
-      scoreWrap.hidden = true;
+      dropScore();
       return paint();
     }
     if (act === 'record') return startTake();
@@ -997,6 +1002,21 @@ export function createListenView(deps) {
     open() {
       if (panel === 'rec') return;
       paint();
+    },
+    /** "Just play" on the Sheet music shelf: free playing, no score. */
+    openFree() {
+      if (panel === 'rec') return;
+      if (source) dropScore();
+      panel = 'start';
+      result = null;
+      paint();
+    },
+    /** Opened from a piece on the Sheet music shelf: that score, ready to play. */
+    async openWith(file) {
+      if (panel === 'rec') return;
+      panel = 'start';
+      paint();
+      await openFile(file);
     },
     /** Leaving the screen: let go of the microphone and the speaker. */
     stop() {

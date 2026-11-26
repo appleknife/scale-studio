@@ -83,7 +83,8 @@ export function createScanner(deps) {
       </div>
       <div class="scan-bar">
         <button class="scan-btn" type="button" data-act="close" aria-label="${t('scan.close')}" title="${t('scan.close')}">${ICON.close}</button>
-        <span class="scan-title" data-el="title">${t('scan.title')}</span>
+        <span class="scan-title"><span data-el="title">${t('scan.title')}</span> <span class="experimental-tag">${t('sheet.scanBeta')}</span>
+          <small class="scan-beta-note">${t('sheet.scanBetaNote')}</small></span>
         <button class="scan-btn" type="button" data-act="torch" aria-label="${t('scan.torch')}" title="${t('scan.torch')}" hidden>${ICON.torch}</button>
         <button class="scan-btn is-on" type="button" data-act="auto" aria-pressed="true" aria-label="${t('scan.auto')}" title="${t('scan.auto')}">${ICON.auto}</button>
       </div>

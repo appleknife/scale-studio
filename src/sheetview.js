@@ -14,18 +14,18 @@
 // MusicXML, and `tempoaudio.js` for the stretch. The mechanics are the same;
 // none of that app's code or art is copied.
 
-import * as Lib from './sheetlib.js?v=202611251900';
-import { renderStretched } from './tempoaudio.js?v=202611251900';
-import { loadOsmd } from './listenview.js?v=202611251900';
-import { t } from './i18n.js?v=202611251900';
-import { readScoreFile } from './musicxml.js?v=202611251900';
+import * as Lib from './sheetlib.js?v=202611252330';
+import { renderStretched } from './tempoaudio.js?v=202611252330';
+import { loadOsmd } from './listenview.js?v=202611252330';
+import { t } from './i18n.js?v=202611252330';
+import { readScoreFile } from './musicxml.js?v=202611252330';
 import { createScanner } from './scanview.js?v=202611241000';
 import * as Dropbox from './dropbox.js?v=202611241000';
 import * as Keys from './sheetkeys.js?v=202611241000';
 
 const PDF_VENDOR = new URL('../vendor/pdfjs/', import.meta.url).href;
-const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611251900';
-const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611251900';
+const PDF_SRC = PDF_VENDOR + 'pdf.js?v=202611252330';
+const PDF_WORKER = PDF_VENDOR + 'pdf.worker.js?v=202611252330';
 const PDF_ASSETS = PDF_VENDOR;
 const MAX_DPR = 2;
 const INK = '#1f4fa8';
@@ -39,6 +39,7 @@ const ICON = {
   back: svg('<path d="M15 5l-7 7 7 7"/>'),
   prev: svg('<path d="M14.5 6l-6 6 6 6"/>'),
   next: svg('<path d="M9.5 6l6 6-6 6"/>'),
+  ear: svg('<path d="M7 9.5a5 5 0 0 1 10 0c0 2.6-1.6 3.6-2.6 4.6-.9.9-1 1.7-1.2 2.9-.3 1.7-1.5 3-3.2 3a2.9 2.9 0 0 1-2.9-2.6"/><path d="M10 10a2 2 0 0 1 4 0c0 1-.8 1.5-1.4 2"/>'),
   bookmark: svg('<path d="M7 4h10v16l-5-3.6L7 20z"/>'),
   pen: svg('<path d="M4 20l4.2-1 10.6-10.6a2 2 0 0 0 0-2.8l-.4-.4a2 2 0 0 0-2.8 0L5 15.8z"/><path d="M13.5 6.5l4 4"/>'),
   sliders: svg('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'),
@@ -115,11 +116,19 @@ export function createSheetView(deps) {
         <p class="subtle sheet-lead">${t('sheet.lead')}</p>
       </div>
       <div class="sheet-head-actions">
-        <button class="sheet-cloud-btn" type="button" data-act="scan">${ICON.scan}${t('sheet.scan')}</button>
+        <button class="sheet-cloud-btn is-experimental" type="button" data-act="scan" title="${t('sheet.scanBetaNote')}">${ICON.scan}${t('sheet.scan')}<span class="experimental-tag">${t('sheet.scanBeta')}</span></button>
         <button class="sheet-cloud-btn" type="button" data-act="cloud">${ICON.cloud}${t('sheet.cloud')}</button>
         <button class="primary-btn sheet-import" type="button" data-act="import">${t('sheet.import')}</button>
       </div>
     </div>
+    <button class="sheet-listen-card" type="button" data-act="listen">
+      <span class="sheet-listen-icon" aria-hidden="true">${ICON.ear}</span>
+      <span class="sheet-listen-text">
+        <strong>${t('sheet.listen.title')} <span class="beta-tag">${t('listen.beta')}</span></strong>
+        <span>${t('sheet.listen.sub')}</span>
+      </span>
+      <span class="sheet-listen-go" aria-hidden="true">${ICON.next}</span>
+    </button>
     <div class="sheet-tools">
       <input class="sheet-search" type="search" placeholder="${t('sheet.search')}" aria-label="${t('sheet.search')}" />
       <span class="sheet-space subtle" data-el="space"></span>
@@ -683,6 +692,7 @@ export function createSheetView(deps) {
         <button class="reader-btn" type="button" data-act="bookmark" data-chrome="bookmarks" aria-label="${t('sheet.bookmark')}" title="${t('sheet.bookmark')}">${ICON.bookmark}</button>
         <button class="reader-btn" type="button" data-act="ink" data-chrome="ink" aria-label="${t('sheet.tools')}" title="${t('sheet.tools')}">${ICON.pen}</button>
         <button class="reader-btn" type="button" data-act="settings" data-chrome="settings" aria-label="${t('sheet.settings')}" title="${t('sheet.settings')}">${ICON.sliders}</button>
+        <button class="reader-btn reader-btn-listen" type="button" data-act="listenScore" data-el="listenBtn" hidden aria-label="${t('sheet.listen.score')}" title="${t('sheet.listen.score')}">${ICON.ear}</button>
         <button class="reader-btn reader-btn-audio" type="button" data-act="audio" data-chrome="audio" aria-label="${t('sheet.audio')}" title="${t('sheet.audio')}">${ICON.note}<i class="reader-live" aria-hidden="true"></i></button>
       </div>
     </div>
@@ -719,6 +729,7 @@ export function createSheetView(deps) {
 
   Object.assign(refs, {
     title: readerEl.querySelector('[data-el="title"]'),
+    listenBtn: readerEl.querySelector('[data-el="listenBtn"]'),
     meta: readerEl.querySelector('[data-el="meta"]'),
     stage: readerEl.querySelector('[data-el="stage"]'),
     pages: readerEl.querySelector('[data-el="pages"]'),
@@ -767,6 +778,8 @@ export function createSheetView(deps) {
     readerOpen = true;
     deps.onViewChange?.();
     refs.title.textContent = sheet.title;
+    // A MusicXML score can be listened against, bar by bar.
+    refs.listenBtn.hidden = sheet.kind !== 'musicxml';
     refs.meta.textContent = sheet.composer || '';
     refs.slider.max = String(Math.max(1, sheet.pageCount || 1));
     refs.pages.innerHTML = '';
@@ -1296,7 +1309,7 @@ ${head('sheet.settings')}
         ${sw('spread', Boolean(s.spread), t('sheet.spread'))}
         ${sw('keepAwake', s.keepAwake !== false, t('sheet.keepAwake'))}
       </div>
-      ${sheet.kind === 'images' ? `<div class="reader-row"><button class="reader-pill" type="button" data-act="addPages">${ICON.plus}${t('sheet.addPages')}</button><button class="reader-pill" type="button" data-act="scan">${ICON.scan}${t('sheet.scanPages')}</button></div>` : ''}
+      ${sheet.kind === 'images' ? `<div class="reader-row"><button class="reader-pill" type="button" data-act="addPages">${ICON.plus}${t('sheet.addPages')}</button><button class="reader-pill" type="button" data-act="scan" title="${t('sheet.scanBetaNote')}">${ICON.scan}${t('sheet.scanPages')}<span class="experimental-tag">${t('sheet.scanBeta')}</span></button></div>` : ''}
       <details class="reader-crop" ${cropped ? 'open' : ''}>
         <summary>${t('sheet.crop')}${cropped ? ' ·' : ''}</summary>
         <div class="sheet-panel-grid">
@@ -1893,6 +1906,16 @@ ${head('sheet.audio')}
         return renderSettings();
       case 'scan':
         return scanner.open();
+      case 'listen':
+        return deps.onListen?.(null);
+      case 'listenScore': {
+        if (!sheet || sheet.kind !== 'musicxml') return;
+        const file = await Lib.getFile(sheet.id);
+        if (!file) return;
+        const named = file.name ? file : new File([file], `${sheet.title}.musicxml`);
+        await showShelf();
+        return deps.onListen?.(named);
+      }
       case 'import':
         fileEl.click();
         return;

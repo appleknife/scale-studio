@@ -10720,3 +10720,88 @@ select,
     animation: none;
   }
 }
+
+/* ── Listen inside Sheet music, and the scanner's warning ───────────── */
+.sheet-listen-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 4px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(120deg, var(--accent-wash), var(--surface) 70%);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -14px rgba(34, 30, 25, 0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.sheet-listen-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 22px -14px rgba(34, 30, 25, 0.55);
+}
+.sheet-listen-card:active {
+  transform: scale(0.99);
+}
+.sheet-listen-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+}
+.sheet-listen-icon .ico {
+  width: 26px;
+  height: 26px;
+}
+.sheet-listen-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sheet-listen-text strong {
+  font: 600 17px/1.2 var(--serif);
+}
+.sheet-listen-text > span {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+.sheet-listen-go {
+  flex: none;
+  color: var(--muted);
+}
+.sheet-listen-go .ico {
+  width: 20px;
+  height: 20px;
+}
+.experimental-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px dashed currentColor;
+  font: 700 9.5px/1.2 var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  vertical-align: middle;
+}
+.sheet-cloud-btn.is-experimental {
+  opacity: 0.8;
+}
+.scan-beta-note {
+  display: block;
+  margin-top: 2px;
+  font: 400 11.5px/1.35 var(--sans);
+  opacity: 0.75;
+}
