@@ -13,8 +13,8 @@
 // the rhythm away from the instrument. Both are stamped on the audio clock, so
 // the judge never sees two different clocks.
 
-import * as Rhythm from './rhythm.js?v=202611261200';
-import { t } from './i18n.js?v=202611252330';
+import * as Rhythm from './rhythm.js?v=202611261300';
+import { t } from './i18n.js?v=202611261300';
 
 const STRINGS = [
   { id: 'G3', name: 'G', freq: 196 },
@@ -112,7 +112,7 @@ export function createRhythmView(deps) {
       return (stats.pools[id] ? Rhythm.makePool(id, stats.pools[id], {}) : []).map((p) => {
         const level = lv[p.sig] || 0;
         return `<span class="rhythm-dot${level >= 2 ? ' is-mastered' : level === 1 ? ' is-half' : level < 0 ? ' is-weak' : ''}"></span>`;
-      });
+      }).join('');
     };
     const rows = Rhythm.RHYTHM_STAGES.map((s) => {
       const isOpen = open[s.index];
@@ -122,7 +122,7 @@ export function createRhythmView(deps) {
       return `<button class="rhythm-stage${on ? ' is-on' : ''}${isClear ? ' is-clear' : ''}" type="button" data-stage="${s.id}" ${isOpen ? '' : 'disabled'}>
         <span class="rhythm-stage-n">${s.index + 1}</span>
         <span class="rhythm-stage-text"><b>${stageName(s.id)}</b><span>${stageDesc(s.id)}</span></span>
-        <span class="rhythm-stage-side">${isClear ? '✓' : isOpen ? `<span class="rhythm-dots">${dots.join('')}</span>` : '🔒'}</span>
+        <span class="rhythm-stage-side">${isClear ? '✓' : isOpen ? `<span class="rhythm-dots">${dots}</span>` : '🔒'}</span>
       </button>`;
     }).join('');
 
@@ -176,9 +176,27 @@ export function createRhythmView(deps) {
 
   /* ── The bar ─────────────────────────────────────────────────────────── */
 
+  // Pixels per tick for the bar on screen: as wide as the lane allows (so the
+  // bar fills it, on a phone or a tablet), never cramped, never sprawling.
+  let col = 22;
+  function fitCol(per) {
+    const lane = root.querySelector('.rhythm-lane');
+    const room = lane ? lane.clientWidth - 22 : 0;
+    col = room > 0 ? Math.max(14, Math.min(64, (room - 8) / per)) : 22;
+    return col;
+  }
+
+  /** Where tick `ticks` of the bar sits, in pixels from the lane's left edge. */
+  function laneX(ticks) {
+    const svgEl = root.querySelector('.rhythm-strip');
+    const scroll = root.querySelector('.rhythm-scroll');
+    const left = (svgEl?.offsetLeft || 0) - (scroll?.scrollLeft || 0);
+    return left + 4 + ticks * col;
+  }
+
   function strip(pattern, { reveal = false } = {}) {
     const per = pattern.perBar;
-    const COL = 22;
+    const COL = col;
     const width = per * COL + 8;
     const height = 138;
     const top = 44;
@@ -199,7 +217,7 @@ export function createRhythmView(deps) {
         continue;
       }
       parts.push(`<rect class="rhythm-slot" x="${x}" y="${top + 6}" width="${w}" height="36" rx="6"/>`);
-      parts.push(`<ellipse class="rhythm-head" cx="${x + 7}" cy="${top + 24}" rx="5.2" ry="3.8" transform="rotate(-18 ${x + 7} ${top + 24})"/>`);
+      parts.push(`<ellipse class="rhythm-notehead" cx="${x + 7}" cy="${top + 24}" rx="5.2" ry="3.8" transform="rotate(-18 ${x + 7} ${top + 24})"/>`);
       const bow = bows.get(e.start);
       if (bow) parts.push(`<text class="rhythm-bow" x="${x + 5}" y="${top - 4}">${bow === 'down' ? '▼' : '▲'}</text>`);
     }
@@ -286,59 +304,89 @@ export function createRhythmView(deps) {
     analyser.smoothingTimeConstant = 0;
     source.connect(analyser);
     const buf = new Float32Array(analyser.fftSize);
-    const hp = new Float32Array(buf.length);
     let y = [0, 0, 0];
     let px = [0, 0, 0];
     let prevHi = 0;
     let pending = null;
+    let lastPoll = 0;
     const recent = [];
     const a = 1 / (1 + (2 * Math.PI * 6000) / ctx.sampleRate);
     lastBlock = 0;
+    clockGaps.length = 0;
     pollTimer = setInterval(() => {
       if (!session || !listening) return;
+      const now = ctx.currentTime;
+      // Only the samples that arrived since the last look. The analyser hands
+      // back its whole window every time, and filtering that window again on
+      // each poll ran the filter across a jump back in time: a spike every
+      // 5 ms, which a held note turned into a stream of phantom bow changes.
+      const fresh = Math.min(buf.length, Math.round((now - lastPoll) * ctx.sampleRate));
+      if (lastPoll && fresh <= 0) return;
+      const n = lastPoll ? fresh : 256;
+      lastPoll = now;
+      noteClock(now);
       analyser.getFloatTimeDomainData(buf);
+      const from = buf.length - n;
       let rms = 0;
       let hi = 0;
-      for (let p = 0; p < 3; p++) {
-        for (let i = 0; i < buf.length; i++) {
-          const x = p === 0 ? buf[i] : hp[i];
+      for (let i = from; i < buf.length; i++) {
+        let x = buf[i];
+        for (let p = 0; p < 3; p++) {
           y[p] = a * (y[p] + x - px[p]);
           px[p] = x;
-          hp[i] = y[p];
+          x = y[p];
         }
-      }
-      for (let i = 0; i < buf.length; i++) {
         rms += buf[i] * buf[i];
-        hi += hp[i] * hp[i];
+        hi += x * x;
       }
-      rms = Math.sqrt(rms / buf.length);
-      hi = Math.sqrt(hi / buf.length);
+      rms = Math.sqrt(rms / n);
+      hi = Math.sqrt(hi / n);
       recent.push(hi);
       if (recent.length > 120) recent.shift();
-      const sorted = [...recent].sort((m, n) => m - n);
+      const sorted = [...recent].sort((m, k) => m - k);
       const floor = sorted[sorted.length >> 1] || 1e-9;
-      const now = ctx.currentTime;
       const flux = Math.max(0, hi - prevHi) / (floor + 1e-9);
       prevHi = hi;
       const micNow = deps.getMic();
       const gate = Math.max(0.008, (micNow?.floor || 0.0012) * 7);
-      const inAnswer = now > session.answerAt - 0.06 && now < session.answerEnd;
+      // The answer window, on the speaker's clock, moved by the delay between a
+      // click leaving and the student's note reaching the microphone.
+      const heard = toPlayer(now);
+      const late = latency();
+      const inAnswer = heard > session.answerAt + late - 0.08 && heard < session.answerEnd + late + 0.12;
       if (inAnswer && rms > gate && flux > 1.5 && now - lastBlock > 0.065) {
         lastBlock = now;
-        pending = { at: now, time: now - buf.length / ctx.sampleRate / 2 };
+        pending = { at: now, time: now - n / ctx.sampleRate / 2 };
       }
       // A bow change is a broadband transient, so wait for the pitched frame
       // that follows it before calling it playing. That keeps the click track
       // (also a transient, but not a note) out of the answer.
       if (pending) {
         if (voicedAt >= pending.time - 0.06) {
-          addOnset(pending.time);
+          addOnset(toPlayer(pending.time));
           pending = null;
         } else if (now - pending.at > 0.16) {
           pending = null;
         }
       }
     }, 5);
+  }
+
+  /* The microphone and the speaker are two audio contexts with two clocks that
+     started at different moments. Everything the exercise schedules is on the
+     speaker's; what the microphone hears is moved onto it here, by the median
+     gap between the two clocks read side by side. */
+  const clockGaps = [];
+  function noteClock(micNow) {
+    const play = deps.audio?.()?.ctx;
+    if (!play) return;
+    clockGaps.push(play.currentTime - micNow);
+    if (clockGaps.length > 61) clockGaps.shift();
+  }
+  function toPlayer(micTime) {
+    if (!clockGaps.length) return micTime;
+    const sorted = [...clockGaps].sort((m, k) => m - k);
+    return micTime + sorted[sorted.length >> 1];
   }
 
   function stopAnalyser() {
@@ -416,7 +464,8 @@ export function createRhythmView(deps) {
     session.exampleAt = t0 + countTicks * session.secTick;
     session.answerAt = session.exampleAt + session.pattern.ticks * session.secTick;
     session.answerEnd = session.answerAt + session.pattern.ticks * session.secTick;
-    session.judgeAt = session.answerEnd + 0.14;
+    // the last note reaches the microphone a speaker-delay after it is due
+    session.judgeAt = session.answerEnd + latency() + 0.2;
 
     // Count-in: the felt beats of two bars, accented on each bar.
     for (let bar = 0; bar < COUNT_IN_BARS; bar++) {
@@ -459,10 +508,8 @@ export function createRhythmView(deps) {
     if (line && stripEl) {
       const at = session.phase === 'answer' || session.phase === 'verdict' ? session.answerAt : session.exampleAt;
       const ticks = (now - at) / session.secTick;
-      const left = clamp((ticks + 4) / (session.pattern.ticks + 4), 0, 1);
-      line.style.left = `${left * 100}%`;
-      const scale = stripEl.getBoundingClientRect().width / (session.pattern.perBar * 22 + 8);
-      void scale;
+      // on the bar's own grid, so it crosses each note as it sounds
+      line.style.left = `${laneX(clamp(ticks, -0.5, session.pattern.ticks + 0.5)).toFixed(1)}px`;
     }
     if (!session.judged && now >= session.judgeAt) {
       finishAnswer();
@@ -477,10 +524,9 @@ export function createRhythmView(deps) {
     const ticks = (time - start) / session.secTick - latency() / session.secTick;
     if (ticks < -1 || ticks > session.pattern.ticks + 1) return;
     session.onsets.push(ticks);
-    const where = clamp(ticks / session.pattern.ticks, 0, 1);
     const dot = document.createElement('span');
     dot.className = 'rhythm-onset';
-    dot.style.left = `${(where * 100).toFixed(2)}%`;
+    dot.style.left = `${(laneX(clamp(ticks, 0, session.pattern.ticks)) - 4.5).toFixed(1)}px`;
     root.querySelector('.rhythm-lane')?.append(dot);
     setTimeout(() => dot.remove(), 900);
   }
@@ -553,7 +599,7 @@ export function createRhythmView(deps) {
       if (f.status === 'ok' || f.status === 'missed') continue;
       const dot = document.createElement('span');
       dot.className = `rhythm-feature is-${f.status}`;
-      dot.style.left = `${clamp((f.onset / pattern.ticks) * 100, 0, 100)}%`;
+      dot.style.left = `${laneX(clamp(f.onset, 0, pattern.ticks)).toFixed(1)}px`;
       lane?.append(dot);
     }
     const timing = Math.round(Math.abs(result.drift) * session.secTick * 1000);
@@ -653,6 +699,9 @@ export function createRhythmView(deps) {
         <p class="rhythm-hint" data-hint>${stats.input === 'tap' ? t('rhythm.hint.tap') : t('rhythm.hint.mic', { s: stringNow().name })}</p>
         <div class="rhythm-live-meter" aria-hidden="true"><span></span></div>
       </section>`;
+    fitCol(pattern.perBar);
+    const scroll = root.querySelector('.rhythm-scroll');
+    if (scroll) scroll.innerHTML = strip(pattern, { reveal: true });
   }
 
   function showHint(text) {
@@ -916,6 +965,14 @@ export function createRhythmView(deps) {
     paintLadder();
   }
 
+  // Turning a tablet re-fits the bar to the new width.
+  window.addEventListener('resize', () => {
+    if (panel !== 'play' || !session) return;
+    fitCol(session.pattern.perBar);
+    const scroll = root.querySelector('.rhythm-scroll');
+    if (scroll) scroll.innerHTML = strip(session.pattern, { reveal: true });
+  });
+
   paintLadder();
 
   return {
@@ -925,6 +982,13 @@ export function createRhythmView(deps) {
     micStalled,
     get listening() {
       return listening;
+    },
+    /** Test hook: the answer in progress and what was heard. */
+    get __session() {
+      return session && { onsets: [...session.onsets], answerAt: session.answerAt, secTick: session.secTick, phase: session.phase, ticks: session.pattern.ticks, attacks: session.pattern.attacks.map((e) => e.start) };
+    },
+    get __last() {
+      return lastResult;
     },
   };
 }

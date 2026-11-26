@@ -10804,6 +10804,8 @@ select,
   margin-top: 2px;
   font: 400 11.5px/1.35 var(--sans);
   opacity: 0.75;
+}
+
 /* ── Rhythm ──────────────────────────────────────────────────────────────
    A call-and-response bar. The lane is printed on light paper in both themes,
    like the staff cards: it is music, and the ink has to stay dark. */
@@ -11026,7 +11028,7 @@ select,
   stroke: var(--line-strong);
   stroke-dasharray: 3 3;
 }
-.rhythm-head {
+.rhythm-notehead {
   fill: var(--ink);
 }
 .rhythm-bow {

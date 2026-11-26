@@ -1,21 +1,21 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611252330';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611252330';
-import { createInk } from './ink.js?v=202611252330';
-import { createFollower } from './follow.js?v=202611252330';
-import { createPetRoom } from './petroom.js?v=202611252330';
-import { SPRINT_FULL } from './pet.js?v=202611252330';
-import { createBuddy } from './buddy.js?v=202611252330';
-import { createSprintView } from './sprintview.js?v=202611252330';
-import { createTrillView } from './trillview.js?v=202611252330';
-import { createRhythmView } from './rhythmview.js?v=202611261200';
-import { createListenView } from './listenview.js?v=202611252330';
-import { createSheetView } from './sheetview.js?v=202611252330';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611261300';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611261300';
+import { createInk } from './ink.js?v=202611261300';
+import { createFollower } from './follow.js?v=202611261300';
+import { createPetRoom } from './petroom.js?v=202611261300';
+import { SPRINT_FULL } from './pet.js?v=202611261300';
+import { createBuddy } from './buddy.js?v=202611261300';
+import { createSprintView } from './sprintview.js?v=202611261300';
+import { createTrillView } from './trillview.js?v=202611261300';
+import { createRhythmView } from './rhythmview.js?v=202611261300';
+import { createListenView } from './listenview.js?v=202611261300';
+import { createSheetView } from './sheetview.js?v=202611261300';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611261200';
+window.__scaleStudioVersion = '202611261300';
 import {
   PitchDetector,
   midiToFreq,
@@ -23,16 +23,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611252330';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611252330';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611252330';
-import { generatePassage } from './sightreading.js?v=202611252330';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611252330';
-import { renderScore } from './score.js?v=202611252330';
-import { summariseIntonation } from './intonation.js?v=202611252330';
-import * as Journal from './journal.js?v=202611252330';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611252330';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611252330';
+} from './pitch.js?v=202611261300';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611261300';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611261300';
+import { generatePassage } from './sightreading.js?v=202611261300';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611261300';
+import { renderScore } from './score.js?v=202611261300';
+import { summariseIntonation } from './intonation.js?v=202611261300';
+import * as Journal from './journal.js?v=202611261300';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611261300';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611261300';
 import {
   STRINGS,
   FIFTHS,
@@ -41,7 +41,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611252330';
+} from './tuner.js?v=202611261300';
 
 const LANG = initLang();
 
@@ -2624,6 +2624,7 @@ async function openListen(file = null) {
   else listenView.openFree();
 }
 window.__listenView = listenView;
+window.__rhythmView = rhythmView;
 
 // Sheet music: a local shelf of the student's own PDFs, photos and MusicXML
 // files, with a page reader, pen and an optional practice track. Nothing is

@@ -10,7 +10,7 @@
 // document-type guessing) are not reproduced; the camera, the quad, the warp
 // and the tone are.
 
-import { t } from './i18n.js?v=202611241000';
+import { t } from './i18n.js?v=202611261300';
 import {
   applyFilter,
   autoQuad,
@@ -22,8 +22,8 @@ import {
   quadToPixels,
   smoothQuad,
   warpPixels,
-} from './scan.js?v=202611241000';
-import { straighten } from './dewarp.js?v=202611241000';
+} from './scan.js?v=202611261300';
+import { straighten } from './dewarp.js?v=202611261300';
 
 const ICON = {
   close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',

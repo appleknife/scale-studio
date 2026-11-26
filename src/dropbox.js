@@ -13,7 +13,7 @@
 // Every URL here was checked for CORS from the published origin: the token,
 // list_folder and download endpoints all answer preflight.
 
-import { base64url } from './sheetlib.js?v=202611241000';
+import { base64url } from './sheetlib.js?v=202611261300';
 
 const API = 'https://api.dropboxapi.com/2';
 const CONTENT = 'https://content.dropboxapi.com/2';
