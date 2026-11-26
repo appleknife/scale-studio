@@ -9,12 +9,13 @@ import { SPRINT_FULL } from './pet.js?v=202611252330';
 import { createBuddy } from './buddy.js?v=202611252330';
 import { createSprintView } from './sprintview.js?v=202611252330';
 import { createTrillView } from './trillview.js?v=202611252330';
+import { createRhythmView } from './rhythmview.js?v=202611261200';
 import { createListenView } from './listenview.js?v=202611252330';
 import { createSheetView } from './sheetview.js?v=202611252330';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611252330';
+window.__scaleStudioVersion = '202611261200';
 import {
   PitchDetector,
   midiToFreq,
@@ -62,11 +63,13 @@ const el = {
     pet: $('view-pet'),
     sprint: $('view-sprint'),
     trill: $('view-trill'),
+    rhythm: $('view-rhythm'),
     listen: $('view-listen'),
     sheets: $('view-sheets'),
   },
   openSprintBtn: $('openSprintBtn'),
   openTrillBtn: $('openTrillBtn'),
+  openRhythmBtn: $('openRhythmBtn'),
   openSheetsBtn: $('openSheetsBtn'),
   openPetBtn: $('openPetBtn'),
   petBack: $('petBack'),
@@ -297,6 +300,7 @@ let micTicket = 0;
 let petRoom = null;
 let sprintView = null;
 let trillView = null;
+let rhythmView = null;
 let listenView = null;
 let sheetView = null;
 /** The small pets that listen beside the music (see createBuddy, below). */
@@ -413,6 +417,7 @@ function showView(name) {
   // Note Sprint lets go of the microphone the moment its screen goes.
   if (name !== 'sprint' && sprintView) sprintView.stop();
   if (name !== 'trill' && trillView) trillView.stop();
+  if (name !== 'rhythm' && rhythmView) rhythmView.stop();
   if (name !== 'listen' && listenView) listenView.stop();
   if (name !== 'sheets' && sheetView) sheetView.stop();
   if (name !== 'sight') {
@@ -2568,6 +2573,29 @@ el.openTrillBtn.addEventListener('click', () => {
   showView('trill');
 });
 
+// Rhythm: hear one bar and answer it. The attacks are the whole score; a
+// microphone hears the bow catch, or the pad stands in. Its ladder is short and
+// violin-shaped — pulse, bow lanes, offbeats, subdivisions, dotted, triplets and
+// syncopation — and a finished rung is practice like any other take.
+rhythmView = createRhythmView({
+  root: el.views.rhythm,
+  profileId: () => petProfileId(),
+  openMic: () => openMicFor('rhythm'),
+  closeMic: () => {
+    micTicket += 1;
+    closeMic();
+  },
+  getMic: () => state.mic,
+  micError: (err) => micErrorMessage(err),
+  audio: () => ({ ctx: player.context, out: player.output }),
+  onFinish: (result) => noteTake('rhythm', null, 0, null, { small: (result?.answers ?? 0) < 6 }),
+  onBack: () => goHome(),
+});
+el.openRhythmBtn.addEventListener('click', () => {
+  rhythmView.open();
+  showView('rhythm');
+});
+
 // Listen (beta): free playing, or a piece against its MusicXML score. Same
 // microphone router; a real take (twenty seconds or more of notes) is logged as
 // practice on a piece.
@@ -2661,7 +2689,7 @@ function petToast(amount, warmed, bonus = 0, kind = 'scale', grew = null, wished
   const topped = bonus + wished;
   const extra = [
     bonus
-      ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : kind === 'sprint' ? 'pet.toast.newSprint' : kind === 'trill' ? 'pet.toast.newTrill' : kind === 'piece' ? 'pet.toast.newPiece' : 'pet.toast.newScale', { n: bonus })}</span>`
+      ? `<span class="pet-toast-bonus">${t(kind === 'sight' ? 'pet.toast.newSight' : kind === 'sprint' ? 'pet.toast.newSprint' : kind === 'rhythm' ? 'pet.toast.newRhythm' : kind === 'trill' ? 'pet.toast.newTrill' : kind === 'piece' ? 'pet.toast.newPiece' : 'pet.toast.newScale', { n: bonus })}</span>`
       : '',
     wished
       ? `<span class="pet-toast-bonus pet-toast-wish">${t('pet.toast.keywish', { key: esc(keyName(wishId)) })}</span>`
@@ -3612,7 +3640,7 @@ function noteTake(tag, cardId = null, score = 0, details = null, { small = false
   // Real practice earns notes for the pet room; a false start earns nothing.
   // (A piece played in Listen is practice like the rest; it used to log the day
   // and pay nothing.)
-  if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint' || tag === 'trill' || tag === 'vibrato' || tag === 'piece')) {
+  if (counted && (tag === 'scales' || tag === 'sight' || tag === 'sprint' || tag === 'trill' || tag === 'vibrato' || tag === 'rhythm' || tag === 'piece')) {
     const kind = tag === 'scales' ? 'scale' : tag;
     const earned = petRoom.earnTake({ kind, id: cardId || '', dayKey: today, octaves: details?.octaves || 1, small });
     petToast(earned.amount, earned.warmed, earned.bonus, kind, earned.grew, earned.wished, cardId || '');
@@ -4518,6 +4546,7 @@ async function openMic(emit, { windowSize = 2048 } = {}) {
  */
 function onMicStalled() {
   trillView?.micStalled();
+  rhythmView?.micStalled();
   if (sight.phase !== 'idle') {
     stopSightTake(false);
     el.sightStatus.textContent = t('mic.paused');
@@ -4691,6 +4720,7 @@ function routeFrame(frame, from) {
   paintMicLevel(frame.rms);
   if (sprintView?.listening) return sprintView.frame(frame);
   if (trillView?.listening) return trillView.frame(frame);
+  if (rhythmView?.listening) return rhythmView.frame(frame);
   if (listenView?.listening) return listenView.frame(frame);
   if (sight.phase !== 'idle' && sight.take) return ingestSightFrame(frame);
   if (state.take) return onFrame(frame);
@@ -5607,6 +5637,10 @@ renderWho();
 
 if (params.has('help') && el.helpDialog.showModal) el.helpDialog.showModal();
 if (params.has('pet')) openPet();
+if (params.has('rhythm')) {
+  rhythmView.open(params.get('rhythm') || undefined);
+  showView('rhythm');
+}
 if (params.has('sheets')) {
   sheetView.open();
   showView('sheets');

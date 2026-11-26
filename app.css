@@ -10804,4 +10804,356 @@ select,
   margin-top: 2px;
   font: 400 11.5px/1.35 var(--sans);
   opacity: 0.75;
+/* ── Rhythm ──────────────────────────────────────────────────────────────
+   A call-and-response bar. The lane is printed on light paper in both themes,
+   like the staff cards: it is music, and the ink has to stay dark. */
+
+.rhythm-head {
+  align-items: flex-start;
+}
+.rhythm-lead {
+  max-width: 58ch;
+}
+.rhythm-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+.rhythm-card-head,
+.rhythm-play-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rhythm-card h3,
+.rhythm-play-head h3 {
+  margin: 2px 0 0;
+  font-family: var(--serif);
+  font-size: 1.45rem;
+}
+.rhythm-eyebrow {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.rhythm-stage-badge {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.rhythm-stage-desc {
+  color: var(--ink-soft);
+  margin: 10px 0 14px;
+}
+.rhythm-meter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.rhythm-tempo {
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.rhythm-accuracy {
+  margin-left: auto;
+}
+.rhythm-note,
+.rhythm-progress-line {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.rhythm-strings {
+  margin: 8px 0 14px;
+}
+.rhythm-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.rhythm-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+}
+.rhythm-dot.is-half {
+  background: var(--gold-wash);
+  border-color: var(--gold);
+}
+.rhythm-dot.is-mastered {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.rhythm-dot.is-weak {
+  background: var(--rose-wash);
+  border-color: var(--rose);
+}
+.rhythm-progress {
+  margin: 6px 0 4px;
+}
+.rhythm-actions,
+.rhythm-play-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.rhythm-ladder {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.rhythm-stage {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.rhythm-stage:disabled {
+  opacity: 0.48;
+}
+.rhythm-stage.is-on {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.rhythm-stage.is-clear .rhythm-stage-side {
+  color: var(--accent);
+  font-weight: 700;
+}
+.rhythm-stage-n {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.rhythm-stage-text {
+  display: grid;
+  gap: 2px;
+}
+.rhythm-stage-text span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+.rhythm-focus {
+  margin-top: 4px;
+}
+
+/* The lane */
+.rhythm-play {
+  padding-bottom: 14px;
+}
+.rhythm-status {
+  margin: 10px 0 8px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+.rhythm-status.is-listen {
+  color: var(--gold);
+}
+.rhythm-status.is-play {
+  color: var(--accent);
+}
+.rhythm-status.is-bad {
+  color: var(--rose);
+}
+.rhythm-status.is-good {
+  color: var(--accent);
+}
+:root[data-theme='dark'] .rhythm-lane {
+  --paper: #f6f1e7;
+  --surface: #fbf7ef;
+  --ink: #221e19;
+  --ink-soft: #4d463e;
+  --muted: #7d756a;
+  --line: #e3d9c9;
+  --line-strong: #d3c6b1;
+  --accent: #2f5d4e;
+  --accent-wash: #e6eee8;
+  --gold: #b0843f;
+  --rose: #a4534a;
+}
+.rhythm-lane {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px 6px;
+  overflow: hidden;
+}
+.rhythm-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.rhythm-strip {
+  display: block;
+  min-width: 100%;
+}
+.rhythm-beatline {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.rhythm-barline {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+.rhythm-beatnum {
+  fill: var(--muted);
+  font: 10px var(--sans);
+}
+.rhythm-slot {
+  fill: var(--surface);
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+.rhythm-rest {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-dasharray: 3 3;
+}
+.rhythm-head {
+  fill: var(--ink);
+}
+.rhythm-bow {
+  fill: var(--muted);
+  font: 11px var(--sans);
+}
+.rhythm-playhead {
+  position: absolute;
+  top: 10px;
+  bottom: 20px;
+  width: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+  pointer-events: none;
+}
+.rhythm-onset {
+  position: absolute;
+  top: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: rhythm-fade 0.9s forwards;
+}
+.rhythm-feature {
+  position: absolute;
+  bottom: 22px;
+  width: 3px;
+  height: 22px;
+  transform: translateX(-50%);
+  background: var(--rose);
+  pointer-events: none;
+}
+.rhythm-feature.is-extra {
+  background: var(--gold);
+}
+@keyframes rhythm-fade {
+  to { opacity: 0; }
+}
+.rhythm-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 22px;
+  margin-top: 6px;
+  color: var(--rose);
+  font-size: 0.84rem;
+}
+.rhythm-mark {
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--rose-wash);
+}
+.rhythm-mark.is-ok {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+.rhythm-mark.is-extra {
+  background: var(--gold-wash);
+  color: var(--gold);
+}
+.rhythm-drift {
+  color: var(--muted);
+  padding: 2px 4px;
+}
+.rhythm-pad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 78px;
+  margin-top: 12px;
+  border-radius: 14px;
+  border: 1px dashed var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-weight: 600;
+  user-select: none;
+}
+.rhythm-pad:active {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+}
+.rhythm-pad-icon {
+  font-size: 1.4rem;
+  color: var(--accent);
+}
+.rhythm-hint {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 10px 0 0;
+}
+.rhythm-live-meter {
+  height: 4px;
+  margin-top: 10px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+}
+.rhythm-live-meter span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.08s linear;
+}
+.rhythm-card.is-clean {
+  border-color: var(--accent);
+}
+.rhythm-card.is-fail {
+  border-color: var(--rose);
+}
+
+/* Finish and calibration */
+.rhythm-finish h3 {
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  margin: 6px 0;
+}
+.rhythm-finish-stats,
+.rhythm-calib-value {
+  font-weight: 700;
+  color: var(--accent);
+}
+.rhythm-calibrate .rhythm-pad {
+  min-height: 110px;
 }

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rhythm ladder, generator and judge</title>
+    <style>
+      body { font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; margin: 20px; background: #faf7f1; color: #221e19; }
+      h2 { font-size: 15px; margin: 22px 0 6px; letter-spacing: 0.06em; text-transform: uppercase; color: #8b8277; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; overflow: auto; }
+      .ok { color: #0a7a3d; font-weight: 700; }
+      .bad { color: #a3231c; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }) });
+      });
+    </script>
+    <script type="module">
+      import * as R from '../src/rhythm.js';
+
+      const problems = [];
+      const log = [];
+      const check = (ok, msg) => { if (!ok) problems.push(msg); };
+
+      const FIG = R.RHYTHM_STAGES.flatMap((s) => s.figures);
+      const allowed = (stage, figure) => !figure || figure === 'q' || figure === 'h' || figure === 'w' || figure === 'r' || figure === 'e' || stage.figures.includes(figure);
+
+      /* 1. Every stage draws legal, complete, playable bars. */
+      let checked = 0;
+      for (const stage of R.RHYTHM_STAGES) {
+        const weak = {};
+        for (let seed = 0; seed < 200; seed++) {
+          // A fresh weak map each seed, but use the public pool path too.
+          const one = R.makePattern({ stageId: stage.id, seed, weak });
+          if (!one) continue;
+          checked++;
+          const id = `${stage.id} seed ${seed}`;
+          check(stage.meters.includes(one.meter), `${id}: meter ${one.meter} not in stage`);
+          check(one.bars === (stage.bars || 1), `${id}: ${one.bars} bars`);
+          const per = R.METERS[one.meter].perBar;
+          for (let b = 0; b < one.bars; b++) {
+            const sum = one.events.filter((e) => e.start >= b * per && e.start < (b + 1) * per).reduce((a, e) => a + e.dur, 0);
+            check(Math.abs(sum - per) < 1e-6, `${id}: bar ${b + 1} adds to ${sum}, not ${per}`);
+          }
+          if (!stage.mayOpenRest) check(!one.events[0].rest, `${id}: opens on a rest`);
+          check(one.attacks.length > 0, `${id}: no attacks`);
+          check(Math.abs(one.ticks - per * one.bars) < 1e-6, `${id}: ticks ${one.ticks}`);
+          for (const e of one.events) {
+            check(e.dur > 0 && isFinite(e.dur), `${id}: bad duration ${e.dur}`);
+            check(allowed(stage, e.figure), `${id}: figure ${e.figure} outside stage`);
+          }
+        }
+        // and the public pool always fills
+        for (let seed = 0; seed < 40; seed++) {
+          const pool = R.makePool(stage.id, seed, {});
+          check(pool.length === (stage.cards || 5), `${stage.id} pool ${seed}: only ${pool.length} bars`);
+          check(new Set(pool.map((p) => p.sig)).size === pool.length, `${stage.id} pool ${seed}: duplicate bars`);
+        }
+      }
+
+      /* 2. Seeded generation is reproducible. */
+      const a = R.makePattern({ stageId: 'eighths', seed: 4 });
+      const b = R.makePattern({ stageId: 'eighths', seed: 4 });
+      check(a && b && a.sig === b.sig, 'same seed gave two different bars');
+
+      /* 3. The judge: exact, shifted, missing, extra, uneven. */
+      const T = [0, 4, 8, 12];
+      const exact = R.judge(T, T, { ticksPerBeat: 4 });
+      check(exact.clean && exact.empty === false, 'exact answer not clean');
+      const under = R.judge(T, T.map((n) => n + 0.5), { ticksPerBeat: 4 });
+      check(under.clean, 'half-tick shift refused');
+      const over = R.judge(T, T.map((n) => n + 1.2), { ticksPerBeat: 4 });
+      check(!over.clean && over.bad, 'tick-and-a-bit shift passed');
+      const missing = R.judge(T, [0, 8, 12], { ticksPerBeat: 4 });
+      check(!missing.clean && missing.missed === 1, 'missing note not counted once');
+      const extra = R.judge(T, [0, 4, 5.9, 8, 12], { ticksPerBeat: 4 });
+      check(!extra.clean && extra.extra === 1, 'extra note not counted');
+      const empty = R.judge(T, [], { ticksPerBeat: 4 });
+      check(empty.empty && empty.missed === 4 && !empty.clean, 'empty answer not handled');
+      check(R.judge([], [], { ticksPerBeat: 4 }).clean, 'empty bar not clean');
+
+      // A pair whose absolute places are fine but whose gap is wrong is a fumble.
+      const uneven = R.judge([0, 2], [0.4, 3.2], { ticksPerBeat: 4 });
+      check(!uneven.clean, 'uneven pair passed');
+      // Strict halves the gap tolerance.
+      const loose = R.judge([0, 2], [0, 2.5], { ticksPerBeat: 4, strict: false });
+      const strict = R.judge([0, 2], [0, 2.5], { ticksPerBeat: 4, strict: true });
+      check(loose.clean && !strict.clean, 'strict did not narrow the gap');
+
+      // Drift keeps its sign.
+      check(R.judge([4], [4.4], { ticksPerBeat: 4 }).drift > 0, 'late drift lost its sign');
+      check(R.judge([4], [3.6], { ticksPerBeat: 4 }).drift < 0, 'early drift lost its sign');
+      // The accuracy coefficients are ordered.
+      const coeffs = R.ACCURACY.map((x) => x.coeff);
+      check(coeffs.every((c, i) => i === 0 || c < coeffs[i - 1]), 'accuracy levels are not ordered');
+
+      /* 4. Progress: clamp, mastery, weakest first. */
+      check(R.bumpLevel(2, true) === 2, 'level passed its ceiling');
+      check(R.bumpLevel(-2, false) === -2, 'level passed its floor');
+      const pool = [
+        { sig: 'a', figures: ['ee'] },
+        { sig: 'b', figures: ['er'] },
+        { sig: 'c', figures: ['re'] },
+      ];
+      const levels = { a: 2, b: -1, c: 0 };
+      check(R.chooseNext(pool, levels, null).sig === 'b', 'weakest bar not chosen');
+      check(R.chooseNext(pool, levels, 'b').sig !== 'b', 'same bar chosen twice');
+      check(!R.stageDone(pool, levels), 'stage called done early');
+      check(R.stageDone(pool, { a: 2, b: 2, c: 2 }), 'stage not done with every bar mastered');
+
+      /* 5. Tempo moves, and stays inside the rung. */
+      const stage = R.stageById('sixteenths');
+      check(R.tempoAfter(stage.cap, stage, { clean: true, streak: 4, failStreak: 0 }) === stage.cap, 'tempo passed the cap');
+      const down = R.tempoAfter(70, stage, { clean: false, streak: 0, failStreak: 3 });
+      check(down < 70, 'three fumbles did not slow the tempo');
+      check(R.tempoFor({ tempo: { sixteenths: 200 } }, stage) === stage.cap, 'stored tempo not capped');
+
+      /* 6. Bridging: a bow on every attack, alternating, rests skipped. */
+      const p = R.makePattern({ stageId: 'pulse', seed: 3 });
+      const plan = R.bowPlan(p);
+      check(plan.size === p.attacks.length, 'bow plan did not mark every attack');
+      const bows = p.attacks.map((e) => plan.get(e.start));
+      check(bows.every((v, i) => v === (i % 2 ? 'up' : 'down')), 'bows are not alternating');
+
+      /* 7. Calibration takes the median and ignores a stray tap. */
+      const clicks = [1, 1.6, 2.2, 2.8, 3.4, 4, 4.6, 5.2];
+      const taps = clicks.map((c, i) => c + (i === 3 ? 0.3 : 0.05));
+      const offset = R.calibrationOffset(clicks, taps);
+      check(offset != null && Math.abs(offset - 0.05) < 0.005, `calibration median ${offset}`);
+
+      /* 8. Levels: every rung after the first needs the one before. */
+      check(R.unlockedStages({ cleared: ['pulse'] })[1], 'second rung locked after the first');
+      check(!R.unlockedStages({ cleared: [] })[1], 'second rung open from the start');
+
+      log.push(`checked ${checked} generated bars across ${R.RHYTHM_STAGES.length} rungs`);
+      log.push(`${problems.length ? problems.length + ' problems' : 'no problems'}`);
+      if (problems.length) log.push('', ...problems.slice(0, 80));
+      document.getElementById('report').innerHTML = problems.length
+        ? `<span class="bad">FAIL</span>\n${log.join('\n')}`
+        : `<span class="ok">PASS</span>\n${log.join('\n')}`;
+
+      fetch('/result', {
+        method: 'POST',
+        body: JSON.stringify({ stage: 'rhythm', problems, log: log.join('\n') }),
+      });
+    </script>
+  </body>
+</html>

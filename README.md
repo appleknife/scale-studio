@@ -826,6 +826,55 @@ judging them from two separate screenshots did not.
   the crescendo walks p → mp → mf → f and every take plays within a couple of per
   cent of the level it was recorded at. `playback.test.html` weighs five hairpins
   and refuses a peak above 1.2× a take.
+## Rhythm
+
+A short call-and-response ladder for the right hand. A bar is played, then you
+play it back on one open string; the app marks each attack, not the pitch. Two
+bars of count-in, one bar to hear, one bar to answer (two bars at the last
+rung), and a clean bar is left alone. The figures are kept behind small gates,
+so nothing arrives before its turn.
+
+The rungs run **pulse and whole bow → long/short bow → detaché eighths →
+rests and offbeats → eighths among quarters → sixteenths → dotted rhythms →
+triplets → syncopation → a two-bar reading mix**. The order and the reasons are
+in [`docs/rhythm-ladder.md`](docs/rhythm-ladder.md); the short version is that a
+violinist needs a bow lane and a pulse before notation, and one new demand per
+rung. The mode is this app's own: the sounds are made with oscillators, the
+screen is drawn here, and no outside code, art, sound or voice ships with it.
+
+Mechanically the app keeps the parts that make a trainer feel fair:
+
+* **The target window is halfway to the next note**, so every attack has one
+  home. The nearest attack can match only if it is close, and — when the
+  previous note was matched and is less than a quarter away — if the *gap* is
+  close too. A bar played a little behind but evenly can pass; a bar that
+  stumbles cannot.
+* **A failed bar comes back**, up to four times. Each bar has its own level from
+  −2 to +2; a pass raises it, a fail lowers it, and the weakest bar is drawn
+  next. A rung is complete when every bar in it is mastered twice.
+* **The tempo is earned.** Clean runs lift it every fourth bar; three fumbles
+  in a row bring it down. Each rung has its own ceiling so sixteenths and
+  triplets stay playable.
+* **Accuracy is a choice** (`Room`, `Normal`, `Tight`, `Pro`). It scales the
+  window; it is not a hidden grade.
+* **The output delay is measured.** Calibrate taps eight clicks and stores the
+  median on this device; without it a phone speaker sits noticeably late.
+
+The bow plan — down on the first attack, alternating, rests skipped — is drawn
+as chevrons over the bar. It is a plan, not a measurement: the microphone cannot
+see bow direction. The mode can hear attacks, silence and the shape of the gaps;
+it cannot hear weight, contact point or string crossing. Those are in the
+disclosure under the ladder.
+
+`Space`, a tap anywhere on the bar, or the big pad are a full-window onset if no
+microphone is available. The click track is only in the answer and can be turned
+off. Every note is a woodblock-style tick, never a voice.
+
+The rules and the generator live in [`src/rhythm.js`](src/rhythm.js) — a pure
+module, so the matcher and every rung can be weighed without audio —
+[`tests/rhythm.test.html`](tests/rhythm.test.html) does exactly that, and
+[`tests/rhythm-ui.test.html`](tests/rhythm-ui.test.html) walks the screen.
+
 ## Practice log
 
 A fourth screen, reached from the home page, keeps a practice record on that device: a
@@ -1301,6 +1350,12 @@ tests/sampler.test.html   the sample set and the voice's arithmetic: every whole
                       cent, articulation takes used when they are close enough,
                       and the dynamic ladder in order
 src/app.js            screens, microphone, results
+src/rhythm.js         the rhythm ladder, seeded bar generator and attack judge
+src/rhythmview.js     the rhythm screen: count-in, bar, pad, microphone, calibration
+docs/rhythm-ladder.md why the rungs go in this order, and what the judge keeps
+tests/rhythm.test.html  every rung over 200 seeds, the judge's windows and gaps,
+                      mastery, tempo bounds, bowings and calibration
+tests/rhythm-ui.test.html  the rhythm screen walks: ladder, start, pad, end, calibrate
 src/intonation.js     the note-by-note picture of intonation: the axis, the bands,
                       and the stems that say which way a note was off
 tests/intonation.test.html  that picture's geometry: symmetry, clamping, which
@@ -1348,6 +1403,14 @@ server.ps1            the local server used by Start Scale Studio.cmd
 
 `tests/i18n.test.html` loads each screen with `?lang=zh`, walks the visible text and
 reports anything still in English — the quick check after editing either table.
+
+`tests/rhythm.test.html` draws two hundred seeds a rung and refuses a bar that
+does not fill its metre, opens on a rest where it should not, uses a figure from
+another rung or repeats another bar. It then feeds the judge exact, shifted,
+missing, extra and deliberately uneven answers, and checks the window, the gap
+check, the strict half, mastery and the tempo floor and ceiling.
+`tests/rhythm-ui.test.html` opens the screen, starts a tap run, ends it and
+calibrates, so a broken selector or paint is caught without a microphone.
 
 `tests/sightreading.test.html` generates 720 passages (6 levels × 120 seeds) and
 checks the rules hold: bars add up, every note is in range, the phrase ends on the

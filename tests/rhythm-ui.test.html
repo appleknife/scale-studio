@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Rhythm screen smoke test</title>
+    <style>
+      body { font: 14px/1.5 -apple-system, "Segoe UI", system-ui, sans-serif; margin: 20px; background: #faf7f1; color: #221e19; }
+      pre { background: #fffdfa; border: 1px solid #e8dfd1; padding: 12px; }
+      .ok { color: #0a7a3d; font-weight: 700; }
+      .bad { color: #a3231c; font-weight: 700; }
+      #view-rhythm { max-width: 760px; }
+    </style>
+  </head>
+  <body>
+    <pre id="report">running…</pre>
+    <section id="view-rhythm"></section>
+    <script>
+      window.addEventListener('error', (e) => {
+        fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'error', message: e.message, stack: e.error && e.error.stack }) });
+      });
+    </script>
+    <script type="module">
+      import { createRhythmView } from '../src/rhythmview.js';
+
+      const problems = [];
+      const check = (ok, msg) => { if (!ok) problems.push(msg); };
+      localStorage.clear();
+
+      const ctx = new AudioContext();
+      const out = ctx.createGain();
+      out.connect(ctx.destination);
+      const root = document.getElementById('view-rhythm');
+      const view = createRhythmView({
+        root,
+        profileId: () => 'ui-test',
+        openMic: async () => { throw Object.assign(new Error('no mic'), { name: 'NotFoundError' }); },
+        closeMic: () => {},
+        getMic: () => null,
+        micError: () => 'no microphone',
+        audio: () => ({ ctx, out }),
+        onFinish: () => {},
+        onBack: () => {},
+      });
+
+      const click = (el) => el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const pointer = (el) => el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+
+      view.open();
+      check(root.querySelectorAll('[data-stage]').length === 10, 'ladder did not list every rung');
+      check(root.querySelector('[data-act="start"]'), 'no start button');
+      check(root.querySelector('[data-act="calibrate"]'), 'no calibrate button');
+
+      click(root.querySelector('[data-act="start"]'));
+      await new Promise((r) => setTimeout(r, 80));
+      check(root.querySelector('.rhythm-strip'), 'play screen has no bar');
+      check(root.querySelector('[data-pad]'), 'play screen has no pad');
+      check(root.querySelector('[data-status]'), 'play screen has no status');
+      pointer(root.querySelector('[data-pad]'));
+
+      click(root.querySelector('[data-act="end"]'));
+      check(root.querySelector('[data-act="start"]'), 'end did not return to the ladder');
+
+      click(root.querySelector('[data-act="calibrate"]'));
+      check(root.querySelector('[data-act="save-calib"]') || root.querySelector('[data-pad]'), 'calibrate screen did not open');
+      for (let i = 0; i < 3; i++) pointer(root.querySelector('[data-pad]'));
+      view.stop();
+
+      // A second open keeps working after stop.
+      view.open();
+      check(root.querySelectorAll('[data-stage]').length === 10, 'ladder did not come back');
+
+      const report = document.getElementById('report');
+      report.innerHTML = problems.length ? `<span class="bad">FAIL</span>\n${problems.join('\n')}` : '<span class="ok">PASS</span>';
+      await ctx.close();
+      fetch('/result', { method: 'POST', body: JSON.stringify({ stage: 'rhythm-ui', problems, log: problems.join('\n') }) });
+    </script>
+  </body>
+</html>

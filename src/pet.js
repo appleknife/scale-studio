@@ -533,6 +533,7 @@ function recordTake(p, { kind, id, dayKey, octaves, grew }) {
   }
   if (kind === 'sight') add('sight', { kind: 'sight' });
   if (kind === 'sprint') add('sprint', { kind: 'sprint' });
+  if (kind === 'rhythm') add('rhythm', { kind: 'rhythm' });
   if (kind === 'trill') add('trill', { kind: 'trill' });
   if (kind === 'piece') add('piece', { kind: 'piece' });
   for (const mark of TAKE_MARKS) {
@@ -620,7 +621,7 @@ export function savePet(profileId, pet, storage = globalThis.localStorage) {
 }
 
 /**
- * Notes are earned by practice. `kind` is 'scale', 'sight', 'sprint', 'trill' or
+ * Notes are earned by practice. `kind` is 'scale', 'sight', 'sprint', 'rhythm', 'trill' or
  * 'piece' (a piece played in Listen) for a counted take, 'practice' for a day of practice logged by hand, and 'recording'
  * for a take kept to listen back to; `id` is the scale's key for a scale.
  *
@@ -652,6 +653,7 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1, s
     (kind === 'scale' && id && !day.keys.includes(id)) ||
     (kind === 'sight' && !day.sight) ||
     (kind === 'sprint' && !day.sprint) ||
+    (kind === 'rhythm' && !day.rhythm) ||
     (kind === 'trill' && !day.trill) ||
     (kind === 'piece' && !day.piece);
   // The new-key bonus stands apart from the cap, so it can be shown on its own.
@@ -682,6 +684,7 @@ export function earn(pet, { kind = 'scale', id = '', dayKey = '', octaves = 1, s
   if (kind === 'scale' && id && !day.keys.includes(id)) day.keys.push(id);
   if (kind === 'sight') day.sight = true;
   if (kind === 'sprint') day.sprint = true;
+  if (kind === 'rhythm') day.rhythm = true;
   if (kind === 'trill') day.trill = true;
   if (kind === 'piece') day.piece = true;
   credit(pet, day, amount);
@@ -727,6 +730,7 @@ function freshDay(dayKey) {
     keys: [],
     sight: false,
     sprint: false,
+    rhythm: false,
     any: false,
     practice: false,
     recording: false,

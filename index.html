@@ -126,6 +126,12 @@
                 Two fingers, one string. Trill between the notes, or roll around one inside the half step — and watch the wave get even.
               </span>
             </button>
+            <button class="menu-tile" id="openRhythmBtn" type="button">
+              <span class="menu-title">Rhythm <span class="menu-new">New</span></span>
+              <span class="menu-sub">
+                Hear a bar, play it back. A short violin ladder — pulse, bow lanes, offbeats, sixteenths, dotted, triplets, syncopation.
+              </span>
+            </button>
             <button class="menu-tile" id="openSheetsBtn" type="button">
               <span class="menu-title">Sheet music &amp; Listen <span class="menu-new">New</span></span>
               <span class="menu-sub">
@@ -161,6 +167,9 @@
 
         <!-- ── Trill Trainer (drawn by src/trillview.js) ──────────────── -->
         <section class="view" id="view-trill" hidden></section>
+
+        <!-- Rhythm (drawn by src/rhythmview.js) -->
+        <section class="view" id="view-rhythm" hidden></section>
 
         <!-- ── Listen, beta (drawn by src/listenview.js) ──────────────────── -->
         <section class="view" id="view-listen" hidden></section>
@@ -1193,13 +1202,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611252330"></script>
+    <script type="module" src="src/app.js?v=202611261200"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611252330';
+        var V = '202611261200';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;

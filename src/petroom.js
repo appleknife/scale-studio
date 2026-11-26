@@ -1890,6 +1890,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         return t('pet.mem.sight');
       case 'sprint':
         return t('pet.mem.sprint');
+      case 'rhythm':
+        return t('pet.mem.rhythm');
       case 'trill':
         return t('pet.mem.trill');
       case 'piece':
