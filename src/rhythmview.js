@@ -13,8 +13,8 @@
 // the rhythm away from the instrument. Both are stamped on the audio clock, so
 // the judge never sees two different clocks.
 
-import * as Rhythm from './rhythm.js?v=202611261300';
-import { t } from './i18n.js?v=202611261300';
+import * as Rhythm from './rhythm.js?v=202611261400';
+import { t } from './i18n.js?v=202611261400';
 
 const STRINGS = [
   { id: 'G3', name: 'G', freq: 196 },
@@ -25,12 +25,17 @@ const STRINGS = [
 
 const LEAD = 0.35; // a breath after Start
 const COUNT_IN_BARS = 2;
-const RESULT_PAUSE = 1.5; // how long the verdict stays before the next bar
+const RESULT_PAUSE = 1.6; // seconds the verdict stays before the next bar
 const RETRIES = 4;
 const ESC = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+const ICON_CHECK =
+  '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
+const ICON_LOCK =
+  '<svg class="rhythm-lock" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2.2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></svg>';
 
 export function createRhythmView(deps) {
   const root = deps.root;
@@ -119,10 +124,10 @@ export function createRhythmView(deps) {
       const isClear = cleared.has(s.id);
       const on = s.id === stage.id;
       const dots = dotsFor(s.id);
-      return `<button class="rhythm-stage${on ? ' is-on' : ''}${isClear ? ' is-clear' : ''}" type="button" data-stage="${s.id}" ${isOpen ? '' : 'disabled'}>
-        <span class="rhythm-stage-n">${s.index + 1}</span>
+      return `<button class="rhythm-stage${on ? ' is-on' : ''}${isClear ? ' is-clear' : ''}${isOpen ? '' : ' is-locked'}" type="button" data-stage="${s.id}" ${isOpen ? '' : 'disabled'}>
+        <span class="rhythm-stage-n">${isClear ? ICON_CHECK : s.index + 1}</span>
         <span class="rhythm-stage-text"><b>${stageName(s.id)}</b><span>${stageDesc(s.id)}</span></span>
-        <span class="rhythm-stage-side">${isClear ? '✓' : isOpen ? `<span class="rhythm-dots">${dots}</span>` : '🔒'}</span>
+        <span class="rhythm-stage-side">${isClear ? '' : isOpen ? `<span class="rhythm-dots">${dots}</span>` : ICON_LOCK}</span>
       </button>`;
     }).join('');
 
@@ -130,17 +135,17 @@ export function createRhythmView(deps) {
     body.innerHTML = `
       <section class="rhythm-card">
         <div class="rhythm-card-head">
-          <div>
-            <span class="rhythm-eyebrow">${t('rhythm.stage.label')}</span>
+          <span class="rhythm-rung-badge" aria-hidden="true"><b>${stage.index + 1}</b><i>/ ${Rhythm.RHYTHM_STAGES.length}</i></span>
+          <div class="rhythm-card-title">
+            <span class="rhythm-eyebrow">${t('rhythm.stage.label')} ${stage.index + 1}</span>
             <h3>${stageName(stage.id)}</h3>
           </div>
-          <span class="rhythm-stage-badge">${stage.index + 1} / ${Rhythm.RHYTHM_STAGES.length}</span>
         </div>
         <p class="rhythm-stage-desc">${stageDesc(stage.id)}</p>
         <div class="rhythm-meter-row">
-          <span class="rhythm-tempo">${t('rhythm.tempo', { bpm: tempo })}</span>
-          <div class="segmented small">
+          <div class="rhythm-stepper" role="group" aria-label="${t('rhythm.tempo', { bpm: tempo })}">
             <button type="button" data-tempo="-4" aria-label="${t('rhythm.slower')}">−</button>
+            <span class="rhythm-tempo"><b>${tempo}</b><small>${t('rhythm.bpm')}</small></span>
             <button type="button" data-tempo="4" aria-label="${t('rhythm.faster')}">+</button>
           </div>
           <div class="segmented small rhythm-accuracy" role="group" aria-label="${t('rhythm.accuracy')}">
@@ -155,8 +160,10 @@ export function createRhythmView(deps) {
             (s) => `<button class="chip" type="button" data-string="${s.id}" aria-pressed="${stringNow().id === s.id}">${t('rhythm.onString', { s: s.name })}</button>`,
           ).join('')}
         </div>
-        <div class="rhythm-dots rhythm-progress" aria-hidden="true">${dotsFor(stage.id)}</div>
-        <p class="rhythm-progress-line">${done ? t('rhythm.stage.done') : t('rhythm.stage.progress', { done: pool.filter((p) => (levels[p.sig] || 0) >= 2).length, n: pool.length })}</p>
+        <div class="rhythm-progress-row">
+          <div class="rhythm-dots rhythm-progress" aria-hidden="true">${dotsFor(stage.id)}</div>
+          <p class="rhythm-progress-line">${done ? t('rhythm.stage.done') : t('rhythm.stage.progress', { done: pool.filter((p) => (levels[p.sig] || 0) >= 2).length, n: pool.length })}</p>
+        </div>
         <div class="rhythm-actions">
           <button class="primary-btn" type="button" data-act="start">${done ? t('rhythm.start.stretch') : t('rhythm.start')}</button>
           <button class="quiet-btn" type="button" data-act="reroll">${t('rhythm.reroll')}</button>
@@ -216,10 +223,14 @@ export function createRhythmView(deps) {
         parts.push(`<rect class="rhythm-rest" x="${x + 2}" y="${top + 12}" width="${Math.max(4, w - 4)}" height="24" rx="5"/>`);
         continue;
       }
-      parts.push(`<rect class="rhythm-slot" x="${x}" y="${top + 6}" width="${w}" height="36" rx="6"/>`);
-      parts.push(`<ellipse class="rhythm-notehead" cx="${x + 7}" cy="${top + 24}" rx="5.2" ry="3.8" transform="rotate(-18 ${x + 7} ${top + 24})"/>`);
+      parts.push(`<g class="rhythm-note-g" data-at="${e.start}">`);
+      parts.push(`<rect class="rhythm-slot" x="${x}" y="${top + 6}" width="${w}" height="36" rx="9"/>`);
+      parts.push(`<ellipse class="rhythm-notehead" cx="${x + 10}" cy="${top + 30}" rx="5.6" ry="4.1" transform="rotate(-20 ${x + 10} ${top + 30})"/>`);
+      parts.push(`<line class="rhythm-stem" x1="${x + 15.2}" y1="${top + 29}" x2="${x + 15.2}" y2="${top + 11}"/>`);
+      parts.push(`<text class="rhythm-verdict-tag" x="${x + 4}" y="${top + 60}"></text>`);
+      parts.push(`</g>`);
       const bow = bows.get(e.start);
-      if (bow) parts.push(`<text class="rhythm-bow" x="${x + 5}" y="${top - 4}">${bow === 'down' ? '▼' : '▲'}</text>`);
+      if (bow) parts.push(`<path class="rhythm-bow" d="${bow === 'down' ? `M${x + 4} ${top - 11} h11 v6 M${x + 4} ${top - 11} v6 M${x + 15} ${top - 11} v6` : `M${x + 4} ${top - 4} L${x + 9.5} ${top - 13} L${x + 15} ${top - 4}`}"/>`);
     }
     return `<svg class="rhythm-strip${reveal ? ' is-reveal' : ''}" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${t('rhythm.strip.aria')}">${parts.join('')}</svg>`;
   }
@@ -497,12 +508,21 @@ export function createRhythmView(deps) {
     const phase = now < session.exampleAt ? 'countin' : now < session.answerAt ? 'example' : now < session.answerEnd ? 'answer' : 'verdict';
     if (phase !== session.phase) {
       session.phase = phase;
+      root.querySelector('.rhythm-lane')?.setAttribute('data-phase', phase);
+      root.querySelectorAll('[data-steps] li').forEach((li) => {
+        const order = ['countin', 'example', 'answer', 'verdict'];
+        const at = order.indexOf(phase);
+        const mine = order.indexOf(li.dataset.step);
+        li.classList.toggle('is-now', mine === at);
+        li.classList.toggle('is-past', mine < at);
+      });
       const status = root.querySelector('[data-status]');
       if (status) {
         status.textContent = phase === 'countin' ? t('rhythm.phase.countin') : phase === 'example' ? t('rhythm.phase.listen') : phase === 'answer' ? t('rhythm.phase.play') : t('rhythm.phase.judge');
         status.className = `rhythm-status is-${phase}`;
       }
     }
+    paintPulse(now);
     const stripEl = root.querySelector('.rhythm-strip');
     const line = root.querySelector('.rhythm-playhead');
     if (line && stripEl) {
@@ -516,6 +536,48 @@ export function createRhythmView(deps) {
       return;
     }
     raf = requestAnimationFrame(frameTick);
+  }
+
+  /** The beat lights, the big count-in numbers, and the note that is sounding. */
+  function paintPulse(now) {
+    const meter = Rhythm.METERS[session.meter];
+    const tpb = Rhythm.ticksPerBeat(session.meter);
+    let ticks;
+    if (now < session.exampleAt) ticks = (now - session.t0) / session.secTick;
+    else if (now < session.answerAt) ticks = (now - session.exampleAt) / session.secTick;
+    else ticks = (now - session.answerAt) / session.secTick;
+    const inBar = ((ticks % meter.perBar) + meter.perBar) % meter.perBar;
+    const beat = ticks < 0 || session.phase === 'verdict' ? -1 : Math.floor(inBar / tpb);
+    if (beat !== session.beatShown) {
+      session.beatShown = beat;
+      root.querySelectorAll('[data-beats] i').forEach((el, i) => {
+        el.classList.toggle('is-on', i === beat);
+        el.classList.toggle('is-down', i === beat && i === 0);
+      });
+      const count = root.querySelector('[data-count]');
+      if (count) {
+        // Count-in: the beats of the last bar are counted out loud, big.
+        const show = session.phase === 'countin' && beat >= 0;
+        count.textContent = show ? String(beat + 1) : '';
+        count.classList.remove('is-pop');
+        if (show) {
+          void count.offsetWidth;
+          count.classList.add('is-pop');
+        }
+      }
+    }
+    // the note under the playhead lights as it sounds (example) or is due (answer)
+    if (session.phase === 'example' || session.phase === 'answer') {
+      let lit = null;
+      for (const e of session.pattern.events) if (!e.rest && ticks >= e.start && ticks < e.start + e.dur) lit = e.start;
+      if (lit !== session.litShown) {
+        session.litShown = lit;
+        root.querySelectorAll('.rhythm-note-g').forEach((g) => g.classList.toggle('is-lit', Number(g.dataset.at) === lit));
+      }
+    } else if (session.litShown != null) {
+      session.litShown = null;
+      root.querySelectorAll('.rhythm-note-g.is-lit').forEach((g) => g.classList.remove('is-lit'));
+    }
   }
 
   function addOnset(time) {
@@ -533,6 +595,12 @@ export function createRhythmView(deps) {
 
   function onPad(event) {
     const node = event.target?.closest ? event.target : null;
+    const pad = node?.closest?.('[data-pad]');
+    if (pad) {
+      pad.classList.remove('is-hit');
+      void pad.offsetWidth;
+      pad.classList.add('is-hit');
+    }
     if (panel === 'calibrate' && calib && !calib.done) {
       if (node?.closest('button') && !node.closest('[data-pad]')) return;
       event.preventDefault();
@@ -543,10 +611,14 @@ export function createRhythmView(deps) {
     }
     if (!session || !listening) return;
     if (node?.closest('button, input, summary, label') && !node.closest('[data-pad]')) return;
-    if (session.phase !== 'answer') return;
+    // By the clock, not the screen's phase: the screen turns to "Your turn" on
+    // the next frame, and a tap a hair early on beat one (as most are) was lost.
+    const now = ctxNow();
+    const beat = session.secTick * Rhythm.ticksPerBeat(session.meter);
+    if (now < session.answerAt - beat * 0.45 || now > session.answerEnd + latency() + 0.15) return;
     event.preventDefault();
     session.tapped = true;
-    addOnset(ctxNow());
+    addOnset(now);
   }
 
   function finishAnswer() {
@@ -587,6 +659,20 @@ export function createRhythmView(deps) {
     save();
     const card = root.querySelector('.rhythm-card');
     card?.classList.add(result.clean ? 'is-clean' : 'is-fail');
+    // Each note says how it went, on the bar itself.
+    for (const f of result.features) {
+      const g = root.querySelector(`.rhythm-note-g[data-at="${f.target}"]`);
+      if (!g) continue;
+      g.classList.add(`is-${f.status}`);
+      const tag = g.querySelector('.rhythm-verdict-tag');
+      if (tag) tag.textContent = f.status === 'ok' ? '✓' : f.status === 'missed' ? t('rhythm.mark.missed') : t(`rhythm.mark.${f.status}`);
+    }
+    const badge = root.querySelector('[data-badge]');
+    if (badge) {
+      badge.textContent = result.clean ? '✓' : result.empty ? '?' : '↺';
+      badge.className = `rhythm-badge is-show ${result.clean ? 'is-good' : 'is-bad'}`;
+    }
+    deps.cheer?.(result.clean);
     const status = root.querySelector('[data-status]');
     if (status) {
       status.textContent = result.clean ? t('rhythm.verdict.clean') : result.empty ? t('rhythm.verdict.empty') : t('rhythm.verdict.again');
@@ -603,11 +689,15 @@ export function createRhythmView(deps) {
       lane?.append(dot);
     }
     const timing = Math.round(Math.abs(result.drift) * session.secTick * 1000);
-    if (marks && !result.clean && result.bad) {
+    // The average only means something over the notes that landed.
+    const landed = result.features.filter((f) => f.status === 'ok').length;
+    if (marks && !result.clean && result.bad && landed && timing >= 15) {
       marks.innerHTML += `<span class="rhythm-drift">${t('rhythm.drift', { n: timing })}</span>`;
     }
     clearTimeout(session.timer);
-    session.timer = setTimeout(next, result.clean ? RESULT_PAUSE : RESULT_PAUSE + 300);
+    // In milliseconds. Once written as seconds (1.5 ms), which wiped the
+    // verdict before anyone could see it; a miss stays up longer, to be read.
+    session.timer = setTimeout(next, (result.clean ? RESULT_PAUSE : RESULT_PAUSE + 0.9) * 1000);
   }
 
   function next() {
@@ -682,8 +772,17 @@ export function createRhythmView(deps) {
             <button type="button" data-play-tempo="4" aria-label="${t('rhythm.faster')}">+</button>
           </div>
         </div>
+        <ol class="rhythm-steps" data-steps>
+          <li data-step="countin">${t('rhythm.step.count')}</li>
+          <li data-step="example">${t('rhythm.step.listen')}</li>
+          <li data-step="answer">${t('rhythm.step.play')}</li>
+          <li data-step="verdict">${t('rhythm.step.result')}</li>
+        </ol>
         <p class="rhythm-status" data-status>${t('rhythm.phase.countin')}</p>
-        <div class="rhythm-lane">
+        <div class="rhythm-lane" data-phase="countin">
+          <div class="rhythm-beats" data-beats>${Array.from({ length: Rhythm.METERS[pattern.meter].beats }, (_, i) => `<i data-b="${i}"></i>`).join('')}</div>
+          <span class="rhythm-count" data-count aria-hidden="true"></span>
+          <span class="rhythm-badge" data-badge aria-hidden="true"></span>
           <div class="rhythm-scroll">${strip(pattern, { reveal: true })}</div>
           <span class="rhythm-playhead"></span>
           <div class="rhythm-marks" data-marks>${retries ? t('rhythm.retry', { n: retries }) : ''}</div>
@@ -712,12 +811,19 @@ export function createRhythmView(deps) {
   function paintDone() {
     const answers = stats.runs.filter((r) => r.stage === stage.id);
     const clean = answers.filter((r) => r.clean).length;
+    const tempo = Rhythm.tempoFor(stats, stage);
     body.innerHTML = `
       <section class="rhythm-card rhythm-finish">
+        <div class="rhythm-finish-burst" aria-hidden="true">${Array.from({ length: 14 }, (_, i) => `<i style="--a:${i * 25.7}deg;--d:${(i % 4) * 0.05}s"></i>`).join('')}</div>
+        <span class="rhythm-finish-medal" aria-hidden="true">${ICON_CHECK}</span>
         <span class="rhythm-eyebrow">${t('rhythm.done.eyebrow')}</span>
         <h3>${t('rhythm.done.title', { stage: stageName(stage.id) })}</h3>
-        <p>${t('rhythm.done.body')}</p>
-        <p class="rhythm-finish-stats">${clean} ${t('rhythm.done.clean')}</p>
+        <p class="rhythm-finish-body">${t('rhythm.done.body')}</p>
+        <div class="rhythm-finish-stats">
+          <span><b>${clean}</b>${t('rhythm.done.clean')}</span>
+          <span><b>${stats.bestStreak || 0}</b>${t('rhythm.done.streak')}</span>
+          <span><b>${tempo}</b>${t('rhythm.bpm')}</span>
+        </div>
         <div class="rhythm-actions">
           <button class="primary-btn" type="button" data-act="next-stage">${t('rhythm.done.next')}</button>
           <button class="quiet-btn" type="button" data-act="ladder">${t('rhythm.done.ladder')}</button>
@@ -740,7 +846,21 @@ export function createRhythmView(deps) {
       tick(at, i % 4 === 0 ? 'accent' : 'beat', true);
     }
     paintCalibrate();
-    calib.timer = setTimeout(calibResult, 0.7 + 8 * 0.6 + 0.2);
+    // milliseconds: this was once written as seconds, which showed the result
+    // before the first click had sounded
+    calib.timer = setTimeout(calibResult, (0.7 + 8 * 0.6 + 0.5) * 1000);
+    calib.t0 = t0;
+    const light = () => {
+      if (!calib || calib.done || panel !== 'calibrate') return;
+      const now = ctxNow();
+      const i = Math.floor((now - calib.t0) / 0.6 + 0.0001);
+      root.querySelectorAll('[data-calib-beats] i').forEach((el, k) => {
+        el.classList.toggle('is-on', k === i && now - (calib.t0 + k * 0.6) < 0.18);
+        el.classList.toggle('is-past', k < i);
+      });
+      requestAnimationFrame(light);
+    };
+    requestAnimationFrame(light);
   }
 
   function paintCalibrate() {
@@ -748,6 +868,7 @@ export function createRhythmView(deps) {
       <section class="rhythm-card rhythm-calibrate">
         <span class="rhythm-eyebrow">${t('rhythm.calibrate.title')}</span>
         <p>${t('rhythm.calibrate.body')}</p>
+        <div class="rhythm-beats rhythm-calib-beats" data-calib-beats>${'<i></i>'.repeat(8)}</div>
         <button class="rhythm-pad" type="button" data-pad><span class="rhythm-pad-icon" aria-hidden="true">◉</span><span>${t('rhythm.calibrate.tap')}</span></button>
         <p class="rhythm-status" data-calib-status>${t('rhythm.calibrate.listening', { n: calib.taps.length })}</p>
         <div class="rhythm-actions"><button class="quiet-btn" type="button" data-act="ladder">${t('rhythm.calibrate.cancel')}</button></div>
@@ -883,6 +1004,7 @@ export function createRhythmView(deps) {
       return;
     }
     if (event.key === ' ' || event.key === 'Enter') {
+      if (event.repeat) return; // a held key is one attack, not a drum roll
       if (event.target.closest('button, input, textarea, summary')) return;
       event.preventDefault();
       onPad(event);
@@ -990,5 +1112,6 @@ export function createRhythmView(deps) {
     get __last() {
       return lastResult;
     },
+    __now: () => ctxNow(),
   };
 }

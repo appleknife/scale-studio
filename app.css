@@ -10817,49 +10817,105 @@ select,
   max-width: 58ch;
 }
 .rhythm-card {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: var(--shadow-sm);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 1px 2px rgba(34, 30, 25, 0.05), 0 14px 34px -22px rgba(34, 30, 25, 0.4);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
-.rhythm-card-head,
-.rhythm-play-head {
+.rhythm-card-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
+}
+.rhythm-rung-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #0d2a22));
+  color: #fff;
+  box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--accent) 80%, black);
+}
+.rhythm-rung-badge b {
+  font: 700 24px/1 var(--serif);
+}
+.rhythm-rung-badge i {
+  font: 600 10px/1 var(--sans);
+  font-style: normal;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+.rhythm-card-title {
+  min-width: 0;
 }
 .rhythm-card h3,
 .rhythm-play-head h3 {
   margin: 2px 0 0;
-  font-family: var(--serif);
-  font-size: 1.45rem;
+  font: 600 1.5rem/1.15 var(--serif);
 }
 .rhythm-eyebrow {
   color: var(--muted);
   font-size: 0.72rem;
-  letter-spacing: 0.09em;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-}
-.rhythm-stage-badge {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
 }
 .rhythm-stage-desc {
   color: var(--ink-soft);
-  margin: 10px 0 14px;
+  margin: 14px 0 16px;
+  line-height: 1.5;
 }
 .rhythm-meter-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+}
+.rhythm-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.rhythm-stepper button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 18px/1 var(--sans);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(34, 30, 25, 0.12);
+  transition: transform 0.1s ease;
+}
+.rhythm-stepper button:active {
+  transform: scale(0.9);
 }
 .rhythm-tempo {
-  color: var(--ink-soft);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0 10px;
   font-variant-numeric: tabular-nums;
+}
+.rhythm-tempo b {
+  font: 700 20px/1 var(--sans);
+  color: var(--ink);
+}
+.rhythm-tempo small {
+  font-size: 12px;
+  color: var(--muted);
 }
 .rhythm-accuracy {
   margin-left: auto;
@@ -10868,21 +10924,35 @@ select,
 .rhythm-progress-line {
   color: var(--muted);
   font-size: 0.9rem;
+  margin: 0;
 }
 .rhythm-strings {
-  margin: 8px 0 14px;
+  margin: 8px 0 16px;
+}
+.rhythm-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--paper);
 }
 .rhythm-dots {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px;
 }
 .rhythm-dot {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border: 1px solid var(--line-strong);
+  border: 1.5px solid var(--line-strong);
   background: transparent;
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+.rhythm-progress .rhythm-dot {
+  width: 14px;
+  height: 14px;
 }
 .rhythm-dot.is-half {
   background: var(--gold-wash);
@@ -10896,79 +10966,187 @@ select,
   background: var(--rose-wash);
   border-color: var(--rose);
 }
-.rhythm-progress {
-  margin: 6px 0 4px;
-}
 .rhythm-actions,
 .rhythm-play-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
+
+/* The ladder: rungs joined by a rail, cleared ones ticked off. */
 .rhythm-ladder {
+  position: relative;
   display: grid;
   gap: 8px;
-  margin: 16px 0;
+  margin: 22px 0 18px;
+}
+.rhythm-ladder::before {
+  content: '';
+  position: absolute;
+  left: 29px;
+  top: 24px;
+  bottom: 24px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--line);
 }
 .rhythm-stage {
+  position: relative;
   display: grid;
-  grid-template-columns: 32px 1fr auto;
+  grid-template-columns: 36px 1fr auto;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-align: left;
-  padding: 11px 12px;
-  border-radius: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
-.rhythm-stage:disabled {
-  opacity: 0.48;
+.rhythm-stage:not(:disabled):hover {
+  border-color: var(--line-strong);
+  transform: translateX(2px);
+}
+.rhythm-stage.is-locked {
+  cursor: default;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+.rhythm-stage.is-locked .rhythm-stage-text {
+  opacity: 0.55;
 }
 .rhythm-stage.is-on {
   border-color: var(--accent);
   background: var(--accent-wash);
-}
-.rhythm-stage.is-clear .rhythm-stage-side {
-  color: var(--accent);
-  font-weight: 700;
+  box-shadow: 0 8px 20px -16px color-mix(in srgb, var(--accent) 80%, black);
 }
 .rhythm-stage-n {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: var(--paper);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 2px solid var(--line-strong);
+  font: 700 14px/1 var(--sans);
   font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+.rhythm-stage-n svg {
+  width: 18px;
+  height: 18px;
+}
+.rhythm-stage.is-clear .rhythm-stage-n {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.rhythm-stage.is-on .rhythm-stage-n {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: rhythm-rung-glow 2.4s ease-in-out infinite;
+}
+.rhythm-stage.is-on.is-clear .rhythm-stage-n {
+  color: #fff;
+}
+@keyframes rhythm-rung-glow {
+  50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 10%, transparent); }
 }
 .rhythm-stage-text {
   display: grid;
   gap: 2px;
+  min-width: 0;
+}
+.rhythm-stage-text b {
+  font-weight: 600;
 }
 .rhythm-stage-text span {
   color: var(--muted);
   font-size: 0.84rem;
+  line-height: 1.4;
+}
+.rhythm-lock {
+  width: 17px;
+  height: 17px;
+  color: var(--muted);
 }
 .rhythm-focus {
   margin-top: 4px;
 }
 
-/* The lane */
+/* ── The exercise ── */
 .rhythm-play {
-  padding-bottom: 14px;
+  padding-bottom: 16px;
+  overflow: hidden;
+}
+.rhythm-play-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rhythm-steps {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0 4px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.rhythm-steps li {
+  flex: 1;
+  position: relative;
+  padding: 8px 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+.rhythm-steps li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--line);
+  transition: background 0.25s ease;
+}
+.rhythm-steps li.is-past::before {
+  background: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+.rhythm-steps li.is-now {
+  color: var(--accent);
+}
+.rhythm-steps li.is-now::before {
+  background: var(--accent);
+  animation: rhythm-step 1.2s ease-in-out infinite;
+}
+@keyframes rhythm-step {
+  50% { opacity: 0.55; }
 }
 .rhythm-status {
-  margin: 10px 0 8px;
-  font-weight: 600;
+  margin: 10px 0 10px;
+  font: 600 1.15rem/1.3 var(--serif);
+  color: var(--ink);
+  transition: color 0.2s ease;
+}
+.rhythm-status.is-countin {
   color: var(--ink-soft);
 }
-.rhythm-status.is-listen {
+.rhythm-status.is-example {
   color: var(--gold);
 }
-.rhythm-status.is-play {
+.rhythm-status.is-answer {
   color: var(--accent);
 }
 .rhythm-status.is-bad {
@@ -10988,15 +11166,108 @@ select,
   --accent: #2f5d4e;
   --accent-wash: #e6eee8;
   --gold: #b0843f;
+  --gold-wash: #f6ecd8;
   --rose: #a4534a;
+  --rose-wash: #f6e3df;
 }
 .rhythm-lane {
   position: relative;
-  background: var(--paper);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.7), transparent 70%),
+    var(--paper);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 8px 10px 6px;
+  border-radius: 16px;
+  padding: 34px 12px 8px;
   overflow: hidden;
+  transition: box-shadow 0.3s ease, background 0.3s ease;
+}
+.rhythm-lane[data-phase='answer'] {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.rhythm-lane[data-phase='example'] {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent);
+}
+/* the beat lights across the top of the lane */
+.rhythm-beats {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+}
+.rhythm-beats i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  transition: background 0.08s ease, transform 0.12s ease;
+}
+.rhythm-beats i.is-on {
+  background: var(--accent);
+  transform: scale(1.35);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.rhythm-beats i.is-down {
+  background: var(--gold);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 25%, transparent);
+}
+.rhythm-lane[data-phase='example'] .rhythm-beats i.is-on:not(.is-down) {
+  background: var(--gold);
+}
+/* the big count-in number over the bar */
+.rhythm-count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 800 92px/1 var(--serif);
+  color: color-mix(in srgb, var(--accent) 80%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 2;
+}
+.rhythm-count.is-pop {
+  animation: rhythm-count-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+@keyframes rhythm-count-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  25% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0; transform: scale(1.18); }
+}
+.rhythm-lane[data-phase='countin'] .rhythm-strip {
+  opacity: 0.55;
+}
+/* the verdict badge in the corner */
+.rhythm-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font: 800 20px/1 var(--sans);
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.4);
+  pointer-events: none;
+}
+.rhythm-badge.is-show {
+  animation: rhythm-badge-in 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.rhythm-badge.is-good {
+  background: var(--accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.rhythm-badge.is-bad {
+  background: var(--rose);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--rose) 20%, transparent);
+}
+@keyframes rhythm-badge-in {
+  to { opacity: 1; transform: none; }
 }
 .rhythm-scroll {
   overflow-x: auto;
@@ -11004,7 +11275,8 @@ select,
 }
 .rhythm-strip {
   display: block;
-  min-width: 100%;
+  margin: 0 auto;
+  transition: opacity 0.3s ease;
 }
 .rhythm-beatline {
   stroke: var(--line);
@@ -11012,16 +11284,17 @@ select,
 }
 .rhythm-barline {
   stroke: var(--ink);
-  stroke-width: 2;
+  stroke-width: 2.4;
 }
 .rhythm-beatnum {
   fill: var(--muted);
-  font: 10px var(--sans);
+  font: 600 11px var(--sans);
 }
 .rhythm-slot {
   fill: var(--surface);
   stroke: var(--line-strong);
-  stroke-width: 1;
+  stroke-width: 1.2;
+  transition: fill 0.12s ease, stroke 0.12s ease;
 }
 .rhythm-rest {
   fill: none;
@@ -11031,58 +11304,139 @@ select,
 .rhythm-notehead {
   fill: var(--ink);
 }
+.rhythm-stem {
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
 .rhythm-bow {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rhythm-note-g {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.12s ease;
+}
+/* sounding now */
+.rhythm-note-g.is-lit .rhythm-slot {
+  fill: var(--accent-wash);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.rhythm-lane[data-phase='example'] .rhythm-note-g.is-lit .rhythm-slot {
+  fill: var(--gold-wash);
+  stroke: var(--gold);
+}
+.rhythm-note-g.is-lit {
+  transform: scale(1.04);
+}
+/* how each note went */
+.rhythm-verdict-tag {
+  font: 700 10.5px var(--sans);
   fill: var(--muted);
-  font: 11px var(--sans);
+}
+.rhythm-note-g.is-ok .rhythm-slot {
+  fill: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  stroke: var(--accent);
+  stroke-width: 1.8;
+}
+.rhythm-note-g.is-ok .rhythm-verdict-tag {
+  fill: var(--accent);
+}
+.rhythm-note-g.is-early .rhythm-slot,
+.rhythm-note-g.is-late .rhythm-slot {
+  fill: var(--rose-wash);
+  stroke: var(--rose);
+  stroke-width: 1.8;
+}
+.rhythm-note-g.is-missed .rhythm-slot {
+  fill: var(--surface);
+  stroke: var(--rose);
+  stroke-width: 1.8;
+  stroke-dasharray: 4 3;
+}
+.rhythm-note-g.is-early .rhythm-verdict-tag,
+.rhythm-note-g.is-late .rhythm-verdict-tag,
+.rhythm-note-g.is-missed .rhythm-verdict-tag {
+  fill: var(--rose);
+}
+.rhythm-note-g.is-ok,
+.rhythm-note-g.is-early,
+.rhythm-note-g.is-late,
+.rhythm-note-g.is-missed {
+  animation: rhythm-note-judged 0.4s ease both;
+}
+@keyframes rhythm-note-judged {
+  40% { transform: scale(1.08); }
 }
 .rhythm-playhead {
   position: absolute;
-  top: 10px;
-  bottom: 20px;
-  width: 2px;
+  top: 30px;
+  bottom: 26px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 3px;
   background: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent);
   pointer-events: none;
+  z-index: 1;
+}
+.rhythm-lane[data-phase='example'] .rhythm-playhead {
+  background: var(--gold);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--gold) 60%, transparent);
+}
+.rhythm-lane[data-phase='countin'] .rhythm-playhead,
+.rhythm-lane[data-phase='verdict'] .rhythm-playhead {
+  opacity: 0;
 }
 .rhythm-onset {
   position: absolute;
-  top: 4px;
+  top: 34px;
   width: 9px;
   height: 9px;
   border-radius: 50%;
   background: var(--accent);
-  transform: translateX(-50%);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
   pointer-events: none;
-  animation: rhythm-fade 0.9s forwards;
+  animation: rhythm-onset 0.9s ease-out forwards;
+}
+@keyframes rhythm-onset {
+  0% { transform: scale(0.4); opacity: 1; }
+  25% { transform: scale(1.4); }
+  100% { transform: scale(1); opacity: 0; }
 }
 .rhythm-feature {
   position: absolute;
-  bottom: 22px;
+  top: 82px; /* across the note row, where the attack actually landed */
   width: 3px;
-  height: 22px;
+  height: 40px;
   transform: translateX(-50%);
   background: var(--rose);
+  border-radius: 3px;
   pointer-events: none;
 }
 .rhythm-feature.is-extra {
   background: var(--gold);
 }
-@keyframes rhythm-fade {
-  to { opacity: 0; }
-}
 .rhythm-marks {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
-  min-height: 22px;
-  margin-top: 6px;
+  min-height: 24px;
+  margin-top: 4px;
   color: var(--rose);
   font-size: 0.84rem;
 }
 .rhythm-mark {
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   background: var(--rose-wash);
+  font-weight: 600;
 }
 .rhythm-mark.is-ok {
   background: var(--accent-wash);
@@ -11094,39 +11448,65 @@ select,
 }
 .rhythm-drift {
   color: var(--muted);
-  padding: 2px 4px;
+  padding: 3px 4px;
 }
 .rhythm-pad {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   width: 100%;
-  min-height: 78px;
-  margin-top: 12px;
-  border-radius: 14px;
-  border: 1px dashed var(--line-strong);
-  background: var(--surface);
+  min-height: 84px;
+  margin-top: 14px;
+  border-radius: 16px;
+  border: 1.5px dashed var(--line-strong);
+  background: var(--paper);
   color: var(--ink-soft);
-  font-weight: 600;
+  font: 600 15px var(--sans);
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.rhythm-pad::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.rhythm-pad.is-hit::after {
+  animation: rhythm-ripple 0.45s ease-out;
+}
+@keyframes rhythm-ripple {
+  0% { opacity: 1; transform: scale(0.3); }
+  100% { opacity: 0; transform: scale(9); }
 }
 .rhythm-pad:active {
-  background: var(--accent-wash);
   border-color: var(--accent);
+  background: var(--accent-wash);
 }
 .rhythm-pad-icon {
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   color: var(--accent);
 }
 .rhythm-hint {
   color: var(--muted);
-  font-size: 0.82rem;
-  margin: 10px 0 0;
+  font-size: 0.84rem;
+  margin: 12px 0 0;
 }
 .rhythm-live-meter {
-  height: 4px;
-  margin-top: 10px;
+  height: 5px;
+  margin-top: 12px;
   border-radius: 99px;
   background: var(--line);
   overflow: hidden;
@@ -11135,27 +11515,150 @@ select,
   display: block;
   height: 100%;
   width: 0;
-  background: var(--accent);
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #9fd8c2));
   transition: width 0.08s linear;
 }
 .rhythm-card.is-clean {
   border-color: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent), 0 14px 34px -22px rgba(34, 30, 25, 0.4);
 }
 .rhythm-card.is-fail {
   border-color: var(--rose);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--rose) 12%, transparent), 0 14px 34px -22px rgba(34, 30, 25, 0.4);
 }
 
-/* Finish and calibration */
-.rhythm-finish h3 {
-  font-family: var(--serif);
-  font-size: 1.5rem;
-  margin: 6px 0;
+/* ── Finish and calibration ── */
+.rhythm-finish {
+  text-align: center;
+  padding: 34px 22px 26px;
+  overflow: hidden;
 }
-.rhythm-finish-stats,
+.rhythm-finish-burst {
+  position: absolute;
+  left: 50%;
+  top: 70px;
+  width: 0;
+  height: 0;
+}
+.rhythm-finish-burst i {
+  position: absolute;
+  width: 8px;
+  height: 14px;
+  margin: -7px 0 0 -4px;
+  border-radius: 3px;
+  background: var(--gold);
+  transform: rotate(var(--a)) translateY(-20px);
+  opacity: 0;
+  animation: rhythm-burst 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) var(--d) both;
+}
+.rhythm-finish-burst i:nth-child(3n) {
+  background: var(--accent);
+}
+.rhythm-finish-burst i:nth-child(3n + 1) {
+  background: var(--rose);
+}
+@keyframes rhythm-burst {
+  0% { opacity: 1; transform: rotate(var(--a)) translateY(-10px) scale(0.6); }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(-110px) scale(1); }
+}
+.rhythm-finish-medal {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #0d2a22));
+  color: #fff;
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 14%, transparent), 0 12px 26px -12px color-mix(in srgb, var(--accent) 80%, black);
+  animation: rhythm-medal 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.rhythm-finish-medal svg {
+  width: 38px;
+  height: 38px;
+}
+@keyframes rhythm-medal {
+  from { transform: scale(0.2) rotate(-30deg); opacity: 0; }
+}
+.rhythm-finish h3 {
+  font: 600 1.7rem/1.2 var(--serif);
+  margin: 6px 0 8px;
+}
+.rhythm-finish-body {
+  color: var(--ink-soft);
+  max-width: 46ch;
+  margin: 0 auto;
+}
+.rhythm-finish-stats {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0 4px;
+}
+.rhythm-finish-stats span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 92px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 12px;
+}
+.rhythm-finish-stats b {
+  font: 700 26px/1.1 var(--sans);
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.rhythm-finish .rhythm-actions {
+  justify-content: center;
+}
 .rhythm-calib-value {
   font-weight: 700;
+  font-size: 1.1rem;
   color: var(--accent);
 }
 .rhythm-calibrate .rhythm-pad {
-  min-height: 110px;
+  min-height: 120px;
+}
+.rhythm-calib-beats {
+  position: static;
+  transform: none;
+  justify-content: center;
+  margin: 14px 0 4px;
+}
+.rhythm-calib-beats i.is-past {
+  background: color-mix(in srgb, var(--accent) 40%, var(--line-strong));
+}
+
+@media (max-width: 520px) {
+  .rhythm-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+  .rhythm-accuracy {
+    margin-left: 0;
+  }
+  .rhythm-steps li {
+    font-size: 11px;
+  }
+  .rhythm-count {
+    font-size: 72px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rhythm-stage.is-on .rhythm-stage-n,
+  .rhythm-steps li.is-now::before,
+  .rhythm-count.is-pop,
+  .rhythm-note-g,
+  .rhythm-finish-burst i,
+  .rhythm-finish-medal {
+    animation: none;
+  }
 }
