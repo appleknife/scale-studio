@@ -104,6 +104,20 @@
         expect('furniture put out', [true, true]);
         if (doc.querySelector('.pet-hit') !== petBefore) problems.push('putting furniture out rebuilt the pet and restarted its animations');
         await tab('me');
+        // The avatar's shop opens on one shelf at a time, so the hats do not
+        // push the haircuts (and everything else) off the bottom of the page.
+        const meCat = (name) => doc.querySelector(`[data-me-cat="${name}"]`);
+        if (!meCat('hair') || !meCat('hat')) problems.push('the avatar shop has no category tabs');
+        if (!doc.querySelector('.pet-tray.is-me [data-av="hair-bob"]')) problems.push('the hair shelf is missing its haircuts');
+        if (doc.querySelector('.pet-tray.is-me [data-av="hat-bow"]')) problems.push('hats are showing on the hair shelf');
+        if (meCat('hat') && meCat('hair')) {
+          meCat('hat').click();
+          await wait(250);
+          if (!doc.querySelector('.pet-tray.is-me [data-av="hat-bow"]')) problems.push('the hat shelf is missing its hats');
+          if (doc.querySelector('.pet-tray.is-me [data-av="hair-bob"]')) problems.push('haircuts are showing on the hat shelf');
+          meCat('hair').click();
+          await wait(250);
+        }
         await tap('[data-av="hair-bob"]');
         expect('a haircut', [true, true]);
         await tap('[data-me-skin="s5"]');

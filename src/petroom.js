@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611261400';
-import { currentSeason } from './season.js?v=202611261400';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611261400';
+import * as Pet from './pet.js?v=202611271600';
+import { currentSeason } from './season.js?v=202611271600';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611271600';
 import {
   petMarkup,
   eggMarkup,
@@ -33,8 +33,8 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611261400';
-import { t, getLang } from './i18n.js?v=202611261400';
+} from './petart.js?v=202611271600';
+import { t, getLang } from './i18n.js?v=202611271600';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -130,6 +130,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   // stray tap never spends a week's notes. { kind: 'snack' | 'item', id }
   let pending = null;
   let renaming = false;
+  let meCat = 'hair'; // the shelf of the avatar's shop that is open
   let picked = null; // the egg being considered
   let ball = null; // { x, y } while a ball is out
   let busy = false; // a scripted moment (eating, hatching) is playing
@@ -2122,10 +2123,12 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         <span class="tray-name">${t(`av.item.${item.id}`)}</span>
         <span class="tray-cost">${label}</span></button>`;
     };
-    const groups = ME_GROUPS.map(([name, slots]) => {
-      const items = Pet.AVATAR_ITEMS.filter((i) => slots.includes(i.slot) && Pet.avatarInShop(pet, i, season));
-      return `<h4 class="me-h">${t(`av.group.${name}`)}</h4><div class="pet-tray is-me">${items.map(tile).join('')}</div>`;
-    }).join('');
+    const [catName, catSlots] = ME_GROUPS.find(([name]) => name === meCat) || ME_GROUPS[0];
+    const cats = `<div class="me-cats" role="tablist" aria-label="${esc(t('av.groups'))}">${ME_GROUPS.map(
+      ([name]) =>
+        `<button class="me-cat" id="me-cat-${name}" type="button" role="tab" data-me-cat="${name}" aria-selected="${name === catName}" aria-controls="me-cat-panel">${t(`av.group.${name}`)}</button>`,
+    ).join('')}</div>`;
+    const items = Pet.AVATAR_ITEMS.filter((i) => catSlots.includes(i.slot) && Pet.avatarInShop(pet, i, season));
     return `
       <div class="me-top">
         <div class="me-figure${tryingOn() ? ' is-trying' : ''}">${avatarPortrait(a, '', tryWear())}</div>
@@ -2141,7 +2144,8 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       </div>
       <p class="me-note">${t('av.note')}</p>
       ${confirmRow('avatar')}
-      ${groups}`;
+      ${cats}
+      <div class="pet-tray is-me" id="me-cat-panel" role="tabpanel" aria-labelledby="me-cat-${catName}">${items.map(tile).join('')}</div>`;
   }
 
   /** The figure changed: the one in the room and the one in the panel are redrawn. */
@@ -2286,6 +2290,10 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
     } else if (b.dataset.act === 'me-move') {
       runMove(els.panel.querySelector('.me-figure .av'), pet.avatar.wear.move);
       doMove();
+    } else if (b.dataset.meCat) {
+      meCat = b.dataset.meCat;
+      pending = null;
+      paintPanel();
     } else if (b.dataset.meSkin) {
       Pet.setAvatar(pet, { skin: b.dataset.meSkin });
       avatarChanged();

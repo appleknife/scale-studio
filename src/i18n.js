@@ -947,6 +947,7 @@ export const S = {
   'av.skin': ['Skin', '肤色'],
   'av.hair': ['Hair colour', '发色'],
   'av.note': ['Skin and hair colour are free, and so is one of everything to start with. The rest is bought with notes, and what you buy you keep.', '肤色和发色是免费的，每样东西也都有一款免费的。其余的用音符买，买了就一直是你的。'],
+  'av.groups': ['Pick a category', '选择分类'],
   'av.group.hair': ['Hair', '发型'],
   'av.group.face': ['Face', '脸'],
   'av.group.makeup': ['Makeup & face paint', '化妆和脸绘'],

@@ -4515,12 +4515,28 @@ select,
   color: var(--muted);
 }
 
-.me-h {
-  margin: 16px 0 8px;
-  font: 700 13px var(--sans);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--muted);
+.me-cats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin: 4px 0 12px;
+}
+
+.me-cat {
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font: 600 13.5px var(--sans);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.me-cat[aria-selected='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .pet-tray.is-me {
