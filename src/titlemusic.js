@@ -58,13 +58,31 @@ export function createTitleMusic({ src, context }) {
     gain.gain.linearRampToValueAtTime(to, now + seconds);
   }
 
-  // Browsers only let sound start from a touch: if it could not start, the
-  // next touch anywhere starts it.
+  // Browsers only let sound start from a touch. Safari is sneaky about it: the
+  // element's play() succeeds, but into an audio context that is still
+  // suspended, so nothing is heard until something resumes it from inside a
+  // touch. So the next touch anywhere resumes the context and starts the music.
+  // iOS counts a touch as permission when the finger lifts, not when it lands:
+  // listen for both, and for clicks and keys.
+  const UNLOCK = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'];
+
+  function armTouch() {
+    if (waitingForTouch) return;
+    waitingForTouch = true;
+    for (const type of UNLOCK) window.addEventListener(type, onTouch, true);
+  }
+
   function onTouch() {
-    waitingForTouch = false;
-    window.removeEventListener('pointerdown', onTouch, true);
-    window.removeEventListener('keydown', onTouch, true);
+    const ctx = context();
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
     if (active && wanted) start();
+    // Done once the context really runs; until then every touch tries again.
+    setTimeout(() => {
+      if (context()?.state === 'running' || !gain) {
+        waitingForTouch = false;
+        for (const type of UNLOCK) window.removeEventListener(type, onTouch, true);
+      }
+    }, 120);
   }
 
   function start() {
@@ -73,15 +91,13 @@ export function createTitleMusic({ src, context }) {
     const ctx = context();
     if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
     const playing = audio.play();
-    const ok = () => ramp(LEVEL, FADE_IN);
-    if (playing && playing.then) {
-      playing.then(ok).catch(() => {
-        if (waitingForTouch) return;
-        waitingForTouch = true;
-        window.addEventListener('pointerdown', onTouch, true);
-        window.addEventListener('keydown', onTouch, true);
-      });
-    } else ok();
+    const ok = () => {
+      ramp(LEVEL, FADE_IN);
+      // Playing, but into a context still asleep: wait for a touch to wake it.
+      if (gain && context()?.state !== 'running') armTouch();
+    };
+    if (playing && playing.then) playing.then(ok).catch(armTouch);
+    else ok();
   }
 
   function stop() {

@@ -13,8 +13,8 @@
 // the rhythm away from the instrument. Both are stamped on the audio clock, so
 // the judge never sees two different clocks.
 
-import * as Rhythm from './rhythm.js?v=202611272010';
-import { t } from './i18n.js?v=202611272010';
+import * as Rhythm from './rhythm.js?v=202611272020';
+import { t } from './i18n.js?v=202611272020';
 
 const STRINGS = [
   { id: 'G3', name: 'G', freq: 196 },
