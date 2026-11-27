@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611271900" />
+    <link rel="stylesheet" href="app.css?v=202611272000" />
   </head>
   <body>
     <div class="shell">
@@ -52,6 +52,10 @@
             <svg class="theme-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.6A6.5 6.5 0 0 1 7.4 4.5a6.5 6.5 0 1 0 8.1 8.1z" fill="currentColor"/></svg>
             <svg class="theme-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6" fill="currentColor"/><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M10 2.2v2M10 15.8v2M2.2 10h2M15.8 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M4.5 15.5l1.4-1.4M14.1 5.9l1.4-1.4"/></g></svg>
             <span class="theme-label" id="themeLabel">Dark</span>
+          </button>
+          <button class="ghost-btn music-btn" id="musicBtn" type="button" aria-pressed="true" hidden>
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 14.5V5l8-1.6v9.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="6" cy="14.6" r="2.2" fill="currentColor"/><circle cx="14" cy="12.9" r="2.2" fill="currentColor"/><path class="music-off" d="M3 3l14 14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span>Music</span>
           </button>
           <button class="ghost-btn" id="langBtn" type="button">中文</button>
           <button class="ghost-btn" id="tuneBtn" type="button">Tuner</button>
@@ -1208,13 +1212,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611271900"></script>
+    <script type="module" src="src/app.js?v=202611272000"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611271900';
+        var V = '202611272000';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;

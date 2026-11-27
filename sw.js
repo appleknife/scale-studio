@@ -23,7 +23,7 @@
 // — the publish routine does both from one number. Without that, a student keeps
 // whatever was cached the first time, which is the same stale-code trap the
 // stamps exist to avoid.
-const VERSION = '202611271900';
+const VERSION = '202611272000';
 const SHELL = 'scale-studio-shell-' + VERSION;
 // The recordings and the score renderer do not change from one publish to the
 // next, so their cache is not named after VERSION: a new version used to throw
@@ -73,6 +73,7 @@ const BASE = [
   'src/musicxml.js',
   'src/intonation.js',
   'src/journal.js',
+  'src/titlemusic.js',
   'src/music.js',
   'src/offline.js',
   'src/pitch.js',
@@ -150,6 +151,9 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // The title music streams: Safari asks for it in byte ranges, which a
+  // worker's cached whole file answers badly. The browser's own cache has it.
+  if (url.pathname.includes('/assets/music/')) return;
 
   if (url.pathname.includes('/samples/') || url.pathname.includes('/vendor/')) {
     // Recorded takes never change name within a version, and they are the bulk

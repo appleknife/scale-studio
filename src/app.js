@@ -1,21 +1,21 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611271900';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611271900';
-import { createInk } from './ink.js?v=202611271900';
-import { createFollower } from './follow.js?v=202611271900';
-import { createPetRoom } from './petroom.js?v=202611271900';
-import { SPRINT_FULL } from './pet.js?v=202611271900';
-import { createBuddy } from './buddy.js?v=202611271900';
-import { createSprintView } from './sprintview.js?v=202611271900';
-import { createTrillView } from './trillview.js?v=202611271900';
-import { createRhythmView } from './rhythmview.js?v=202611271900';
-import { createListenView } from './listenview.js?v=202611271900';
-import { createSheetView } from './sheetview.js?v=202611271900';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611272000';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611272000';
+import { createInk } from './ink.js?v=202611272000';
+import { createFollower } from './follow.js?v=202611272000';
+import { createPetRoom } from './petroom.js?v=202611272000';
+import { SPRINT_FULL } from './pet.js?v=202611272000';
+import { createBuddy } from './buddy.js?v=202611272000';
+import { createSprintView } from './sprintview.js?v=202611272000';
+import { createTrillView } from './trillview.js?v=202611272000';
+import { createRhythmView } from './rhythmview.js?v=202611272000';
+import { createListenView } from './listenview.js?v=202611272000';
+import { createSheetView } from './sheetview.js?v=202611272000';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611271900';
+window.__scaleStudioVersion = '202611272000';
 import {
   PitchDetector,
   midiToFreq,
@@ -23,16 +23,17 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611271900';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611271900';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611271900';
-import { generatePassage } from './sightreading.js?v=202611271900';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611271900';
-import { renderScore } from './score.js?v=202611271900';
-import { summariseIntonation } from './intonation.js?v=202611271900';
-import * as Journal from './journal.js?v=202611271900';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611271900';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611271900';
+} from './pitch.js?v=202611272000';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611272000';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611272000';
+import { generatePassage } from './sightreading.js?v=202611272000';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611272000';
+import { renderScore } from './score.js?v=202611272000';
+import { summariseIntonation } from './intonation.js?v=202611272000';
+import * as Journal from './journal.js?v=202611272000';
+import { createTitleMusic } from './titlemusic.js?v=202611272000';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611272000';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611272000';
 import {
   STRINGS,
   FIFTHS,
@@ -41,7 +42,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611271900';
+} from './tuner.js?v=202611272000';
 
 const LANG = initLang();
 
@@ -199,6 +200,7 @@ const el = {
   twoOctRow: $('twoOctRow'),
 
   langBtn: $('langBtn'),
+  musicBtn: $('musicBtn'),
   themeBtn: $('themeBtn'),
   themeLabel: $('themeLabel'),
   tuneBtn: $('tuneBtn'),
@@ -431,8 +433,33 @@ function showView(name) {
   Object.entries(el.views).forEach(([key, node]) => {
     node.hidden = key !== name;
   });
+  syncTitleMusic();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+/* ── Title music ── a quiet loop on the menu only, never with the mic open. */
+
+const titleMusic = createTitleMusic({
+  src: 'assets/music/practice-room-warmth.mp3',
+  context: () => player.context,
+});
+
+function syncTitleMusic() {
+  const home = !el.views.choose.hidden;
+  if (el.musicBtn) {
+    el.musicBtn.hidden = !home;
+    el.musicBtn.setAttribute('aria-pressed', String(titleMusic.on));
+    el.musicBtn.classList.toggle('is-off', !titleMusic.on);
+  }
+  // The tuner opens over the menu with the microphone: the music makes way.
+  titleMusic.setActive(home && !state.mic);
+}
+el.musicBtn?.addEventListener('click', () => {
+  titleMusic.toggle();
+  syncTitleMusic();
+});
+// The microphone opens and closes from many places; a light check keeps up.
+setInterval(syncTitleMusic, 600);
 
 function cardList() {
   return state.mode === 'major' ? MAJOR_KEYS : MINOR_KEYS;

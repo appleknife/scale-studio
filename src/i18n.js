@@ -2109,6 +2109,7 @@ export const STATIC = {
 
   /* sheet music */
   'Sheet music': '乐谱',
+  Music: '音乐',
   'Sheet music & Listen': '乐谱与聆听',
   'Your own PDFs, photos and scores on the stand — and Listen, which hears you play a piece and says what it noticed.':
     '把自己的 PDF、照片和乐谱放上谱架——还有“聆听”：它听你拉一首曲子，告诉你它注意到了什么。',

@@ -11678,3 +11678,22 @@ select,
     animation: none;
   }
 }
+
+/* The title music's switch: a note, struck through when off. */
+.music-btn svg {
+  width: 16px;
+  height: 16px;
+}
+.music-btn .music-off {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.music-btn.is-off {
+  opacity: 0.7;
+}
+.music-btn.is-off .music-off {
+  opacity: 1;
+}
+.music-btn[hidden] {
+  display: none;
+}

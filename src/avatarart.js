@@ -260,32 +260,32 @@ function brows(h) {
     <path d="M36.8 35.9 q3.2 -1.4 6.4 -.3"/><path d="M63.2 35.9 q-3.2 -1.4 -6.4 -.3"/></g>`;
 }
 
+// Eyes the way toy characters have them: one glossy dark oval with a big
+// catch-light and a small one, and no white round the iris. (Nov 2026: a
+// version with whites, an iris and lash flicks at both corners looked like it
+// was staring, and the inner flicks read as a frown, on a face this chunky.)
+function glossyEye(x, iris, { r = 1 } = {}) {
+  return `<ellipse cx="${x}" cy="40" rx="${(3.25 * r).toFixed(2)}" ry="${(3.95 * r).toFixed(2)}" fill="${iris}"/>
+    <ellipse cx="${x}" cy="41.3" rx="${(2.3 * r).toFixed(2)}" ry="${(2.2 * r).toFixed(2)}" fill="#000" opacity=".22"/>
+    <ellipse cx="${(x + 1.05).toFixed(2)}" cy="38.5" rx="1.3" ry="1.45" fill="#fff"/>
+    <circle cx="${(x - 1.15).toFixed(2)}" cy="41.9" r=".55" fill="#fff" opacity=".8"/>`;
+}
+
 function eyes(style) {
   switch (style) {
     case 'eyes-bright':
-      return `<g class="av-eyes">
-        <ellipse cx="40.6" cy="40" rx="3.65" ry="4.5" fill="#fffdf8" stroke="${INK}" stroke-width=".85"/>
-        <ellipse cx="59.4" cy="40" rx="3.65" ry="4.5" fill="#fffdf8" stroke="${INK}" stroke-width=".85"/>
-        <ellipse cx="40.6" cy="40.3" rx="2.45" ry="3.35" fill="#5f8a70"/>
-        <ellipse cx="59.4" cy="40.3" rx="2.45" ry="3.35" fill="#5f8a70"/>
-        <ellipse cx="40.5" cy="40.4" rx="1.4" ry="2.1" fill="#27201b"/><ellipse cx="59.3" cy="40.4" rx="1.4" ry="2.1" fill="#27201b"/>
-        <circle cx="41.6" cy="38.7" r="1.05" fill="#fff"/><circle cx="60.4" cy="38.7" r="1.05" fill="#fff"/>
-        <circle cx="39.6" cy="42" r=".55" fill="#fff" opacity=".75"/><circle cx="58.4" cy="42" r=".55" fill="#fff" opacity=".75"/>
-        <path d="M36.7 37.2 q3.8 -2.2 7.7 -.3 M63.3 37.2 q-3.8 -2.2 -7.7 -.3" fill="none" stroke="${INK}" stroke-width="1.15" stroke-linecap="round"/>
-        <path d="M36.6 38.6 l-2 -1.5 M44.6 38.6 l2 -1.5 M62.4 38.6 l2 -1.5 M60.4 38.6 l-2 -1.5" stroke="${INK}" stroke-width="1.05" stroke-linecap="round"/></g>`;
+      // a coloured eye: deep teal with a darker centre, the same gloss
+      return `<g class="av-eyes">${glossyEye(40.6, '#2f6a5b', { r: 1.04 })}${glossyEye(59.4, '#2f6a5b', { r: 1.04 })}
+        <ellipse cx="40.6" cy="40.4" rx="1.45" ry="1.85" fill="#14231f" opacity=".75"/><ellipse cx="59.4" cy="40.4" rx="1.45" ry="1.85" fill="#14231f" opacity=".75"/>
+        <ellipse cx="41.65" cy="38.5" rx="1.3" ry="1.45" fill="#fff"/><ellipse cx="60.45" cy="38.5" rx="1.3" ry="1.45" fill="#fff"/></g>`;
     case 'eyes-lash':
-      return `<g class="av-eyes">
-        <ellipse cx="40.6" cy="40" rx="3.35" ry="4.2" fill="#fffaf5" stroke="${INK}" stroke-width=".85"/>
-        <ellipse cx="59.4" cy="40" rx="3.35" ry="4.2" fill="#fffaf5" stroke="${INK}" stroke-width=".85"/>
-        <ellipse cx="40.6" cy="40.3" rx="2.2" ry="3.05" fill="#6b4a36"/><ellipse cx="59.4" cy="40.3" rx="2.2" ry="3.05" fill="#6b4a36"/>
-        <ellipse cx="40.5" cy="40.4" rx="1.25" ry="1.9" fill="#281f19"/><ellipse cx="59.3" cy="40.4" rx="1.25" ry="1.9" fill="#281f19"/>
-        <circle cx="41.5" cy="38.9" r=".9" fill="#fff"/><circle cx="60.3" cy="38.9" r=".9" fill="#fff"/>
-        <path d="M36.8 37.4 q3.8 -2 7.6 -.3 M63.2 37.4 q-3.8 -2 -7.6 -.3" fill="none" stroke="${INK}" stroke-width="1.15" stroke-linecap="round"/>
-        <path d="M36.2 38.2 l-2.6 -1.7 M37.1 36.5 l-1.5 -2.3 M63.8 38.2 l2.6 -1.7 M62.9 36.5 l1.5 -2.3" stroke="${INK}" stroke-width="1.05" stroke-linecap="round"/></g>`;
+      // lashes only at the outer corners, curling up and out
+      return `<g class="av-eyes">${glossyEye(40.6, INK)}${glossyEye(59.4, INK)}
+        <path d="M37.6 37.6 q-1.5 -.6 -2.3 -1.9 M38.6 36.5 q-.9 -1 -1.1 -2.4 M62.4 37.6 q1.5 -.6 2.3 -1.9 M61.4 36.5 q.9 -1 1.1 -2.4" fill="none" stroke="${INK}" stroke-width="1.05" stroke-linecap="round"/></g>`;
     case 'eyes-happy':
       return `<g class="av-eyes" fill="none" stroke="${INK}" stroke-width="1.9" stroke-linecap="round"><path d="M37.6 40.6 q3 -3.8 6 0"/><path d="M56.4 40.6 q3 -3.8 6 0"/></g>`;
     case 'eyes-wink':
-      return `<g class="av-eyes"><ellipse cx="40.6" cy="40" rx="2.1" ry="2.7" fill="${INK}"/><circle cx="41.3" cy="39" r=".75" fill="#fff"/>
+      return `<g class="av-eyes">${glossyEye(40.6, INK)}
         <path d="M56.4 40.4 q3 2.6 6 0" fill="none" stroke="${INK}" stroke-width="1.9" stroke-linecap="round"/></g>`;
     case 'eyes-sleepy':
       return `<g class="av-eyes"><path d="M38.2 39.6 a2.4 2.4 0 0 0 4.8 0 z M57 39.6 a2.4 2.4 0 0 0 4.8 0 z" fill="${INK}"/>
@@ -300,15 +300,7 @@ function eyes(style) {
       return `<g class="av-eyes">${heart(40.6, 39.6)}${heart(59.4, 39.6)}</g>`;
     }
     default:
-      return `<g class="av-eyes">
-        <ellipse cx="40.6" cy="40" rx="3.45" ry="4.3" fill="#fffaf5" stroke="${INK}" stroke-width=".85"/>
-        <ellipse cx="59.4" cy="40" rx="3.45" ry="4.3" fill="#fffaf5" stroke="${INK}" stroke-width=".85"/>
-        <ellipse cx="40.6" cy="40.3" rx="2.3" ry="3.15" fill="#6b4a36"/><ellipse cx="59.4" cy="40.3" rx="2.3" ry="3.15" fill="#6b4a36"/>
-        <ellipse cx="40.5" cy="40.4" rx="1.3" ry="2" fill="#281f19"/><ellipse cx="59.3" cy="40.4" rx="1.3" ry="2" fill="#281f19"/>
-        <circle cx="41.5" cy="38.9" r=".95" fill="#fff"/><circle cx="60.3" cy="38.9" r=".95" fill="#fff"/>
-        <circle cx="39.6" cy="42" r=".5" fill="#fff" opacity=".7"/><circle cx="58.4" cy="42" r=".5" fill="#fff" opacity=".7"/>
-        <path d="M36.9 37.4 q3.7 -2 7.5 -.3 M63.1 37.4 q-3.7 -2 -7.5 -.3" fill="none" stroke="${INK}" stroke-width="1.1" stroke-linecap="round"/>
-        <path d="M36.5 38.3 l-2.2 -1.5 M44.7 38.3 l2.2 -1.5 M63.5 38.3 l2.2 -1.5 M59.3 38.3 l-2.2 -1.5" stroke="${INK}" stroke-width="1" stroke-linecap="round"/></g>`;
+      return `<g class="av-eyes">${glossyEye(40.6, INK)}${glossyEye(59.4, INK)}</g>`;
   }
 }
 
