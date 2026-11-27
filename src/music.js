@@ -2,9 +2,9 @@
 //
 // Everything is built from spelled notes (letter + accidental + octave) rather
 // than raw MIDI numbers, so the staff can be drawn with the right accidentals
-// and the app can show enharmonic spellings (F♯ / G♭, C♯ / D♭, B / C♭).
+// and the app can show enharmonic spellings (F♯ / G♭, D♭ / C♯, B / C♭).
 
-import { getLang, t } from './i18n.js?v=202611271600';
+import { getLang, t } from './i18n.js?v=202611271800';
 
 export const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const LETTER_SEMITONE = [0, 2, 4, 5, 7, 9, 11];
@@ -48,7 +48,7 @@ export function makeNote(letter, alter, octave) {
 //
 // NYSSMA Levels 5–6 for violin/viola/cello: "15 major scales, all two octaves,
 // up and down, from memory." The 15 = C major + the 7 sharp keys + the 7 flat
-// keys; three of them share a pitch set (B/C♭, F♯/G♭, C♯/D♭), so the grid
+// keys; three of them share a pitch set (B/C♭, F♯/G♭, D♭/C♯), so the grid
 // shows 12 cards with a spelling switch where it applies.
 //
 // Starting octaves follow the usual two-octave violin fingering: the tonic is
@@ -78,7 +78,9 @@ export const MAJOR_KEYS = [
   { id: 'Bb', variants: [variant('B\u266D', 6, -1, -2, 3, null, 4)] },
   { id: 'B', variants: [variant('B', 6, 0, 5, 3), variant('C\u266D', 0, -1, -7, 4)] },
   { id: 'C', variants: [variant('C', 0, 0, 0, 4)] },
-  { id: 'C#', variants: [variant('C\u266F', 0, 1, 7, 4), variant('D\u266D', 1, -1, -5, 4)] },
+  // D♭ is the default spelling at the practice screen, as many studios teach it;
+  // the switch still reaches C♯ for anyone who wants the sharp name.
+  { id: 'C#', variants: [variant('D\u266D', 1, -1, -5, 4), variant('C\u266F', 0, 1, 7, 4)] },
   { id: 'D', variants: [variant('D', 1, 0, 2, 4)] },
   { id: 'Eb', variants: [variant('E\u266D', 2, -1, -3, 4)] },
   { id: 'E', variants: [variant('E', 2, 0, 4, 4)] },

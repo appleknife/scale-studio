@@ -192,7 +192,7 @@ export function partAverages(state, { kind = 'scale', window = 12 } = {}) {
  *
  * Levels I–II: three scales, one octave, chosen by the student. III–IV: seven,
  * two of them in two octaves, also chosen. V–VI: fifteen major scales in two
- * octaves, which in this app is twelve keys, because C♯ and D♭ are the same
+ * octaves, which in this app is twelve keys, because D♭ and C♯ are the same
  * scale played the same way.
  *
  * The point of writing it down here is that the log can then say "two of three"

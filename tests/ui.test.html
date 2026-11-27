@@ -88,6 +88,16 @@
           if (d.querySelectorAll('#staffHost ellipse').length !== 29)
             problems.push('two-octave staff should have 29 notes');
 
+          /* ── D-flat is the default spelling ──────────────────────── */
+          d.getElementById('backBtn').click();
+          d.querySelector('#scaleGrid .key-card[data-id="C#"]').click();
+          const dfTitle = d.getElementById('scaleTitle').textContent;
+          const dfSpell = d.querySelectorAll('#spellingRow button');
+          log.push(`D-flat default: ${dfTitle} (${[...dfSpell].map((b) => b.textContent).join(' / ')})`);
+          if (!/D♭ major/.test(dfTitle)) problems.push('the C-sharp/D-flat card does not open as D-flat');
+          if (dfSpell.length !== 2 || dfSpell[0].textContent !== 'D♭' || dfSpell[0].getAttribute('aria-pressed') !== 'true')
+            problems.push('D-flat is not the default spelling');
+
           /* ── help dialog ─────────────────────────────────────────── */
           d.getElementById('helpBtn').click();
           if (!d.getElementById('helpDialog').open) problems.push('help dialog did not open');

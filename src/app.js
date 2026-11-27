@@ -1,21 +1,21 @@
 // app.js — screen flow, microphone capture and rendering.
 
-import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611271600';
-import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611271600';
-import { createInk } from './ink.js?v=202611271600';
-import { createFollower } from './follow.js?v=202611271600';
-import { createPetRoom } from './petroom.js?v=202611271600';
-import { SPRINT_FULL } from './pet.js?v=202611271600';
-import { createBuddy } from './buddy.js?v=202611271600';
-import { createSprintView } from './sprintview.js?v=202611271600';
-import { createTrillView } from './trillview.js?v=202611271600';
-import { createRhythmView } from './rhythmview.js?v=202611271600';
-import { createListenView } from './listenview.js?v=202611271600';
-import { createSheetView } from './sheetview.js?v=202611271600';
+import { MAJOR_KEYS, MINOR_KEYS, buildScale, describeKey } from './music.js?v=202611271800';
+import { renderStaff, keySignatureGlyphs, followArrowMarkup } from './staff.js?v=202611271800';
+import { createInk } from './ink.js?v=202611271800';
+import { createFollower } from './follow.js?v=202611271800';
+import { createPetRoom } from './petroom.js?v=202611271800';
+import { SPRINT_FULL } from './pet.js?v=202611271800';
+import { createBuddy } from './buddy.js?v=202611271800';
+import { createSprintView } from './sprintview.js?v=202611271800';
+import { createTrillView } from './trillview.js?v=202611271800';
+import { createRhythmView } from './rhythmview.js?v=202611271800';
+import { createListenView } from './listenview.js?v=202611271800';
+import { createSheetView } from './sheetview.js?v=202611271800';
 
 // Which version this code is: the page checks it against its own, and an update
 // caught halfway (new page, old code) heals itself. See the end of index.html.
-window.__scaleStudioVersion = '202611271600';
+window.__scaleStudioVersion = '202611271800';
 import {
   PitchDetector,
   midiToFreq,
@@ -23,16 +23,16 @@ import {
   quietLevel,
   hearLevel,
   strongLevel,
-} from './pitch.js?v=202611271600';
-import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611271600';
-import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611271600';
-import { generatePassage } from './sightreading.js?v=202611271600';
-import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611271600';
-import { renderScore } from './score.js?v=202611271600';
-import { summariseIntonation } from './intonation.js?v=202611271600';
-import * as Journal from './journal.js?v=202611271600';
-import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611271600';
-import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611271600';
+} from './pitch.js?v=202611271800';
+import { analyzeTake, analyzeSightTake, gradeFor } from './analyze.js?v=202611271800';
+import { initLang, setLang, getLang, applyStatic, t } from './i18n.js?v=202611271800';
+import { generatePassage } from './sightreading.js?v=202611271800';
+import { createPlayer, countInPlan, secondsPerQuarter } from './playback.js?v=202611271800';
+import { renderScore } from './score.js?v=202611271800';
+import { summariseIntonation } from './intonation.js?v=202611271800';
+import * as Journal from './journal.js?v=202611271800';
+import { canRecord, startRecording, recordStream, play as playRecording } from './recorder.js?v=202611271800';
+import { startOffline, applyUpdate, downloadSamples, samplesStored } from './offline.js?v=202611271800';
 import {
   STRINGS,
   FIFTHS,
@@ -41,7 +41,7 @@ import {
   nearestString,
   foldOctave,
   isInTune,
-} from './tuner.js?v=202611271600';
+} from './tuner.js?v=202611271800';
 
 const LANG = initLang();
 
@@ -251,6 +251,9 @@ const el = {
   breakdown: $('breakdown'),
   resultStaff: $('resultStaff'),
   resultIntonationSum: $('resultIntonationSum'),
+  resultReplayRow: $('resultReplayRow'),
+  resultReplayBtn: $('resultReplayBtn'),
+  resultReplayStatus: $('resultReplayStatus'),
   tips: $('tips'),
   retryBtn: $('retryBtn'),
   anotherBtn: $('anotherBtn'),
@@ -568,10 +571,15 @@ function shuffle(list) {
  * and in practice nobody is asked for C♭ when B major is the same notes; the
  * practice screen still offers the other spelling for anyone who wants it.
  */
+function drawVariantIndex(card) {
+  const sharp = card.variants.findIndex((v) => v.alter > 0);
+  return sharp >= 0 ? sharp : 0;
+}
+
 function drawThreeScales() {
   return shuffle(MAJOR_KEYS.slice())
     .slice(0, TEST_COUNT)
-    .map((card) => buildScale(card, 0, 'major', 'melodic', 2));
+    .map((card) => buildScale(card, drawVariantIndex(card), 'major', 'melodic', 2));
 }
 
 function keyGlyphs(scale) {
@@ -4017,6 +4025,7 @@ el.recList.addEventListener('click', (event) => {
 function openScale(cardId, variantIndex = 0) {
   state.test = null;
   el.testBar.hidden = true;
+  clearScaleReplay();
   state.cardId = cardId;
   state.variantIndex = variantIndex;
   state.scale = practiceScale();
@@ -4041,6 +4050,7 @@ function goHome() {
 /** The grid's own screen: reached from the menu, and where a take goes back to. */
 function openScales() {
   cancelListening();
+  clearScaleReplay();
   // The cards light up with today's takes, so they are drawn fresh each visit —
   // and after midnight they start the new day dark.
   renderGrid();
@@ -4810,6 +4820,17 @@ function beginTake() {
   clearFollowMarks();
   const armed = state.take;
 
+  // A practice take is recorded from the moment it is armed, so the first note's
+  // attack is in the playback. A mock audition keeps its takes to itself.
+  if (!state.test) {
+    clearScaleReplay();
+    scaleReplayToken += 1;
+    if (canRecord() && state.mic?.stream) {
+      armed.rec = recordStream(state.mic.stream);
+      armed.recToken = scaleReplayToken;
+    }
+  }
+
   setStatus(true, t('status.listening'));
   el.listenHint.textContent = state.test ? t('hint.beginTest') : t('hint.playing');
 
@@ -4980,6 +5001,20 @@ function finishTake() {
   el.live.hidden = true;
   el.levelBar.hidden = true;
 
+  // Stop the recorder before the microphone closes, and let it arrive on the
+  // result screen a moment later. The token keeps a slow stop from replacing the
+  // recording of a take that has since been started.
+  if (!state.test && take.rec) {
+    const rec = take.rec;
+    const token = take.recToken;
+    take.rec = null;
+    rec.stop().then((blob) => {
+      if (!blob || token !== scaleReplayToken) return;
+      scaleReplay = { blob };
+      paintResultReplay();
+    });
+  }
+
   let result = analyzeTake(take.frames, state.scale);
   // In a mock audition a one-octave G or A may be played from either octave:
   // score the take against both and keep whichever the student actually played.
@@ -5091,6 +5126,57 @@ function closeMic() {
 /** The scale the result screen is about — Try again plays this one. */
 let lastResultScale = null;
 
+// The scale take's recording, kept in memory until the next take or another
+// scale. It is heard through the practice log's hall, so the result screen and
+// the log do not sound like two different rooms.
+let scaleReplay = null; // { blob }
+let scaleReplaying = null;
+let scaleReplayToken = 0;
+
+function clearScaleReplay() {
+  stopScaleReplay();
+  scaleReplay = null;
+  if (el.resultReplayStatus) el.resultReplayStatus.textContent = '';
+  paintResultReplay();
+}
+
+function stopScaleReplay() {
+  if (scaleReplaying) {
+    scaleReplaying.stop();
+    scaleReplaying = null;
+  }
+  paintResultReplay();
+}
+
+function paintResultReplay() {
+  if (!el.resultReplayRow) return;
+  el.resultReplayRow.hidden = !scaleReplay;
+  el.resultReplayBtn.classList.toggle('is-on', Boolean(scaleReplaying));
+  el.resultReplayBtn.textContent = scaleReplaying ? t('sight.replayStop') : t('sight.replay');
+}
+
+async function playScaleReplay() {
+  if (scaleReplaying) {
+    stopScaleReplay();
+    return;
+  }
+  if (!scaleReplay) return;
+  try {
+    const handle = await playRecording(scaleReplay.blob, { wet: 0.34 });
+    scaleReplaying = handle;
+    el.resultReplayStatus.textContent = '';
+    paintResultReplay();
+    handle.ended.then(() => {
+      if (scaleReplaying === handle) {
+        scaleReplaying = null;
+        paintResultReplay();
+      }
+    });
+  } catch {
+    el.resultReplayStatus.textContent = t('sight.replayFail');
+  }
+}
+
 function noteColour(entry) {
   if (entry.status !== 'exact') return '#c2b7a6';
   const c = Math.abs(entry.cents);
@@ -5119,6 +5205,7 @@ function renderResult(result) {
   const scale = result.scale;
   lastResultScale = scale;
   showView('result');
+  paintResultReplay();
 
   el.resultEyebrow.textContent = t('eyebrow.result', { title: scale.title, o: scale.octaves });
 
@@ -5392,6 +5479,7 @@ el.resultBack.addEventListener('click', () => {
   else openScales();
 });
 el.anotherBtn.addEventListener('click', openScales);
+el.resultReplayBtn.addEventListener('click', playScaleReplay);
 el.openScalesBtn.addEventListener('click', openScales);
 el.scalesBack.addEventListener('click', goHome);
 
@@ -5540,7 +5628,14 @@ function cancelListening() {
   micTicket += 1;
   stopHearing();
   stopSightReplay();
+  scaleReplayToken += 1;
+  stopScaleReplay();
   listenBuddy?.listen(false);
+  if (state.take?.rec) {
+    const rec = state.take.rec;
+    state.take.rec = null;
+    rec.stop();
+  }
   if (state.mic) {
     state.mic.close();
     state.mic = null;

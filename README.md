@@ -147,6 +147,10 @@ answer is on screen next to the button that acts on it, instead of a scroll away
 the audition card also repeats the level beside its title so there is never a doubt
 about which one is loaded.
 
+A single scale take is recorded while it is played. After the result, **Hear
+yourself** plays it back through the practice log's hall. The recording lives in
+memory only, and the next take or page replaces it — the same promise as the log.
+
 ## Mock audition
 
 Every audition is three scales, played back to back, with one report at the end.
@@ -207,7 +211,7 @@ is very slow (the Manual says "moderate", not "fast").
 
 Because the Manual never names its fifteen scales. It only ever says "Fifteen (15)
 major scales", so the list is an inference: C plus the seven sharp keys and the seven
-flat keys. That counts B/C♭, F♯/G♭ and C♯/D♭ as separate scales even though they are
+flat keys. That counts B/C♭, F♯/G♭ and D♭/C♯ as separate scales even though they are
 the same notes with the same fingerings — which is why the count comes out as fifteen
 rather than twelve.
 
@@ -217,7 +221,8 @@ notes that we do not even have statistics on how often a key like C♭ has ever 
 picked by an adjudicator. Flesch and Galamian both use twelve. On the ground, the
 enharmonic pairs are taught as one scale: a Long Island studio's NYSSMA video series
 teaches D♭ for Levels 5–6 and says outright that it "is the same exact note as C
-sharp".
+sharp". The C♯/D♭ card therefore opens on D♭ by default; its spelling switch still
+reaches C♯.
 
 So C♭ is here for completeness, but it is off by default. If you want to drill it,
 open the B / C♭ card on the practice screen and switch the spelling.
@@ -237,7 +242,7 @@ spelling, so the grid shows twelve cards:
 | E | 4♯ | E4 (1st finger, D string) |
 | B / C♭ | 5♯ / 7♭ | B3 (2nd finger, G string) |
 | F♯ / G♭ | 6♯ / 6♭ | F♯4 (high 2nd finger, D string) |
-| C♯ / D♭ | 7♯ / 5♭ | C♯4 (2nd finger, A string) |
+| D♭ / C♯ | 5♭ / 7♯ | D♭4 (2nd finger, A string) |
 | F | 1♭ | F4 (low 2nd finger, D string) |
 | B♭ | 2♭ | B♭3 (low 2nd finger, G string) |
 | E♭ | 3♭ | E♭4 (low 1st finger, D string) |

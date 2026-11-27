@@ -1781,8 +1781,8 @@ export const S = {
     '三至四级要 {n} 条音阶，其中两条是两八度——七条由你自己挑。一条在两个不同日子拉干净就算就绪。',
   ],
   'log.ready.hint.5-6': [
-    'Level V–VI asks for {n} major scales, all in two octaves. The Manual counts fifteen, which in this app is twelve keys: C♯ and D♭ are one scale played one way. A scale is ready after two clean days.',
-    '五至六级要 {n} 条大调音阶，全部两个八度。手册上算十五条，这里是十二个调：升 C 和降 D 是同一条音阶的两种写法。一条在两个不同日子拉干净就算就绪。',
+    'Level V–VI asks for {n} major scales, all in two octaves. The Manual counts fifteen, which in this app is twelve keys: D♭ and C♯ are one scale played one way. A scale is ready after two clean days.',
+    '五至六级要 {n} 条大调音阶，全部两个八度。手册上算十五条，这里是十二个调：降 D 和升 C 是同一条音阶的两种写法。一条在两个不同日子拉干净就算就绪。',
   ],
   'log.ready.count': ['{done} of {need} ready', '{done} / {need} 已就绪'],
   'log.ready.met': [
@@ -1982,6 +1982,7 @@ export const STATIC = {
   'Dark': '深色',
   'Pet room': '宠物小屋',
   'Tap a bar on the page to start from there.': '点谱子上的一个小节，就从那里开始。',
+  'Played through the same hall as the practice log.': '和练习记录一样，加了厅堂混响。',
   'Note Sprint': '音符冲刺',
   'Trill & Vibrato': '颤音与揉弦',
   'Two fingers, one string. Trill between the notes, or roll around one inside the half step — and watch the wave get even.': '两根手指，一根弦。在两个音之间颤音，或围绕其中一个音在半音之内揉弦——看着音波变得均匀。',

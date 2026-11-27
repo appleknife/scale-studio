@@ -31,7 +31,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Scale Studio" />
-    <link rel="stylesheet" href="app.css?v=202611271600" />
+    <link rel="stylesheet" href="app.css?v=202611271800" />
   </head>
   <body>
     <div class="shell">
@@ -1061,6 +1061,12 @@
 
           <div class="tips" id="tips"></div>
 
+          <div class="sight-replay" id="resultReplayRow" hidden>
+            <button class="ghost-btn" id="resultReplayBtn" type="button">▶ Hear yourself</button>
+            <span class="sight-replay-hint">Played through the same hall as the practice log.</span>
+          </div>
+          <p class="rec-status" id="resultReplayStatus" role="status" aria-live="polite"></p>
+
           <div class="actions">
             <button class="primary-btn" id="retryBtn" type="button">Play it again</button>
             <button class="quiet-btn" id="anotherBtn" type="button">Choose another scale</button>
@@ -1202,13 +1208,13 @@
         });
       }
     </script>
-    <script type="module" src="src/app.js?v=202611271600"></script>
+    <script type="module" src="src/app.js?v=202611271800"></script>
     <!-- A page newer than its code heals itself. If this page arrived ahead of
          its own scripts (an update caught halfway, with the old code still
          answering), the waiting version is taken and the page reloads — once. -->
     <script>
       (function () {
-        var V = '202611271600';
+        var V = '202611271800';
         window.addEventListener('load', function () {
           setTimeout(function () {
             if (window.__scaleStudioVersion === V || !('serviceWorker' in navigator)) return;
