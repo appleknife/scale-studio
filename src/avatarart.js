@@ -197,15 +197,21 @@ function hairBack(style, h) {
   }
 }
 
+const STRANDED_HAIR = new Set(['hair-short', 'hair-bob', 'hair-long', 'hair-fringe', 'hair-wavy', 'hair-pony', 'hair-pigtails', 'hair-topknot', 'hair-braids']);
+
 function hairFront(style, h) {
   const shape = hairFrontShape(style, h);
   if (!shape) return '';
   // a soft highlight across the crown, the way flat cartoon hair catches light
   if (style === 'hair-mohawk') return shape;
+  const strands = STRANDED_HAIR.has(style)
+    ? `<g fill="none" stroke="${h.line}" stroke-width=".55" stroke-linecap="round" opacity=".3">
+        <path d="M34.2 23.4 q-1.2 4 -.6 7.6"/><path d="M65.8 23.4 q1.2 4 .6 7.6"/></g>`
+    : '';
   const shine = style === 'hair-curly' || style === 'hair-spiky' || style === 'hair-afro'
     ? `<path d="M40 15 q10 -5 20 0" fill="none" stroke="${h.hi}" stroke-width="2.4" stroke-linecap="round" opacity=".75"/>`
     : `<path d="M37 16.5 q8 -6.5 17 -5.5" fill="none" stroke="${h.hi}" stroke-width="2.6" stroke-linecap="round" opacity=".8"/>`;
-  return shape + shine;
+  return shape + strands + shine;
 }
 
 function hairFrontShape(style, h) {
@@ -250,8 +256,8 @@ function hairFrontShape(style, h) {
 
 /** Soft eyebrows above the eyes, the same tone as the outline of the hair. */
 function brows(h) {
-  return `<g class="av-brows" fill="none" stroke="${h.line}" stroke-width="1.05" stroke-linecap="round" opacity=".72">
-    <path d="M36.4 35.8 q3.6 -1.7 7.2 -.5"/><path d="M63.6 35.8 q-3.6 -1.7 -7.2 -.5"/></g>`;
+  return `<g class="av-brows" fill="none" stroke="${h.line}" stroke-width=".92" stroke-linecap="round" opacity=".58">
+    <path d="M36.8 35.9 q3.2 -1.4 6.4 -.3"/><path d="M63.2 35.9 q-3.2 -1.4 -6.4 -.3"/></g>`;
 }
 
 function eyes(style) {
@@ -307,10 +313,10 @@ function eyes(style) {
 }
 
 /** A small round nose, a shade darker than the face — the look's one detail in the middle. */
-const nose = (skin) => `<path d="M49.4 40.8 q.8 -.6 1.4 .1" fill="none" stroke="#fff" stroke-width=".9" stroke-linecap="round" opacity=".55"/>
-  <ellipse cx="50" cy="44.2" rx="2.4" ry="1.7" fill="${skin.line}" opacity=".45"/>
-  <ellipse cx="48.5" cy="44.5" rx=".55" ry=".4" fill="${skin.line}" opacity=".45"/><ellipse cx="51.5" cy="44.5" rx=".55" ry=".4" fill="${skin.line}" opacity=".45"/>
-  <path d="M47.9 45.4 q2.1 1 4.2 0" fill="none" stroke="${skin.line}" stroke-width=".55" stroke-linecap="round" opacity=".32"/>`;
+const nose = (skin) => `<path d="M49.5 40.9 q.7 -.6 1.3 .1" fill="none" stroke="#fff" stroke-width=".85" stroke-linecap="round" opacity=".5"/>
+  <ellipse cx="50" cy="44.2" rx="2.35" ry="1.65" fill="${skin.line}" opacity=".32"/>
+  <ellipse cx="48.7" cy="44.5" rx=".45" ry=".32" fill="${skin.line}" opacity=".28"/><ellipse cx="51.3" cy="44.5" rx=".45" ry=".32" fill="${skin.line}" opacity=".28"/>
+  <path d="M48.2 45.2 q1.8 .9 3.6 0" fill="none" stroke="${skin.line}" stroke-width=".5" stroke-linecap="round" opacity=".22"/>`;
 
 function mouth(style) {
   switch (style) {
@@ -327,8 +333,9 @@ function mouth(style) {
     case 'mouth-smirk':
       return `<path d="M46.6 49.6 q4.2 1.4 7.4 -1.8" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>`;
     default:
-      return `<path d="M46.4 48.5 q3.6 3.8 7.2 0 q-3.6 1.7 -7.2 0 z" fill="#c56b6b" opacity=".35"/>
-        <path d="M46.4 48.6 q3.6 3.4 7.2 0" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round"/>
+      return `<path d="M50 46.8 v1.3" stroke="${INK}" stroke-width=".45" stroke-linecap="round" opacity=".12"/>
+        <path d="M46.4 48.5 q3.6 3.8 7.2 0 q-3.6 1.7 -7.2 0 z" fill="#c56b6b" opacity=".32"/>
+        <path d="M46.4 48.6 q3.6 3.4 7.2 0" fill="none" stroke="${INK}" stroke-width="1.5" stroke-linecap="round"/>
         <path d="M47.8 49.2 q1.2 -.2 2.4 .1" fill="none" stroke="#fff" stroke-width=".55" stroke-linecap="round" opacity=".55"/>`;
   }
 }
@@ -528,6 +535,10 @@ function arm(side, skin, top) {
 // The head is drawn about a face at (50, 37), 46 wide; this sets it on the
 // body, wider than it is tall and big — the look's main idea.
 const HEAD = 'translate(50 49.2) scale(1.32 1.16) translate(-50 -37)';
+// A face with a soft forehead, cheeks and a tapered chin, rather than a plain
+// oval: the shape a toy character keeps when it is drawn a little more like a
+// person. The same path takes both the base skin and its light.
+const FACE = 'M50 15.4 C61.6 15.4 72.1 23.8 73 35.6 C73.7 42.8 71.2 49.2 64.2 53.8 C59 57.2 54.4 58.6 50 58.6 C45.6 58.6 41 57.2 35.8 53.8 C28.8 49.2 26.3 42.8 27 35.6 C27.9 23.8 38.4 15.4 50 15.4 Z';
 
 /**
  * The figure. `avatar` is the saved one (pet.avatar); `wear` overrides what it
@@ -561,6 +572,10 @@ export function avatarMarkup(avatar, { wear = {}, cls = '' } = {}) {
   const folds = top.skirt
     ? `<g fill="none" stroke="${top.line}" stroke-width=".85" stroke-linecap="round" opacity=".18"><path d="M39.4 88 q-1.2 7 -2.8 12"/><path d="M60.6 88 q1.2 7 2.8 12"/><path d="M46 111.4 q4 1.1 8 0"/></g>`
     : `<g fill="none" stroke="${top.line}" stroke-width=".85" stroke-linecap="round" opacity=".17"><path d="M39.8 87 q-1 5 -2 9"/><path d="M60.2 87 q1 5 2 9"/><path d="M43 105 q7 1.8 14 0"/></g>`;
+  const collar = `<path d="M42 78.6 q8 5.2 16 0" fill="none" stroke="${top.line}" stroke-width=".85" stroke-linecap="round" opacity=".28"/>`;
+  const hem = top.skirt
+    ? `<path d="M30 109.8 q20 4 40 0" fill="none" stroke="${top.line}" stroke-width=".9" stroke-linecap="round" opacity=".2"/>`
+    : `<path d="M34.6 102.6 q15.4 2.6 30.8 0" fill="none" stroke="${top.line}" stroke-width=".9" stroke-linecap="round" opacity=".2"/>`;
   // sneakers: white leather, a coral sole, a tongue and laces
   const shoe = (x) => `<g>
     <path d="M${x - 7} 122 q0 -6 7 -6 q7.4 0 7.4 6 q0 3.6 -7.2 3.6 q-7.2 0 -7.2 -3.6 z" fill="#ffffff" stroke="#b9afa2" stroke-width="1.1"/>
@@ -585,8 +600,10 @@ export function avatarMarkup(avatar, { wear = {}, cls = '' } = {}) {
           ${body}
           ${light}
           ${shade}
+          ${collar}
           ${folds}
           ${top.over || ''}
+          ${hem}
           ${accPart(on.acc, 'front')}
           ${arm('l', skin, cloth)}
           <g class="av-violin" transform="translate(1 15)">
@@ -594,17 +611,17 @@ export function avatarMarkup(avatar, { wear = {}, cls = '' } = {}) {
             <path d="M24.6 62 L12 53" stroke="#4a3226" stroke-width="2.6" stroke-linecap="round"/><path d="M31 63.6 L15 52.4" stroke="#f3ead8" stroke-width=".7"/>
           </g>
           ${arm('r', skin, cloth)}
-          <rect x="45.6" y="70" width="8.8" height="10" rx="3.4" fill="${skin.fill}" stroke="${skin.line}" stroke-width="1.1"/>
-          <path d="M46.2 71.8 q3.8 2.4 7.6 0 v2 q-3.8 2.4 -7.6 0 z" fill="${skin.line}" opacity=".16"/>
+          <path d="M45.7 70.2 q0 -2.2 4.3 -2.2 q4.3 0 4.3 2.2 v10.2 q-4.3 2.4 -8.6 0 z" fill="${skin.fill}" stroke="${skin.line}" stroke-width="1.1" stroke-linejoin="round"/>
+          <path d="M46.2 71.8 q3.8 2.2 7.6 0 v1.8 q-3.8 2.2 -7.6 0 z" fill="${skin.line}" opacity=".15"/>
           ${accPart(on.acc, 'neck')}
           <g class="av-head" transform="${HEAD}">
             ${hairBack(COVERS.has(on.hat) && UNDER_HAT.has(on.hair) ? '' : on.hair, hairPaint)}
             <circle cx="27.6" cy="40.4" r="3.4" fill="${skin.fill}" stroke="${skin.line}" stroke-width="1"/>
             <path d="M27 38.6 q-2 1.7 0 3.6 M73 38.6 q2 1.7 0 3.6" fill="none" stroke="${skin.line}" stroke-width=".65" stroke-linecap="round" opacity=".45"/>
             <circle cx="72.4" cy="40.4" r="3.4" fill="${skin.fill}" stroke="${skin.line}" stroke-width="1"/>
-            <ellipse cx="50" cy="37" rx="23" ry="21.4" fill="${skin.fill}" stroke="${skin.line}" stroke-width="1.1"/>
-            <ellipse cx="50" cy="37" rx="23" ry="21.4" fill="${tones.skin}" stroke="none"/>
-            <ellipse cx="50" cy="56.4" rx="10" ry="2.3" fill="${skin.line}" opacity=".09"/>
+            <path d="${FACE}" fill="${skin.fill}" stroke="${skin.line}" stroke-width="1.1" stroke-linejoin="round"/>
+            <path d="${FACE}" fill="${tones.skin}" stroke="none"/>
+            <ellipse cx="50" cy="56.4" rx="9.6" ry="2.2" fill="${skin.line}" opacity=".09"/>
             <ellipse cx="34.8" cy="46.4" rx="3.8" ry="2.3" fill="#f47c86" opacity=".24"/><ellipse cx="65.2" cy="46.4" rx="3.8" ry="2.3" fill="#f47c86" opacity=".24"/>
             ${extra(on.extra === 'extra-rosy' || on.extra === 'extra-freckles' ? on.extra : '')}
             ${makeup(on.makeup, 'under')}
@@ -614,6 +631,7 @@ export function avatarMarkup(avatar, { wear = {}, cls = '' } = {}) {
             ${nose(skin)}
             ${mouth(on.mouth)}
             ${makeup(on.makeup, 'over')}
+            <path d="M29.4 32 Q50 25 70.6 32 Q50 29 29.4 32 Z" fill="${skin.line}" opacity=".08"/>
             ${hairFront(COVERS.has(on.hat) && TALL.has(on.hair) ? 'hair-short' : on.hair, hairPaint)}
             ${extra(GLASSES.has(on.extra) ? on.extra : '')}
             ${hat(on.hat)}
