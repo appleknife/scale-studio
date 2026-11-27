@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611272000';
-import { currentSeason } from './season.js?v=202611272000';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611272000';
+import * as Pet from './pet.js?v=202611272010';
+import { currentSeason } from './season.js?v=202611272010';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611272010';
 import {
   petMarkup,
   eggMarkup,
@@ -33,8 +33,8 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611272000';
-import { t, getLang } from './i18n.js?v=202611272000';
+} from './petart.js?v=202611272010';
+import { t, getLang } from './i18n.js?v=202611272010';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
