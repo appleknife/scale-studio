@@ -21,8 +21,8 @@
 //     single-pitch detector frames with no clear period, so a take that is loud
 //     but mostly unclear is most likely playing along with something.
 
-import { segmentNotes, align } from './analyze.js?v=202611281215';
-import { vibratoOf, vibratoSummary } from './vibrato.js?v=202611281215';
+import { segmentNotes, align } from './analyze.js?v=202611281300';
+import { vibratoOf, vibratoSummary } from './vibrato.js?v=202611281300';
 
 // Kept here as well: the Listen suite and older imports reach these through
 // listen.js. The measurement itself lives in vibrato.js so a trainer can use

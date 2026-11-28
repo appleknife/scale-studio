@@ -6626,6 +6626,24 @@ select,
   height: auto;
 }
 
+/* On a tablet the note you play is drawn at the same generous size as the
+   picker's staff, so the whole screen reads the same way while choosing and
+   while playing. Phones are already at full width; the picker's own height
+   guard is reused so the card stays in view. */
+@media (hover: none), (pointer: coarse) {
+  .sprint-stage {
+    width: 100%;
+    max-width: min(100%, 860px, calc((100vh - 150px) * 1.22));
+    max-width: min(100%, 860px, calc((100dvh - 150px) * 1.22));
+    box-sizing: border-box;
+  }
+
+  .sprint-note {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 .sprint-note.is-in {
   animation: sprint-in 0.22s ease-out;
 }
