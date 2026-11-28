@@ -1,0 +1,40 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Pitch: octave errors</title>
+<pre id="out">running…</pre>
+<script type="module">
+  // A low note on the G string with a weak fundamental and strong even
+  // harmonics must not be read an octave up (Nov 2026: a C on the G string read
+  // as the C on the A string in Note Sprint), and real higher notes must not be
+  // pulled an octave down by the check that fixes it.
+  import { PitchDetector, freqToMidi } from '../src/pitch.js?v=202611281200';
+  const sr = 48000, n = 2048;
+  const det = new PitchDetector({ sampleRate: sr, bufferSize: n, minFreq: 150, maxFreq: 1800 });
+  let seed = 11;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+  function tone(f, amps, noise) {
+    const b = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      let v = 0;
+      amps.forEach((a, k) => (v += a * Math.sin(2 * Math.PI * f * (k + 1) * (i / sr) + k)));
+      b[i] = v * 0.2 + noise * rnd();
+    }
+    return b;
+  }
+  const spectra = {
+    'G-string low note (even harmonics strong)': [0.25, 1, 0.15, 0.6, 0.1, 0.3, 0.05],
+    'ordinary violin': [1, 0.7, 0.5, 0.35, 0.25, 0.18, 0.12],
+    'bright E string': [1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3],
+  };
+  const notes = [55, 57, 59, 60, 62, 64, 67, 72, 76, 81, 88];
+  const problems = [];
+  for (const [label, amps] of Object.entries(spectra))
+    for (const noise of [0.012, 0.03])
+      for (const m of notes) {
+        const f = 440 * 2 ** ((m - 69) / 12);
+        const { freq } = det.detect(tone(f, amps, noise));
+        const got = freq ? Math.round(freqToMidi(freq)) : null;
+        if (got !== m) problems.push(`${label}, noise ${noise}: midi ${m} read as ${got}`);
+      }
+  document.getElementById('out').textContent = problems.length ? 'PROBLEMS\n' + problems.join('\n') : 'PITCH OCTAVE OK — ' + notes.length * 6 + ' notes read at the right octave';
+</script>

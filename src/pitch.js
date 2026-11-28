@@ -144,6 +144,25 @@ export class PitchDetector {
       }
     }
 
+    // And the other way: the dip found may be *half* the period. A low note on
+    // the G string has a weak fundamental and a strong second harmonic (the
+    // violin body barely sounds below about 280 Hz), so the waveform nearly
+    // repeats every half period and that dip can slip under the threshold
+    // first — a C on the G string reported as the C an octave up, on the A
+    // string. A real note an octave up repeats just as well at twice its lag,
+    // but no *better*; the half-period of a low note is a clearly worse match
+    // than its true period. So twice the lag wins only when its dip is much
+    // deeper than the one chosen.
+    {
+      const chosen = cmnd[tauEst];
+      const centre = tauEst * 2;
+      if (chosen >= 0.045 && centre + 2 <= maxLag) {
+        let at = centre - 2;
+        for (let tau = centre - 1; tau <= centre + 2; tau++) if (cmnd[tau] < cmnd[at]) at = tau;
+        if (cmnd[at] < chosen * 0.4 && cmnd[at] <= cmnd[at - 1] && cmnd[at] <= cmnd[at + 1]) tauEst = at;
+      }
+    }
+
     // Parabolic interpolation around the dip for sub-sample accuracy.
     const y0 = cmnd[tauEst - 1];
     const y1 = cmnd[tauEst];
