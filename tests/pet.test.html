@@ -249,6 +249,8 @@
           eq('one of each needed thing is free', ['hair', 'eyes', 'mouth', 'top', 'move'].every((slot) => P.AVATAR_ITEMS.some((i) => i.slot === slot && i.cost === 0)), true);
           eq('skin and hair colour are free to change', [P.setAvatar(a, { skin: 's5', hairColour: 'blue' }).skin, a.avatar.hairColour, a.notes], ['s5', 'blue', 0]);
           eq('a made-up skin or colour is refused', [P.setAvatar(a, { skin: 'green', hairColour: 'x' }).skin, a.avatar.hairColour], ['s5', 'blue']);
+          eq('the wacky skins are free to wear', ['s-alien', 's-purple', 's-blue', 's-mint', 's-orange', 's-grey'].map((skin) => P.setAvatar(a, { skin }).skin), ['s-alien', 's-purple', 's-blue', 's-mint', 's-orange', 's-grey']);
+          P.setAvatar(a, { skin: 's5' });
           eq('a free haircut is put on without paying', [P.wear(a, 'hair-bob'), a.avatar.wear.hair], [true, 'hair-bob']);
           eq('what is not owned cannot be worn', [P.wear(a, 'hat-crown'), a.avatar.wear.hat], [false, null]);
           eq('nor bought without the notes', [P.buyAvatar(a, 'hat-crown'), a.owned.length], [false, 0]);
@@ -280,6 +282,9 @@
           const on = (y, m, d) => S.seasonOn(new Date(y, m - 1, d));
           eq('Christmas runs from 1 November to 6 January', [on(2026, 10, 31), on(2026, 11, 1), on(2026, 12, 25), on(2027, 1, 6), on(2027, 1, 7), on(2027, 7, 4)], [null, 'xmas', 'xmas', 'xmas', null, null]);
           eq('the address can show or hide it', [S.currentSeason(new Date(2027, 6, 4), '?season=xmas'), S.currentSeason(new Date(2026, 11, 25), '?season=off'), S.currentSeason(new Date(2026, 11, 25), '')], ['xmas', null, 'xmas']);
+          eq('South Park shares the same dates', [on(2026, 10, 31), on(2026, 11, 1), on(2027, 1, 6), on(2027, 1, 7)], [null, 'xmas', 'xmas', null]);
+          eq('both winter collections are on together', S.seasonsOn(new Date(2026, 11, 25)), ['xmas', 'southpark']);
+          eq('the address can show South Park by itself', S.currentSeasons(new Date(2027, 6, 4), '?season=southpark'), ['southpark']);
         }
         // Christmas things: for sale only in season, kept for good once bought.
         const tree = P.ITEMS.find((i) => i.id === 'xmas-tree');

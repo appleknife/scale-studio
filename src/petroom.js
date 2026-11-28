@@ -15,9 +15,9 @@
 // every browser); the breathing, blinking, wagging and hopping are CSS on the
 // pet's own parts.
 
-import * as Pet from './pet.js?v=202611272020';
-import { currentSeason } from './season.js?v=202611272020';
-import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611272020';
+import * as Pet from './pet.js?v=202611281215';
+import { currentSeasons } from './season.js?v=202611281215';
+import { avatarMarkup, avatarItemIcon, avatarPortrait, skinFill, hairFill } from './avatarart.js?v=202611281215';
 import {
   petMarkup,
   eggMarkup,
@@ -33,8 +33,8 @@ import {
   lookOf,
   STAGE_SCALE,
   HEART,
-} from './petart.js?v=202611272020';
-import { t, getLang } from './i18n.js?v=202611272020';
+} from './petart.js?v=202611281215';
+import { t, getLang } from './i18n.js?v=202611281215';
 
 const NS = 'http://www.w3.org/2000/svg';
 const FLOOR_Y = 268; // where feet stand
@@ -144,7 +144,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   /** What to call an animal: a chick that has grown up is a hen. */
   const kindOf = (a) => t(`pet.kind.${lookOf(a.species, Pet.stageOf(a))}`);
   const timeNow = () => (Number.isFinite(hour) ? hour : clockNow());
-  const season = currentSeason(); // what the shop has on its shelves just now
+  const seasons = currentSeasons(); // what the shop has on its shelves just now
   // The bowl and the bed are wherever they have been dragged to.
   const bowlAt = () => ({ x: BOWL.x + Pet.itemAt(pet, 'bowl').x, y: BOWL.y + Pet.itemAt(pet, 'bowl').y });
   const bedAt = () => ({ x: BED.x + Pet.itemAt(pet, 'bed').x, y: BED.y + Pet.itemAt(pet, 'bed').y });
@@ -159,7 +159,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       placed: look && slot !== 'wall' && slot !== 'floor' ? [...pet.placed.filter((id) => id !== look.id), look.id] : pet.placed,
       wall: slot === 'wall' ? look.id : pet.wall,
       floor: slot === 'floor' ? look.id : pet.floor,
-      season,
+      season: seasons,
       fish: isFish(),
       hour: timeNow(),
       where: pet.where,
@@ -1726,7 +1726,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
 
   function buyOrToggle(itemId) {
     if (pet.owned.includes(itemId)) Pet.place(pet, itemId);
-    else if (!Pet.buy(pet, itemId, season)) return;
+    else if (!Pet.buy(pet, itemId, seasons)) return;
     save();
     drawRoom(true); // scenery only: the pet keeps breathing while you decorate
     paintNotes();
@@ -2062,9 +2062,9 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
   }
 
   function decorTray() {
-    const seasonal = season && Pet.ITEMS.some((i) => i.season === season && !pet.owned.includes(i.id));
-    const note = seasonal ? `<p class="pet-season-note">${t(`pet.season.${season}`)}</p>` : '';
-    const shelf = Pet.ITEMS.filter((i) => Pet.inShop(pet, i, season) && !(isFish() && i.id === 'bed') && !(isFish() && i.id === 'ball'));
+    const seasonal = seasons.filter((s) => Pet.ITEMS.some((i) => i.season === s && !pet.owned.includes(i.id)));
+    const note = seasonal.map((s) => `<p class="pet-season-note">${t(`pet.season.${s}`)}</p>`).join('');
+    const shelf = Pet.ITEMS.filter((i) => Pet.inShop(pet, i, seasons) && !(isFish() && i.id === 'bed') && !(isFish() && i.id === 'ball'));
     // what is only here for a while goes first, so nobody misses it
     shelf.sort((a, b) => Number(Boolean(b.season && !pet.owned.includes(b.id))) - Number(Boolean(a.season && !pet.owned.includes(a.id))));
     return `${confirmRow('item')}${note}<div class="pet-tray is-decor">${shelf.map((item) => {
@@ -2128,7 +2128,11 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       ([name]) =>
         `<button class="me-cat" id="me-cat-${name}" type="button" role="tab" data-me-cat="${name}" aria-selected="${name === catName}" aria-controls="me-cat-panel">${t(`av.group.${name}`)}</button>`,
     ).join('')}</div>`;
-    const items = Pet.AVATAR_ITEMS.filter((i) => catSlots.includes(i.slot) && Pet.avatarInShop(pet, i, season));
+    const items = Pet.AVATAR_ITEMS.filter((i) => catSlots.includes(i.slot) && Pet.avatarInShop(pet, i, seasons));
+    // What is only here for a while goes first, with a note, so nobody misses it.
+    items.sort((a, b) => Number(Boolean(b.season && !pet.owned.includes(b.id))) - Number(Boolean(a.season && !pet.owned.includes(a.id))));
+    const seasonal = seasons.filter((s) => Pet.AVATAR_ITEMS.some((i) => i.season === s && !pet.owned.includes(i.id)));
+    const note = seasonal.map((s) => `<p class="pet-season-note">${t(`pet.season.${s}`)}</p>`).join('');
     return `
       <div class="me-top">
         <div class="me-figure${tryingOn() ? ' is-trying' : ''}">${avatarPortrait(a, '', tryWear())}</div>
@@ -2143,6 +2147,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
         </div>
       </div>
       <p class="me-note">${t('av.note')}</p>
+      ${note}
       ${confirmRow('avatar')}
       ${cats}
       <div class="pet-tray is-me" id="me-cat-panel" role="tabpanel" aria-labelledby="me-cat-${catName}">${items.map(tile).join('')}</div>`;
@@ -2278,7 +2283,7 @@ export function createPetRoom({ els, profileId, onPractise = () => {}, demo = fa
       const { kind, id } = pending;
       pending = null;
       if (kind === 'avatar') {
-        if (Pet.buyAvatar(pet, id, season)) avatarChanged(id.startsWith('move-'));
+        if (Pet.buyAvatar(pet, id, seasons)) avatarChanged(id.startsWith('move-'));
         return;
       }
       if (kind === 'snack') feed(id);

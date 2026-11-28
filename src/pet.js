@@ -176,7 +176,9 @@ export const ITEMS = [
 // What it wears, how its hair is cut, and the moves it knows are bought with
 // notes, with a plain set to start from that costs nothing.
 
-export const SKINS = ['s1', 's2', 's3', 's4', 's5', 's6'];
+// The first six are ordinary skin tones. The rest are the wacky ones — alien
+// green, deep-space purple, ice blue and so on — free to wear at any time.
+export const SKINS = ['s1', 's2', 's3', 's4', 's5', 's6', 's-alien', 's-purple', 's-blue', 's-mint', 's-orange', 's-grey'];
 export const HAIR_COLOURS = ['black', 'brown', 'chestnut', 'blond', 'red', 'grey', 'blue', 'pink'];
 // One of each kind is worn at a time. Glasses ('extra'), makeup and face paint,
 // an accessory and a hat may each be left off; they all go together.
@@ -247,6 +249,13 @@ export const AVATAR_ITEMS = [
   { id: 'top-raincoat', slot: 'top', cost: 12 },
   { id: 'top-jacket', slot: 'top', cost: 12 },
   { id: 'top-tutu', slot: 'top', cost: 14 },
+  // South Park: a limited edition on the same winter dates as the Christmas
+  // things. The clothes and hats are the four friends' own outfits; the red
+  // mittens and Towelie's towel finish them off.
+  { id: 'top-southpark-stan', slot: 'top', cost: 12, season: 'southpark' },
+  { id: 'top-southpark-kyle', slot: 'top', cost: 12, season: 'southpark' },
+  { id: 'top-southpark-cartman', slot: 'top', cost: 12, season: 'southpark' },
+  { id: 'top-southpark-kenny', slot: 'top', cost: 12, season: 'southpark' },
 
   { id: 'acc-necklace', slot: 'acc', cost: 6 },
   { id: 'acc-earrings', slot: 'acc', cost: 6 },
@@ -255,6 +264,8 @@ export const AVATAR_ITEMS = [
   { id: 'acc-neckphones', slot: 'acc', cost: 10 },
   { id: 'acc-backpack', slot: 'acc', cost: 10 },
   { id: 'acc-cape', slot: 'acc', cost: 14 },
+  { id: 'acc-southpark-gloves', slot: 'acc', cost: 6, season: 'southpark' },
+  { id: 'acc-southpark-towel', slot: 'acc', cost: 8, season: 'southpark' },
 
   { id: 'hat-bow', slot: 'hat', cost: 6 },
   { id: 'hat-cap', slot: 'hat', cost: 8 },
@@ -268,6 +279,10 @@ export const AVATAR_ITEMS = [
   { id: 'hat-headphones', slot: 'hat', cost: 12 },
   { id: 'hat-party', slot: 'hat', cost: 8 },
   { id: 'hat-wizard', slot: 'hat', cost: 15 },
+  { id: 'hat-southpark-stan', slot: 'hat', cost: 10, season: 'southpark' },
+  { id: 'hat-southpark-kyle', slot: 'hat', cost: 10, season: 'southpark' },
+  { id: 'hat-southpark-cartman', slot: 'hat', cost: 10, season: 'southpark' },
+  { id: 'hat-southpark-kenny', slot: 'hat', cost: 10, season: 'southpark' },
 
   { id: 'move-wave', slot: 'move', cost: 0 },
   { id: 'move-jump', slot: 'move', cost: 8 },
@@ -295,6 +310,13 @@ export function freshAvatar() {
 }
 
 const avatarItem = (id) => AVATAR_ITEMS.find((i) => i.id === id);
+
+/** Is a seasonal thing in season? A season may be one name or a list of them. */
+const seasonHas = (item, season) => {
+  if (!item.season) return true;
+  const on = Array.isArray(season) ? season : season == null ? [] : [season];
+  return on.includes(item.season);
+};
 
 /** Free things are everybody's; the rest are owned once bought. */
 export function avatarOwns(pet, id) {
@@ -348,7 +370,7 @@ export function wear(pet, id) {
 export function buyAvatar(pet, id, season = null) {
   const item = avatarItem(id);
   if (!item || avatarOwns(pet, id) || pet.notes < item.cost) return false;
-  if (item.season && item.season !== season) return false;
+  if (!seasonHas(item, season)) return false;
   pet.notes -= item.cost;
   pet.owned.push(id);
   pet.avatar.wear[item.slot] = id;
@@ -357,12 +379,12 @@ export function buyAvatar(pet, id, season = null) {
 
 /** On the avatar's shelves: free and bought things always, seasonal ones in season. */
 export function avatarInShop(pet, item, season = null) {
-  return !item.season || item.season === season || pet.owned.includes(item.id);
+  return seasonHas(item, season) || pet.owned.includes(item.id);
 }
 
 /** What the shop has on its shelves: everything in season, and anything already owned. */
 export function inShop(pet, item, season = null) {
-  return !item.season || item.season === season || pet.owned.includes(item.id);
+  return seasonHas(item, season) || pet.owned.includes(item.id);
 }
 
 /**
@@ -958,7 +980,7 @@ export function feed(pet, snackId, now = Date.now(), dayKey = dayKeyOf(now)) {
 export function buy(pet, itemId, season = null) {
   const item = ITEMS.find((i) => i.id === itemId);
   if (!item || pet.owned.includes(itemId) || pet.notes < item.cost) return false;
-  if (item.season && item.season !== season) return false; // out of season: not for sale
+  if (!seasonHas(item, season)) return false; // out of season: not for sale
   pet.notes -= item.cost;
   pet.owned.push(itemId);
   place(pet, itemId, true);

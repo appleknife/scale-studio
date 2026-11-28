@@ -23,6 +23,12 @@ const SKIN = {
   s4: { fill: '#c98d5b', line: '#8a5a30' },
   s5: { fill: '#9a6338', line: '#63391a' },
   s6: { fill: '#6b4226', line: '#3d2412' },
+  's-alien': { fill: '#8fe38a', line: '#4f9e4a' },
+  's-purple': { fill: '#c9a6f0', line: '#8d62c2' },
+  's-blue': { fill: '#9fd4f2', line: '#5a9fc9' },
+  's-mint': { fill: '#a8ead8', line: '#54aa94' },
+  's-orange': { fill: '#f7b26a', line: '#c07a2c' },
+  's-grey': { fill: '#c9ccd6', line: '#878b98' },
 };
 const HAIR = {
   black: { fill: '#34302f', line: '#1d1a1a', hi: '#5a5452' },
@@ -156,6 +162,40 @@ const TOPS = {
       <path d="M44 77 L40.6 84 L44.6 86 L43.4 106.4 M56 77 L59.4 84 L55.4 86 L56.6 106.4" fill="none" stroke="#3e6ca8" stroke-width="1.3" stroke-linejoin="round"/>
       <path d="M37.6 88 h4.6 M57.8 88 h4.6" stroke="#9cbbe5" stroke-width="1.2" stroke-dasharray="1.4 1.2"/>
       <g fill="#f6d77a"><circle cx="41" cy="96" r="1"/><circle cx="59" cy="96" r="1"/></g>`,
+  },
+  // The South Park limited edition: the four friends' own winter things. Flat
+  // colours and simple trims, in the spirit of the show, but cut to this figure.
+  'top-southpark-stan': {
+    fill: '#6b4a2f', line: '#4a3020', sleeve: 0.96, trousers: '#3d5f8f', trouserLine: '#2a4368',
+    over: `<path d="M41 78 q9 5.8 18 0 l-1.6 -2.2 q-7.4 4.4 -14.8 0 z" fill="#c7483f" stroke="#8f2b24" stroke-width="1"/>
+      <path d="M50 79.6 V106" stroke="#4a3020" stroke-width="1.2"/>
+      <path d="M50 80.2 v3 M50 86 v3 M50 92 v3 M50 98 v3" stroke="#d9c19d" stroke-width=".8" stroke-linecap="round"/>
+      <path d="M38.4 96 h6 v5 h-6 z M55.6 96 h6 v5 h-6 z" fill="none" stroke="#4a3020" stroke-width="1.1" stroke-linejoin="round"/>`,
+    cuff: '#c7483f',
+  },
+  'top-southpark-kyle': {
+    fill: '#f28a2e', line: '#bf6212', sleeve: 0.96, trousers: '#376b44', trouserLine: '#244d2e',
+    over: `<path d="M40.4 78 q9.6 6.4 19.2 0 l-1.4 -2.4 q-8.2 4.8 -16.4 0 z" fill="#d97218" stroke="#a94f0c" stroke-width="1"/>
+      <path d="M50 80 V106" stroke="#a94f0c" stroke-width="1.2"/>
+      <path d="M50 81 v3 M50 87 v3 M50 93 v3 M50 99 v3" stroke="#f9c37f" stroke-width=".8" stroke-linecap="round"/>
+      <path d="M37.6 95 h7 v6 h-7 z M55.4 95 h7 v6 h-7 z" fill="none" stroke="#a94f0c" stroke-width="1.1" stroke-linejoin="round"/>`,
+  },
+  'top-southpark-cartman': {
+    fill: '#d9403a', line: '#a32420', sleeve: 0.96, trousers: '#3d5f8f', trouserLine: '#2a4368',
+    over: `<path d="M41 78 q9 5.8 18 0 l-1.4 -2.2 q-7.6 4.4 -15.2 0 z" fill="#f2c84b" stroke="#c49a1e" stroke-width="1"/>
+      <path d="M50 79.6 V106" stroke="#a32420" stroke-width="1.2"/>
+      <path d="M50 80.2 v3 M50 86 v3 M50 92 v3 M50 98 v3" stroke="#f7dc8e" stroke-width=".8" stroke-linecap="round"/>
+      <path d="M34.6 101.8 h30.8" stroke="#f2c84b" stroke-width="2.6"/>
+      <path d="M38.4 95 h6 v5 h-6 z M55.6 95 h6 v5 h-6 z" fill="none" stroke="#a32420" stroke-width="1.1" stroke-linejoin="round"/>`,
+    cuff: '#f2c84b',
+  },
+  'top-southpark-kenny': {
+    fill: '#ef8426', line: '#b75a0f', sleeve: 0.96, trousers: '#7a512c', trouserLine: '#54371c',
+    over: `<path d="M40 78 q10 7 20 0 l-1.4 -2.6 q-8.6 5.2 -17.2 0 z" fill="#d36c14" stroke="#a34c0b" stroke-width="1"/>
+      <path d="M46 79.4 l-1 7 M54 79.4 l1 7" stroke="#f8d6a5" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M47.8 85 h4.4 l.8 1.8 h-6 z" fill="#f8d6a5" stroke="#b75a0f" stroke-width=".7" stroke-linejoin="round"/>
+      <path d="M50 89 V106" stroke="#a34c0b" stroke-width="1.2"/>
+      <path d="M39 96 h8 v7 h-8 z M53 96 h8 v7 h-8 z" fill="#d36c14" stroke="#a34c0b" stroke-width="1" stroke-linejoin="round"/>`,
   },
   // A leotard with a puff of tulle, over pink tights.
   'top-tutu': {
@@ -440,6 +480,16 @@ const ACC = {
       <path d="M62 79 Q72 92 79 115 Q74 116.6 68 117.2 Z" fill="#000" opacity=".1"/>`,
     neck: `<circle cx="42" cy="79" r="1.8" fill="#f4c542" stroke="#c8961e" stroke-width=".8"/><circle cx="58" cy="79" r="1.8" fill="#f4c542" stroke="#c8961e" stroke-width=".8"/>`,
   },
+  // Red winter mittens, drawn around each hand so they follow the arms in a move.
+  'acc-southpark-gloves': { hands: true },
+  // Towelie's towel: a blue towel round the neck, its ends hanging down the chest.
+  'acc-southpark-towel': {
+    neck: `<path d="M40.6 76.4 q9.4 6.4 18.8 0 l1.2 4.4 q-10.6 7.2 -21.2 0 z" fill="#8fd0e8" stroke="#4f9fbd" stroke-width="1.1" stroke-linejoin="round"/>
+      <path d="M43 80.4 l-2 16.4 l5.4 -1.2 l1.6 -13.6 z" fill="#8fd0e8" stroke="#4f9fbd" stroke-width="1.1" stroke-linejoin="round"/>
+      <path d="M57 80.4 l2.4 12.8 l5.2 1 l-1.8 -15 z" fill="#8fd0e8" stroke="#4f9fbd" stroke-width="1.1" stroke-linejoin="round"/>
+      <path d="M41.2 96.4 l.6 2.4 M43.4 95.8 l.5 2.4 M45.6 95.4 l.5 2.4 M58.6 93 l.8 2.4 M60.8 93.6 l.8 2.4 M63 94.2 l.8 2.2" stroke="#4f9fbd" stroke-width=".9" stroke-linecap="round"/>
+      <path d="M42.2 82.6 q7.8 4.6 15.6 0" fill="none" stroke="#c9ecf6" stroke-width="1.2" stroke-linecap="round" opacity=".8"/>`,
+  },
 };
 const accPart = (id, part) => (ACC[id] && ACC[id][part]) || '';
 
@@ -490,13 +540,31 @@ function hat(style) {
     case 'hat-santa':
       return `<path d="M24.8 27 C25 0 62 -6 80 18 C74 17 72 22 75.2 27 Z" fill="#c8372f" stroke="#8f1f1a" stroke-width="1.2" stroke-linejoin="round"/>
         <rect x="23.2" y="23.4" width="53.6" height="8.4" rx="4.2" fill="#fff" stroke="#c9d3dc" stroke-width="1.1"/><circle cx="81.4" cy="19.6" r="5" fill="#fff" stroke="#c9d3dc" stroke-width="1.1"/>`;
+    case 'hat-southpark-stan':
+      return `<path d="M24.8 29 C22 -1 78 -1 75.2 29 Z" fill="#4f7dc9" stroke="#315a99" stroke-width="1.2" stroke-linejoin="round"/>
+        <rect x="23.4" y="24.4" width="53.2" height="8" rx="4" fill="#c7483f" stroke="#8f2b24" stroke-width="1.1"/>
+        <circle cx="50" cy="2.6" r="5.4" fill="#c7483f" stroke="#8f2b24" stroke-width="1.1"/>`;
+    case 'hat-southpark-kyle':
+      return `<path d="M25.2 27 C24 -1 76 -1 74.8 27 Z" fill="#4f9a4a" stroke="#2f6b2e" stroke-width="1.2" stroke-linejoin="round"/>
+        <path d="M25.6 24 C17.6 27 17 38 23.6 43.4 C27.6 39.6 27 31 28.2 26 Z M74.4 24 C82.4 27 83 38 76.4 43.4 C72.4 39.6 73 31 71.8 26 Z" fill="#3f833c" stroke="#2f6b2e" stroke-width="1.1" stroke-linejoin="round"/>
+        <rect x="23.4" y="23.2" width="53.2" height="7.2" rx="3.6" fill="#f2cf55" stroke="#c49a1e" stroke-width="1.1"/>
+        <path d="M32 30.4 v4 M68 30.4 v4" stroke="#2f6b2e" stroke-width="1.2" stroke-linecap="round"/>`;
+    case 'hat-southpark-cartman':
+      return `<path d="M24.8 29 C22 -1 78 -1 75.2 29 Z" fill="#6fa8e0" stroke="#4179b3" stroke-width="1.2" stroke-linejoin="round"/>
+        <rect x="23.4" y="24.4" width="53.2" height="8" rx="4" fill="#f2cf55" stroke="#c49a1e" stroke-width="1.1"/>
+        <circle cx="50" cy="2.6" r="5.4" fill="#f2cf55" stroke="#c49a1e" stroke-width="1.1"/>`;
+    case 'hat-southpark-kenny':
+      return `<path fill-rule="evenodd" d="M50 4 C23 4 17 27 21.6 54 C24.8 65 35.4 70 50 70 C64.6 70 75.2 65 78.4 54 C83 27 77 4 50 4 Z M50 16 C32 16 27.6 31 31.4 48.2 C33.6 56.6 41 61 50 61 C59 61 66.4 56.6 68.6 48.2 C72.4 31 68 16 50 16 Z" fill="#ef8426" stroke="#b75a0f" stroke-width="1.2" stroke-linejoin="round"/>
+        <path d="M43 62 l-1.4 7 M57 62 l1.4 7" stroke="#f8d6a5" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="41.6" cy="69" r="1.5" fill="#f8d6a5"/><circle cx="58.4" cy="69" r="1.5" fill="#f8d6a5"/>
+        <path d="M32 47 C35 34 41 26 50 26 C59 26 65 34 68 47" fill="none" stroke="#d36c14" stroke-width="2" stroke-linecap="round"/>`;
     default:
       return '';
   }
 }
 
 /** One arm, hanging from its shoulder: skin, a round hand, and as much sleeve as the top has. */
-function arm(side, skin, top) {
+function arm(side, skin, top, acc = null) {
   // Drawn from its own shoulder at (0, 0), inside a group that puts the shoulder
   // in place: a CSS rotation on `.av-arm` then turns about the shoulder whatever
   // else is drawn in the arm.
@@ -515,6 +583,12 @@ function arm(side, skin, top) {
         <ellipse cx="0" cy=".9" rx="3.55" ry="4" fill="${skin.fill}" stroke="${skin.line}" stroke-width="1.1"/>
         <path d="M-1.5 3.1 q1.6 1.1 3.2 -.1" fill="none" stroke="${skin.line}" stroke-width=".55" stroke-linecap="round" opacity=".55"/>
         <path d="M-1.5 -1.2 q1.2 -1 2.8 -.7" fill="none" stroke="#fff" stroke-width=".8" stroke-linecap="round" opacity=".45"/>
+        ${acc === 'acc-southpark-gloves' ? `<g class="av-glove">
+          <path d="M${th * 2.6} -1.4 q${th * 3.2} 0 ${th * 3.4} 2.2 q${-th * 1.8} .7 ${-th * 3.2} -.1 z" fill="#d9403a" stroke="#a32420" stroke-width=".9" stroke-linejoin="round"/>
+          <ellipse cx="0" cy="1.2" rx="4.1" ry="4.7" fill="#d9403a" stroke="#a32420" stroke-width="1"/>
+          <rect x="-3.8" y="-3.8" width="7.6" height="3" rx="1.5" fill="#f2cf55" stroke="#c49a1e" stroke-width=".7"/>
+          <path d="M-1.4 2.8 q1.4 1 2.8 0" fill="none" stroke="#a32420" stroke-width=".6" stroke-linecap="round" opacity=".7"/>
+        </g>` : ''}
       </g>
       <path d="M0 0 L${ex} ${ey}" stroke="${top.line}" stroke-width="9.8" stroke-linecap="round"/>
       <path d="M0 0 L${ex} ${ey}" stroke="${top.fill}" stroke-width="7.6" stroke-linecap="round"/>
@@ -597,12 +671,12 @@ export function avatarMarkup(avatar, { wear = {}, cls = '' } = {}) {
           ${top.over || ''}
           ${hem}
           ${accPart(on.acc, 'front')}
-          ${arm('l', skin, cloth)}
+          ${arm('l', skin, cloth, on.acc)}
           <g class="av-violin" transform="translate(1 15)">
             <path d="M30 60 C24 57 20 61 22 66 C19 69 21 75 27 76 C32 77 36 73 35 69 C38 66 36 61 30 60 Z" fill="#b5763f" stroke="#7d4d24" stroke-width="1.2" stroke-linejoin="round"/>
             <path d="M24.6 62 L12 53" stroke="#4a3226" stroke-width="2.6" stroke-linecap="round"/><path d="M31 63.6 L15 52.4" stroke="#f3ead8" stroke-width=".7"/>
           </g>
-          ${arm('r', skin, cloth)}
+          ${arm('r', skin, cloth, on.acc)}
           <path d="M45.7 70.2 q0 -2.2 4.3 -2.2 q4.3 0 4.3 2.2 v10.2 q-4.3 2.4 -8.6 0 z" fill="${skin.fill}" stroke="${skin.line}" stroke-width="1.1" stroke-linejoin="round"/>
           <path d="M46.2 71.8 q3.8 2.2 7.6 0 v1.8 q-3.8 2.2 -7.6 0 z" fill="${skin.line}" opacity=".15"/>
           ${accPart(on.acc, 'neck')}
@@ -635,7 +709,7 @@ export function avatarMarkup(avatar, { wear = {}, cls = '' } = {}) {
 
 // A hat that sits right down on the head flattens hair that stands up, and
 // hides what is gathered on top.
-const COVERS = new Set(['hat-cap', 'hat-beanie', 'hat-santa', 'hat-wizard']);
+const COVERS = new Set(['hat-cap', 'hat-beanie', 'hat-santa', 'hat-wizard', 'hat-southpark-stan', 'hat-southpark-kyle', 'hat-southpark-cartman', 'hat-southpark-kenny']);
 const TALL = new Set(['hair-spiky', 'hair-curly', 'hair-buns', 'hair-afro', 'hair-mohawk', 'hair-topknot']);
 const UNDER_HAT = new Set(['hair-buns', 'hair-topknot']);
 // glasses go on after the hair; freckles and rosy cheeks under it

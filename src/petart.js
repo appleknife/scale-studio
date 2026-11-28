@@ -1073,10 +1073,10 @@ const FOOT = {
 };
 
 export function roomMarkup({ placed = [], wall = null, floor = null, fish = false, hour = clockNow(), where = {}, season = null } = {}) {
-  // At Christmas it snows outside whatever the weather: flakes in the pane and a
-  // drift on the sill, for as long as the season lasts.
+  // In the winter seasons it snows outside whatever the weather: flakes in the
+  // pane and a drift on the sill, for as long as either collection lasts.
   const snow =
-    season === 'xmas'
+    (Array.isArray(season) ? season : [season]).some((s) => s === 'xmas' || s === 'southpark')
       ? `<g class="window-snow" pointer-events="none"><g fill="#fff">${[
           [66, 52, 1.8], [84, 60, 1.4], [104, 50, 2], [122, 62, 1.5], [72, 78, 1.5], [94, 84, 1.9], [114, 80, 1.4], [128, 94, 1.8], [64, 100, 1.7], [84, 106, 1.3], [106, 102, 1.8],
         ]
